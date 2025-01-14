@@ -1,11 +1,15 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
+import 'package:market_monk/symbol.dart';
 
 class ChartPage extends StatefulWidget {
   const ChartPage({super.key});
@@ -15,13 +19,14 @@ class ChartPage extends StatefulWidget {
 }
 
 class _ChartPageState extends State<ChartPage> {
-  final symbol = TextEditingController(text: "GOOG");
+  TextEditingController stock = TextEditingController(text: "GOOG");
+  List<Symbol> symbols = [];
   int year = 1;
   int month = 0;
 
   late Stream<List<Ticker>> tickerStream = (db.tickers.select()
         ..where(
-          (tbl) => tbl.symbol.equals(symbol.text),
+          (tbl) => tbl.symbol.equals("GOOG"),
         )
         ..limit(1))
       .watch();
@@ -32,15 +37,31 @@ class _ChartPageState extends State<ChartPage> {
     startDate: DateTime(now.year - 1, now.month, now.day),
   );
 
+  @override
+  void initState() {
+    super.initState();
+    getSymbols();
+  }
+
+  getSymbols() async {
+    final String response =
+        await rootBundle.loadString('assets/nasdaq-full-tickers.json');
+    final List<dynamic> jsonData = json.decode(response);
+    setState(() {
+      symbols = jsonData.map((d) => Symbol.fromJson(d)).toList();
+    });
+  }
+
   void loadData() {
+    final symbol = stock.text.split(' ').first;
     setState(() {
       future = const YahooFinanceDailyReader().getDailyDTOs(
-        symbol.text,
+        symbol,
         startDate: DateTime(now.year - year, now.month - month, now.day),
       );
       tickerStream = (db.tickers.select()
             ..where(
-              (tbl) => tbl.symbol.equals(symbol.text),
+              (tbl) => tbl.symbol.equals(symbol),
             )
             ..limit(1))
           .watch();
@@ -108,19 +129,81 @@ class _ChartPageState extends State<ChartPage> {
         children: <Widget>[
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: TextField(
-              decoration: const InputDecoration(labelText: 'Ticker'),
-              controller: symbol,
-              onSubmitted: (value) => loadData(),
-              onTap: () => symbol.selection = TextSelection(
-                baseOffset: 0,
-                extentOffset: symbol.text.length,
-              ),
+            child: Autocomplete<String>(
+              optionsBuilder: (TextEditingValue textEditingValue) {
+                final filtered = symbols
+                    .where(
+                      (option) =>
+                          option.value
+                              .toLowerCase()
+                              .contains(textEditingValue.text.toLowerCase()) ||
+                          option.name
+                              .toLowerCase()
+                              .contains(textEditingValue.text.toLowerCase()),
+                    )
+                    .toList();
+                filtered.sort((a, b) {
+                  String text = textEditingValue.text.toLowerCase();
+                  bool aStartsWithText = a.value.toLowerCase().startsWith(text);
+                  bool bStartsWithText = b.value.toLowerCase().startsWith(text);
+                  if (aStartsWithText && !bStartsWithText) return -1;
+                  if (!aStartsWithText && bStartsWithText) return 1;
+                  return 0;
+                });
+                return filtered
+                    .map((option) => '${option.value} (${option.name})');
+              },
+              initialValue: stock.value,
+              onSelected: (value) => loadData(),
+              fieldViewBuilder: (
+                BuildContext context,
+                TextEditingController fieldTextEditingController,
+                FocusNode fieldFocusNode,
+                VoidCallback onFieldSubmitted,
+              ) {
+                stock = fieldTextEditingController;
+                return TextField(
+                  controller: fieldTextEditingController,
+                  focusNode: fieldFocusNode,
+                  decoration: const InputDecoration(
+                    labelText: 'Ticker',
+                  ),
+                  onTap: () => stock.selection = TextSelection(
+                    baseOffset: 0,
+                    extentOffset: stock.text.length,
+                  ),
+                  onChanged: (text) {},
+                  onSubmitted: (text) {
+                    String? selection;
+
+                    for (final option in symbols) {
+                      if (option.value.toLowerCase() == text.toLowerCase())
+                        selection = '${option.value} (${option.name})';
+                      else if (selection == null &&
+                          option.value
+                              .toLowerCase()
+                              .contains(text.toLowerCase()))
+                        selection = '${option.value} (${option.name})';
+                      else if (selection == null &&
+                          option.name
+                              .toLowerCase()
+                              .contains(text.toLowerCase()))
+                        selection = '${option.value} (${option.name})';
+                    }
+
+                    stock.text = selection!.toUpperCase();
+                    loadData();
+                  },
+                );
+              },
             ),
           ),
           const SizedBox(height: 16),
           Wrap(
-            children: monthButtons + yearButtons,
+            children: [
+              ...monthButtons,
+              ...yearButtons,
+            ],
           ),
           FutureBuilder(
             future: future,
@@ -129,12 +212,6 @@ class _ChartPageState extends State<ChartPage> {
           FutureBuilder(
             future: future,
             builder: summaryBuilder,
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            children: [
-              StreamBuilder(stream: tickerStream, builder: buttonsBuilder),
-            ],
           ),
         ],
       ),
@@ -146,12 +223,13 @@ class _ChartPageState extends State<ChartPage> {
     AsyncSnapshot<List<Ticker>> snapshot,
   ) {
     if (snapshot.hasError) return ErrorWidget(snapshot.error.toString());
+    if (snapshot.data == null) return const SizedBox();
 
     if (snapshot.data?.isNotEmpty == true)
       return TextButton.icon(
         onPressed: () async {
-          await (db.tickers.delete()
-                ..where((u) => u.symbol.equals(symbol.text)))
+          final symbol = stock.text.split(' ').first;
+          await (db.tickers.delete()..where((u) => u.symbol.equals(symbol)))
               .go();
         },
         label: const Text("Remove from portfolio"),
@@ -163,9 +241,10 @@ class _ChartPageState extends State<ChartPage> {
         final data = (await future).candlesData;
         final percentChange =
             safePercentChange(data.first.close, data.last.close);
+        final symbol = stock.text.split(' ').first;
         await (db.tickers.insertOne(
           TickersCompanion.insert(
-            symbol: symbol.text,
+            symbol: symbol,
             amount: 0,
             change: percentChange,
           ),
@@ -187,6 +266,11 @@ class _ChartPageState extends State<ChartPage> {
           width: 50,
           child: CircularProgressIndicator(),
         ),
+      );
+    if (snapshot.data == null)
+      return const ListTile(
+        title: Text("No data found"),
+        subtitle: Text("Are you sure you typed it correctly?"),
       );
 
     final candles = snapshot.data!.candlesData;
@@ -220,17 +304,18 @@ class _ChartPageState extends State<ChartPage> {
       padding: const EdgeInsets.all(16.0),
       child: Row(
         children: [
-          Icon(Icons.arrow_upward, color: color),
-          Text(
-            "$percentStr%",
-            style:
-                Theme.of(context).textTheme.titleLarge!.copyWith(color: color),
-          ),
-          const SizedBox(width: 16),
           Text(
             "\$${candles.last.close.toStringAsFixed(2)}",
             style: Theme.of(context).textTheme.titleLarge,
           ),
+          const SizedBox(width: 16),
+          Icon(Icons.arrow_upward, color: color),
+          Text(
+            "$percentStr%",
+            style:
+                Theme.of(context).textTheme.titleMedium!.copyWith(color: color),
+          ),
+          StreamBuilder(stream: tickerStream, builder: buttonsBuilder),
         ],
       ),
     );
