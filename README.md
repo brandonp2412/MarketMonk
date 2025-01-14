@@ -1,16 +1,36 @@
-# market_monk
+# Market Monk
 
-A new Flutter project.
+Track stocks on any platform 📈 - without ads or being spied on 🕵️.
 
-## Getting Started
+<img src="docs/screenshot1.jpg" height="700"/>
+<img src="docs/screenshot2.jpg" height="700"/>
 
-This project is a starting point for a Flutter application.
+## Pre-publish requirements
 
-A few resources to get you started if this is your first Flutter project:
+1. Offline caching
+2. Settings ⚙️
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## Platforms we intend to support
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+1. Android
+2. iOS
+3. Windows
+4. MacOS
+5. Linux
+
+## What about web?
+
+Might give it a shot later on but i've had trouble with the drift package on flutter web in the past.
+
+## Features
+
+1. Quickly view a stocks price graph 🤑
+2. Easily switch between periods 📅
+3. Manage a portfolio of tracked stocks 💵
+
+## Coming soon...
+
+4. Offline caching of stock data 😎
+5. Have portfolio amounts and track gains/losses since purchase date 🍰
+6. Customizable settings for everything! ⚙️
+7. Compare multiple stocks on line graphs
