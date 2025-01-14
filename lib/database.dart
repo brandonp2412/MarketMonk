@@ -16,6 +16,8 @@ class Database extends _$Database {
 
   Database() : super(_openConnection());
 
+  Database.connect(super.executor);
+
   static QueryExecutor _openConnection() {
     return driftDatabase(
       name: 'my_database',
