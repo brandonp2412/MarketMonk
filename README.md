@@ -36,3 +36,7 @@ Might give it a shot later on but i've had trouble with the drift package on flu
 5. Have portfolio amounts and track gains/losses since purchase date 🍰
 6. Customizable settings for everything! ⚙️
 7. Compare multiple stocks on line graphs
+
+## Attribution
+
+<a href="https://www.flaticon.com/free-icons/meditation" title="meditation icons">Meditation icons created by Freepik - Flaticon</a>
