@@ -17,7 +17,8 @@ class ChartPage extends StatefulWidget {
 }
 
 class _ChartPageState extends State<ChartPage> {
-  TextEditingController stock = TextEditingController(text: "GOOG");
+  TextEditingController stock =
+      TextEditingController(text: "GOOG (ALPHABET INC. CLASS C CAPITAL STOCK)");
   List<Symbol> symbols = [];
   int year = 1;
   int month = 0;
@@ -240,7 +241,7 @@ class _ChartPageState extends State<ChartPage> {
           await (db.tickers.delete()..where((u) => u.symbol.equals(symbol)))
               .go();
         },
-        label: const Text("Remove from portfolio"),
+        label: const Text("Remove"),
         icon: const Icon(Icons.remove),
       );
 
@@ -250,15 +251,20 @@ class _ChartPageState extends State<ChartPage> {
         final percentChange =
             safePercentChange(data.first.close, data.last.close);
         final symbol = stock.text.split(' ').first;
-        await (db.tickers.insertOne(
+        (db.tickers.insertOne(
           TickersCompanion.insert(
             symbol: symbol,
             amount: 0,
             change: percentChange,
+            name: stock.text
+                .split(' ')
+                .sublist(1)
+                .join(' ')
+                .replaceAll(RegExp(r'\(|\)'), ''),
           ),
         ));
       },
-      label: const Text("Add to portfolio"),
+      label: const Text("Add"),
       icon: const Icon(Icons.add),
     );
   }

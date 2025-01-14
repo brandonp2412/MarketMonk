@@ -63,6 +63,11 @@ class _PortfolioPageState extends State<PortfolioPage> {
             stream: stream,
             builder: (context, snapshot) {
               if (!snapshot.hasData) return const SizedBox();
+              if (snapshot.data?.isEmpty == true)
+                return const ListTile(
+                  title: Text("No portfolio yet"),
+                  subtitle: Text("Swipe over to Charts to add some tickers!"),
+                );
               if (snapshot.hasError)
                 return ErrorWidget(snapshot.error.toString());
 

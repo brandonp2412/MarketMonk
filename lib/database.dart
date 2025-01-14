@@ -12,15 +12,17 @@ part 'database.g.dart';
 @DriftDatabase(tables: [Tickers])
 class Database extends _$Database {
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   Database() : super(_openConnection());
 
   Database.connect(super.executor);
 
   static QueryExecutor _openConnection() {
+    getApplicationSupportDirectory().then(print);
+
     return driftDatabase(
-      name: 'my_database',
+      name: 'market-monk',
       native: const DriftNativeOptions(
         databaseDirectory: getApplicationSupportDirectory,
       ),
@@ -46,8 +48,10 @@ class Database extends _$Database {
         if (kDebugMode) {
           final wrongForeignKeys =
               await customSelect('PRAGMA foreign_key_check').get();
-          assert(wrongForeignKeys.isEmpty,
-              '${wrongForeignKeys.map((e) => e.data)}');
+          assert(
+            wrongForeignKeys.isEmpty,
+            '${wrongForeignKeys.map((e) => e.data)}',
+          );
         }
 
         await customStatement('PRAGMA foreign_keys = ON');
@@ -67,6 +71,10 @@ class Database extends _$Database {
           schema.tickers,
         ),
       );
+    },
+    from2To3: (Migrator m, Schema3 schema) async {
+      await schema.tickers.deleteAll();
+      await m.addColumn(schema.tickers, schema.tickers.name);
     },
   );
 }

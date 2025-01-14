@@ -2,8 +2,6 @@ import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
-import 'package:market_monk/symbol.dart';
-import 'package:market_monk/utils.dart';
 
 class EditTickerPage extends StatefulWidget {
   final Ticker ticker;
@@ -15,7 +13,7 @@ class EditTickerPage extends StatefulWidget {
 }
 
 class _EditTickerPageState extends State<EditTickerPage> {
-  final stock = TextEditingController();
+  late final name = TextEditingController(text: widget.ticker.name);
   late final amount =
       TextEditingController(text: widget.ticker.amount.toStringAsFixed(2));
   late final change =
@@ -30,14 +28,6 @@ class _EditTickerPageState extends State<EditTickerPage> {
   @override
   void initState() {
     super.initState();
-
-    getSymbols().then(
-      (symbols) => setState(() {
-        stock.text = symbols
-            .firstWhere((symbol) => symbol.value == widget.ticker.symbol)
-            .name;
-      }),
-    );
   }
 
   @override
@@ -51,7 +41,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
         child: ListView(
           children: [
             TextField(
-              controller: stock,
+              controller: name,
               readOnly: true,
               decoration: const InputDecoration(labelText: 'Stock'),
             ),

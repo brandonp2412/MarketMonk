@@ -24,6 +24,11 @@ class $TickersTable extends Tickers with TableInfo<$TickersTable, Ticker> {
       type: DriftSqlType.string,
       requiredDuringInsert: true,
       defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'));
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+      'name', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _changeMeta = const VerificationMeta('change');
   @override
   late final GeneratedColumn<double> change = GeneratedColumn<double>(
@@ -52,7 +57,7 @@ class $TickersTable extends Tickers with TableInfo<$TickersTable, Ticker> {
       type: DriftSqlType.double, requiredDuringInsert: true);
   @override
   List<GeneratedColumn> get $columns =>
-      [id, symbol, change, createdAt, updatedAt, amount];
+      [id, symbol, name, change, createdAt, updatedAt, amount];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -71,6 +76,12 @@ class $TickersTable extends Tickers with TableInfo<$TickersTable, Ticker> {
           symbol.isAcceptableOrUnknown(data['symbol']!, _symbolMeta));
     } else if (isInserting) {
       context.missing(_symbolMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    } else if (isInserting) {
+      context.missing(_nameMeta);
     }
     if (data.containsKey('change')) {
       context.handle(_changeMeta,
@@ -105,6 +116,8 @@ class $TickersTable extends Tickers with TableInfo<$TickersTable, Ticker> {
           .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
       symbol: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}symbol'])!,
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
       change: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}change'])!,
       createdAt: attachedDatabase.typeMapping
@@ -125,6 +138,7 @@ class $TickersTable extends Tickers with TableInfo<$TickersTable, Ticker> {
 class Ticker extends DataClass implements Insertable<Ticker> {
   final int id;
   final String symbol;
+  final String name;
   final double change;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -132,6 +146,7 @@ class Ticker extends DataClass implements Insertable<Ticker> {
   const Ticker(
       {required this.id,
       required this.symbol,
+      required this.name,
       required this.change,
       required this.createdAt,
       required this.updatedAt,
@@ -141,6 +156,7 @@ class Ticker extends DataClass implements Insertable<Ticker> {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['symbol'] = Variable<String>(symbol);
+    map['name'] = Variable<String>(name);
     map['change'] = Variable<double>(change);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -152,6 +168,7 @@ class Ticker extends DataClass implements Insertable<Ticker> {
     return TickersCompanion(
       id: Value(id),
       symbol: Value(symbol),
+      name: Value(name),
       change: Value(change),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -165,6 +182,7 @@ class Ticker extends DataClass implements Insertable<Ticker> {
     return Ticker(
       id: serializer.fromJson<int>(json['id']),
       symbol: serializer.fromJson<String>(json['symbol']),
+      name: serializer.fromJson<String>(json['name']),
       change: serializer.fromJson<double>(json['change']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -177,6 +195,7 @@ class Ticker extends DataClass implements Insertable<Ticker> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'symbol': serializer.toJson<String>(symbol),
+      'name': serializer.toJson<String>(name),
       'change': serializer.toJson<double>(change),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -187,6 +206,7 @@ class Ticker extends DataClass implements Insertable<Ticker> {
   Ticker copyWith(
           {int? id,
           String? symbol,
+          String? name,
           double? change,
           DateTime? createdAt,
           DateTime? updatedAt,
@@ -194,6 +214,7 @@ class Ticker extends DataClass implements Insertable<Ticker> {
       Ticker(
         id: id ?? this.id,
         symbol: symbol ?? this.symbol,
+        name: name ?? this.name,
         change: change ?? this.change,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
@@ -203,6 +224,7 @@ class Ticker extends DataClass implements Insertable<Ticker> {
     return Ticker(
       id: data.id.present ? data.id.value : this.id,
       symbol: data.symbol.present ? data.symbol.value : this.symbol,
+      name: data.name.present ? data.name.value : this.name,
       change: data.change.present ? data.change.value : this.change,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -215,6 +237,7 @@ class Ticker extends DataClass implements Insertable<Ticker> {
     return (StringBuffer('Ticker(')
           ..write('id: $id, ')
           ..write('symbol: $symbol, ')
+          ..write('name: $name, ')
           ..write('change: $change, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -225,13 +248,14 @@ class Ticker extends DataClass implements Insertable<Ticker> {
 
   @override
   int get hashCode =>
-      Object.hash(id, symbol, change, createdAt, updatedAt, amount);
+      Object.hash(id, symbol, name, change, createdAt, updatedAt, amount);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Ticker &&
           other.id == this.id &&
           other.symbol == this.symbol &&
+          other.name == this.name &&
           other.change == this.change &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
@@ -241,6 +265,7 @@ class Ticker extends DataClass implements Insertable<Ticker> {
 class TickersCompanion extends UpdateCompanion<Ticker> {
   final Value<int> id;
   final Value<String> symbol;
+  final Value<String> name;
   final Value<double> change;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -248,6 +273,7 @@ class TickersCompanion extends UpdateCompanion<Ticker> {
   const TickersCompanion({
     this.id = const Value.absent(),
     this.symbol = const Value.absent(),
+    this.name = const Value.absent(),
     this.change = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -256,16 +282,19 @@ class TickersCompanion extends UpdateCompanion<Ticker> {
   TickersCompanion.insert({
     this.id = const Value.absent(),
     required String symbol,
+    required String name,
     required double change,
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     required double amount,
   })  : symbol = Value(symbol),
+        name = Value(name),
         change = Value(change),
         amount = Value(amount);
   static Insertable<Ticker> custom({
     Expression<int>? id,
     Expression<String>? symbol,
+    Expression<String>? name,
     Expression<double>? change,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -274,6 +303,7 @@ class TickersCompanion extends UpdateCompanion<Ticker> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (symbol != null) 'symbol': symbol,
+      if (name != null) 'name': name,
       if (change != null) 'change': change,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -284,6 +314,7 @@ class TickersCompanion extends UpdateCompanion<Ticker> {
   TickersCompanion copyWith(
       {Value<int>? id,
       Value<String>? symbol,
+      Value<String>? name,
       Value<double>? change,
       Value<DateTime>? createdAt,
       Value<DateTime>? updatedAt,
@@ -291,6 +322,7 @@ class TickersCompanion extends UpdateCompanion<Ticker> {
     return TickersCompanion(
       id: id ?? this.id,
       symbol: symbol ?? this.symbol,
+      name: name ?? this.name,
       change: change ?? this.change,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -306,6 +338,9 @@ class TickersCompanion extends UpdateCompanion<Ticker> {
     }
     if (symbol.present) {
       map['symbol'] = Variable<String>(symbol.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
     }
     if (change.present) {
       map['change'] = Variable<double>(change.value);
@@ -327,6 +362,7 @@ class TickersCompanion extends UpdateCompanion<Ticker> {
     return (StringBuffer('TickersCompanion(')
           ..write('id: $id, ')
           ..write('symbol: $symbol, ')
+          ..write('name: $name, ')
           ..write('change: $change, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -350,6 +386,7 @@ abstract class _$Database extends GeneratedDatabase {
 typedef $$TickersTableCreateCompanionBuilder = TickersCompanion Function({
   Value<int> id,
   required String symbol,
+  required String name,
   required double change,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
@@ -358,6 +395,7 @@ typedef $$TickersTableCreateCompanionBuilder = TickersCompanion Function({
 typedef $$TickersTableUpdateCompanionBuilder = TickersCompanion Function({
   Value<int> id,
   Value<String> symbol,
+  Value<String> name,
   Value<double> change,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
@@ -377,6 +415,9 @@ class $$TickersTableFilterComposer extends Composer<_$Database, $TickersTable> {
 
   ColumnFilters<String> get symbol => $composableBuilder(
       column: $table.symbol, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<double> get change => $composableBuilder(
       column: $table.change, builder: (column) => ColumnFilters(column));
@@ -406,6 +447,9 @@ class $$TickersTableOrderingComposer
   ColumnOrderings<String> get symbol => $composableBuilder(
       column: $table.symbol, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<double> get change => $composableBuilder(
       column: $table.change, builder: (column) => ColumnOrderings(column));
 
@@ -433,6 +477,9 @@ class $$TickersTableAnnotationComposer
 
   GeneratedColumn<String> get symbol =>
       $composableBuilder(column: $table.symbol, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
 
   GeneratedColumn<double> get change =>
       $composableBuilder(column: $table.change, builder: (column) => column);
@@ -472,6 +519,7 @@ class $$TickersTableTableManager extends RootTableManager<
           updateCompanionCallback: ({
             Value<int> id = const Value.absent(),
             Value<String> symbol = const Value.absent(),
+            Value<String> name = const Value.absent(),
             Value<double> change = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
@@ -480,6 +528,7 @@ class $$TickersTableTableManager extends RootTableManager<
               TickersCompanion(
             id: id,
             symbol: symbol,
+            name: name,
             change: change,
             createdAt: createdAt,
             updatedAt: updatedAt,
@@ -488,6 +537,7 @@ class $$TickersTableTableManager extends RootTableManager<
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
             required String symbol,
+            required String name,
             required double change,
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
@@ -496,6 +546,7 @@ class $$TickersTableTableManager extends RootTableManager<
               TickersCompanion.insert(
             id: id,
             symbol: symbol,
+            name: name,
             change: change,
             createdAt: createdAt,
             updatedAt: updatedAt,
