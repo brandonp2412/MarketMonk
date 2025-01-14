@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' as material;
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
 
@@ -38,30 +39,79 @@ class _EditTickerPageState extends State<EditTickerPage> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: ListView(
+        child: material.Column(
           children: [
-            TextField(
-              controller: name,
-              readOnly: true,
-              decoration: const InputDecoration(labelText: 'Stock'),
-            ),
-            TextField(
-              controller: amount,
-              decoration: const InputDecoration(labelText: 'Amount'),
-            ),
-            TextField(
-              controller: change,
-              decoration: const InputDecoration(labelText: 'Change %'),
-            ),
-            TextField(
-              controller: createdAt,
-              decoration: const InputDecoration(labelText: 'Created at'),
-              readOnly: true,
-            ),
-            TextField(
-              controller: updatedAt,
-              decoration: const InputDecoration(labelText: 'Updated at'),
-              readOnly: true,
+            Expanded(
+              child: ListView(
+                children: [
+                  TextField(
+                    controller: name,
+                    decoration: const InputDecoration(labelText: 'Stock'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: amount,
+                    decoration: const InputDecoration(labelText: 'Amount'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: change,
+                    decoration: const InputDecoration(labelText: 'Change %'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: createdAt,
+                    decoration: const InputDecoration(labelText: 'Created at'),
+                    readOnly: true,
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: updatedAt,
+                    decoration: const InputDecoration(labelText: 'Updated at'),
+                    readOnly: true,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      TextButton.icon(
+                        label: const Text('Delete'),
+                        onPressed: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text("Are you sure?"),
+                              content: const Text("Deleting is irreversible."),
+                              actions: [
+                                TextButton.icon(
+                                  onPressed: () {
+                                    Navigator.of(context).pop(true);
+                                  },
+                                  icon: const Icon(Icons.delete),
+                                  label: const Text("OK"),
+                                ),
+                                TextButton.icon(
+                                  onPressed: () {
+                                    Navigator.of(context).pop(false);
+                                  },
+                                  icon: const Icon(Icons.close),
+                                  label: const Text("Cancel"),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm != true) return;
+
+                          db.tickers.deleteOne(
+                            TickersCompanion(id: Value(widget.ticker.id)),
+                          );
+                          if (context.mounted) Navigator.of(context).pop();
+                        },
+                        icon: const Icon(Icons.delete),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -74,6 +124,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
               amount: Value(double.parse(amount.text)),
               change: Value(double.parse(change.text)),
               updatedAt: Value(DateTime.now()),
+              name: Value(name.text),
             ),
           );
           Navigator.of(context).pop();
