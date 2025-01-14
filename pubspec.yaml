@@ -16,13 +16,14 @@ dependencies:
   intl: ^0.20.1
   drift: ^2.23.1
   drift_flutter: ^0.2.4
+  path_provider: ^2.1.5
+  drift_dev: ^2.23.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
   flutter_lints: ^4.0.0
-  drift_dev: ^2.23.1
   build_runner: ^2.4.14
 
 flutter:

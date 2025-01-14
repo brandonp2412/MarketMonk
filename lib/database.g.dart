@@ -3,12 +3,11 @@
 part of 'database.dart';
 
 // ignore_for_file: type=lint
-class $TodoItemsTable extends TodoItems
-    with TableInfo<$TodoItemsTable, TodoItem> {
+class $TickersTable extends Tickers with TableInfo<$TickersTable, Ticker> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $TodoItemsTable(this.attachedDatabase, [this._alias]);
+  $TickersTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<int> id = GeneratedColumn<int>(
@@ -18,56 +17,80 @@ class $TodoItemsTable extends TodoItems
       requiredDuringInsert: false,
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
-  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  static const VerificationMeta _symbolMeta = const VerificationMeta('symbol');
   @override
-  late final GeneratedColumn<String> title = GeneratedColumn<String>(
-      'title', aliasedName, false,
-      additionalChecks:
-          GeneratedColumn.checkTextLength(minTextLength: 6, maxTextLength: 32),
+  late final GeneratedColumn<String> symbol = GeneratedColumn<String>(
+      'symbol', aliasedName, false,
       type: DriftSqlType.string,
-      requiredDuringInsert: true);
-  static const VerificationMeta _contentMeta =
-      const VerificationMeta('content');
+      requiredDuringInsert: true,
+      defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'));
+  static const VerificationMeta _changeMeta = const VerificationMeta('change');
   @override
-  late final GeneratedColumn<String> content = GeneratedColumn<String>(
-      'body', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
+  late final GeneratedColumn<double> change = GeneratedColumn<double>(
+      'change', aliasedName, false,
+      type: DriftSqlType.double, requiredDuringInsert: true);
   static const VerificationMeta _createdAtMeta =
       const VerificationMeta('createdAt');
   @override
   late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
-      'created_at', aliasedName, true,
-      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
   @override
-  List<GeneratedColumn> get $columns => [id, title, content, createdAt];
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  static const VerificationMeta _amountMeta = const VerificationMeta('amount');
+  @override
+  late final GeneratedColumn<double> amount = GeneratedColumn<double>(
+      'amount', aliasedName, false,
+      type: DriftSqlType.double, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, symbol, change, createdAt, updatedAt, amount];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
   String get actualTableName => $name;
-  static const String $name = 'todo_items';
+  static const String $name = 'tickers';
   @override
-  VerificationContext validateIntegrity(Insertable<TodoItem> instance,
+  VerificationContext validateIntegrity(Insertable<Ticker> instance,
       {bool isInserting = false}) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     }
-    if (data.containsKey('title')) {
-      context.handle(
-          _titleMeta, title.isAcceptableOrUnknown(data['title']!, _titleMeta));
+    if (data.containsKey('symbol')) {
+      context.handle(_symbolMeta,
+          symbol.isAcceptableOrUnknown(data['symbol']!, _symbolMeta));
     } else if (isInserting) {
-      context.missing(_titleMeta);
+      context.missing(_symbolMeta);
     }
-    if (data.containsKey('body')) {
-      context.handle(_contentMeta,
-          content.isAcceptableOrUnknown(data['body']!, _contentMeta));
+    if (data.containsKey('change')) {
+      context.handle(_changeMeta,
+          change.isAcceptableOrUnknown(data['change']!, _changeMeta));
     } else if (isInserting) {
-      context.missing(_contentMeta);
+      context.missing(_changeMeta);
     }
     if (data.containsKey('created_at')) {
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    }
+    if (data.containsKey('amount')) {
+      context.handle(_amountMeta,
+          amount.isAcceptableOrUnknown(data['amount']!, _amountMeta));
+    } else if (isInserting) {
+      context.missing(_amountMeta);
     }
     return context;
   }
@@ -75,67 +98,77 @@ class $TodoItemsTable extends TodoItems
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  TodoItem map(Map<String, dynamic> data, {String? tablePrefix}) {
+  Ticker map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return TodoItem(
+    return Ticker(
       id: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
-      title: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}title'])!,
-      content: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}body'])!,
+      symbol: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}symbol'])!,
+      change: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}change'])!,
       createdAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at']),
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+      amount: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}amount'])!,
     );
   }
 
   @override
-  $TodoItemsTable createAlias(String alias) {
-    return $TodoItemsTable(attachedDatabase, alias);
+  $TickersTable createAlias(String alias) {
+    return $TickersTable(attachedDatabase, alias);
   }
 }
 
-class TodoItem extends DataClass implements Insertable<TodoItem> {
+class Ticker extends DataClass implements Insertable<Ticker> {
   final int id;
-  final String title;
-  final String content;
-  final DateTime? createdAt;
-  const TodoItem(
+  final String symbol;
+  final double change;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final double amount;
+  const Ticker(
       {required this.id,
-      required this.title,
-      required this.content,
-      this.createdAt});
+      required this.symbol,
+      required this.change,
+      required this.createdAt,
+      required this.updatedAt,
+      required this.amount});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
-    map['title'] = Variable<String>(title);
-    map['body'] = Variable<String>(content);
-    if (!nullToAbsent || createdAt != null) {
-      map['created_at'] = Variable<DateTime>(createdAt);
-    }
+    map['symbol'] = Variable<String>(symbol);
+    map['change'] = Variable<double>(change);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['amount'] = Variable<double>(amount);
     return map;
   }
 
-  TodoItemsCompanion toCompanion(bool nullToAbsent) {
-    return TodoItemsCompanion(
+  TickersCompanion toCompanion(bool nullToAbsent) {
+    return TickersCompanion(
       id: Value(id),
-      title: Value(title),
-      content: Value(content),
-      createdAt: createdAt == null && nullToAbsent
-          ? const Value.absent()
-          : Value(createdAt),
+      symbol: Value(symbol),
+      change: Value(change),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      amount: Value(amount),
     );
   }
 
-  factory TodoItem.fromJson(Map<String, dynamic> json,
+  factory Ticker.fromJson(Map<String, dynamic> json,
       {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return TodoItem(
+    return Ticker(
       id: serializer.fromJson<int>(json['id']),
-      title: serializer.fromJson<String>(json['title']),
-      content: serializer.fromJson<String>(json['content']),
-      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
+      symbol: serializer.fromJson<String>(json['symbol']),
+      change: serializer.fromJson<double>(json['change']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      amount: serializer.fromJson<double>(json['amount']),
     );
   }
   @override
@@ -143,97 +176,125 @@ class TodoItem extends DataClass implements Insertable<TodoItem> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
-      'title': serializer.toJson<String>(title),
-      'content': serializer.toJson<String>(content),
-      'createdAt': serializer.toJson<DateTime?>(createdAt),
+      'symbol': serializer.toJson<String>(symbol),
+      'change': serializer.toJson<double>(change),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'amount': serializer.toJson<double>(amount),
     };
   }
 
-  TodoItem copyWith(
+  Ticker copyWith(
           {int? id,
-          String? title,
-          String? content,
-          Value<DateTime?> createdAt = const Value.absent()}) =>
-      TodoItem(
+          String? symbol,
+          double? change,
+          DateTime? createdAt,
+          DateTime? updatedAt,
+          double? amount}) =>
+      Ticker(
         id: id ?? this.id,
-        title: title ?? this.title,
-        content: content ?? this.content,
-        createdAt: createdAt.present ? createdAt.value : this.createdAt,
+        symbol: symbol ?? this.symbol,
+        change: change ?? this.change,
+        createdAt: createdAt ?? this.createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+        amount: amount ?? this.amount,
       );
-  TodoItem copyWithCompanion(TodoItemsCompanion data) {
-    return TodoItem(
+  Ticker copyWithCompanion(TickersCompanion data) {
+    return Ticker(
       id: data.id.present ? data.id.value : this.id,
-      title: data.title.present ? data.title.value : this.title,
-      content: data.content.present ? data.content.value : this.content,
+      symbol: data.symbol.present ? data.symbol.value : this.symbol,
+      change: data.change.present ? data.change.value : this.change,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      amount: data.amount.present ? data.amount.value : this.amount,
     );
   }
 
   @override
   String toString() {
-    return (StringBuffer('TodoItem(')
+    return (StringBuffer('Ticker(')
           ..write('id: $id, ')
-          ..write('title: $title, ')
-          ..write('content: $content, ')
-          ..write('createdAt: $createdAt')
+          ..write('symbol: $symbol, ')
+          ..write('change: $change, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('amount: $amount')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, title, content, createdAt);
+  int get hashCode =>
+      Object.hash(id, symbol, change, createdAt, updatedAt, amount);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is TodoItem &&
+      (other is Ticker &&
           other.id == this.id &&
-          other.title == this.title &&
-          other.content == this.content &&
-          other.createdAt == this.createdAt);
+          other.symbol == this.symbol &&
+          other.change == this.change &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.amount == this.amount);
 }
 
-class TodoItemsCompanion extends UpdateCompanion<TodoItem> {
+class TickersCompanion extends UpdateCompanion<Ticker> {
   final Value<int> id;
-  final Value<String> title;
-  final Value<String> content;
-  final Value<DateTime?> createdAt;
-  const TodoItemsCompanion({
+  final Value<String> symbol;
+  final Value<double> change;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<double> amount;
+  const TickersCompanion({
     this.id = const Value.absent(),
-    this.title = const Value.absent(),
-    this.content = const Value.absent(),
+    this.symbol = const Value.absent(),
+    this.change = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.amount = const Value.absent(),
   });
-  TodoItemsCompanion.insert({
+  TickersCompanion.insert({
     this.id = const Value.absent(),
-    required String title,
-    required String content,
+    required String symbol,
+    required double change,
     this.createdAt = const Value.absent(),
-  })  : title = Value(title),
-        content = Value(content);
-  static Insertable<TodoItem> custom({
+    this.updatedAt = const Value.absent(),
+    required double amount,
+  })  : symbol = Value(symbol),
+        change = Value(change),
+        amount = Value(amount);
+  static Insertable<Ticker> custom({
     Expression<int>? id,
-    Expression<String>? title,
-    Expression<String>? content,
+    Expression<String>? symbol,
+    Expression<double>? change,
     Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<double>? amount,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
-      if (title != null) 'title': title,
-      if (content != null) 'body': content,
+      if (symbol != null) 'symbol': symbol,
+      if (change != null) 'change': change,
       if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (amount != null) 'amount': amount,
     });
   }
 
-  TodoItemsCompanion copyWith(
+  TickersCompanion copyWith(
       {Value<int>? id,
-      Value<String>? title,
-      Value<String>? content,
-      Value<DateTime?>? createdAt}) {
-    return TodoItemsCompanion(
+      Value<String>? symbol,
+      Value<double>? change,
+      Value<DateTime>? createdAt,
+      Value<DateTime>? updatedAt,
+      Value<double>? amount}) {
+    return TickersCompanion(
       id: id ?? this.id,
-      title: title ?? this.title,
-      content: content ?? this.content,
+      symbol: symbol ?? this.symbol,
+      change: change ?? this.change,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      amount: amount ?? this.amount,
     );
   }
 
@@ -243,57 +304,68 @@ class TodoItemsCompanion extends UpdateCompanion<TodoItem> {
     if (id.present) {
       map['id'] = Variable<int>(id.value);
     }
-    if (title.present) {
-      map['title'] = Variable<String>(title.value);
+    if (symbol.present) {
+      map['symbol'] = Variable<String>(symbol.value);
     }
-    if (content.present) {
-      map['body'] = Variable<String>(content.value);
+    if (change.present) {
+      map['change'] = Variable<double>(change.value);
     }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (amount.present) {
+      map['amount'] = Variable<double>(amount.value);
     }
     return map;
   }
 
   @override
   String toString() {
-    return (StringBuffer('TodoItemsCompanion(')
+    return (StringBuffer('TickersCompanion(')
           ..write('id: $id, ')
-          ..write('title: $title, ')
-          ..write('content: $content, ')
-          ..write('createdAt: $createdAt')
+          ..write('symbol: $symbol, ')
+          ..write('change: $change, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('amount: $amount')
           ..write(')'))
         .toString();
   }
 }
 
-abstract class _$AppDatabase extends GeneratedDatabase {
-  _$AppDatabase(QueryExecutor e) : super(e);
-  $AppDatabaseManager get managers => $AppDatabaseManager(this);
-  late final $TodoItemsTable todoItems = $TodoItemsTable(this);
+abstract class _$Database extends GeneratedDatabase {
+  _$Database(QueryExecutor e) : super(e);
+  $DatabaseManager get managers => $DatabaseManager(this);
+  late final $TickersTable tickers = $TickersTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [todoItems];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [tickers];
 }
 
-typedef $$TodoItemsTableCreateCompanionBuilder = TodoItemsCompanion Function({
+typedef $$TickersTableCreateCompanionBuilder = TickersCompanion Function({
   Value<int> id,
-  required String title,
-  required String content,
-  Value<DateTime?> createdAt,
+  required String symbol,
+  required double change,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+  required double amount,
 });
-typedef $$TodoItemsTableUpdateCompanionBuilder = TodoItemsCompanion Function({
+typedef $$TickersTableUpdateCompanionBuilder = TickersCompanion Function({
   Value<int> id,
-  Value<String> title,
-  Value<String> content,
-  Value<DateTime?> createdAt,
+  Value<String> symbol,
+  Value<double> change,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+  Value<double> amount,
 });
 
-class $$TodoItemsTableFilterComposer
-    extends Composer<_$AppDatabase, $TodoItemsTable> {
-  $$TodoItemsTableFilterComposer({
+class $$TickersTableFilterComposer extends Composer<_$Database, $TickersTable> {
+  $$TickersTableFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -303,19 +375,25 @@ class $$TodoItemsTableFilterComposer
   ColumnFilters<int> get id => $composableBuilder(
       column: $table.id, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<String> get title => $composableBuilder(
-      column: $table.title, builder: (column) => ColumnFilters(column));
+  ColumnFilters<String> get symbol => $composableBuilder(
+      column: $table.symbol, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<String> get content => $composableBuilder(
-      column: $table.content, builder: (column) => ColumnFilters(column));
+  ColumnFilters<double> get change => $composableBuilder(
+      column: $table.change, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get amount => $composableBuilder(
+      column: $table.amount, builder: (column) => ColumnFilters(column));
 }
 
-class $$TodoItemsTableOrderingComposer
-    extends Composer<_$AppDatabase, $TodoItemsTable> {
-  $$TodoItemsTableOrderingComposer({
+class $$TickersTableOrderingComposer
+    extends Composer<_$Database, $TickersTable> {
+  $$TickersTableOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -325,19 +403,25 @@ class $$TodoItemsTableOrderingComposer
   ColumnOrderings<int> get id => $composableBuilder(
       column: $table.id, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<String> get title => $composableBuilder(
-      column: $table.title, builder: (column) => ColumnOrderings(column));
+  ColumnOrderings<String> get symbol => $composableBuilder(
+      column: $table.symbol, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<String> get content => $composableBuilder(
-      column: $table.content, builder: (column) => ColumnOrderings(column));
+  ColumnOrderings<double> get change => $composableBuilder(
+      column: $table.change, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get amount => $composableBuilder(
+      column: $table.amount, builder: (column) => ColumnOrderings(column));
 }
 
-class $$TodoItemsTableAnnotationComposer
-    extends Composer<_$AppDatabase, $TodoItemsTable> {
-  $$TodoItemsTableAnnotationComposer({
+class $$TickersTableAnnotationComposer
+    extends Composer<_$Database, $TickersTable> {
+  $$TickersTableAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -347,61 +431,75 @@ class $$TodoItemsTableAnnotationComposer
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
-  GeneratedColumn<String> get title =>
-      $composableBuilder(column: $table.title, builder: (column) => column);
+  GeneratedColumn<String> get symbol =>
+      $composableBuilder(column: $table.symbol, builder: (column) => column);
 
-  GeneratedColumn<String> get content =>
-      $composableBuilder(column: $table.content, builder: (column) => column);
+  GeneratedColumn<double> get change =>
+      $composableBuilder(column: $table.change, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<double> get amount =>
+      $composableBuilder(column: $table.amount, builder: (column) => column);
 }
 
-class $$TodoItemsTableTableManager extends RootTableManager<
-    _$AppDatabase,
-    $TodoItemsTable,
-    TodoItem,
-    $$TodoItemsTableFilterComposer,
-    $$TodoItemsTableOrderingComposer,
-    $$TodoItemsTableAnnotationComposer,
-    $$TodoItemsTableCreateCompanionBuilder,
-    $$TodoItemsTableUpdateCompanionBuilder,
-    (TodoItem, BaseReferences<_$AppDatabase, $TodoItemsTable, TodoItem>),
-    TodoItem,
+class $$TickersTableTableManager extends RootTableManager<
+    _$Database,
+    $TickersTable,
+    Ticker,
+    $$TickersTableFilterComposer,
+    $$TickersTableOrderingComposer,
+    $$TickersTableAnnotationComposer,
+    $$TickersTableCreateCompanionBuilder,
+    $$TickersTableUpdateCompanionBuilder,
+    (Ticker, BaseReferences<_$Database, $TickersTable, Ticker>),
+    Ticker,
     PrefetchHooks Function()> {
-  $$TodoItemsTableTableManager(_$AppDatabase db, $TodoItemsTable table)
+  $$TickersTableTableManager(_$Database db, $TickersTable table)
       : super(TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
-              $$TodoItemsTableFilterComposer($db: db, $table: table),
+              $$TickersTableFilterComposer($db: db, $table: table),
           createOrderingComposer: () =>
-              $$TodoItemsTableOrderingComposer($db: db, $table: table),
+              $$TickersTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
-              $$TodoItemsTableAnnotationComposer($db: db, $table: table),
+              $$TickersTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback: ({
             Value<int> id = const Value.absent(),
-            Value<String> title = const Value.absent(),
-            Value<String> content = const Value.absent(),
-            Value<DateTime?> createdAt = const Value.absent(),
+            Value<String> symbol = const Value.absent(),
+            Value<double> change = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<double> amount = const Value.absent(),
           }) =>
-              TodoItemsCompanion(
+              TickersCompanion(
             id: id,
-            title: title,
-            content: content,
+            symbol: symbol,
+            change: change,
             createdAt: createdAt,
+            updatedAt: updatedAt,
+            amount: amount,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
-            required String title,
-            required String content,
-            Value<DateTime?> createdAt = const Value.absent(),
+            required String symbol,
+            required double change,
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            required double amount,
           }) =>
-              TodoItemsCompanion.insert(
+              TickersCompanion.insert(
             id: id,
-            title: title,
-            content: content,
+            symbol: symbol,
+            change: change,
             createdAt: createdAt,
+            updatedAt: updatedAt,
+            amount: amount,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
@@ -410,22 +508,22 @@ class $$TodoItemsTableTableManager extends RootTableManager<
         ));
 }
 
-typedef $$TodoItemsTableProcessedTableManager = ProcessedTableManager<
-    _$AppDatabase,
-    $TodoItemsTable,
-    TodoItem,
-    $$TodoItemsTableFilterComposer,
-    $$TodoItemsTableOrderingComposer,
-    $$TodoItemsTableAnnotationComposer,
-    $$TodoItemsTableCreateCompanionBuilder,
-    $$TodoItemsTableUpdateCompanionBuilder,
-    (TodoItem, BaseReferences<_$AppDatabase, $TodoItemsTable, TodoItem>),
-    TodoItem,
+typedef $$TickersTableProcessedTableManager = ProcessedTableManager<
+    _$Database,
+    $TickersTable,
+    Ticker,
+    $$TickersTableFilterComposer,
+    $$TickersTableOrderingComposer,
+    $$TickersTableAnnotationComposer,
+    $$TickersTableCreateCompanionBuilder,
+    $$TickersTableUpdateCompanionBuilder,
+    (Ticker, BaseReferences<_$Database, $TickersTable, Ticker>),
+    Ticker,
     PrefetchHooks Function()>;
 
-class $AppDatabaseManager {
-  final _$AppDatabase _db;
-  $AppDatabaseManager(this._db);
-  $$TodoItemsTableTableManager get todoItems =>
-      $$TodoItemsTableTableManager(_db, _db.todoItems);
+class $DatabaseManager {
+  final _$Database _db;
+  $DatabaseManager(this._db);
+  $$TickersTableTableManager get tickers =>
+      $$TickersTableTableManager(_db, _db.tickers);
 }

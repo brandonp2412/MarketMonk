@@ -1,33 +1,70 @@
 import 'package:drift/drift.dart';
+import 'package:drift/internal/versioned_schema.dart';
+import 'package:drift_dev/api/migrations_native.dart';
 import 'package:drift_flutter/drift_flutter.dart';
+import 'package:flutter/foundation.dart';
+import 'package:market_monk/database.steps.dart';
+import 'package:market_monk/tables.dart';
+import 'package:path_provider/path_provider.dart';
 
 part 'database.g.dart';
 
-class TodoItems extends Table {
-  IntColumn get id => integer().autoIncrement()();
-  TextColumn get title => text().withLength(min: 6, max: 32)();
-  TextColumn get content => text().named('body')();
-  DateTimeColumn get createdAt => dateTime().nullable()();
-}
-
-@DriftDatabase(tables: [TodoItems])
-class AppDatabase extends _$AppDatabase {
-  // After generating code, this class needs to define a `schemaVersion` getter
-  // and a constructor telling drift where the database should be stored.
-  // These are described in the getting started guide: https://drift.simonbinder.eu/setup/
-  AppDatabase() : super(_openConnection());
-
+@DriftDatabase(tables: [Tickers])
+class Database extends _$Database {
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  Database() : super(_openConnection());
 
   static QueryExecutor _openConnection() {
     return driftDatabase(
       name: 'my_database',
       native: const DriftNativeOptions(
-        // By default, `driftDatabase` from `package:drift_flutter` stores the
-        // database files in `getApplicationDocumentsDirectory()`.
         databaseDirectory: getApplicationSupportDirectory,
       ),
     );
   }
+
+  @override
+  MigrationStrategy get migration {
+    return MigrationStrategy(
+      onUpgrade: (m, from, to) async {
+        // Following the advice from https://drift.simonbinder.eu/Migrations/api/#general-tips
+        await customStatement('PRAGMA foreign_keys = OFF');
+
+        await transaction(
+          () => VersionedSchema.runMigrationSteps(
+            migrator: m,
+            from: from,
+            to: to,
+            steps: _upgrade,
+          ),
+        );
+
+        if (kDebugMode) {
+          final wrongForeignKeys =
+              await customSelect('PRAGMA foreign_key_check').get();
+          assert(wrongForeignKeys.isEmpty,
+              '${wrongForeignKeys.map((e) => e.data)}');
+        }
+
+        await customStatement('PRAGMA foreign_keys = ON');
+      },
+      beforeOpen: (details) async {
+        // For Flutter apps, this should be wrapped in an if (kDebugMode) as
+        // suggested here: https://drift.simonbinder.eu/Migrations/tests/#verifying-a-database-schema-at-runtime
+        await validateDatabaseSchema();
+      },
+    );
+  }
+
+  static final _upgrade = migrationSteps(
+    from1To2: (m, schema) async {
+      await m.alterTable(
+        TableMigration(
+          schema.tickers,
+        ),
+      );
+    },
+  );
 }

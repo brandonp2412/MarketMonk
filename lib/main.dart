@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:market_monk/chart_page.dart';
+import 'package:market_monk/database.dart';
 import 'package:market_monk/portfolio_page.dart';
 
 void main() {
   runApp(const MyApp());
 }
+
+Database db = Database();
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
