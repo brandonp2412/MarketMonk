@@ -190,8 +190,8 @@ class _ChartPageState extends State<ChartPage> {
                               .contains(text.toLowerCase()))
                         selection = '${option.value} (${option.name})';
                     }
-
-                    stock.text = selection!.toUpperCase();
+                    selection ??= text;
+                    stock.text = selection.toUpperCase();
                     loadData();
                   },
                 );
@@ -286,12 +286,13 @@ class _ChartPageState extends State<ChartPage> {
     );
   }
 
-  Widget summaryBuilder(context, snapshot) {
+  Widget summaryBuilder(
+    BuildContext context,
+    AsyncSnapshot<YahooFinanceResponse> snapshot,
+  ) {
     if (snapshot.connectionState != ConnectionState.done)
       return const SizedBox();
-    if (snapshot.hasError) return ErrorWidget(snapshot.error.toString());
-    if (!snapshot.hasData || snapshot.data == null)
-      return ErrorWidget("No data.");
+    if (!snapshot.hasData || snapshot.data == null) return const SizedBox();
 
     final candles = snapshot.data!.candlesData;
     var percentChange =
