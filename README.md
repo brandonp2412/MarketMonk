@@ -2,8 +2,10 @@
 
 Track stocks on any platform 📈 - without ads or being spied on 🕵️.
 
-<img src="docs/screenshot1.jpg" height="700"/>
-<img src="docs/screenshot2.jpg" height="700"/>
+<p float="left">
+    <img src="docs/screenshot1.jpg" height="700"/>
+    <img src="docs/screenshot2.jpg" height="700"/>
+</p>
 
 ## Pre-publish requirements
 
