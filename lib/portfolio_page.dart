@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:market_monk/database.dart';
+import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/main.dart';
 
 class PortfolioPage extends StatefulWidget {
@@ -15,29 +16,47 @@ class _PortfolioPageState extends State<PortfolioPage> {
   late Stream<List<Ticker>> stream = (db.tickers.select()).watch();
   final search = TextEditingController();
 
+  void updateStream() {
+    setState(() {
+      stream = (db.tickers.select()
+            ..where(
+              (tbl) => tbl.symbol.contains(search.text.toLowerCase()),
+            ))
+          .watch();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: material.Column(
         children: [
-          TextField(
+          SearchBar(
             controller: search,
-            decoration: const InputDecoration(
-              labelText: 'Search...',
-            ),
+            hintText: 'Search...',
+            leading: search.text.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.only(left: 16.0, right: 8.0),
+                    child: Icon(Icons.search),
+                  )
+                : IconButton(
+                    onPressed: () {
+                      search.text = '';
+                      updateStream();
+                    },
+                    icon: const Icon(Icons.arrow_back),
+                    padding: const EdgeInsets.only(
+                      left: 16.0,
+                      right: 8.0,
+                    ),
+                  ),
             onTap: () => search.selection = TextSelection(
               baseOffset: 0,
               extentOffset: search.text.length,
             ),
             onChanged: (text) {
-              setState(() {
-                stream = (db.tickers.select()
-                      ..where(
-                        (tbl) => tbl.symbol.contains(search.text.toLowerCase()),
-                      ))
-                    .watch();
-              });
+              updateStream();
             },
           ),
           StreamBuilder(
@@ -63,6 +82,12 @@ class _PortfolioPageState extends State<PortfolioPage> {
                       leading: ticker.change > 0
                           ? const Icon(Icons.arrow_upward, color: Colors.green)
                           : const Icon(Icons.arrow_downward, color: Colors.red),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EditTickerPage(ticker: ticker),
+                        ),
+                      ),
                     );
                   },
                   itemCount: tickers.length,

@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_interpolation_to_compose_strings
+
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
@@ -61,7 +63,8 @@ class TickerLine extends StatelessWidget {
                 sideTitles: SideTitles(showTitles: false),
               ),
               leftTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: true, reservedSize: 45)),
+                sideTitles: SideTitles(showTitles: true, reservedSize: 45),
+              ),
               bottomTitles: AxisTitles(
                 sideTitles: SideTitles(
                   showTitles: true,
@@ -104,14 +107,13 @@ class TickerLine extends StatelessWidget {
     List<LineBarSpot> touchedSpots,
     BuildContext context,
   ) {
+    final price = '\$${touchedSpots.first.y.toStringAsFixed(2)}';
+    final date = formatter.format(
+      dates.elementAt(touchedSpots.first.x.toInt()),
+    );
     return [
       LineTooltipItem(
-        // ignore: prefer_interpolation_to_compose_strings
-        touchedSpots.first.y.toStringAsFixed(2) +
-            '\n' +
-            formatter.format(
-              dates.elementAt(touchedSpots.first.x.toInt()),
-            ),
+        '$price\n$date',
         Theme.of(context).textTheme.bodyLarge!,
       ),
     ];

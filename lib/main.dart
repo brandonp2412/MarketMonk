@@ -35,25 +35,16 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
+    return const DefaultTabController(
       length: 2,
       child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-          titleTextStyle: Theme.of(context).textTheme.titleLarge,
-          leading: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Image.asset('assets/meditation.png'),
-          ),
-          title: const Text("MarketMonk"),
-        ),
-        body: const TabBarView(
+        body: TabBarView(
           children: [
             ChartPage(),
             PortfolioPage(),
           ],
         ),
-        bottomNavigationBar: const TabBar(
+        bottomNavigationBar: TabBar(
           tabs: [
             Tab(
               icon: Icon(Icons.insights),
