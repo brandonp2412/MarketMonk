@@ -1,0 +1,31 @@
+name: market_monk
+description: "A new Flutter project."
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  yahoo_finance_data_reader: ^1.0.11
+  fl_chart: ^0.70.1
+  intl: ^0.20.1
+  drift: ^2.23.1
+  drift_flutter: ^0.2.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^4.0.0
+  drift_dev: ^2.23.1
+  build_runner: ^2.4.14
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/
