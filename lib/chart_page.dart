@@ -1,13 +1,11 @@
-import 'dart:convert';
-
 import 'package:drift/drift.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/ticker_line.dart';
+import 'package:market_monk/utils.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
 import 'package:market_monk/symbol.dart';
 
@@ -40,16 +38,11 @@ class _ChartPageState extends State<ChartPage> {
   @override
   void initState() {
     super.initState();
-    getSymbols();
-  }
-
-  getSymbols() async {
-    final String response =
-        await rootBundle.loadString('assets/nasdaq-full-tickers.json');
-    final List<dynamic> jsonData = json.decode(response);
-    setState(() {
-      symbols = jsonData.map((d) => Symbol.fromJson(d)).toList();
-    });
+    getSymbols().then(
+      (value) => setState(() {
+        symbols = value;
+      }),
+    );
   }
 
   void loadData() {
@@ -162,12 +155,27 @@ class _ChartPageState extends State<ChartPage> {
                 VoidCallback onFieldSubmitted,
               ) {
                 stock = fieldTextEditingController;
-                return TextField(
+                return SearchBar(
                   controller: fieldTextEditingController,
+                  leading: stock.text.isEmpty
+                      ? const Padding(
+                          padding: EdgeInsets.only(left: 16.0, right: 8.0),
+                          child: Icon(Icons.search),
+                        )
+                      : IconButton(
+                          onPressed: () {
+                            setState(() {
+                              stock.text = '';
+                            });
+                          },
+                          icon: const Icon(Icons.arrow_back),
+                          padding: const EdgeInsets.only(
+                            left: 16.0,
+                            right: 8.0,
+                          ),
+                        ),
                   focusNode: fieldFocusNode,
-                  decoration: const InputDecoration(
-                    labelText: 'Ticker',
-                  ),
+                  hintText: 'Search...',
                   onTap: () => stock.selection = TextSelection(
                     baseOffset: 0,
                     extentOffset: stock.text.length,
