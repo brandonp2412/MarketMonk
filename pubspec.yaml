@@ -1,5 +1,5 @@
 name: market_monk
-description: "A new Flutter project."
+description: "Track stocks quickly and easily"
 
 version: 1.0.0+1
 
@@ -20,6 +20,7 @@ dependencies:
   drift_dev: ^2.23.1
   test: ^1.25.8
   sqlite3_flutter_libs: ^0.5.28
+  flutter_launcher_icons: ^0.14.2
 
 dev_dependencies:
   flutter_test:

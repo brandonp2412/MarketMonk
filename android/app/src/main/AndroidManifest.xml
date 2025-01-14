@@ -3,9 +3,9 @@
 
 
     <application
-        android:label="market_monk"
+        android:label="MarketMonk"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/launcher_icon">
         <activity
             android:name=".MainActivity"
             android:exported="true"
