@@ -6,7 +6,6 @@ import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
-import 'package:test/test.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
 import 'package:market_monk/symbol.dart';
 
