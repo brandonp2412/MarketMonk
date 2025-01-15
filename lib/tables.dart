@@ -20,9 +20,4 @@ class Candles extends Table {
   RealColumn get close => real().withDefault(const Constant(-1.0))();
   IntColumn get volume => integer().withDefault(const Constant(0))();
   RealColumn get adjClose => real().withDefault(const Constant(-1.0))();
-
-  @override
-  List<Set<Column<Object>>>? get uniqueKeys => [
-        {id, symbol, date},
-      ];
 }

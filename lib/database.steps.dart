@@ -150,9 +150,7 @@ final class Schema4 extends i0.VersionedSchema {
         entityName: 'candles',
         withoutRowId: false,
         isStrict: false,
-        tableConstraints: [
-          'UNIQUE(id, symbol, date)',
-        ],
+        tableConstraints: [],
         columns: [
           _column_0,
           _column_7,

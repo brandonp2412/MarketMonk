@@ -500,10 +500,6 @@ class $CandlesTable extends Candles with TableInfo<$CandlesTable, Candle> {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  List<Set<GeneratedColumn>> get uniqueKeys => [
-        {id, symbol, date},
-      ];
-  @override
   Candle map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return Candle(
