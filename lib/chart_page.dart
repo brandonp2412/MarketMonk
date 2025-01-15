@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:drift/drift.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -12,8 +14,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
 
 class CandleTicker {
-  final Candle candle;
-  final Ticker? ticker;
+  final CandlesCompanion candle;
+  final TickersCompanion? ticker;
 
   CandleTicker({this.ticker, required this.candle});
 }
@@ -139,19 +141,6 @@ class _ChartPageState extends State<ChartPage> {
                       child: CircularProgressIndicator(),
                     ),
                   );
-                else if (stock.text.isNotEmpty)
-                  leading = IconButton(
-                    onPressed: () {
-                      setState(() {
-                        stock.text = '';
-                      });
-                    },
-                    icon: const Icon(Icons.arrow_back),
-                    padding: const EdgeInsets.only(
-                      left: 16.0,
-                      right: 8.0,
-                    ),
-                  );
 
                 return SearchBar(
                   controller: fieldTextEditingController,
@@ -213,12 +202,12 @@ class _ChartPageState extends State<ChartPage> {
         snapshot.data!.map((tickerCandle) => tickerCandle.candle).toList();
     List<FlSpot> spots = [];
     for (var index = 0; index < candles.length; index++) {
-      spots.add(FlSpot(index.toDouble(), candles[index].close));
+      spots.add(FlSpot(index.toDouble(), candles[index].close.value));
     }
 
     return TickerLine(
       formatter: DateFormat("d/M/yy"),
-      dates: candles.map((candle) => candle.date),
+      dates: candles.map((candle) => candle.date.value),
       spots: spots,
     );
   }
@@ -227,19 +216,17 @@ class _ChartPageState extends State<ChartPage> {
   void initState() {
     super.initState();
     initData();
-    getSymbols().then(
-      (value) => setState(() {
-        symbols = value;
-      }),
-    );
   }
 
   void initData() async {
+    final gotSymbols = await getSymbols();
+    setState(() {
+      symbols = gotSymbols;
+    });
+
     final prefs = await SharedPreferences.getInstance();
-    favoriteStock = prefs.getString('favoriteStock');
-    if (favoriteStock != null)
-      stock.text = favoriteStock!;
-    else {
+    stock.text = prefs.getString('favoriteStock') ?? "";
+    if (stock.text.isEmpty) {
       final tickers = await (db.tickers.select()
             ..orderBy(
               [
@@ -254,7 +241,14 @@ class _ChartPageState extends State<ChartPage> {
       if (tickers.isNotEmpty)
         stock.text = "${tickers.first.symbol} (${tickers.first.name})";
     }
-    refreshData();
+
+    if (stock.text.isEmpty) {
+      final random = Random();
+      final randomSymbol = gotSymbols[random.nextInt(gotSymbols.length)];
+      stock.text = "${randomSymbol.value} (${randomSymbol.name})";
+    }
+
+    updateData();
   }
 
   Future<void> insertCandles(
@@ -288,7 +282,7 @@ class _ChartPageState extends State<ChartPage> {
     }
   }
 
-  void loadData() async {
+  Future<void> loadData() async {
     setStream();
     setState(() {
       loading = true;
@@ -307,7 +301,7 @@ class _ChartPageState extends State<ChartPage> {
     }
   }
 
-  void refreshData() async {
+  void updateData() async {
     if (stock.text.isEmpty) return;
     setStream();
     setState(() {
@@ -327,12 +321,16 @@ class _ChartPageState extends State<ChartPage> {
               ],
             )
             ..limit(1))
-          .getSingle();
-      final response = await const YahooFinanceDailyReader().getDailyDTOs(
-        symbol,
-        startDate: latest.date,
-      );
-      await insertCandles(response.candlesData, symbol);
+          .getSingleOrNull();
+      if (latest != null) {
+        final response = await const YahooFinanceDailyReader().getDailyDTOs(
+          symbol,
+          startDate: latest.date,
+        );
+        await insertCandles(response.candlesData, symbol);
+      } else {
+        await loadData();
+      }
     } catch (error) {
       if (mounted) toast(context, error.toString());
     } finally {
@@ -358,8 +356,9 @@ class _ChartPageState extends State<ChartPage> {
 
     stream = (db.selectOnly(db.candles)
           ..addColumns([
-            ...db.candles.$columns,
-            ...db.tickers.$columns,
+            db.candles.date,
+            db.candles.close,
+            db.tickers.id,
           ])
           ..where(
             db.candles.symbol.equals(stock.text.split(' ').first) &
@@ -385,26 +384,13 @@ class _ChartPageState extends State<ChartPage> {
           (results) => results
               .map(
                 (result) => CandleTicker(
-                  candle: Candle(
-                    id: result.read(db.candles.id)!,
-                    symbol: result.read(db.candles.symbol)!,
-                    date: result.read(db.candles.date)!,
-                    open: result.read(db.candles.open)!,
-                    high: result.read(db.candles.high)!,
-                    low: result.read(db.candles.low)!,
-                    close: result.read(db.candles.close)!,
-                    volume: result.read(db.candles.volume)!,
-                    adjClose: result.read(db.candles.adjClose)!,
+                  candle: CandlesCompanion(
+                    date: Value(result.read(db.candles.date)!),
+                    close: Value(result.read(db.candles.close)!),
                   ),
                   ticker: result.read(db.tickers.id) != null
-                      ? Ticker(
-                          id: result.read(db.tickers.id)!,
-                          symbol: result.read(db.tickers.symbol)!,
-                          name: result.read(db.tickers.name)!,
-                          change: result.read(db.tickers.change)!,
-                          createdAt: result.read(db.tickers.createdAt)!,
-                          updatedAt: result.read(db.tickers.updatedAt)!,
-                          amount: result.read(db.tickers.amount)!,
+                      ? TickersCompanion(
+                          id: Value(result.read(db.tickers.id)!),
                         )
                       : null,
                 ),
@@ -423,7 +409,7 @@ class _ChartPageState extends State<ChartPage> {
     final candles =
         snapshot.data!.map((tickerCandle) => tickerCandle.candle).toList();
     var percentChange =
-        safePercentChange(candles.first.close, candles.last.close);
+        safePercentChange(candles.first.close.value, candles.last.close.value);
     var color = Colors.green;
     if (percentChange < 0) color = Colors.red;
     var percentStr = percentChange.toStringAsFixed(2);
@@ -444,7 +430,7 @@ class _ChartPageState extends State<ChartPage> {
               ),
               const SizedBox(width: 16),
               Text(
-                "\$${candles.last.close.toStringAsFixed(2)}",
+                "\$${candles.last.close.value.toStringAsFixed(2)}",
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(width: 8),
@@ -509,7 +495,7 @@ class _ChartPageState extends State<ChartPage> {
                     : const Icon(Icons.favorite_border),
               ),
               TextButton.icon(
-                onPressed: () => refreshData(),
+                onPressed: () => updateData(),
                 label: const Text("Refresh"),
                 icon: const Icon(Icons.refresh),
               ),
