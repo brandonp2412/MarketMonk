@@ -12,6 +12,7 @@ class Tickers extends Table {
 
 class Candles extends Table {
   IntColumn get id => integer().autoIncrement()();
+  TextColumn get symbol => text().references(Tickers, #symbol)();
   DateTimeColumn get date => dateTime()();
   RealColumn get open => real().withDefault(const Constant(-1.0))();
   RealColumn get high => real().withDefault(const Constant(-1.0))();
@@ -19,4 +20,9 @@ class Candles extends Table {
   RealColumn get close => real().withDefault(const Constant(-1.0))();
   IntColumn get volume => integer().withDefault(const Constant(0))();
   RealColumn get adjClose => real().withDefault(const Constant(-1.0))();
+
+  @override
+  List<Set<Column<Object>>>? get uniqueKeys => [
+        {id, symbol, date},
+      ];
 }

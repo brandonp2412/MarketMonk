@@ -386,6 +386,14 @@ class $CandlesTable extends Candles with TableInfo<$CandlesTable, Candle> {
       requiredDuringInsert: false,
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _symbolMeta = const VerificationMeta('symbol');
+  @override
+  late final GeneratedColumn<String> symbol = GeneratedColumn<String>(
+      'symbol', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: true,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES tickers (symbol)'));
   static const VerificationMeta _dateMeta = const VerificationMeta('date');
   @override
   late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
@@ -436,7 +444,7 @@ class $CandlesTable extends Candles with TableInfo<$CandlesTable, Candle> {
       defaultValue: const Constant(-1.0));
   @override
   List<GeneratedColumn> get $columns =>
-      [id, date, open, high, low, close, volume, adjClose];
+      [id, symbol, date, open, high, low, close, volume, adjClose];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -449,6 +457,12 @@ class $CandlesTable extends Candles with TableInfo<$CandlesTable, Candle> {
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('symbol')) {
+      context.handle(_symbolMeta,
+          symbol.isAcceptableOrUnknown(data['symbol']!, _symbolMeta));
+    } else if (isInserting) {
+      context.missing(_symbolMeta);
     }
     if (data.containsKey('date')) {
       context.handle(
@@ -486,11 +500,17 @@ class $CandlesTable extends Candles with TableInfo<$CandlesTable, Candle> {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+        {id, symbol, date},
+      ];
+  @override
   Candle map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return Candle(
       id: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      symbol: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}symbol'])!,
       date: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}date'])!,
       open: attachedDatabase.typeMapping
@@ -516,6 +536,7 @@ class $CandlesTable extends Candles with TableInfo<$CandlesTable, Candle> {
 
 class Candle extends DataClass implements Insertable<Candle> {
   final int id;
+  final String symbol;
   final DateTime date;
   final double open;
   final double high;
@@ -525,6 +546,7 @@ class Candle extends DataClass implements Insertable<Candle> {
   final double adjClose;
   const Candle(
       {required this.id,
+      required this.symbol,
       required this.date,
       required this.open,
       required this.high,
@@ -536,6 +558,7 @@ class Candle extends DataClass implements Insertable<Candle> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
+    map['symbol'] = Variable<String>(symbol);
     map['date'] = Variable<DateTime>(date);
     map['open'] = Variable<double>(open);
     map['high'] = Variable<double>(high);
@@ -549,6 +572,7 @@ class Candle extends DataClass implements Insertable<Candle> {
   CandlesCompanion toCompanion(bool nullToAbsent) {
     return CandlesCompanion(
       id: Value(id),
+      symbol: Value(symbol),
       date: Value(date),
       open: Value(open),
       high: Value(high),
@@ -564,6 +588,7 @@ class Candle extends DataClass implements Insertable<Candle> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Candle(
       id: serializer.fromJson<int>(json['id']),
+      symbol: serializer.fromJson<String>(json['symbol']),
       date: serializer.fromJson<DateTime>(json['date']),
       open: serializer.fromJson<double>(json['open']),
       high: serializer.fromJson<double>(json['high']),
@@ -578,6 +603,7 @@ class Candle extends DataClass implements Insertable<Candle> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
+      'symbol': serializer.toJson<String>(symbol),
       'date': serializer.toJson<DateTime>(date),
       'open': serializer.toJson<double>(open),
       'high': serializer.toJson<double>(high),
@@ -590,6 +616,7 @@ class Candle extends DataClass implements Insertable<Candle> {
 
   Candle copyWith(
           {int? id,
+          String? symbol,
           DateTime? date,
           double? open,
           double? high,
@@ -599,6 +626,7 @@ class Candle extends DataClass implements Insertable<Candle> {
           double? adjClose}) =>
       Candle(
         id: id ?? this.id,
+        symbol: symbol ?? this.symbol,
         date: date ?? this.date,
         open: open ?? this.open,
         high: high ?? this.high,
@@ -610,6 +638,7 @@ class Candle extends DataClass implements Insertable<Candle> {
   Candle copyWithCompanion(CandlesCompanion data) {
     return Candle(
       id: data.id.present ? data.id.value : this.id,
+      symbol: data.symbol.present ? data.symbol.value : this.symbol,
       date: data.date.present ? data.date.value : this.date,
       open: data.open.present ? data.open.value : this.open,
       high: data.high.present ? data.high.value : this.high,
@@ -624,6 +653,7 @@ class Candle extends DataClass implements Insertable<Candle> {
   String toString() {
     return (StringBuffer('Candle(')
           ..write('id: $id, ')
+          ..write('symbol: $symbol, ')
           ..write('date: $date, ')
           ..write('open: $open, ')
           ..write('high: $high, ')
@@ -637,12 +667,13 @@ class Candle extends DataClass implements Insertable<Candle> {
 
   @override
   int get hashCode =>
-      Object.hash(id, date, open, high, low, close, volume, adjClose);
+      Object.hash(id, symbol, date, open, high, low, close, volume, adjClose);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Candle &&
           other.id == this.id &&
+          other.symbol == this.symbol &&
           other.date == this.date &&
           other.open == this.open &&
           other.high == this.high &&
@@ -654,6 +685,7 @@ class Candle extends DataClass implements Insertable<Candle> {
 
 class CandlesCompanion extends UpdateCompanion<Candle> {
   final Value<int> id;
+  final Value<String> symbol;
   final Value<DateTime> date;
   final Value<double> open;
   final Value<double> high;
@@ -663,6 +695,7 @@ class CandlesCompanion extends UpdateCompanion<Candle> {
   final Value<double> adjClose;
   const CandlesCompanion({
     this.id = const Value.absent(),
+    this.symbol = const Value.absent(),
     this.date = const Value.absent(),
     this.open = const Value.absent(),
     this.high = const Value.absent(),
@@ -673,6 +706,7 @@ class CandlesCompanion extends UpdateCompanion<Candle> {
   });
   CandlesCompanion.insert({
     this.id = const Value.absent(),
+    required String symbol,
     required DateTime date,
     this.open = const Value.absent(),
     this.high = const Value.absent(),
@@ -680,9 +714,11 @@ class CandlesCompanion extends UpdateCompanion<Candle> {
     this.close = const Value.absent(),
     this.volume = const Value.absent(),
     this.adjClose = const Value.absent(),
-  }) : date = Value(date);
+  })  : symbol = Value(symbol),
+        date = Value(date);
   static Insertable<Candle> custom({
     Expression<int>? id,
+    Expression<String>? symbol,
     Expression<DateTime>? date,
     Expression<double>? open,
     Expression<double>? high,
@@ -693,6 +729,7 @@ class CandlesCompanion extends UpdateCompanion<Candle> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (symbol != null) 'symbol': symbol,
       if (date != null) 'date': date,
       if (open != null) 'open': open,
       if (high != null) 'high': high,
@@ -705,6 +742,7 @@ class CandlesCompanion extends UpdateCompanion<Candle> {
 
   CandlesCompanion copyWith(
       {Value<int>? id,
+      Value<String>? symbol,
       Value<DateTime>? date,
       Value<double>? open,
       Value<double>? high,
@@ -714,6 +752,7 @@ class CandlesCompanion extends UpdateCompanion<Candle> {
       Value<double>? adjClose}) {
     return CandlesCompanion(
       id: id ?? this.id,
+      symbol: symbol ?? this.symbol,
       date: date ?? this.date,
       open: open ?? this.open,
       high: high ?? this.high,
@@ -729,6 +768,9 @@ class CandlesCompanion extends UpdateCompanion<Candle> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<int>(id.value);
+    }
+    if (symbol.present) {
+      map['symbol'] = Variable<String>(symbol.value);
     }
     if (date.present) {
       map['date'] = Variable<DateTime>(date.value);
@@ -758,6 +800,7 @@ class CandlesCompanion extends UpdateCompanion<Candle> {
   String toString() {
     return (StringBuffer('CandlesCompanion(')
           ..write('id: $id, ')
+          ..write('symbol: $symbol, ')
           ..write('date: $date, ')
           ..write('open: $open, ')
           ..write('high: $high, ')
@@ -801,6 +844,26 @@ typedef $$TickersTableUpdateCompanionBuilder = TickersCompanion Function({
   Value<double> amount,
 });
 
+final class $$TickersTableReferences
+    extends BaseReferences<_$Database, $TickersTable, Ticker> {
+  $$TickersTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$CandlesTable, List<Candle>> _candlesRefsTable(
+          _$Database db) =>
+      MultiTypedResultKey.fromTable(db.candles,
+          aliasName:
+              $_aliasNameGenerator(db.tickers.symbol, db.candles.symbol));
+
+  $$CandlesTableProcessedTableManager get candlesRefs {
+    final manager = $$CandlesTableTableManager($_db, $_db.candles)
+        .filter((f) => f.symbol.symbol($_item.symbol));
+
+    final cache = $_typedResult.readTableOrNull(_candlesRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+}
+
 class $$TickersTableFilterComposer extends Composer<_$Database, $TickersTable> {
   $$TickersTableFilterComposer({
     required super.$db,
@@ -829,6 +892,27 @@ class $$TickersTableFilterComposer extends Composer<_$Database, $TickersTable> {
 
   ColumnFilters<double> get amount => $composableBuilder(
       column: $table.amount, builder: (column) => ColumnFilters(column));
+
+  Expression<bool> candlesRefs(
+      Expression<bool> Function($$CandlesTableFilterComposer f) f) {
+    final $$CandlesTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.symbol,
+        referencedTable: $db.candles,
+        getReferencedColumn: (t) => t.symbol,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$CandlesTableFilterComposer(
+              $db: $db,
+              $table: $db.candles,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
 }
 
 class $$TickersTableOrderingComposer
@@ -891,6 +975,27 @@ class $$TickersTableAnnotationComposer
 
   GeneratedColumn<double> get amount =>
       $composableBuilder(column: $table.amount, builder: (column) => column);
+
+  Expression<T> candlesRefs<T extends Object>(
+      Expression<T> Function($$CandlesTableAnnotationComposer a) f) {
+    final $$CandlesTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.symbol,
+        referencedTable: $db.candles,
+        getReferencedColumn: (t) => t.symbol,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$CandlesTableAnnotationComposer(
+              $db: $db,
+              $table: $db.candles,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
 }
 
 class $$TickersTableTableManager extends RootTableManager<
@@ -902,9 +1007,9 @@ class $$TickersTableTableManager extends RootTableManager<
     $$TickersTableAnnotationComposer,
     $$TickersTableCreateCompanionBuilder,
     $$TickersTableUpdateCompanionBuilder,
-    (Ticker, BaseReferences<_$Database, $TickersTable, Ticker>),
+    (Ticker, $$TickersTableReferences),
     Ticker,
-    PrefetchHooks Function()> {
+    PrefetchHooks Function({bool candlesRefs})> {
   $$TickersTableTableManager(_$Database db, $TickersTable table)
       : super(TableManagerState(
           db: db,
@@ -952,9 +1057,31 @@ class $$TickersTableTableManager extends RootTableManager<
             amount: amount,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) =>
+                  (e.readTable(table), $$TickersTableReferences(db, table, e)))
               .toList(),
-          prefetchHooksCallback: null,
+          prefetchHooksCallback: ({candlesRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [if (candlesRefs) db.candles],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (candlesRefs)
+                    await $_getPrefetchedData(
+                        currentTable: table,
+                        referencedTable:
+                            $$TickersTableReferences._candlesRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$TickersTableReferences(db, table, p0).candlesRefs,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.symbol == item.symbol),
+                        typedResults: items)
+                ];
+              },
+            );
+          },
         ));
 }
 
@@ -967,11 +1094,12 @@ typedef $$TickersTableProcessedTableManager = ProcessedTableManager<
     $$TickersTableAnnotationComposer,
     $$TickersTableCreateCompanionBuilder,
     $$TickersTableUpdateCompanionBuilder,
-    (Ticker, BaseReferences<_$Database, $TickersTable, Ticker>),
+    (Ticker, $$TickersTableReferences),
     Ticker,
-    PrefetchHooks Function()>;
+    PrefetchHooks Function({bool candlesRefs})>;
 typedef $$CandlesTableCreateCompanionBuilder = CandlesCompanion Function({
   Value<int> id,
+  required String symbol,
   required DateTime date,
   Value<double> open,
   Value<double> high,
@@ -982,6 +1110,7 @@ typedef $$CandlesTableCreateCompanionBuilder = CandlesCompanion Function({
 });
 typedef $$CandlesTableUpdateCompanionBuilder = CandlesCompanion Function({
   Value<int> id,
+  Value<String> symbol,
   Value<DateTime> date,
   Value<double> open,
   Value<double> high,
@@ -990,6 +1119,23 @@ typedef $$CandlesTableUpdateCompanionBuilder = CandlesCompanion Function({
   Value<int> volume,
   Value<double> adjClose,
 });
+
+final class $$CandlesTableReferences
+    extends BaseReferences<_$Database, $CandlesTable, Candle> {
+  $$CandlesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $TickersTable _symbolTable(_$Database db) => db.tickers
+      .createAlias($_aliasNameGenerator(db.candles.symbol, db.tickers.symbol));
+
+  $$TickersTableProcessedTableManager get symbol {
+    final manager = $$TickersTableTableManager($_db, $_db.tickers)
+        .filter((f) => f.symbol($_item.symbol));
+    final item = $_typedResult.readTableOrNull(_symbolTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+}
 
 class $$CandlesTableFilterComposer extends Composer<_$Database, $CandlesTable> {
   $$CandlesTableFilterComposer({
@@ -1022,6 +1168,26 @@ class $$CandlesTableFilterComposer extends Composer<_$Database, $CandlesTable> {
 
   ColumnFilters<double> get adjClose => $composableBuilder(
       column: $table.adjClose, builder: (column) => ColumnFilters(column));
+
+  $$TickersTableFilterComposer get symbol {
+    final $$TickersTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.symbol,
+        referencedTable: $db.tickers,
+        getReferencedColumn: (t) => t.symbol,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$TickersTableFilterComposer(
+              $db: $db,
+              $table: $db.tickers,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
 }
 
 class $$CandlesTableOrderingComposer
@@ -1056,6 +1222,26 @@ class $$CandlesTableOrderingComposer
 
   ColumnOrderings<double> get adjClose => $composableBuilder(
       column: $table.adjClose, builder: (column) => ColumnOrderings(column));
+
+  $$TickersTableOrderingComposer get symbol {
+    final $$TickersTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.symbol,
+        referencedTable: $db.tickers,
+        getReferencedColumn: (t) => t.symbol,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$TickersTableOrderingComposer(
+              $db: $db,
+              $table: $db.tickers,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
 }
 
 class $$CandlesTableAnnotationComposer
@@ -1090,6 +1276,26 @@ class $$CandlesTableAnnotationComposer
 
   GeneratedColumn<double> get adjClose =>
       $composableBuilder(column: $table.adjClose, builder: (column) => column);
+
+  $$TickersTableAnnotationComposer get symbol {
+    final $$TickersTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.symbol,
+        referencedTable: $db.tickers,
+        getReferencedColumn: (t) => t.symbol,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$TickersTableAnnotationComposer(
+              $db: $db,
+              $table: $db.tickers,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
 }
 
 class $$CandlesTableTableManager extends RootTableManager<
@@ -1101,9 +1307,9 @@ class $$CandlesTableTableManager extends RootTableManager<
     $$CandlesTableAnnotationComposer,
     $$CandlesTableCreateCompanionBuilder,
     $$CandlesTableUpdateCompanionBuilder,
-    (Candle, BaseReferences<_$Database, $CandlesTable, Candle>),
+    (Candle, $$CandlesTableReferences),
     Candle,
-    PrefetchHooks Function()> {
+    PrefetchHooks Function({bool symbol})> {
   $$CandlesTableTableManager(_$Database db, $CandlesTable table)
       : super(TableManagerState(
           db: db,
@@ -1116,6 +1322,7 @@ class $$CandlesTableTableManager extends RootTableManager<
               $$CandlesTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback: ({
             Value<int> id = const Value.absent(),
+            Value<String> symbol = const Value.absent(),
             Value<DateTime> date = const Value.absent(),
             Value<double> open = const Value.absent(),
             Value<double> high = const Value.absent(),
@@ -1126,6 +1333,7 @@ class $$CandlesTableTableManager extends RootTableManager<
           }) =>
               CandlesCompanion(
             id: id,
+            symbol: symbol,
             date: date,
             open: open,
             high: high,
@@ -1136,6 +1344,7 @@ class $$CandlesTableTableManager extends RootTableManager<
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
+            required String symbol,
             required DateTime date,
             Value<double> open = const Value.absent(),
             Value<double> high = const Value.absent(),
@@ -1146,6 +1355,7 @@ class $$CandlesTableTableManager extends RootTableManager<
           }) =>
               CandlesCompanion.insert(
             id: id,
+            symbol: symbol,
             date: date,
             open: open,
             high: high,
@@ -1155,9 +1365,43 @@ class $$CandlesTableTableManager extends RootTableManager<
             adjClose: adjClose,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) =>
+                  (e.readTable(table), $$CandlesTableReferences(db, table, e)))
               .toList(),
-          prefetchHooksCallback: null,
+          prefetchHooksCallback: ({symbol = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins: <
+                  T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic>>(state) {
+                if (symbol) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.symbol,
+                    referencedTable: $$CandlesTableReferences._symbolTable(db),
+                    referencedColumn:
+                        $$CandlesTableReferences._symbolTable(db).symbol,
+                  ) as T;
+                }
+
+                return state;
+              },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
         ));
 }
 
@@ -1170,9 +1414,9 @@ typedef $$CandlesTableProcessedTableManager = ProcessedTableManager<
     $$CandlesTableAnnotationComposer,
     $$CandlesTableCreateCompanionBuilder,
     $$CandlesTableUpdateCompanionBuilder,
-    (Candle, BaseReferences<_$Database, $CandlesTable, Candle>),
+    (Candle, $$CandlesTableReferences),
     Candle,
-    PrefetchHooks Function()>;
+    PrefetchHooks Function({bool symbol})>;
 
 class $DatabaseManager {
   final _$Database _db;

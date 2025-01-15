@@ -16,29 +16,65 @@ class ChartPage extends StatefulWidget {
   State<ChartPage> createState() => _ChartPageState();
 }
 
+class CandleTicker {
+  final Candle candle;
+  final Ticker? ticker;
+
+  CandleTicker({this.ticker, required this.candle});
+}
+
 class _ChartPageState extends State<ChartPage> {
   TextEditingController stock =
       TextEditingController(text: "GOOG (ALPHABET INC. CLASS C CAPITAL STOCK)");
   List<Symbol> symbols = [];
   int year = 1;
   int month = 0;
+  bool loading = false;
 
-  late Stream<List<Ticker>> tickerStream = (db.tickers.select()
-        ..where(
-          (tbl) => tbl.symbol.equals("GOOG"),
-        )
-        ..limit(1))
-      .watch();
+  late Stream<List<CandleTicker>> stream;
+
+  void setStream() {
+    final now = DateTime.now();
+    final after = DateTime(now.year - year, now.month - month, now.day);
+    stream = (db.select(db.candles)
+          ..where(
+            (tbl) =>
+                tbl.symbol.equals(stock.text.split(' ').first) &
+                tbl.date.isBiggerThanValue(after),
+          )
+          ..orderBy(
+            [
+              (u) => OrderingTerm(
+                    expression: u.date,
+                    mode: OrderingMode.asc,
+                  ),
+            ],
+          ))
+        .join([
+          leftOuterJoin(
+            db.tickers,
+            db.tickers.symbol.equalsExp(db.candles.symbol),
+          ),
+        ])
+        .watch()
+        .map(
+          (results) => results
+              .map(
+                (result) => CandleTicker(
+                  candle: result.readTable(db.candles),
+                  ticker: result.readTableOrNull(db.tickers),
+                ),
+              )
+              .toList(),
+        );
+  }
 
   final now = DateTime.now();
-  late var future = const YahooFinanceDailyReader().getDailyDTOs(
-    "GOOG",
-    startDate: DateTime(now.year - 1, now.month, now.day),
-  );
 
   @override
   void initState() {
     super.initState();
+    loadData();
     getSymbols().then(
       (value) => setState(() {
         symbols = value;
@@ -46,20 +82,56 @@ class _ChartPageState extends State<ChartPage> {
     );
   }
 
-  void loadData() {
-    final symbol = stock.text.split(' ').first;
+  void loadData() async {
+    setStream();
     setState(() {
-      future = const YahooFinanceDailyReader().getDailyDTOs(
+      loading = true;
+    });
+    try {
+      final symbol = stock.text.split(' ').first;
+      final response = await const YahooFinanceDailyReader().getDailyDTOs(
         symbol,
         startDate: DateTime(now.year - year, now.month - month, now.day),
       );
-      tickerStream = (db.tickers.select()
-            ..where(
-              (tbl) => tbl.symbol.equals(symbol),
-            )
-            ..limit(1))
-          .watch();
-    });
+      await insertCandles(response.candlesData, symbol);
+    } finally {
+      if (mounted)
+        setState(() {
+          loading = false;
+        });
+    }
+  }
+
+  Future<void> insertCandles(
+    List<YahooFinanceCandleData> dataList,
+    String symbol,
+  ) async {
+    const int batchSize = 1000;
+    int totalRecords = dataList.length;
+
+    for (int i = 0; i < totalRecords; i += batchSize) {
+      final batch = dataList.skip(i).take(batchSize).map((data) {
+        return CandlesCompanion.insert(
+          date: data.date,
+          symbol: symbol,
+          open: Value(data.open),
+          high: Value(data.high),
+          low: Value(data.low),
+          close: Value(data.close),
+          adjClose: Value(data.adjClose),
+          volume: Value(data.volume),
+        );
+      }).toList();
+
+      await db.batch((batchBuilder) {
+        batchBuilder.insertAllOnConflictUpdate(
+          db.candles,
+          batch,
+        );
+      });
+
+      debugPrint('Inserted ${i + batch.length} of $totalRecords records');
+    }
   }
 
   double safePercentChange(double oldValue, double newValue) {
@@ -156,25 +228,36 @@ class _ChartPageState extends State<ChartPage> {
                 VoidCallback onFieldSubmitted,
               ) {
                 stock = fieldTextEditingController;
+                Widget leading = const Padding(
+                  padding: EdgeInsets.only(left: 16.0, right: 8.0),
+                  child: Icon(Icons.search),
+                );
+                if (loading)
+                  leading = const Padding(
+                    padding: EdgeInsets.only(left: 16.0, right: 8.0),
+                    child: SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                else if (stock.text.isNotEmpty)
+                  leading = IconButton(
+                    onPressed: () {
+                      setState(() {
+                        stock.text = '';
+                      });
+                    },
+                    icon: const Icon(Icons.arrow_back),
+                    padding: const EdgeInsets.only(
+                      left: 16.0,
+                      right: 8.0,
+                    ),
+                  );
+
                 return SearchBar(
                   controller: fieldTextEditingController,
-                  leading: stock.text.isEmpty
-                      ? const Padding(
-                          padding: EdgeInsets.only(left: 16.0, right: 8.0),
-                          child: Icon(Icons.search),
-                        )
-                      : IconButton(
-                          onPressed: () {
-                            setState(() {
-                              stock.text = '';
-                            });
-                          },
-                          icon: const Icon(Icons.arrow_back),
-                          padding: const EdgeInsets.only(
-                            left: 16.0,
-                            right: 8.0,
-                          ),
-                        ),
+                  leading: leading,
                   focusNode: fieldFocusNode,
                   hintText: 'Search...',
                   onTap: () => stock.selection = TextSelection(
@@ -209,17 +292,14 @@ class _ChartPageState extends State<ChartPage> {
           ),
           const SizedBox(height: 16),
           Wrap(
-            children: [
-              ...monthButtons,
-              ...yearButtons,
-            ],
+            children: monthButtons + yearButtons,
           ),
-          FutureBuilder(
-            future: future,
+          StreamBuilder(
+            stream: stream,
             builder: chartBuilder,
           ),
-          FutureBuilder(
-            future: future,
+          StreamBuilder(
+            stream: stream,
             builder: summaryBuilder,
           ),
         ],
@@ -227,68 +307,19 @@ class _ChartPageState extends State<ChartPage> {
     );
   }
 
-  Widget buttonsBuilder(
-    BuildContext context,
-    AsyncSnapshot<List<Ticker>> snapshot,
-  ) {
-    if (snapshot.hasError) return ErrorWidget(snapshot.error.toString());
-    if (snapshot.data == null) return const SizedBox();
-
-    if (snapshot.data?.isNotEmpty == true)
-      return TextButton.icon(
-        onPressed: () async {
-          final symbol = stock.text.split(' ').first;
-          (db.tickers.delete()..where((u) => u.symbol.equals(symbol))).go();
-          if (context.mounted) toast(context, 'Removed $symbol from portfolio');
-        },
-        label: const Text("Remove"),
-        icon: const Icon(Icons.remove),
-      );
-
-    return TextButton.icon(
-      onPressed: () async {
-        final data = (await future).candlesData;
-        final percentChange =
-            safePercentChange(data.first.close, data.last.close);
-        final symbol = stock.text.split(' ').first;
-        (db.tickers.insertOne(
-          TickersCompanion.insert(
-            symbol: symbol,
-            amount: 0,
-            change: percentChange,
-            name: stock.text
-                .split(' ')
-                .sublist(1)
-                .join(' ')
-                .replaceAll(RegExp(r'\(|\)'), ''),
-          ),
-        ));
-        if (context.mounted) toast(context, 'Added $symbol to portfolio');
-      },
-      label: const Text("Add"),
-      icon: const Icon(Icons.add),
-    );
-  }
-
   Widget chartBuilder(
     BuildContext context,
-    AsyncSnapshot<YahooFinanceResponse> snapshot,
+    AsyncSnapshot<List<CandleTicker>> snapshot,
   ) {
-    if (snapshot.connectionState != ConnectionState.done)
-      return const Center(
-        child: SizedBox(
-          height: 50,
-          width: 50,
-          child: CircularProgressIndicator(),
-        ),
-      );
-    if (snapshot.data == null)
+    if (snapshot.hasError) return ErrorWidget(snapshot.error.toString());
+    if (snapshot.data == null || snapshot.data!.isEmpty)
       return const ListTile(
         title: Text("No data found"),
         subtitle: Text("Are you sure you typed it correctly?"),
       );
 
-    final candles = snapshot.data!.candlesData;
+    final candles =
+        snapshot.data!.map((tickerCandle) => tickerCandle.candle).toList();
     List<FlSpot> spots = [];
     for (var index = 0; index < candles.length; index++) {
       spots.add(FlSpot(index.toDouble(), candles[index].close));
@@ -303,13 +334,13 @@ class _ChartPageState extends State<ChartPage> {
 
   Widget summaryBuilder(
     BuildContext context,
-    AsyncSnapshot<YahooFinanceResponse> snapshot,
+    AsyncSnapshot<List<CandleTicker>> snapshot,
   ) {
-    if (snapshot.connectionState != ConnectionState.done)
+    if (!snapshot.hasData || snapshot.data == null || snapshot.data!.isEmpty)
       return const SizedBox();
-    if (!snapshot.hasData || snapshot.data == null) return const SizedBox();
 
-    final candles = snapshot.data!.candlesData;
+    final candles =
+        snapshot.data!.map((tickerCandle) => tickerCandle.candle).toList();
     var percentChange =
         safePercentChange(candles.first.close, candles.last.close);
     var color = Colors.green;
@@ -331,7 +362,40 @@ class _ChartPageState extends State<ChartPage> {
             "\$${candles.last.close.toStringAsFixed(2)}",
             style: Theme.of(context).textTheme.titleLarge,
           ),
-          StreamBuilder(stream: tickerStream, builder: buttonsBuilder),
+          if (snapshot.data?.first.ticker != null)
+            TextButton.icon(
+              onPressed: () async {
+                final symbol = stock.text.split(' ').first;
+                (db.tickers.delete()..where((u) => u.symbol.equals(symbol)))
+                    .go();
+                if (context.mounted)
+                  toast(context, 'Removed $symbol from portfolio');
+              },
+              label: const Text("Remove"),
+              icon: const Icon(Icons.remove),
+            ),
+          if (snapshot.data?.first.ticker == null)
+            TextButton.icon(
+              onPressed: () async {
+                final symbol = stock.text.split(' ').first;
+                (db.tickers.insertOne(
+                  TickersCompanion.insert(
+                    symbol: symbol,
+                    amount: 0,
+                    change: percentChange,
+                    name: stock.text
+                        .split(' ')
+                        .sublist(1)
+                        .join(' ')
+                        .replaceAll(RegExp(r'\(|\)'), ''),
+                  ),
+                ));
+                if (context.mounted)
+                  toast(context, 'Added $symbol to portfolio');
+              },
+              label: const Text("Add"),
+              icon: const Icon(Icons.add),
+            ),
         ],
       ),
     );

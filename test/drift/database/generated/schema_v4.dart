@@ -327,6 +327,12 @@ class Candles extends Table with TableInfo<Candles, CandlesData> {
       requiredDuringInsert: false,
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  late final GeneratedColumn<String> symbol = GeneratedColumn<String>(
+      'symbol', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: true,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES tickers (symbol)'));
   late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
       'date', aliasedName, false,
       type: DriftSqlType.dateTime, requiredDuringInsert: true);
@@ -362,7 +368,7 @@ class Candles extends Table with TableInfo<Candles, CandlesData> {
       defaultValue: const CustomExpression('-1.0'));
   @override
   List<GeneratedColumn> get $columns =>
-      [id, date, open, high, low, close, volume, adjClose];
+      [id, symbol, date, open, high, low, close, volume, adjClose];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -371,11 +377,17 @@ class Candles extends Table with TableInfo<Candles, CandlesData> {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+        {id, symbol, date},
+      ];
+  @override
   CandlesData map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return CandlesData(
       id: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      symbol: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}symbol'])!,
       date: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}date'])!,
       open: attachedDatabase.typeMapping
@@ -401,6 +413,7 @@ class Candles extends Table with TableInfo<Candles, CandlesData> {
 
 class CandlesData extends DataClass implements Insertable<CandlesData> {
   final int id;
+  final String symbol;
   final DateTime date;
   final double open;
   final double high;
@@ -410,6 +423,7 @@ class CandlesData extends DataClass implements Insertable<CandlesData> {
   final double adjClose;
   const CandlesData(
       {required this.id,
+      required this.symbol,
       required this.date,
       required this.open,
       required this.high,
@@ -421,6 +435,7 @@ class CandlesData extends DataClass implements Insertable<CandlesData> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
+    map['symbol'] = Variable<String>(symbol);
     map['date'] = Variable<DateTime>(date);
     map['open'] = Variable<double>(open);
     map['high'] = Variable<double>(high);
@@ -434,6 +449,7 @@ class CandlesData extends DataClass implements Insertable<CandlesData> {
   CandlesCompanion toCompanion(bool nullToAbsent) {
     return CandlesCompanion(
       id: Value(id),
+      symbol: Value(symbol),
       date: Value(date),
       open: Value(open),
       high: Value(high),
@@ -449,6 +465,7 @@ class CandlesData extends DataClass implements Insertable<CandlesData> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return CandlesData(
       id: serializer.fromJson<int>(json['id']),
+      symbol: serializer.fromJson<String>(json['symbol']),
       date: serializer.fromJson<DateTime>(json['date']),
       open: serializer.fromJson<double>(json['open']),
       high: serializer.fromJson<double>(json['high']),
@@ -463,6 +480,7 @@ class CandlesData extends DataClass implements Insertable<CandlesData> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
+      'symbol': serializer.toJson<String>(symbol),
       'date': serializer.toJson<DateTime>(date),
       'open': serializer.toJson<double>(open),
       'high': serializer.toJson<double>(high),
@@ -475,6 +493,7 @@ class CandlesData extends DataClass implements Insertable<CandlesData> {
 
   CandlesData copyWith(
           {int? id,
+          String? symbol,
           DateTime? date,
           double? open,
           double? high,
@@ -484,6 +503,7 @@ class CandlesData extends DataClass implements Insertable<CandlesData> {
           double? adjClose}) =>
       CandlesData(
         id: id ?? this.id,
+        symbol: symbol ?? this.symbol,
         date: date ?? this.date,
         open: open ?? this.open,
         high: high ?? this.high,
@@ -495,6 +515,7 @@ class CandlesData extends DataClass implements Insertable<CandlesData> {
   CandlesData copyWithCompanion(CandlesCompanion data) {
     return CandlesData(
       id: data.id.present ? data.id.value : this.id,
+      symbol: data.symbol.present ? data.symbol.value : this.symbol,
       date: data.date.present ? data.date.value : this.date,
       open: data.open.present ? data.open.value : this.open,
       high: data.high.present ? data.high.value : this.high,
@@ -509,6 +530,7 @@ class CandlesData extends DataClass implements Insertable<CandlesData> {
   String toString() {
     return (StringBuffer('CandlesData(')
           ..write('id: $id, ')
+          ..write('symbol: $symbol, ')
           ..write('date: $date, ')
           ..write('open: $open, ')
           ..write('high: $high, ')
@@ -522,12 +544,13 @@ class CandlesData extends DataClass implements Insertable<CandlesData> {
 
   @override
   int get hashCode =>
-      Object.hash(id, date, open, high, low, close, volume, adjClose);
+      Object.hash(id, symbol, date, open, high, low, close, volume, adjClose);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is CandlesData &&
           other.id == this.id &&
+          other.symbol == this.symbol &&
           other.date == this.date &&
           other.open == this.open &&
           other.high == this.high &&
@@ -539,6 +562,7 @@ class CandlesData extends DataClass implements Insertable<CandlesData> {
 
 class CandlesCompanion extends UpdateCompanion<CandlesData> {
   final Value<int> id;
+  final Value<String> symbol;
   final Value<DateTime> date;
   final Value<double> open;
   final Value<double> high;
@@ -548,6 +572,7 @@ class CandlesCompanion extends UpdateCompanion<CandlesData> {
   final Value<double> adjClose;
   const CandlesCompanion({
     this.id = const Value.absent(),
+    this.symbol = const Value.absent(),
     this.date = const Value.absent(),
     this.open = const Value.absent(),
     this.high = const Value.absent(),
@@ -558,6 +583,7 @@ class CandlesCompanion extends UpdateCompanion<CandlesData> {
   });
   CandlesCompanion.insert({
     this.id = const Value.absent(),
+    required String symbol,
     required DateTime date,
     this.open = const Value.absent(),
     this.high = const Value.absent(),
@@ -565,9 +591,11 @@ class CandlesCompanion extends UpdateCompanion<CandlesData> {
     this.close = const Value.absent(),
     this.volume = const Value.absent(),
     this.adjClose = const Value.absent(),
-  }) : date = Value(date);
+  })  : symbol = Value(symbol),
+        date = Value(date);
   static Insertable<CandlesData> custom({
     Expression<int>? id,
+    Expression<String>? symbol,
     Expression<DateTime>? date,
     Expression<double>? open,
     Expression<double>? high,
@@ -578,6 +606,7 @@ class CandlesCompanion extends UpdateCompanion<CandlesData> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (symbol != null) 'symbol': symbol,
       if (date != null) 'date': date,
       if (open != null) 'open': open,
       if (high != null) 'high': high,
@@ -590,6 +619,7 @@ class CandlesCompanion extends UpdateCompanion<CandlesData> {
 
   CandlesCompanion copyWith(
       {Value<int>? id,
+      Value<String>? symbol,
       Value<DateTime>? date,
       Value<double>? open,
       Value<double>? high,
@@ -599,6 +629,7 @@ class CandlesCompanion extends UpdateCompanion<CandlesData> {
       Value<double>? adjClose}) {
     return CandlesCompanion(
       id: id ?? this.id,
+      symbol: symbol ?? this.symbol,
       date: date ?? this.date,
       open: open ?? this.open,
       high: high ?? this.high,
@@ -614,6 +645,9 @@ class CandlesCompanion extends UpdateCompanion<CandlesData> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<int>(id.value);
+    }
+    if (symbol.present) {
+      map['symbol'] = Variable<String>(symbol.value);
     }
     if (date.present) {
       map['date'] = Variable<DateTime>(date.value);
@@ -643,6 +677,7 @@ class CandlesCompanion extends UpdateCompanion<CandlesData> {
   String toString() {
     return (StringBuffer('CandlesCompanion(')
           ..write('id: $id, ')
+          ..write('symbol: $symbol, ')
           ..write('date: $date, ')
           ..write('open: $open, ')
           ..write('high: $high, ')

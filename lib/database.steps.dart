@@ -150,7 +150,9 @@ final class Schema4 extends i0.VersionedSchema {
         entityName: 'candles',
         withoutRowId: false,
         isStrict: false,
-        tableConstraints: [],
+        tableConstraints: [
+          'UNIQUE(id, symbol, date)',
+        ],
         columns: [
           _column_0,
           _column_7,
@@ -160,6 +162,7 @@ final class Schema4 extends i0.VersionedSchema {
           _column_11,
           _column_12,
           _column_13,
+          _column_14,
         ],
         attachedDatabase: database,
       ),
@@ -170,6 +173,8 @@ class Shape2 extends i0.VersionedTable {
   Shape2({required super.source, required super.alias}) : super.aliased();
   i1.GeneratedColumn<int> get id =>
       columnsByName['id']! as i1.GeneratedColumn<int>;
+  i1.GeneratedColumn<String> get symbol =>
+      columnsByName['symbol']! as i1.GeneratedColumn<String>;
   i1.GeneratedColumn<DateTime> get date =>
       columnsByName['date']! as i1.GeneratedColumn<DateTime>;
   i1.GeneratedColumn<double> get open =>
@@ -186,29 +191,34 @@ class Shape2 extends i0.VersionedTable {
       columnsByName['adj_close']! as i1.GeneratedColumn<double>;
 }
 
-i1.GeneratedColumn<DateTime> _column_7(String aliasedName) =>
+i1.GeneratedColumn<String> _column_7(String aliasedName) =>
+    i1.GeneratedColumn<String>('symbol', aliasedName, false,
+        type: i1.DriftSqlType.string,
+        defaultConstraints: i1.GeneratedColumn.constraintIsAlways(
+            'REFERENCES tickers (symbol)'));
+i1.GeneratedColumn<DateTime> _column_8(String aliasedName) =>
     i1.GeneratedColumn<DateTime>('date', aliasedName, false,
         type: i1.DriftSqlType.dateTime);
-i1.GeneratedColumn<double> _column_8(String aliasedName) =>
+i1.GeneratedColumn<double> _column_9(String aliasedName) =>
     i1.GeneratedColumn<double>('open', aliasedName, false,
         type: i1.DriftSqlType.double,
         defaultValue: const CustomExpression('-1.0'));
-i1.GeneratedColumn<double> _column_9(String aliasedName) =>
+i1.GeneratedColumn<double> _column_10(String aliasedName) =>
     i1.GeneratedColumn<double>('high', aliasedName, false,
         type: i1.DriftSqlType.double,
         defaultValue: const CustomExpression('-1.0'));
-i1.GeneratedColumn<double> _column_10(String aliasedName) =>
+i1.GeneratedColumn<double> _column_11(String aliasedName) =>
     i1.GeneratedColumn<double>('low', aliasedName, false,
         type: i1.DriftSqlType.double,
         defaultValue: const CustomExpression('-1.0'));
-i1.GeneratedColumn<double> _column_11(String aliasedName) =>
+i1.GeneratedColumn<double> _column_12(String aliasedName) =>
     i1.GeneratedColumn<double>('close', aliasedName, false,
         type: i1.DriftSqlType.double,
         defaultValue: const CustomExpression('-1.0'));
-i1.GeneratedColumn<int> _column_12(String aliasedName) =>
+i1.GeneratedColumn<int> _column_13(String aliasedName) =>
     i1.GeneratedColumn<int>('volume', aliasedName, false,
         type: i1.DriftSqlType.int, defaultValue: const CustomExpression('0'));
-i1.GeneratedColumn<double> _column_13(String aliasedName) =>
+i1.GeneratedColumn<double> _column_14(String aliasedName) =>
     i1.GeneratedColumn<double>('adj_close', aliasedName, false,
         type: i1.DriftSqlType.double,
         defaultValue: const CustomExpression('-1.0'));
