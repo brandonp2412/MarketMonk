@@ -9,3 +9,14 @@ class Tickers extends Table {
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
   RealColumn get amount => real()();
 }
+
+class Candles extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  DateTimeColumn get date => dateTime()();
+  RealColumn get open => real().withDefault(const Constant(-1.0))();
+  RealColumn get high => real().withDefault(const Constant(-1.0))();
+  RealColumn get low => real().withDefault(const Constant(-1.0))();
+  RealColumn get close => real().withDefault(const Constant(-1.0))();
+  IntColumn get volume => integer().withDefault(const Constant(0))();
+  RealColumn get adjClose => real().withDefault(const Constant(-1.0))();
+}

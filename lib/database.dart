@@ -9,18 +9,16 @@ import 'package:path_provider/path_provider.dart';
 
 part 'database.g.dart';
 
-@DriftDatabase(tables: [Tickers])
+@DriftDatabase(tables: [Tickers, Candles])
 class Database extends _$Database {
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   Database() : super(_openConnection());
 
   Database.connect(super.executor);
 
   static QueryExecutor _openConnection() {
-    getApplicationSupportDirectory().then(print);
-
     return driftDatabase(
       name: 'market-monk',
       native: const DriftNativeOptions(
@@ -75,6 +73,9 @@ class Database extends _$Database {
     from2To3: (Migrator m, Schema3 schema) async {
       await schema.tickers.deleteAll();
       await m.addColumn(schema.tickers, schema.tickers.name);
+    },
+    from3To4: (Migrator m, Schema4 schema) async {
+      await m.createTable(schema.candles);
     },
   );
 }
