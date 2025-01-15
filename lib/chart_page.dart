@@ -238,8 +238,8 @@ class _ChartPageState extends State<ChartPage> {
       return TextButton.icon(
         onPressed: () async {
           final symbol = stock.text.split(' ').first;
-          await (db.tickers.delete()..where((u) => u.symbol.equals(symbol)))
-              .go();
+          (db.tickers.delete()..where((u) => u.symbol.equals(symbol))).go();
+          if (context.mounted) toast(context, 'Removed $symbol from portfolio');
         },
         label: const Text("Remove"),
         icon: const Icon(Icons.remove),
@@ -263,6 +263,7 @@ class _ChartPageState extends State<ChartPage> {
                 .replaceAll(RegExp(r'\(|\)'), ''),
           ),
         ));
+        if (context.mounted) toast(context, 'Added $symbol to portfolio');
       },
       label: const Text("Add"),
       icon: const Icon(Icons.add),
