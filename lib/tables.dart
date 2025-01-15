@@ -8,6 +8,7 @@ class Tickers extends Table {
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
   RealColumn get amount => real()();
+  RealColumn get price => real()();
 }
 
 class Candles extends Table {

@@ -12,7 +12,7 @@ part 'database.g.dart';
 @DriftDatabase(tables: [Tickers, Candles])
 class Database extends _$Database {
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   Database() : super(_openConnection());
 
@@ -55,9 +55,7 @@ class Database extends _$Database {
         await customStatement('PRAGMA foreign_keys = ON');
       },
       beforeOpen: (details) async {
-        // For Flutter apps, this should be wrapped in an if (kDebugMode) as
-        // suggested here: https://drift.simonbinder.eu/Migrations/tests/#verifying-a-database-schema-at-runtime
-        await validateDatabaseSchema();
+        if (kDebugMode) await validateDatabaseSchema();
       },
     );
   }
@@ -76,6 +74,10 @@ class Database extends _$Database {
     },
     from3To4: (Migrator m, Schema4 schema) async {
       await m.createTable(schema.candles);
+    },
+    from4To5: (Migrator m, Schema5 schema) async {
+      await schema.tickers.deleteAll();
+      await m.addColumn(schema.tickers, schema.tickers.price);
     },
   );
 }

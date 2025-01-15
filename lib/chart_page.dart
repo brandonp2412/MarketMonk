@@ -484,6 +484,7 @@ class _ChartPageState extends State<ChartPage>
                         symbol: symbol,
                         amount: 0,
                         change: percentChange,
+                        price: candles.last.close.value,
                         name: stock.text
                             .split(' ')
                             .sublist(1)
