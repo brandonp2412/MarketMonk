@@ -5,6 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:intl/intl.dart';
+import 'package:market_monk/candle_ticker.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_page.dart';
@@ -13,13 +14,6 @@ import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
-
-class CandleTicker {
-  final CandlesCompanion candle;
-  final TickersCompanion? ticker;
-
-  CandleTicker({this.ticker, required this.candle});
-}
 
 class ChartPage extends StatefulWidget {
   const ChartPage({super.key});
@@ -44,6 +38,7 @@ class _ChartPageState extends State<ChartPage>
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     List<Widget> yearButtons = [];
     final yearOptions = [1, 2, 3, 5, 10];
     for (final option in yearOptions) {
