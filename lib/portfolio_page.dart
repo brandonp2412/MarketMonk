@@ -76,6 +76,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
 
               return Expanded(
                 child: ListView.builder(
+                  padding: const EdgeInsets.all(0),
                   itemBuilder: (context, index) {
                     final ticker = tickers[index];
 
