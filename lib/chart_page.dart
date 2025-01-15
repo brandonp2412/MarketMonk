@@ -175,6 +175,7 @@ class _ChartPageState extends State<ChartPage> {
             stream: stream,
             builder: chartBuilder,
           ),
+          const SizedBox(height: 8),
           StreamBuilder(
             stream: stream,
             builder: summaryBuilder,
@@ -190,8 +191,7 @@ class _ChartPageState extends State<ChartPage> {
   ) {
     if (snapshot.hasError) return ErrorWidget(snapshot.error.toString());
     if (loading && snapshot.data?.isEmpty == true) return const SizedBox();
-    if (snapshot.data == null)
-      return const ListTile(title: Text("Pick a stock"));
+    if (snapshot.data == null) return const SizedBox();
     if (snapshot.data!.isEmpty)
       return const ListTile(
         title: Text("No data found"),
@@ -417,6 +417,7 @@ class _ChartPageState extends State<ChartPage> {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: material.Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Wrap(
             children: [
@@ -433,9 +434,9 @@ class _ChartPageState extends State<ChartPage> {
                 "\$${candles.last.close.value.toStringAsFixed(2)}",
                 style: Theme.of(context).textTheme.titleLarge,
               ),
-              const SizedBox(width: 8),
             ],
           ),
+          const SizedBox(height: 16),
           Wrap(
             children: [
               if (snapshot.data?.first.ticker != null)
