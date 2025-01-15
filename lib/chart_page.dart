@@ -6,6 +6,7 @@ import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
+import 'package:test/test.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
 import 'package:market_monk/symbol.dart';
 
@@ -36,20 +37,30 @@ class _ChartPageState extends State<ChartPage> {
   void setStream() {
     final now = DateTime.now();
     final after = DateTime(now.year - year, now.month - month, now.day);
-    stream = (db.select(db.candles)
+    const weekExpression = CustomExpression<String>(
+      "STRFTIME('%Y-%m-%W', DATE(\"date\", 'unixepoch', 'localtime'))",
+    );
+    Iterable<Expression<Object>> groupBy = [db.candles.id];
+    if (year > 0 || month > 5) groupBy = [weekExpression];
+
+    stream = (db.selectOnly(db.candles)
+          ..addColumns([
+            ...db.candles.$columns,
+            ...db.tickers.$columns,
+          ])
           ..where(
-            (tbl) =>
-                tbl.symbol.equals(stock.text.split(' ').first) &
-                tbl.date.isBiggerThanValue(after),
+            db.candles.symbol.equals(stock.text.split(' ').first) &
+                db.candles.date.isBiggerThanValue(after),
           )
           ..orderBy(
             [
-              (u) => OrderingTerm(
-                    expression: u.date,
-                    mode: OrderingMode.asc,
-                  ),
+              OrderingTerm(
+                expression: db.candles.date,
+                mode: OrderingMode.asc,
+              ),
             ],
-          ))
+          )
+          ..groupBy(groupBy))
         .join([
           leftOuterJoin(
             db.tickers,
@@ -61,8 +72,28 @@ class _ChartPageState extends State<ChartPage> {
           (results) => results
               .map(
                 (result) => CandleTicker(
-                  candle: result.readTable(db.candles),
-                  ticker: result.readTableOrNull(db.tickers),
+                  candle: Candle(
+                    id: result.read(db.candles.id)!,
+                    symbol: result.read(db.candles.symbol)!,
+                    date: result.read(db.candles.date)!,
+                    open: result.read(db.candles.open)!,
+                    high: result.read(db.candles.high)!,
+                    low: result.read(db.candles.low)!,
+                    close: result.read(db.candles.close)!,
+                    volume: result.read(db.candles.volume)!,
+                    adjClose: result.read(db.candles.adjClose)!,
+                  ),
+                  ticker: result.read(db.tickers.id) != null
+                      ? Ticker(
+                          id: result.read(db.tickers.id)!,
+                          symbol: result.read(db.tickers.symbol)!,
+                          name: result.read(db.tickers.name)!,
+                          change: result.read(db.tickers.change)!,
+                          createdAt: result.read(db.tickers.createdAt)!,
+                          updatedAt: result.read(db.tickers.updatedAt)!,
+                          amount: result.read(db.tickers.amount)!,
+                        )
+                      : null,
                 ),
               )
               .toList(),
@@ -74,12 +105,46 @@ class _ChartPageState extends State<ChartPage> {
   @override
   void initState() {
     super.initState();
-    loadData();
+    refreshData();
     getSymbols().then(
       (value) => setState(() {
         symbols = value;
       }),
     );
+  }
+
+  void refreshData() async {
+    setStream();
+    setState(() {
+      loading = true;
+    });
+
+    try {
+      final symbol = stock.text.split(' ').first;
+      final latest = await (db.candles.select()
+            ..where((tbl) => tbl.symbol.equals(symbol))
+            ..orderBy(
+              [
+                (u) => OrderingTerm(
+                      expression: u.date,
+                      mode: OrderingMode.desc,
+                    ),
+              ],
+            )
+            ..limit(1))
+          .getSingle();
+      final response = await const YahooFinanceDailyReader().getDailyDTOs(
+        symbol,
+        startDate: latest.date,
+      );
+      await insertCandles(response.candlesData, symbol);
+    } catch (error) {
+      if (mounted) toast(context, error.toString());
+    } finally {
+      setState(() {
+        loading = false;
+      });
+    }
   }
 
   void loadData() async {
@@ -91,7 +156,6 @@ class _ChartPageState extends State<ChartPage> {
       final symbol = stock.text.split(' ').first;
       final response = await const YahooFinanceDailyReader().getDailyDTOs(
         symbol,
-        startDate: DateTime(now.year - year, now.month - month, now.day),
       );
       await insertCandles(response.candlesData, symbol);
     } finally {
@@ -151,7 +215,7 @@ class _ChartPageState extends State<ChartPage> {
               year = option;
               month = 0;
             });
-            loadData();
+            setStream();
           },
           style: OutlinedButton.styleFrom(
             side: BorderSide(
@@ -175,7 +239,7 @@ class _ChartPageState extends State<ChartPage> {
               month = option;
               year = 0;
             });
-            loadData();
+            setStream();
           },
           style: OutlinedButton.styleFrom(
             side: BorderSide(
@@ -312,7 +376,8 @@ class _ChartPageState extends State<ChartPage> {
     AsyncSnapshot<List<CandleTicker>> snapshot,
   ) {
     if (snapshot.hasError) return ErrorWidget(snapshot.error.toString());
-    if (snapshot.data == null || snapshot.data!.isEmpty)
+    if (loading && snapshot.data?.isEmpty == true) return const SizedBox();
+    if (snapshot.data!.isEmpty)
       return const ListTile(
         title: Text("No data found"),
         subtitle: Text("Are you sure you typed it correctly?"),
