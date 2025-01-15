@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/material.dart' as material;
@@ -32,7 +34,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
       padding: const EdgeInsets.all(8.0),
       child: material.Column(
         children: [
-          const SizedBox(height: 40),
+          if (Platform.isAndroid) const SizedBox(height: 40),
           SearchBar(
             controller: search,
             hintText: 'Search...',
