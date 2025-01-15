@@ -1,8 +1,12 @@
 import 'dart:convert';
 
+import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:market_monk/database.dart';
+import 'package:market_monk/main.dart';
 import 'package:market_monk/symbol.dart';
+import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
 
 Future<List<Symbol>> getSymbols() async {
   final List<dynamic> nasdaq = json
@@ -32,4 +36,35 @@ void toast(BuildContext context, String message, [SnackBarAction? action]) {
       action: action ?? defaultAction,
     ),
   );
+}
+
+Future<void> insertCandles(
+  List<YahooFinanceCandleData> dataList,
+  String symbol,
+) async {
+  const int batchSize = 1000;
+
+  for (int i = 0; i < dataList.length; i += batchSize) {
+    final batch = dataList.skip(i).take(batchSize).map((data) {
+      return CandlesCompanion.insert(
+        date: data.date,
+        symbol: symbol,
+        open: Value(data.open),
+        high: Value(data.high),
+        low: Value(data.low),
+        close: Value(data.close),
+        adjClose: Value(data.adjClose),
+        volume: Value(data.volume),
+      );
+    }).toList();
+
+    await db.batch((batchBuilder) {
+      batchBuilder.insertAllOnConflictUpdate(
+        db.candles,
+        batch,
+      );
+    });
+
+    debugPrint('Inserted ${i + batch.length}');
+  }
 }

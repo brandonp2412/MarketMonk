@@ -284,37 +284,6 @@ class _ChartPageState extends State<ChartPage>
     updateData();
   }
 
-  Future<void> insertCandles(
-    List<YahooFinanceCandleData> dataList,
-    String symbol,
-  ) async {
-    const int batchSize = 1000;
-
-    for (int i = 0; i < dataList.length; i += batchSize) {
-      final batch = dataList.skip(i).take(batchSize).map((data) {
-        return CandlesCompanion.insert(
-          date: data.date,
-          symbol: symbol,
-          open: Value(data.open),
-          high: Value(data.high),
-          low: Value(data.low),
-          close: Value(data.close),
-          adjClose: Value(data.adjClose),
-          volume: Value(data.volume),
-        );
-      }).toList();
-
-      await db.batch((batchBuilder) {
-        batchBuilder.insertAllOnConflictUpdate(
-          db.candles,
-          batch,
-        );
-      });
-
-      debugPrint('Inserted ${i + batch.length}');
-    }
-  }
-
   void updateData() async {
     if (stock.text.isEmpty) return;
     setStream();
