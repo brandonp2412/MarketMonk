@@ -1,4 +1,4 @@
-package com.example.market_monk
+package com.codesail.market_monk
 
 import io.flutter.embedding.android.FlutterActivity
 
