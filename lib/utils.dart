@@ -5,10 +5,15 @@ import 'package:flutter/services.dart';
 import 'package:market_monk/symbol.dart';
 
 Future<List<Symbol>> getSymbols() async {
-  final String response =
-      await rootBundle.loadString('assets/nasdaq-full-tickers.json');
-  final List<dynamic> jsonData = json.decode(response);
-  return jsonData.map((d) => Symbol.fromJson(d)).toList();
+  final List<dynamic> nasdaq = json
+      .decode(await rootBundle.loadString('assets/nasdaq-full-tickers.json'));
+  final List<dynamic> amex =
+      json.decode(await rootBundle.loadString('assets/amex-full-tickers.json'));
+  final List<dynamic> nyse =
+      json.decode(await rootBundle.loadString('assets/nyse-full-tickers.json'));
+  return nasdaq.map((d) => Symbol.fromJson(d)).toList() +
+      amex.map((d) => Symbol.fromJson(d)).toList() +
+      nyse.map((d) => Symbol.fromJson(d)).toList();
 }
 
 void toast(BuildContext context, String message, [SnackBarAction? action]) {

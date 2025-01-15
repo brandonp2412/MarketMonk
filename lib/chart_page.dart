@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' as material;
 import 'package:intl/intl.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
@@ -168,16 +169,6 @@ class _ChartPageState extends State<ChartPage> {
                     for (final option in symbols) {
                       if (option.value.toLowerCase() == text.toLowerCase())
                         selection = '${option.value} (${option.name})';
-                      else if (selection == null &&
-                          option.value
-                              .toLowerCase()
-                              .contains(text.toLowerCase()))
-                        selection = '${option.value} (${option.name})';
-                      else if (selection == null &&
-                          option.name
-                              .toLowerCase()
-                              .contains(text.toLowerCase()))
-                        selection = '${option.value} (${option.name})';
                     }
                     selection ??= text;
                     stock.text = selection.toUpperCase();
@@ -271,9 +262,8 @@ class _ChartPageState extends State<ChartPage> {
     String symbol,
   ) async {
     const int batchSize = 1000;
-    int totalRecords = dataList.length;
 
-    for (int i = 0; i < totalRecords; i += batchSize) {
+    for (int i = 0; i < dataList.length; i += batchSize) {
       final batch = dataList.skip(i).take(batchSize).map((data) {
         return CandlesCompanion.insert(
           date: data.date,
@@ -294,7 +284,7 @@ class _ChartPageState extends State<ChartPage> {
         );
       });
 
-      debugPrint('Inserted ${i + batch.length} of $totalRecords records');
+      debugPrint('Inserted ${i + batch.length}');
     }
   }
 
@@ -440,80 +430,90 @@ class _ChartPageState extends State<ChartPage> {
 
     return Padding(
       padding: const EdgeInsets.all(16.0),
-      child: Row(
+      child: material.Column(
         children: [
-          Icon(Icons.arrow_upward, color: color),
-          Text(
-            "$percentStr%",
-            style:
-                Theme.of(context).textTheme.titleLarge!.copyWith(color: color),
+          Wrap(
+            children: [
+              Icon(Icons.arrow_upward, color: color),
+              Text(
+                "$percentStr%",
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge!
+                    .copyWith(color: color),
+              ),
+              const SizedBox(width: 16),
+              Text(
+                "\$${candles.last.close.toStringAsFixed(2)}",
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(width: 8),
+            ],
           ),
-          const SizedBox(width: 16),
-          Text(
-            "\$${candles.last.close.toStringAsFixed(2)}",
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(width: 8),
-          if (snapshot.data?.first.ticker != null)
-            TextButton.icon(
-              onPressed: () async {
-                final symbol = stock.text.split(' ').first;
-                (db.tickers.delete()..where((u) => u.symbol.equals(symbol)))
-                    .go();
-                if (context.mounted)
-                  toast(context, 'Removed $symbol from portfolio');
-              },
-              label: const Text("Remove"),
-              icon: const Icon(Icons.remove),
-            ),
-          if (snapshot.data?.first.ticker == null)
-            TextButton.icon(
-              onPressed: () async {
-                final symbol = stock.text.split(' ').first;
-                (db.tickers.insertOne(
-                  TickersCompanion.insert(
-                    symbol: symbol,
-                    amount: 0,
-                    change: percentChange,
-                    name: stock.text
-                        .split(' ')
-                        .sublist(1)
-                        .join(' ')
-                        .replaceAll(RegExp(r'\(|\)'), ''),
-                  ),
-                ));
-                if (context.mounted)
-                  toast(context, 'Added $symbol to portfolio');
-              },
-              label: const Text("Add"),
-              icon: const Icon(Icons.add),
-            ),
-          TextButton.icon(
-            onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              if (favoriteStock == stock.text) {
-                prefs.remove('favoriteStock');
-                setState(() {
-                  favoriteStock = null;
-                });
-                if (context.mounted) toast(context, 'Removed as favorite');
-              } else {
-                prefs.setString('favoriteStock', stock.text);
-                setState(() {
-                  favoriteStock = stock.text;
-                });
-                if (context.mounted) toast(context, 'Set as favorite');
-              }
-            },
-            label: const Text("Favorite"),
-            icon: favoriteStock == stock.text
-                ? const Icon(Icons.favorite)
-                : const Icon(Icons.favorite_border),
-          ),
-          TextButton.icon(
-            onPressed: () => refreshData(),
-            label: const Text("Refresh"),
-            icon: const Icon(Icons.refresh),
+          Wrap(
+            children: [
+              if (snapshot.data?.first.ticker != null)
+                TextButton.icon(
+                  onPressed: () async {
+                    final symbol = stock.text.split(' ').first;
+                    (db.tickers.delete()..where((u) => u.symbol.equals(symbol)))
+                        .go();
+                    if (context.mounted)
+                      toast(context, 'Removed $symbol from portfolio');
+                  },
+                  label: const Text("Remove"),
+                  icon: const Icon(Icons.remove),
+                ),
+              if (snapshot.data?.first.ticker == null)
+                TextButton.icon(
+                  onPressed: () async {
+                    final symbol = stock.text.split(' ').first;
+                    (db.tickers.insertOne(
+                      TickersCompanion.insert(
+                        symbol: symbol,
+                        amount: 0,
+                        change: percentChange,
+                        name: stock.text
+                            .split(' ')
+                            .sublist(1)
+                            .join(' ')
+                            .replaceAll(RegExp(r'\(|\)'), ''),
+                      ),
+                    ));
+                    if (context.mounted)
+                      toast(context, 'Added $symbol to portfolio');
+                  },
+                  label: const Text("Add"),
+                  icon: const Icon(Icons.add),
+                ),
+              TextButton.icon(
+                onPressed: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  if (favoriteStock == stock.text) {
+                    prefs.remove('favoriteStock');
+                    setState(() {
+                      favoriteStock = null;
+                    });
+                    if (context.mounted) toast(context, 'Removed as favorite');
+                  } else {
+                    prefs.setString('favoriteStock', stock.text);
+                    setState(() {
+                      favoriteStock = stock.text;
+                    });
+                    if (context.mounted) toast(context, 'Set as favorite');
+                  }
+                },
+                label: const Text("Favorite"),
+                icon: favoriteStock == stock.text
+                    ? const Icon(Icons.favorite)
+                    : const Icon(Icons.favorite_border),
+              ),
+              TextButton.icon(
+                onPressed: () => refreshData(),
+                label: const Text("Refresh"),
+                icon: const Icon(Icons.refresh),
+              ),
+            ],
           ),
         ],
       ),
