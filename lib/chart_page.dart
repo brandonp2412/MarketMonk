@@ -320,16 +320,16 @@ class _ChartPageState extends State<ChartPage> {
       padding: const EdgeInsets.all(16.0),
       child: Row(
         children: [
-          Text(
-            "\$${candles.last.close.toStringAsFixed(2)}",
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(width: 16),
           Icon(Icons.arrow_upward, color: color),
           Text(
             "$percentStr%",
             style:
-                Theme.of(context).textTheme.titleMedium!.copyWith(color: color),
+                Theme.of(context).textTheme.titleLarge!.copyWith(color: color),
+          ),
+          const SizedBox(width: 16),
+          Text(
+            "\$${candles.last.close.toStringAsFixed(2)}",
+            style: Theme.of(context).textTheme.titleLarge,
           ),
           StreamBuilder(stream: tickerStream, builder: buttonsBuilder),
         ],
