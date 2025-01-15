@@ -426,6 +426,7 @@ class _ChartPageState extends State<ChartPage> {
             "\$${candles.last.close.toStringAsFixed(2)}",
             style: Theme.of(context).textTheme.titleLarge,
           ),
+          const SizedBox(width: 8),
           if (snapshot.data?.first.ticker != null)
             TextButton.icon(
               onPressed: () async {
@@ -460,6 +461,11 @@ class _ChartPageState extends State<ChartPage> {
               label: const Text("Add"),
               icon: const Icon(Icons.add),
             ),
+          TextButton.icon(
+            onPressed: () => refreshData(),
+            label: const Text("Refresh"),
+            icon: const Icon(Icons.refresh),
+          ),
         ],
       ),
     );
