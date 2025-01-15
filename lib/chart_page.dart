@@ -123,7 +123,7 @@ class _ChartPageState extends State<ChartPage> {
                     .map((option) => '${option.value} (${option.name})');
               },
               initialValue: stock.value,
-              onSelected: (value) => loadData(),
+              onSelected: (value) => updateData(),
               fieldViewBuilder: (
                 BuildContext context,
                 TextEditingController fieldTextEditingController,
@@ -164,7 +164,7 @@ class _ChartPageState extends State<ChartPage> {
                     }
                     selection ??= text;
                     stock.text = selection.toUpperCase();
-                    loadData();
+                    updateData();
                   },
                 );
               },
@@ -306,25 +306,6 @@ class _ChartPageState extends State<ChartPage> {
     }
   }
 
-  Future<void> loadData() async {
-    setStream();
-    setState(() {
-      loading = true;
-    });
-    try {
-      final symbol = stock.text.split(' ').first;
-      final response = await const YahooFinanceDailyReader().getDailyDTOs(
-        symbol,
-      );
-      await insertCandles(response.candlesData, symbol);
-    } finally {
-      if (mounted)
-        setState(() {
-          loading = false;
-        });
-    }
-  }
-
   void updateData() async {
     if (stock.text.isEmpty) return;
     setStream();
@@ -346,6 +327,7 @@ class _ChartPageState extends State<ChartPage> {
             )
             ..limit(1))
           .getSingleOrNull();
+
       if (latest != null) {
         final response = await const YahooFinanceDailyReader().getDailyDTOs(
           symbol,
@@ -353,7 +335,10 @@ class _ChartPageState extends State<ChartPage> {
         );
         await insertCandles(response.candlesData, symbol);
       } else {
-        await loadData();
+        final response = await const YahooFinanceDailyReader().getDailyDTOs(
+          symbol,
+        );
+        await insertCandles(response.candlesData, symbol);
       }
     } catch (error) {
       if (mounted) toast(context, error.toString());
