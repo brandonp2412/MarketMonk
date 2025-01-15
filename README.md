@@ -15,16 +15,16 @@ Track stocks on any platform 📈 - without ads or being spied on 🕵️
 
 ## Pre-publish requirements
 
-1. Offline caching
-2. Settings ⚙️
+1. <strike>Offline caching</strike>
+2. <strike>Settings ⚙</strike>️
 
 ## Platforms we intend to support
 
-1. Android
-2. iOS
-3. Windows
-4. MacOS
-5. Linux
+- <strike>Android</strike>
+- iOS
+- <strike>Windows</strike>
+- MacOS
+- Linux
 
 ## What about web?
 
@@ -38,7 +38,7 @@ Might give it a shot later on but i've had trouble with the drift package on flu
 
 ## Coming soon...
 
-4. Offline caching of stock data 😎
+4. <strike>Offline caching of stock data</strike> 😎
 5. Have portfolio amounts and track gains/losses since purchase date 🍰
 6. Customizable settings for everything! ⚙️
 7. Compare multiple stocks on line graphs
