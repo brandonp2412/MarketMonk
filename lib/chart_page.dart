@@ -7,6 +7,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:intl/intl.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/symbol.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
@@ -27,7 +28,8 @@ class ChartPage extends StatefulWidget {
   State<ChartPage> createState() => _ChartPageState();
 }
 
-class _ChartPageState extends State<ChartPage> {
+class _ChartPageState extends State<ChartPage>
+    with AutomaticKeepAliveClientMixin {
   TextEditingController stock = TextEditingController(text: "");
   String? favoriteStock;
   List<Symbol> symbols = [];
@@ -154,7 +156,19 @@ class _ChartPageState extends State<ChartPage> {
                     baseOffset: 0,
                     extentOffset: stock.text.length,
                   ),
-                  onChanged: (text) {},
+                  trailing: [
+                    IconButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SettingsPage(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.settings),
+                    ),
+                  ],
                   onSubmitted: (text) {
                     String? selection;
 
@@ -516,4 +530,7 @@ class _ChartPageState extends State<ChartPage> {
       ),
     );
   }
+
+  @override
+  bool get wantKeepAlive => true;
 }
