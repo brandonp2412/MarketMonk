@@ -7,6 +7,7 @@ import 'package:market_monk/main.dart';
 import 'package:market_monk/symbol.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
 
 class CandleTicker {
@@ -24,14 +25,14 @@ class ChartPage extends StatefulWidget {
 }
 
 class _ChartPageState extends State<ChartPage> {
-  TextEditingController stock =
-      TextEditingController(text: "GOOG (ALPHABET INC. CLASS C CAPITAL STOCK)");
+  TextEditingController stock = TextEditingController(text: "");
+  String? favoriteStock;
   List<Symbol> symbols = [];
   int year = 1;
   int month = 0;
   bool loading = false;
 
-  late Stream<List<CandleTicker>> stream;
+  Stream<List<CandleTicker>>? stream;
 
   final now = DateTime.now();
 
@@ -209,6 +210,8 @@ class _ChartPageState extends State<ChartPage> {
   ) {
     if (snapshot.hasError) return ErrorWidget(snapshot.error.toString());
     if (loading && snapshot.data?.isEmpty == true) return const SizedBox();
+    if (snapshot.data == null)
+      return const ListTile(title: Text("Pick a stock"));
     if (snapshot.data!.isEmpty)
       return const ListTile(
         title: Text("No data found"),
@@ -232,12 +235,35 @@ class _ChartPageState extends State<ChartPage> {
   @override
   void initState() {
     super.initState();
-    refreshData();
+    initData();
     getSymbols().then(
       (value) => setState(() {
         symbols = value;
       }),
     );
+  }
+
+  void initData() async {
+    final prefs = await SharedPreferences.getInstance();
+    favoriteStock = prefs.getString('favoriteStock');
+    if (favoriteStock != null)
+      stock.text = favoriteStock!;
+    else {
+      final tickers = await (db.tickers.select()
+            ..orderBy(
+              [
+                (u) => OrderingTerm(
+                      expression: u.createdAt,
+                      mode: OrderingMode.desc,
+                    ),
+              ],
+            )
+            ..limit(1))
+          .get();
+      if (tickers.isNotEmpty)
+        stock.text = "${tickers.first.symbol} (${tickers.first.name})";
+    }
+    refreshData();
   }
 
   Future<void> insertCandles(
@@ -292,6 +318,7 @@ class _ChartPageState extends State<ChartPage> {
   }
 
   void refreshData() async {
+    if (stock.text.isEmpty) return;
     setStream();
     setState(() {
       loading = true;
@@ -461,6 +488,28 @@ class _ChartPageState extends State<ChartPage> {
               label: const Text("Add"),
               icon: const Icon(Icons.add),
             ),
+          TextButton.icon(
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              if (favoriteStock == stock.text) {
+                prefs.remove('favoriteStock');
+                setState(() {
+                  favoriteStock = null;
+                });
+                if (context.mounted) toast(context, 'Removed as favorite');
+              } else {
+                prefs.setString('favoriteStock', stock.text);
+                setState(() {
+                  favoriteStock = stock.text;
+                });
+                if (context.mounted) toast(context, 'Set as favorite');
+              }
+            },
+            label: const Text("Favorite"),
+            icon: favoriteStock == stock.text
+                ? const Icon(Icons.favorite)
+                : const Icon(Icons.favorite_border),
+          ),
           TextButton.icon(
             onPressed: () => refreshData(),
             label: const Text("Refresh"),

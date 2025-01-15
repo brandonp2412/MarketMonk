@@ -15,14 +15,28 @@ class PortfolioPage extends StatefulWidget {
 }
 
 class _PortfolioPageState extends State<PortfolioPage> {
-  late Stream<List<Ticker>> stream = (db.tickers.select()).watch();
+  late Stream<List<Ticker>> stream;
   final search = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    updateStream();
+  }
 
   void updateStream() {
     setState(() {
       stream = (db.tickers.select()
             ..where(
               (tbl) => tbl.symbol.contains(search.text.toLowerCase()),
+            )
+            ..orderBy(
+              [
+                (u) => OrderingTerm(
+                      expression: u.createdAt,
+                      mode: OrderingMode.desc,
+                    ),
+              ],
             ))
           .watch();
     });
