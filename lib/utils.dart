@@ -16,6 +16,9 @@ Future<List<Symbol>> getSymbols() async {
       nyse.map((d) => Symbol.fromJson(d)).toList();
 }
 
+void selectAll(TextEditingController controller) => controller.selection =
+    TextSelection(baseOffset: 0, extentOffset: controller.text.length);
+
 void toast(BuildContext context, String message, [SnackBarAction? action]) {
   final defaultAction = SnackBarAction(label: 'OK', onPressed: () {});
 
