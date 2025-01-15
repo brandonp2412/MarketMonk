@@ -32,6 +32,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
       padding: const EdgeInsets.all(8.0),
       child: material.Column(
         children: [
+          const SizedBox(height: 40),
           SearchBar(
             controller: search,
             hintText: 'Search...',
