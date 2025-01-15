@@ -4,23 +4,23 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/symbol.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
-import 'package:market_monk/symbol.dart';
-
-class ChartPage extends StatefulWidget {
-  const ChartPage({super.key});
-
-  @override
-  State<ChartPage> createState() => _ChartPageState();
-}
 
 class CandleTicker {
   final Candle candle;
   final Ticker? ticker;
 
   CandleTicker({this.ticker, required this.candle});
+}
+
+class ChartPage extends StatefulWidget {
+  const ChartPage({super.key});
+
+  @override
+  State<ChartPage> createState() => _ChartPageState();
 }
 
 class _ChartPageState extends State<ChartPage> {
@@ -33,174 +33,7 @@ class _ChartPageState extends State<ChartPage> {
 
   late Stream<List<CandleTicker>> stream;
 
-  void setStream() {
-    final now = DateTime.now();
-    final after = DateTime(now.year - year, now.month - month, now.day);
-    const weekExpression = CustomExpression<String>(
-      "STRFTIME('%Y-%m-%W', DATE(\"date\", 'unixepoch', 'localtime'))",
-    );
-    Iterable<Expression<Object>> groupBy = [db.candles.id];
-    if (year > 0 || month > 5) groupBy = [weekExpression];
-
-    stream = (db.selectOnly(db.candles)
-          ..addColumns([
-            ...db.candles.$columns,
-            ...db.tickers.$columns,
-          ])
-          ..where(
-            db.candles.symbol.equals(stock.text.split(' ').first) &
-                db.candles.date.isBiggerThanValue(after),
-          )
-          ..orderBy(
-            [
-              OrderingTerm(
-                expression: db.candles.date,
-                mode: OrderingMode.asc,
-              ),
-            ],
-          )
-          ..groupBy(groupBy))
-        .join([
-          leftOuterJoin(
-            db.tickers,
-            db.tickers.symbol.equalsExp(db.candles.symbol),
-          ),
-        ])
-        .watch()
-        .map(
-          (results) => results
-              .map(
-                (result) => CandleTicker(
-                  candle: Candle(
-                    id: result.read(db.candles.id)!,
-                    symbol: result.read(db.candles.symbol)!,
-                    date: result.read(db.candles.date)!,
-                    open: result.read(db.candles.open)!,
-                    high: result.read(db.candles.high)!,
-                    low: result.read(db.candles.low)!,
-                    close: result.read(db.candles.close)!,
-                    volume: result.read(db.candles.volume)!,
-                    adjClose: result.read(db.candles.adjClose)!,
-                  ),
-                  ticker: result.read(db.tickers.id) != null
-                      ? Ticker(
-                          id: result.read(db.tickers.id)!,
-                          symbol: result.read(db.tickers.symbol)!,
-                          name: result.read(db.tickers.name)!,
-                          change: result.read(db.tickers.change)!,
-                          createdAt: result.read(db.tickers.createdAt)!,
-                          updatedAt: result.read(db.tickers.updatedAt)!,
-                          amount: result.read(db.tickers.amount)!,
-                        )
-                      : null,
-                ),
-              )
-              .toList(),
-        );
-  }
-
   final now = DateTime.now();
-
-  @override
-  void initState() {
-    super.initState();
-    refreshData();
-    getSymbols().then(
-      (value) => setState(() {
-        symbols = value;
-      }),
-    );
-  }
-
-  void refreshData() async {
-    setStream();
-    setState(() {
-      loading = true;
-    });
-
-    try {
-      final symbol = stock.text.split(' ').first;
-      final latest = await (db.candles.select()
-            ..where((tbl) => tbl.symbol.equals(symbol))
-            ..orderBy(
-              [
-                (u) => OrderingTerm(
-                      expression: u.date,
-                      mode: OrderingMode.desc,
-                    ),
-              ],
-            )
-            ..limit(1))
-          .getSingle();
-      final response = await const YahooFinanceDailyReader().getDailyDTOs(
-        symbol,
-        startDate: latest.date,
-      );
-      await insertCandles(response.candlesData, symbol);
-    } catch (error) {
-      if (mounted) toast(context, error.toString());
-    } finally {
-      setState(() {
-        loading = false;
-      });
-    }
-  }
-
-  void loadData() async {
-    setStream();
-    setState(() {
-      loading = true;
-    });
-    try {
-      final symbol = stock.text.split(' ').first;
-      final response = await const YahooFinanceDailyReader().getDailyDTOs(
-        symbol,
-      );
-      await insertCandles(response.candlesData, symbol);
-    } finally {
-      if (mounted)
-        setState(() {
-          loading = false;
-        });
-    }
-  }
-
-  Future<void> insertCandles(
-    List<YahooFinanceCandleData> dataList,
-    String symbol,
-  ) async {
-    const int batchSize = 1000;
-    int totalRecords = dataList.length;
-
-    for (int i = 0; i < totalRecords; i += batchSize) {
-      final batch = dataList.skip(i).take(batchSize).map((data) {
-        return CandlesCompanion.insert(
-          date: data.date,
-          symbol: symbol,
-          open: Value(data.open),
-          high: Value(data.high),
-          low: Value(data.low),
-          close: Value(data.close),
-          adjClose: Value(data.adjClose),
-          volume: Value(data.volume),
-        );
-      }).toList();
-
-      await db.batch((batchBuilder) {
-        batchBuilder.insertAllOnConflictUpdate(
-          db.candles,
-          batch,
-        );
-      });
-
-      debugPrint('Inserted ${i + batch.length} of $totalRecords records');
-    }
-  }
-
-  double safePercentChange(double oldValue, double newValue) {
-    if (oldValue == 0) return 0;
-    return ((newValue - oldValue) / oldValue) * 100;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -394,6 +227,173 @@ class _ChartPageState extends State<ChartPage> {
       dates: candles.map((candle) => candle.date),
       spots: spots,
     );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    refreshData();
+    getSymbols().then(
+      (value) => setState(() {
+        symbols = value;
+      }),
+    );
+  }
+
+  Future<void> insertCandles(
+    List<YahooFinanceCandleData> dataList,
+    String symbol,
+  ) async {
+    const int batchSize = 1000;
+    int totalRecords = dataList.length;
+
+    for (int i = 0; i < totalRecords; i += batchSize) {
+      final batch = dataList.skip(i).take(batchSize).map((data) {
+        return CandlesCompanion.insert(
+          date: data.date,
+          symbol: symbol,
+          open: Value(data.open),
+          high: Value(data.high),
+          low: Value(data.low),
+          close: Value(data.close),
+          adjClose: Value(data.adjClose),
+          volume: Value(data.volume),
+        );
+      }).toList();
+
+      await db.batch((batchBuilder) {
+        batchBuilder.insertAllOnConflictUpdate(
+          db.candles,
+          batch,
+        );
+      });
+
+      debugPrint('Inserted ${i + batch.length} of $totalRecords records');
+    }
+  }
+
+  void loadData() async {
+    setStream();
+    setState(() {
+      loading = true;
+    });
+    try {
+      final symbol = stock.text.split(' ').first;
+      final response = await const YahooFinanceDailyReader().getDailyDTOs(
+        symbol,
+      );
+      await insertCandles(response.candlesData, symbol);
+    } finally {
+      if (mounted)
+        setState(() {
+          loading = false;
+        });
+    }
+  }
+
+  void refreshData() async {
+    setStream();
+    setState(() {
+      loading = true;
+    });
+
+    try {
+      final symbol = stock.text.split(' ').first;
+      final latest = await (db.candles.select()
+            ..where((tbl) => tbl.symbol.equals(symbol))
+            ..orderBy(
+              [
+                (u) => OrderingTerm(
+                      expression: u.date,
+                      mode: OrderingMode.desc,
+                    ),
+              ],
+            )
+            ..limit(1))
+          .getSingle();
+      final response = await const YahooFinanceDailyReader().getDailyDTOs(
+        symbol,
+        startDate: latest.date,
+      );
+      await insertCandles(response.candlesData, symbol);
+    } catch (error) {
+      if (mounted) toast(context, error.toString());
+    } finally {
+      setState(() {
+        loading = false;
+      });
+    }
+  }
+
+  double safePercentChange(double oldValue, double newValue) {
+    if (oldValue == 0) return 0;
+    return ((newValue - oldValue) / oldValue) * 100;
+  }
+
+  void setStream() {
+    final now = DateTime.now();
+    final after = DateTime(now.year - year, now.month - month, now.day);
+    const weekExpression = CustomExpression<String>(
+      "STRFTIME('%Y-%m-%W', DATE(\"date\", 'unixepoch', 'localtime'))",
+    );
+    Iterable<Expression<Object>> groupBy = [db.candles.id];
+    if (year > 0 || month > 5) groupBy = [weekExpression];
+
+    stream = (db.selectOnly(db.candles)
+          ..addColumns([
+            ...db.candles.$columns,
+            ...db.tickers.$columns,
+          ])
+          ..where(
+            db.candles.symbol.equals(stock.text.split(' ').first) &
+                db.candles.date.isBiggerThanValue(after),
+          )
+          ..orderBy(
+            [
+              OrderingTerm(
+                expression: db.candles.date,
+                mode: OrderingMode.asc,
+              ),
+            ],
+          )
+          ..groupBy(groupBy))
+        .join([
+          leftOuterJoin(
+            db.tickers,
+            db.tickers.symbol.equalsExp(db.candles.symbol),
+          ),
+        ])
+        .watch()
+        .map(
+          (results) => results
+              .map(
+                (result) => CandleTicker(
+                  candle: Candle(
+                    id: result.read(db.candles.id)!,
+                    symbol: result.read(db.candles.symbol)!,
+                    date: result.read(db.candles.date)!,
+                    open: result.read(db.candles.open)!,
+                    high: result.read(db.candles.high)!,
+                    low: result.read(db.candles.low)!,
+                    close: result.read(db.candles.close)!,
+                    volume: result.read(db.candles.volume)!,
+                    adjClose: result.read(db.candles.adjClose)!,
+                  ),
+                  ticker: result.read(db.tickers.id) != null
+                      ? Ticker(
+                          id: result.read(db.tickers.id)!,
+                          symbol: result.read(db.tickers.symbol)!,
+                          name: result.read(db.tickers.name)!,
+                          change: result.read(db.tickers.change)!,
+                          createdAt: result.read(db.tickers.createdAt)!,
+                          updatedAt: result.read(db.tickers.updatedAt)!,
+                          amount: result.read(db.tickers.amount)!,
+                        )
+                      : null,
+                ),
+              )
+              .toList(),
+        );
   }
 
   Widget summaryBuilder(
