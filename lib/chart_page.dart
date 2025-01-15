@@ -31,8 +31,9 @@ class _ChartPageState extends State<ChartPage> {
   TextEditingController stock = TextEditingController(text: "");
   String? favoriteStock;
   List<Symbol> symbols = [];
-  int year = 1;
-  int month = 0;
+  int years = 0;
+  int months = 0;
+  int days = 5;
   bool loading = false;
 
   Stream<List<CandleTicker>>? stream;
@@ -48,14 +49,15 @@ class _ChartPageState extends State<ChartPage> {
         OutlinedButton(
           onPressed: () {
             setState(() {
-              year = option;
-              month = 0;
+              years = option;
+              months = 0;
+              days = 0;
             });
             setStream();
           },
           style: OutlinedButton.styleFrom(
             side: BorderSide(
-              color: option == year
+              color: option == years
                   ? Theme.of(context).colorScheme.primary
                   : Colors.transparent,
             ), // Set border color
@@ -72,14 +74,15 @@ class _ChartPageState extends State<ChartPage> {
         OutlinedButton(
           onPressed: () {
             setState(() {
-              month = option;
-              year = 0;
+              months = option;
+              years = 0;
+              days = 0;
             });
             setStream();
           },
           style: OutlinedButton.styleFrom(
             side: BorderSide(
-              color: option == month
+              color: option == months
                   ? Theme.of(context).colorScheme.primary
                   : Colors.transparent,
             ), // Set border color
@@ -169,7 +172,28 @@ class _ChartPageState extends State<ChartPage> {
           ),
           const SizedBox(height: 16),
           Wrap(
-            children: monthButtons + yearButtons,
+            children: [
+              OutlinedButton(
+                onPressed: () {
+                  setState(() {
+                    days = 5;
+                    years = 0;
+                    months = 0;
+                  });
+                  setStream();
+                },
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(
+                    color: days == 5
+                        ? Theme.of(context).colorScheme.primary
+                        : Colors.transparent,
+                  ), // Set border color
+                ),
+                child: const Text("5d"),
+              ),
+              ...monthButtons,
+              ...yearButtons,
+            ],
           ),
           StreamBuilder(
             stream: stream,
@@ -347,12 +371,13 @@ class _ChartPageState extends State<ChartPage> {
 
   void setStream() {
     final now = DateTime.now();
-    final after = DateTime(now.year - year, now.month - month, now.day);
+    final after =
+        DateTime(now.year - years, now.month - months, now.day - days - 1);
     const weekExpression = CustomExpression<String>(
       "STRFTIME('%Y-%m-%W', DATE(\"date\", 'unixepoch', 'localtime'))",
     );
-    Iterable<Expression<Object>> groupBy = [db.candles.id];
-    if (year > 0 || month > 5) groupBy = [weekExpression];
+    Iterable<Expression<Object>> groupBy = [db.candles.date];
+    if (years > 0 || months > 5) groupBy = [weekExpression];
 
     stream = (db.selectOnly(db.candles)
           ..addColumns([
