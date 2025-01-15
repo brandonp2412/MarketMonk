@@ -2,7 +2,7 @@
 
 Track stocks on any platform 📈 - without ads or being spied on 🕵️
 
-<video src="docs/video.mp4" width="315"></video>
+<video src="https://github.com/user-attachments/assets/91e84369-f6a1-4d87-bac7-aa23d812cde7" width="315" height="640"></video>
 
 <p float="left">
     <img src="docs/screenshot1.jpg" height="700"/>
