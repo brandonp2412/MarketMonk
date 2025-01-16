@@ -48,12 +48,12 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'MarketMonk',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF4CAF50)),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2B7A78)),
         useMaterial3: true,
       ),
       darkTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF4CAF50),
+          seedColor: const Color(0xFF2B7A78),
           brightness: Brightness.dark,
         ),
       ),
