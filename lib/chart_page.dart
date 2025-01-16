@@ -306,15 +306,19 @@ class _ChartPageState extends State<ChartPage>
             ..limit(1))
           .getSingleOrNull();
 
-      if (latest != null) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      if (latest == null) {
+        final response = await const YahooFinanceDailyReader().getDailyDTOs(
+          symbol,
+        );
+        await insertCandles(response.candlesData, symbol);
+      } else if (today.isAfter(
+        DateTime(latest.date.year, latest.date.month, latest.date.day),
+      )) {
         final response = await const YahooFinanceDailyReader().getDailyDTOs(
           symbol,
           startDate: latest.date,
-        );
-        await insertCandles(response.candlesData, symbol);
-      } else {
-        final response = await const YahooFinanceDailyReader().getDailyDTOs(
-          symbol,
         );
         await insertCandles(response.candlesData, symbol);
       }
@@ -325,11 +329,6 @@ class _ChartPageState extends State<ChartPage>
         loading = false;
       });
     }
-  }
-
-  double safePercentChange(double oldValue, double newValue) {
-    if (oldValue == 0) return 0;
-    return ((newValue - oldValue) / oldValue) * 100;
   }
 
   void setStream() {
