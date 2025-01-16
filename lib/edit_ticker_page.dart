@@ -137,20 +137,26 @@ class _EditTickerPageState extends State<EditTickerPage> {
                   TextField(
                     controller: name,
                     decoration: const InputDecoration(labelText: 'Stock'),
+                    textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: amount,
                     decoration: const InputDecoration(labelText: 'Amount'),
+                    textInputAction: TextInputAction.next,
                     onTap: () => selectAll(amount),
                     keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: price,
-                    decoration: const InputDecoration(labelText: 'Price \$'),
+                    decoration: const InputDecoration(
+                      labelText: 'Price',
+                      prefix: Text('\$'),
+                    ),
                     onTap: () => selectAll(price),
                     keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
                     onSubmitted: (value) async {
                       if (autoSetPrice) return;
                       final closest = await findClosestPrice(
