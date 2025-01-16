@@ -49,6 +49,11 @@ class TickerLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    List<Color> gradientColors = [
+      Colors.cyan,
+      Colors.transparent,
+    ];
+
     return Padding(
       padding: const EdgeInsets.only(right: 32.0, top: 16.0),
       child: SizedBox(
@@ -78,17 +83,25 @@ class TickerLine extends StatelessWidget {
             lineBarsData: [
               LineChartBarData(
                 spots: spots,
-                isCurved: true,
                 color: Theme.of(context).colorScheme.primary,
-                dotData: FlDotData(
+                barWidth: 5,
+                isStrokeCapRound: true,
+                dotData: const FlDotData(
+                  show: false,
+                ),
+                isCurved: true,
+                curveSmoothness: 0.2,
+                belowBarData: BarAreaData(
                   show: true,
-                  getDotPainter: (p0, p1, p2, p3) => FlDotCirclePainter(
-                    radius: 2,
-                    color: Theme.of(context).colorScheme.primary,
+                  gradient: LinearGradient(
+                    colors: gradientColors
+                        .map((color) => color.withValues(alpha: 0.3))
+                        .toList(),
                   ),
                 ),
               ),
             ],
+            gridData: const FlGridData(show: false),
             lineTouchData: LineTouchData(
               touchTooltipData: LineTouchTooltipData(
                 getTooltipColor: (touchedSpot) =>
