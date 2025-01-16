@@ -31,6 +31,8 @@ class _AddTickerPageState extends State<AddTickerPage> {
   bool loading = false;
   List<Symbol> symbols = [];
 
+  FocusNode? autocomplete;
+
   @override
   void initState() {
     super.initState();
@@ -43,6 +45,7 @@ class _AddTickerPageState extends State<AddTickerPage> {
     setState(() {
       symbols = gotSymbols;
     });
+    autocomplete?.requestFocus();
   }
 
   void setStream() {
@@ -211,6 +214,7 @@ class _AddTickerPageState extends State<AddTickerPage> {
                         VoidCallback onFieldSubmitted,
                       ) {
                         symbol = fieldTextEditingController;
+                        autocomplete = fieldFocusNode;
                         Widget leading = const Padding(
                           padding: EdgeInsets.only(left: 16.0, right: 8.0),
                           child: Icon(Icons.search),
@@ -231,6 +235,7 @@ class _AddTickerPageState extends State<AddTickerPage> {
                           focusNode: fieldFocusNode,
                           hintText: 'Search...',
                           onTap: () => selectAll(symbol),
+                          textInputAction: TextInputAction.next,
                           onSubmitted: (text) async {
                             String? selection;
 
@@ -268,13 +273,18 @@ class _AddTickerPageState extends State<AddTickerPage> {
                     decoration: const InputDecoration(labelText: 'Amount'),
                     onTap: () => selectAll(amount),
                     keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: price,
-                    decoration: const InputDecoration(labelText: 'Price \$'),
+                    decoration: const InputDecoration(
+                      labelText: 'Price',
+                      prefix: Text("\$"),
+                    ),
                     onTap: () => selectAll(price),
                     keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
                     onSubmitted: (value) async {
                       if (autoSetPrice) return;
                       final closest = await findClosestPrice(
