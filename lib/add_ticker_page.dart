@@ -135,10 +135,6 @@ class _AddTickerPageState extends State<AddTickerPage> {
               ? const Icon(Icons.arrow_upward, color: Colors.green)
               : const Icon(Icons.arrow_downward, color: Colors.red),
           title: Text("${percentChange.toStringAsFixed(2)}%"),
-          trailing: Text(
-            "Last updated ${candles.last.date.value}",
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
         ),
         TickerLine(
           formatter: DateFormat("d/M/yy"),
@@ -341,7 +337,17 @@ class _AddTickerPageState extends State<AddTickerPage> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
+        onPressed: () async {
+          Navigator.of(context).pop();
+
+          final candleTickers = await stream?.first;
+          if (candleTickers == null) return;
+
+          var percentChange = safePercentChange(
+            candleTickers.first.candle.close.value,
+            candleTickers.last.candle.close.value,
+          );
+
           db.tickers.insertOne(
             TickersCompanion(
               amount: Value(double.parse(amount.text)),
@@ -350,9 +356,9 @@ class _AddTickerPageState extends State<AddTickerPage> {
               price: Value(double.parse(price.text)),
               name: Value(symbol.text.split(' ').sublist(1).join(' ')),
               symbol: Value(symbol.text.split(' ').first),
+              change: Value(percentChange),
             ),
           );
-          Navigator.of(context).pop();
         },
         label: const Text('Save'),
         icon: const Icon(Icons.save),
