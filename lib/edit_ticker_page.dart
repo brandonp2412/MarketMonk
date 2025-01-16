@@ -31,6 +31,8 @@ class _EditTickerPageState extends State<EditTickerPage> {
   );
   late final price =
       TextEditingController(text: widget.ticker.price.toStringAsFixed(2));
+  bool autoSetCreated = false;
+  bool autoSetPrice = false;
 
   @override
   void initState() {
@@ -149,6 +151,19 @@ class _EditTickerPageState extends State<EditTickerPage> {
                     decoration: const InputDecoration(labelText: 'Price \$'),
                     onTap: () => selectAll(price),
                     keyboardType: TextInputType.number,
+                    onSubmitted: (value) async {
+                      if (autoSetPrice) return;
+                      final closest = await findClosestPrice(
+                        double.parse(price.text),
+                        widget.ticker.symbol,
+                      );
+
+                      if (closest == null) return;
+                      setState(() {
+                        createdAt.text = closest.date.toIso8601String();
+                        autoSetCreated = true;
+                      });
+                    },
                   ),
                   const SizedBox(height: 8),
                   TextField(
@@ -170,6 +185,15 @@ class _EditTickerPageState extends State<EditTickerPage> {
                         createdAt.text = date.toIso8601String();
                       });
                       setStream();
+
+                      if (autoSetCreated) return;
+                      final closest =
+                          await findClosestDate(date, widget.ticker.symbol);
+                      if (closest == null) return;
+                      setState(() {
+                        price.text = closest.close.toStringAsFixed(2);
+                        autoSetPrice = true;
+                      });
                     },
                   ),
                   const SizedBox(height: 8),

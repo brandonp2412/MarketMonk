@@ -68,3 +68,34 @@ Future<void> insertCandles(
     debugPrint('Inserted ${i + batch.length}');
   }
 }
+
+Future<Candle?> findClosestDate(DateTime date, String symbol) {
+  final dateOnly = DateTime(date.year, date.month, date.day);
+  final timestamp = dateOnly.millisecondsSinceEpoch / 1000;
+
+  return (db.candles.select()
+        ..where((u) => u.symbol.equals(symbol))
+        ..orderBy([
+          (t) => OrderingTerm.asc(
+                CustomExpression(
+                  "ABS(\"date\" - $timestamp)",
+                ),
+              ),
+        ])
+        ..limit(1))
+      .getSingleOrNull();
+}
+
+Future<Candle?> findClosestPrice(double price, String symbol) {
+  return (db.candles.select()
+        ..where((u) => u.symbol.equals(symbol))
+        ..orderBy([
+          (t) => OrderingTerm.asc(
+                CustomExpression(
+                  "ABS(close - $price)",
+                ),
+              ),
+        ])
+        ..limit(1))
+      .getSingleOrNull();
+}
