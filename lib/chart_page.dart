@@ -293,35 +293,7 @@ class _ChartPageState extends State<ChartPage>
 
     try {
       final symbol = stock.text.split(' ').first;
-      final latest = await (db.candles.select()
-            ..where((tbl) => tbl.symbol.equals(symbol))
-            ..orderBy(
-              [
-                (u) => OrderingTerm(
-                      expression: u.date,
-                      mode: OrderingMode.desc,
-                    ),
-              ],
-            )
-            ..limit(1))
-          .getSingleOrNull();
-
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      if (latest == null) {
-        final response = await const YahooFinanceDailyReader().getDailyDTOs(
-          symbol,
-        );
-        await insertCandles(response.candlesData, symbol);
-      } else if (today.isAfter(
-        DateTime(latest.date.year, latest.date.month, latest.date.day),
-      )) {
-        final response = await const YahooFinanceDailyReader().getDailyDTOs(
-          symbol,
-          startDate: latest.date,
-        );
-        await insertCandles(response.candlesData, symbol);
-      }
+      await syncCandles(symbol);
     } catch (error) {
       if (mounted) toast(context, error.toString());
     } finally {
