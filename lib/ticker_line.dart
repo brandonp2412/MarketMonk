@@ -84,12 +84,10 @@ class TickerLine extends StatelessWidget {
               LineChartBarData(
                 spots: spots,
                 color: Theme.of(context).colorScheme.primary,
-                barWidth: 5,
-                isStrokeCapRound: true,
+                barWidth: 3,
                 dotData: const FlDotData(
                   show: false,
                 ),
-                isCurved: false,
                 belowBarData: BarAreaData(
                   show: true,
                   gradient: LinearGradient(

@@ -22,11 +22,26 @@ class _PortfolioPageState extends State<PortfolioPage> {
   late Stream<List<Ticker>> stream;
   final search = TextEditingController();
   List<int> selected = [];
+  bool loading = true;
 
   @override
   void initState() {
     super.initState();
     updateStream();
+    updateCandles();
+  }
+
+  void updateCandles() async {
+    setState(() {
+      loading = true;
+    });
+    final tickers = await (db.tickers.select()).get();
+    for (final ticker in tickers) {
+      await syncCandles(ticker.symbol);
+    }
+    setState(() {
+      loading = false;
+    });
   }
 
   void updateStream() {
@@ -137,6 +152,32 @@ class _PortfolioPageState extends State<PortfolioPage> {
       ],
     );
 
+    var leading = search.text.isEmpty
+        ? const Padding(
+            padding: EdgeInsets.only(left: 16.0, right: 8.0),
+            child: Icon(Icons.search),
+          )
+        : IconButton(
+            onPressed: () {
+              search.text = '';
+              updateStream();
+            },
+            icon: const Icon(Icons.arrow_back),
+            padding: const EdgeInsets.only(
+              left: 16.0,
+              right: 8.0,
+            ),
+          );
+    if (loading)
+      leading = const Padding(
+        padding: EdgeInsets.only(left: 16.0, right: 8.0),
+        child: SizedBox(
+          height: 24,
+          width: 24,
+          child: CircularProgressIndicator(),
+        ),
+      );
+
     return Scaffold(
       body: Padding(
         padding: const EdgeInsets.all(8.0),
@@ -146,22 +187,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
             SearchBar(
               controller: search,
               hintText: 'Search...',
-              leading: search.text.isEmpty
-                  ? const Padding(
-                      padding: EdgeInsets.only(left: 16.0, right: 8.0),
-                      child: Icon(Icons.search),
-                    )
-                  : IconButton(
-                      onPressed: () {
-                        search.text = '';
-                        updateStream();
-                      },
-                      icon: const Icon(Icons.arrow_back),
-                      padding: const EdgeInsets.only(
-                        left: 16.0,
-                        right: 8.0,
-                      ),
-                    ),
+              leading: leading,
               onTap: () => search.selection = TextSelection(
                 baseOffset: 0,
                 extentOffset: search.text.length,

@@ -106,7 +106,7 @@ double safePercentChange(double oldValue, double newValue) {
 }
 
 Future<void> syncCandles(String symbol) async {
-  final latest = await (db.candles.select()
+  var latest = await (db.candles.select()
         ..where((tbl) => tbl.symbol.equals(symbol))
         ..orderBy(
           [
@@ -135,6 +135,36 @@ Future<void> syncCandles(String symbol) async {
     );
     await insertCandles(response.candlesData, symbol);
   }
+
+  final ticker = await (db.tickers.select()
+        ..where((u) => u.symbol.equals(symbol))
+        ..limit(1))
+      .getSingleOrNull();
+  if (ticker == null) return;
+
+  final bought = await findClosestDate(ticker.createdAt, symbol);
+  if (bought == null) return;
+
+  latest = await (db.candles.select()
+        ..where((tbl) => tbl.symbol.equals(symbol))
+        ..orderBy(
+          [
+            (u) => OrderingTerm(
+                  expression: u.date,
+                  mode: OrderingMode.desc,
+                ),
+          ],
+        )
+        ..limit(1))
+      .getSingleOrNull();
+  if (latest == null) return;
+
+  final newChange = safePercentChange(bought.close, latest.close);
+  await (db.tickers.update()..where((u) => u.symbol.equals(symbol))).write(
+    TickersCompanion(
+      change: Value(newChange),
+    ),
+  );
 }
 
 (double dollarReturn, double percentReturn) calculateTotalReturns(
