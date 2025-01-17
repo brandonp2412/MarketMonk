@@ -1,6 +1,6 @@
 # Market Monk
 
-Track stocks on any platform 📈 - No ads and no tracking
+Track stocks on any platform 📈 - No ads or tracking 🕵️
 
 <p float="left">
     <img src="docs/screenshot1.jpg" height="700"/>
