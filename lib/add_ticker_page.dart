@@ -270,6 +270,7 @@ class _AddTickerPageState extends State<AddTickerPage> {
                     controller: amount,
                     decoration: const InputDecoration(labelText: 'Amount'),
                     onTap: () => selectAll(amount),
+                    onSubmitted: (value) => selectAll(price),
                     keyboardType: TextInputType.number,
                     textInputAction: TextInputAction.next,
                   ),
