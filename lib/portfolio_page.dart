@@ -7,6 +7,7 @@ import 'package:market_monk/add_ticker_page.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/settings_page.dart';
 
 class PortfolioPage extends StatefulWidget {
   const PortfolioPage({super.key});
@@ -18,6 +19,7 @@ class PortfolioPage extends StatefulWidget {
 class _PortfolioPageState extends State<PortfolioPage> {
   late Stream<List<Ticker>> stream;
   final search = TextEditingController();
+  List<int> selected = [];
 
   @override
   void initState() {
@@ -45,6 +47,94 @@ class _PortfolioPageState extends State<PortfolioPage> {
 
   @override
   Widget build(BuildContext context) {
+    var deleteButton = IconButton(
+      icon: const Icon(Icons.delete),
+      tooltip: "Delete selected",
+      onPressed: () {
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Confirm Delete'),
+              content: Text(
+                'Are you sure you want to delete ${selected.length} stocks? This action is not reversible.',
+              ),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text('Cancel'),
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                ),
+                TextButton(
+                  child: const Text('Delete'),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    await (db.tickers.delete()
+                          ..where((u) => u.id.isIn(selected)))
+                        .go();
+                    setState(() {
+                      selected = [];
+                    });
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    var menuButton = PopupMenuButton(
+      icon: const Icon(Icons.more_vert),
+      tooltip: "Show menu",
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          child: ListTile(
+            leading: const Icon(Icons.done_all),
+            title: const Text('Select all'),
+            onTap: () async {
+              Navigator.pop(context);
+              final tickers = await stream.first;
+              setState(() {
+                selected = tickers.map((ticker) => ticker.id).toList();
+              });
+            },
+          ),
+        ),
+        if (selected.isNotEmpty)
+          PopupMenuItem(
+            child: ListTile(
+              leading: const Icon(Icons.clear_all),
+              title: const Text('Clear'),
+              onTap: () async {
+                setState(() {
+                  selected = [];
+                });
+                Navigator.pop(context);
+              },
+            ),
+          ),
+        if (selected.isEmpty)
+          PopupMenuItem(
+            child: ListTile(
+              leading: const Icon(Icons.settings),
+              title: const Text('Settings'),
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SettingsPage(),
+                  ),
+                );
+                if (!context.mounted) return;
+                Navigator.pop(context);
+              },
+            ),
+          ),
+      ],
+    );
+
     return Scaffold(
       body: Padding(
         padding: const EdgeInsets.all(8.0),
@@ -77,6 +167,15 @@ class _PortfolioPageState extends State<PortfolioPage> {
               onChanged: (text) {
                 updateStream();
               },
+              trailing: [
+                if (selected.isNotEmpty) deleteButton,
+                Badge.count(
+                  count: selected.length,
+                  isLabelVisible: selected.isNotEmpty,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  child: menuButton,
+                ),
+              ],
             ),
             StreamBuilder(
               stream: stream,
@@ -98,29 +197,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
                     itemBuilder: (context, index) {
                       final ticker = tickers[index];
 
-                      return ListTile(
-                        title: Text(ticker.symbol),
-                        subtitle: Text('${ticker.change.toStringAsFixed(2)}%'),
-                        subtitleTextStyle: ticker.change > 0
-                            ? const TextStyle(color: Colors.green)
-                            : const TextStyle(color: Colors.red),
-                        leading: ticker.change > 0
-                            ? const Icon(
-                                Icons.arrow_upward,
-                                color: Colors.green,
-                              )
-                            : const Icon(
-                                Icons.arrow_downward,
-                                color: Colors.red,
-                              ),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                EditTickerPage(ticker: ticker),
-                          ),
-                        ),
-                      );
+                      return folioTile(ticker, context);
                     },
                     itemCount: tickers.length,
                   ),
@@ -141,6 +218,59 @@ class _PortfolioPageState extends State<PortfolioPage> {
         label: const Text('Add'),
         icon: const Icon(Icons.add),
       ),
+    );
+  }
+
+  ListTile folioTile(Ticker ticker, BuildContext context) {
+    var leading = ticker.change > 0
+        ? const Icon(
+            Icons.arrow_upward,
+            color: Colors.green,
+          )
+        : const Icon(
+            Icons.arrow_downward,
+            color: Colors.red,
+          );
+
+    if (selected.contains(ticker.id)) leading = const Icon(Icons.check_circle);
+
+    return ListTile(
+      title: Text(ticker.symbol),
+      subtitle: Text('${ticker.change.toStringAsFixed(2)}%'),
+      selected: selected.contains(ticker.id),
+      onLongPress: () {
+        if (selected.contains(ticker.id))
+          setState(() {
+            selected.remove(ticker.id);
+          });
+        else
+          setState(() {
+            selected.add(ticker.id);
+          });
+      },
+      subtitleTextStyle: ticker.change > 0
+          ? const TextStyle(color: Colors.green)
+          : const TextStyle(color: Colors.red),
+      leading: leading,
+      onTap: () {
+        if (selected.isEmpty)
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => EditTickerPage(ticker: ticker),
+            ),
+          );
+        else {
+          if (selected.contains(ticker.id))
+            setState(() {
+              selected.remove(ticker.id);
+            });
+          else
+            setState(() {
+              selected.add(ticker.id);
+            });
+        }
+      },
     );
   }
 }
