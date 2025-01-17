@@ -181,6 +181,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                         createdAt.text = closest.date.toIso8601String();
                         autoSetCreated = true;
                       });
+                      setStream();
                     },
                   ),
                   const SizedBox(height: 8),
@@ -195,7 +196,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                       final DateTime? date = await showDatePicker(
                         context: context,
                         initialDate: widget.ticker.createdAt,
-                        firstDate: DateTime(2000),
+                        firstDate: DateTime(0),
                         lastDate: DateTime(2100),
                       );
                       if (date == null) return;
