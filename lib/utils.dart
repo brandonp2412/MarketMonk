@@ -136,3 +136,24 @@ Future<void> syncCandles(String symbol) async {
     await insertCandles(response.candlesData, symbol);
   }
 }
+
+(double dollarReturn, double percentReturn) calculateTotalReturns(
+  List<Ticker> tickers,
+) {
+  double totalCurrentValue = 0.0;
+  double totalInitialValue = 0.0;
+
+  for (final ticker in tickers) {
+    double currentPositionValue = ticker.amount * ticker.price;
+    double initialPositionValue =
+        currentPositionValue / (1 + (ticker.change / 100));
+
+    totalCurrentValue += currentPositionValue;
+    totalInitialValue += initialPositionValue;
+  }
+
+  double dollarReturn = totalCurrentValue - totalInitialValue;
+  double percentReturn = ((totalCurrentValue / totalInitialValue) - 1) * 100;
+
+  return (dollarReturn, percentReturn);
+}

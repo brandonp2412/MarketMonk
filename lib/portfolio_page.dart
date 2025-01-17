@@ -3,11 +3,13 @@ import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/material.dart' as material;
+import 'package:intl/intl.dart';
 import 'package:market_monk/add_ticker_page.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_page.dart';
+import 'package:market_monk/utils.dart';
 
 class PortfolioPage extends StatefulWidget {
   const PortfolioPage({super.key});
@@ -179,39 +181,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
             ),
             StreamBuilder(
               stream: stream,
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) return const SizedBox();
-                if (snapshot.data?.isEmpty == true)
-                  return ListTile(
-                    title: const Text("No stock found"),
-                    subtitle: Text("Tap to add ${search.text}"),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => AddTickerPage(
-                            symbol: search.text,
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                if (snapshot.hasError)
-                  return ErrorWidget(snapshot.error.toString());
-
-                final tickers = snapshot.data!;
-
-                return Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(0),
-                    itemBuilder: (context, index) {
-                      final ticker = tickers[index];
-
-                      return folioTile(ticker, context);
-                    },
-                    itemCount: tickers.length,
-                  ),
-                );
-              },
+              builder: streamBuilder,
             ),
           ],
         ),
@@ -226,6 +196,59 @@ class _PortfolioPageState extends State<PortfolioPage> {
         },
         label: const Text('Add'),
         icon: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget streamBuilder(
+    BuildContext context,
+    AsyncSnapshot<List<Ticker>> snapshot,
+  ) {
+    if (!snapshot.hasData) return const SizedBox();
+    if (snapshot.data?.isEmpty == true)
+      return ListTile(
+        title: const Text("No stock found"),
+        subtitle: Text("Tap to add ${search.text}"),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => AddTickerPage(
+                symbol: search.text,
+              ),
+            ),
+          );
+        },
+      );
+    if (snapshot.hasError) return ErrorWidget(snapshot.error.toString());
+
+    final tickers = snapshot.data!;
+    final formatter = NumberFormat.simpleCurrency();
+    final (dollarReturn, percentReturn) = calculateTotalReturns(tickers);
+
+    return Expanded(
+      child: ListView.builder(
+        padding: const EdgeInsets.all(0),
+        itemBuilder: (context, index) {
+          if (index == 0)
+            return material.Column(
+              children: [
+                ListTile(
+                  leading: const Icon(
+                    Icons.account_balance,
+                  ),
+                  title: Text("${percentReturn.toStringAsFixed(2)}%"),
+                  subtitle: Text(formatter.format(dollarReturn)),
+                  trailing: const Text("(Total return)"),
+                ),
+                const Divider(),
+              ],
+            );
+
+          final ticker = tickers[index - 1];
+
+          return folioTile(ticker, context);
+        },
+        itemCount: tickers.length + 1,
       ),
     );
   }
