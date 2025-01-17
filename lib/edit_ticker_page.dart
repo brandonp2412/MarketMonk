@@ -24,8 +24,6 @@ class _EditTickerPageState extends State<EditTickerPage> {
   late final name = TextEditingController(text: widget.ticker.name);
   late final amount =
       TextEditingController(text: widget.ticker.amount.toStringAsFixed(2));
-  late final change =
-      TextEditingController(text: widget.ticker.change.toStringAsFixed(2));
   late final createdAt = TextEditingController(
     text: widget.ticker.createdAt.toIso8601String(),
   );
@@ -113,11 +111,24 @@ class _EditTickerPageState extends State<EditTickerPage> {
     for (var index = 0; index < candles.length; index++) {
       spots.add(FlSpot(index.toDouble(), candles[index].close.value));
     }
+    var percentChange =
+        safePercentChange(candles.first.close.value, candles.last.close.value);
 
-    return TickerLine(
-      formatter: DateFormat("d/M/yy"),
-      dates: candles.map((candle) => candle.date.value),
-      spots: spots,
+    return material.Column(
+      children: [
+        const SizedBox(height: 8),
+        ListTile(
+          leading: percentChange > 0
+              ? const Icon(Icons.arrow_upward, color: Colors.green)
+              : const Icon(Icons.arrow_downward, color: Colors.red),
+          title: Text("${percentChange.toStringAsFixed(2)}%"),
+        ),
+        TickerLine(
+          formatter: DateFormat("d/M/yy"),
+          dates: candles.map((candle) => candle.date.value),
+          spots: spots,
+        ),
+      ],
     );
   }
 
@@ -145,6 +156,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                     decoration: const InputDecoration(labelText: 'Amount'),
                     textInputAction: TextInputAction.next,
                     onTap: () => selectAll(amount),
+                    onSubmitted: (value) => selectAll(price),
                     keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: 8),
@@ -202,13 +214,6 @@ class _EditTickerPageState extends State<EditTickerPage> {
                       });
                     },
                   ),
-                  const SizedBox(height: 8),
-                  ListTile(
-                    leading: widget.ticker.change > 0
-                        ? const Icon(Icons.arrow_upward, color: Colors.green)
-                        : const Icon(Icons.arrow_downward, color: Colors.red),
-                    title: Text("${widget.ticker.change.toStringAsFixed(2)}%"),
-                  ),
                   StreamBuilder(stream: stream, builder: chartBuilder),
                   const SizedBox(height: 8),
                   Row(
@@ -257,19 +262,28 @@ class _EditTickerPageState extends State<EditTickerPage> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
+        onPressed: () async {
+          final candleTickers = await stream?.first;
+          if (candleTickers == null) return;
+
+          var percentChange = safePercentChange(
+            candleTickers.first.candle.close.value,
+            candleTickers.last.candle.close.value,
+          );
+
           (db.tickers.update()..where((tbl) => tbl.id.equals(widget.ticker.id)))
               .write(
             TickersCompanion(
               amount: Value(double.parse(amount.text)),
-              change: Value(double.parse(change.text)),
               updatedAt: Value(DateTime.now()),
               createdAt: Value(DateTime.parse(createdAt.text)),
               price: Value(double.parse(price.text)),
               name: Value(name.text),
+              change: Value(percentChange),
             ),
           );
-          Navigator.of(context).pop();
+
+          if (context.mounted) Navigator.of(context).pop();
         },
         label: const Text('Save'),
         icon: const Icon(Icons.save),
