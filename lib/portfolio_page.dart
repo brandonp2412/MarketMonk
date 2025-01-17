@@ -182,9 +182,18 @@ class _PortfolioPageState extends State<PortfolioPage> {
               builder: (context, snapshot) {
                 if (!snapshot.hasData) return const SizedBox();
                 if (snapshot.data?.isEmpty == true)
-                  return const ListTile(
-                    title: Text("No portfolio yet"),
-                    subtitle: Text("Swipe over to Charts to add some tickers!"),
+                  return ListTile(
+                    title: const Text("No stock found"),
+                    subtitle: Text("Tap to add ${search.text}"),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => AddTickerPage(
+                            symbol: search.text,
+                          ),
+                        ),
+                      );
+                    },
                   );
                 if (snapshot.hasError)
                   return ErrorWidget(snapshot.error.toString());

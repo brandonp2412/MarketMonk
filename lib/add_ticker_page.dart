@@ -11,14 +11,16 @@ import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
 
 class AddTickerPage extends StatefulWidget {
-  const AddTickerPage({super.key});
+  final String? symbol;
+
+  const AddTickerPage({super.key, this.symbol});
 
   @override
   State<AddTickerPage> createState() => _AddTickerPageState();
 }
 
 class _AddTickerPageState extends State<AddTickerPage> {
-  var symbol = TextEditingController();
+  late var symbol = TextEditingController(text: widget.symbol);
   final amount = TextEditingController(text: '0');
   final createdAt = TextEditingController(
     text: DateTime.now().subtract(const Duration(days: 100)).toIso8601String(),
