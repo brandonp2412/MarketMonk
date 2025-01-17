@@ -236,9 +236,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
                   leading: const Icon(
                     Icons.account_balance,
                   ),
-                  title: percentReturn > 0
-                      ? Text("+${percentReturn.toStringAsFixed(2)}%")
-                      : Text("${percentReturn.toStringAsFixed(2)}%"),
+                  title: Text("${percentReturn.toStringAsFixed(2)}%"),
                   subtitle: Text(formatter.format(dollarReturn)),
                   subtitleTextStyle: TextStyle(
                     color: dollarReturn > 0 ? Colors.green : Colors.redAccent,
