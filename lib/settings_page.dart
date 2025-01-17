@@ -18,6 +18,7 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final packageInfo = PackageInfo.fromPlatform();
+    final settings = context.watch<SettingsState>();
 
     return Scaffold(
       appBar: AppBar(
@@ -28,7 +29,7 @@ class _SettingsPageState extends State<SettingsPage> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: DropdownButtonFormField<ThemeMode>(
-              value: ThemeMode.system,
+              value: settings.theme,
               decoration: const InputDecoration(
                 labelStyle: TextStyle(),
                 labelText: 'Theme',
@@ -55,6 +56,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 prefs.setString('theme', value.toString());
               },
             ),
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          Padding(
+            padding: const EdgeInsets.only(left: 16.0, bottom: 8),
+            child:
+                Text("About", style: Theme.of(context).textTheme.headlineLarge),
           ),
           ListTile(
             leading: const Icon(Icons.info_outline),
