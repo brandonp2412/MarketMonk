@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:market_monk/chart_page.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/portfolio_page.dart';
@@ -73,26 +74,32 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
-    return const DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        body: TabBarView(
-          children: [
-            ChartPage(),
-            PortfolioPage(),
-          ],
-        ),
-        bottomNavigationBar: TabBar(
-          tabs: [
-            Tab(
-              icon: Icon(Icons.insights),
-              text: "Charts",
-            ),
-            Tab(
-              icon: Icon(Icons.pie_chart),
-              text: "Portfolio",
-            ),
-          ],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        systemNavigationBarColor: Theme.of(context).colorScheme.surface,
+      ),
+      child: const DefaultTabController(
+        length: 2,
+        child: Scaffold(
+          body: TabBarView(
+            children: [
+              ChartPage(),
+              PortfolioPage(),
+            ],
+          ),
+          bottomNavigationBar: TabBar(
+            dividerColor: Colors.transparent,
+            tabs: [
+              Tab(
+                icon: Icon(Icons.insights),
+                text: "Charts",
+              ),
+              Tab(
+                icon: Icon(Icons.pie_chart),
+                text: "Portfolio",
+              ),
+            ],
+          ),
         ),
       ),
     );
