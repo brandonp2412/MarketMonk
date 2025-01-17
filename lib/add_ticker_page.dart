@@ -235,6 +235,7 @@ class _AddTickerPageState extends State<AddTickerPage> {
                           onTap: () => selectAll(symbol),
                           textInputAction: TextInputAction.next,
                           onSubmitted: (text) async {
+                            selectAll(amount);
                             String? selection;
 
                             for (final option in symbols) {
