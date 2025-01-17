@@ -350,13 +350,19 @@ class _AddTickerPageState extends State<AddTickerPage> {
             candleTickers.last.candle.close.value,
           );
 
+          final name = symbol.text
+              .split(' ')
+              .sublist(1)
+              .join(' ')
+              .replaceAll(RegExp(r'\(|\)'), '');
+
           db.tickers.insertOne(
             TickersCompanion(
               amount: Value(double.parse(amount.text)),
               updatedAt: Value(DateTime.now()),
               createdAt: Value(DateTime.parse(createdAt.text)),
               price: Value(double.parse(price.text)),
-              name: Value(symbol.text.split(' ').sublist(1).join(' ')),
+              name: Value(name),
               symbol: Value(symbol.text.split(' ').first),
               change: Value(percentChange),
             ),
