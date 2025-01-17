@@ -121,9 +121,10 @@ class TickerLine extends StatelessWidget {
     BuildContext context,
   ) {
     final price = '\$${touchedSpots.first.y.toStringAsFixed(2)}';
-    final date = formatter.format(
-      dates.elementAt(touchedSpots.first.x.toInt()),
-    );
+    final dateStr = dates.elementAtOrNull(touchedSpots.first.x.toInt());
+    if (dateStr == null) return [];
+    final date = formatter.format(dateStr);
+
     return [
       LineTooltipItem(
         '$price\n$date',
