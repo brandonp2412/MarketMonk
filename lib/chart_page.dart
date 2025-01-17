@@ -13,7 +13,6 @@ import 'package:market_monk/symbol.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
 
 class ChartPage extends StatefulWidget {
   const ChartPage({super.key});
