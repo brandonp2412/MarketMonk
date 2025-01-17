@@ -3,12 +3,12 @@
 Track stocks on any platform 📈 - No ads or tracking 🕵️
 
 <p float="left">
-    <img src="docs/screenshot1.jpg" height="700"/>
-    <img src="docs/screenshot2.jpg" height="700"/>
-    <img src="docs/screenshot3.jpg" height="700"/>
-    <img src="docs/screenshot4.jpg" height="700"/>
     <img src="docs/screenshot5.jpg" height="700"/>
     <img src="docs/screenshot6.jpg" height="700"/>
+    <img src="docs/screenshot4.jpg" height="700"/>
+    <img src="docs/screenshot3.jpg" height="700"/>
+    <img src="docs/screenshot1.jpg" height="700"/>
+    <img src="docs/screenshot2.jpg" height="700"/>
 </p>
 
 ## Pre-publish requirements
