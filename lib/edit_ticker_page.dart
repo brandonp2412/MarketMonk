@@ -208,10 +208,6 @@ class _EditTickerPageState extends State<EditTickerPage> {
                         ? const Icon(Icons.arrow_upward, color: Colors.green)
                         : const Icon(Icons.arrow_downward, color: Colors.red),
                     title: Text("${widget.ticker.change.toStringAsFixed(2)}%"),
-                    trailing: Text(
-                      "Last updated ${widget.ticker.updatedAt}",
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
                   ),
                   StreamBuilder(stream: stream, builder: chartBuilder),
                   const SizedBox(height: 8),
