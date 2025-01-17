@@ -90,7 +90,7 @@ class TickerLine extends StatelessWidget {
                   show: false,
                 ),
                 isCurved: true,
-                curveSmoothness: 0.2,
+                curveSmoothness: 0.5,
                 belowBarData: BarAreaData(
                   show: true,
                   gradient: LinearGradient(
