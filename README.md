@@ -1,4 +1,4 @@
-# Market Monk
+# MarketMonk
 
 Track stocks on any platform 📈 - No ads
 
