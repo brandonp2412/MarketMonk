@@ -77,6 +77,10 @@ class _MyHomePageState extends State<MyHomePage> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         systemNavigationBarColor: Theme.of(context).colorScheme.surface,
+        statusBarColor: Theme.of(context).colorScheme.surface,
+        statusBarIconBrightness: Theme.of(context).brightness == Brightness.dark
+            ? Brightness.light
+            : Brightness.dark,
       ),
       child: const DefaultTabController(
         length: 2,
