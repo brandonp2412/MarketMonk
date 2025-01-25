@@ -50,8 +50,8 @@ class TickerLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     List<Color> gradientColors = [
-      Colors.cyan,
-      Colors.transparent,
+      Theme.of(context).colorScheme.primary,
+      Theme.of(context).colorScheme.surface,
     ];
 
     return Padding(
