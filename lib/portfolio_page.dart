@@ -184,26 +184,29 @@ class _PortfolioPageState extends State<PortfolioPage> {
         child: material.Column(
           children: [
             if (Platform.isAndroid) const SizedBox(height: 40),
-            SearchBar(
-              controller: search,
-              hintText: 'Search...',
-              leading: leading,
-              onTap: () => search.selection = TextSelection(
-                baseOffset: 0,
-                extentOffset: search.text.length,
-              ),
-              onChanged: (text) {
-                updateStream();
-              },
-              trailing: [
-                if (selected.isNotEmpty) deleteButton,
-                Badge.count(
-                  count: selected.length,
-                  isLabelVisible: selected.isNotEmpty,
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  child: menuButton,
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: SearchBar(
+                controller: search,
+                hintText: 'Search...',
+                leading: leading,
+                onTap: () => search.selection = TextSelection(
+                  baseOffset: 0,
+                  extentOffset: search.text.length,
                 ),
-              ],
+                onChanged: (text) {
+                  updateStream();
+                },
+                trailing: [
+                  if (selected.isNotEmpty) deleteButton,
+                  Badge.count(
+                    count: selected.length,
+                    isLabelVisible: selected.isNotEmpty,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    child: menuButton,
+                  ),
+                ],
+              ),
             ),
             StreamBuilder(
               stream: stream,

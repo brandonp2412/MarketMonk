@@ -141,39 +141,42 @@ class _ChartPageState extends State<ChartPage>
                     ),
                   );
 
-                return SearchBar(
-                  controller: fieldTextEditingController,
-                  leading: leading,
-                  focusNode: fieldFocusNode,
-                  hintText: 'Search...',
-                  onTap: () => stock.selection = TextSelection(
-                    baseOffset: 0,
-                    extentOffset: stock.text.length,
-                  ),
-                  trailing: [
-                    IconButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const SettingsPage(),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.settings),
+                return Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: SearchBar(
+                    controller: fieldTextEditingController,
+                    leading: leading,
+                    focusNode: fieldFocusNode,
+                    hintText: 'Search...',
+                    onTap: () => stock.selection = TextSelection(
+                      baseOffset: 0,
+                      extentOffset: stock.text.length,
                     ),
-                  ],
-                  onSubmitted: (text) {
-                    String? selection;
+                    trailing: [
+                      IconButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const SettingsPage(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.settings),
+                      ),
+                    ],
+                    onSubmitted: (text) {
+                      String? selection;
 
-                    for (final option in symbols) {
-                      if (option.value.toLowerCase() == text.toLowerCase())
-                        selection = '${option.value} (${option.name})';
-                    }
-                    selection ??= text;
-                    stock.text = selection.toUpperCase();
-                    updateData();
-                  },
+                      for (final option in symbols) {
+                        if (option.value.toLowerCase() == text.toLowerCase())
+                          selection = '${option.value} (${option.name})';
+                      }
+                      selection ??= text;
+                      stock.text = selection.toUpperCase();
+                      updateData();
+                    },
+                  ),
                 );
               },
             ),
