@@ -56,56 +56,53 @@ class TickerLine extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(right: 32.0, top: 16.0),
-      child: SizedBox(
-        height: 350,
-        child: LineChart(
-          LineChartData(
-            titlesData: FlTitlesData(
-              topTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: false),
+      child: LineChart(
+        LineChartData(
+          titlesData: FlTitlesData(
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            leftTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: true, reservedSize: 45),
+            ),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 27,
+                interval: 1,
+                getTitlesWidget: (value, meta) =>
+                    getBottomTitles(value, meta, context),
               ),
-              rightTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: false),
+            ),
+          ),
+          lineBarsData: [
+            LineChartBarData(
+              spots: spots,
+              color: Theme.of(context).colorScheme.primary,
+              barWidth: 3,
+              dotData: const FlDotData(
+                show: false,
               ),
-              leftTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: true, reservedSize: 45),
-              ),
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  reservedSize: 27,
-                  interval: 1,
-                  getTitlesWidget: (value, meta) =>
-                      getBottomTitles(value, meta, context),
+              belowBarData: BarAreaData(
+                show: true,
+                gradient: LinearGradient(
+                  colors: gradientColors
+                      .map((color) => color.withValues(alpha: 0.3))
+                      .toList(),
                 ),
               ),
             ),
-            lineBarsData: [
-              LineChartBarData(
-                spots: spots,
-                color: Theme.of(context).colorScheme.primary,
-                barWidth: 3,
-                dotData: const FlDotData(
-                  show: false,
-                ),
-                belowBarData: BarAreaData(
-                  show: true,
-                  gradient: LinearGradient(
-                    colors: gradientColors
-                        .map((color) => color.withValues(alpha: 0.3))
-                        .toList(),
-                  ),
-                ),
-              ),
-            ],
-            gridData: const FlGridData(show: false),
-            lineTouchData: LineTouchData(
-              touchTooltipData: LineTouchTooltipData(
-                getTooltipColor: (touchedSpot) =>
-                    Theme.of(context).colorScheme.surface,
-                getTooltipItems: (touchedSpots) =>
-                    getTooltip(touchedSpots, context),
-              ),
+          ],
+          gridData: const FlGridData(show: false),
+          lineTouchData: LineTouchData(
+            touchTooltipData: LineTouchTooltipData(
+              getTooltipColor: (touchedSpot) =>
+                  Theme.of(context).colorScheme.surface,
+              getTooltipItems: (touchedSpots) =>
+                  getTooltip(touchedSpots, context),
             ),
           ),
         ),

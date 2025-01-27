@@ -123,10 +123,13 @@ class _EditTickerPageState extends State<EditTickerPage> {
               : const Icon(Icons.arrow_downward, color: Colors.red),
           title: Text("${percentChange.toStringAsFixed(2)}%"),
         ),
-        TickerLine(
-          formatter: DateFormat("d/M/yy"),
-          dates: candles.map((candle) => candle.date.value),
-          spots: spots,
+        SizedBox(
+          height: MediaQuery.of(context).size.height * 0.5,
+          child: TickerLine(
+            formatter: DateFormat("d/M/yy"),
+            dates: candles.map((candle) => candle.date.value),
+            spots: spots,
+          ),
         ),
       ],
     );
