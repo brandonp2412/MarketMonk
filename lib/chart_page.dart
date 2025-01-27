@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:drift/drift.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -23,7 +21,7 @@ class ChartPage extends StatefulWidget {
 
 class _ChartPageState extends State<ChartPage>
     with AutomaticKeepAliveClientMixin {
-  TextEditingController stock = TextEditingController(text: "");
+  TextEditingController stock = TextEditingController(text: "GME");
   String? favoriteStock;
   List<Symbol> symbols = [];
   int years = 0;
@@ -275,12 +273,6 @@ class _ChartPageState extends State<ChartPage>
           .get();
       if (tickers.isNotEmpty)
         stock.text = "${tickers.first.symbol} (${tickers.first.name})";
-    }
-
-    if (stock.text.isEmpty) {
-      final random = Random();
-      final randomSymbol = gotSymbols[random.nextInt(gotSymbols.length)];
-      stock.text = "${randomSymbol.value} (${randomSymbol.name})";
     }
 
     updateData();
