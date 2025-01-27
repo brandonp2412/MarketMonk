@@ -23,7 +23,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
   late var symbol = TextEditingController(text: widget.symbol);
   final amount = TextEditingController(text: '1');
   final createdAt = TextEditingController(
-    text: DateTime.now().subtract(const Duration(days: 100)).toIso8601String(),
+    text: DateTime.now().toIso8601String(),
   );
   final price = TextEditingController(text: '0');
 
@@ -392,8 +392,8 @@ class _EditTickerPageState extends State<EditTickerPage> {
                       final DateTime? date = await showDatePicker(
                         context: context,
                         initialDate: DateTime.parse(createdAt.text),
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime(2100),
+                        firstDate: DateTime(0),
+                        lastDate: DateTime(999999),
                       );
                       if (date == null) return;
                       setState(() {

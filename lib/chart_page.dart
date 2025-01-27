@@ -419,7 +419,7 @@ class _ChartPageState extends State<ChartPage>
                             .join(' ')
                             .replaceAll(RegExp(r'\(|\)'), ''),
                         createdAt: Value(
-                          DateTime.now().subtract(const Duration(days: 30)),
+                          DateTime.now(),
                         ),
                       ),
                     ));
