@@ -41,23 +41,26 @@ class _ChartPageState extends State<ChartPage>
     final yearOptions = [1, 2, 3, 5, 10];
     for (final option in yearOptions) {
       yearButtons.add(
-        OutlinedButton(
-          onPressed: () {
-            setState(() {
-              years = option;
-              months = 0;
-              days = 0;
-            });
-            setStream();
-          },
-          style: OutlinedButton.styleFrom(
-            side: BorderSide(
-              color: option == years
-                  ? Theme.of(context).colorScheme.primary
-                  : Colors.transparent,
-            ), // Set border color
+        Tooltip(
+          message: 'Show the $option last years of prices',
+          child: OutlinedButton(
+            onPressed: () {
+              setState(() {
+                years = option;
+                months = 0;
+                days = 0;
+              });
+              setStream();
+            },
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(
+                color: option == years
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.transparent,
+              ), // Set border color
+            ),
+            child: Text("${option}y"),
           ),
-          child: Text("${option}y"),
         ),
       );
     }
@@ -66,23 +69,26 @@ class _ChartPageState extends State<ChartPage>
     final monthOptions = [1, 2, 3, 6];
     for (final option in monthOptions) {
       monthButtons.add(
-        OutlinedButton(
-          onPressed: () {
-            setState(() {
-              months = option;
-              years = 0;
-              days = 0;
-            });
-            setStream();
-          },
-          style: OutlinedButton.styleFrom(
-            side: BorderSide(
-              color: option == months
-                  ? Theme.of(context).colorScheme.primary
-                  : Colors.transparent,
-            ), // Set border color
+        Tooltip(
+          message: "Show the last $option months of prices",
+          child: OutlinedButton(
+            onPressed: () {
+              setState(() {
+                months = option;
+                years = 0;
+                days = 0;
+              });
+              setStream();
+            },
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(
+                color: option == months
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.transparent,
+              ), // Set border color
+            ),
+            child: Text("${option}m"),
           ),
-          child: Text("${option}m"),
         ),
       );
     }
@@ -183,23 +189,26 @@ class _ChartPageState extends State<ChartPage>
           const SizedBox(height: 16),
           Wrap(
             children: [
-              OutlinedButton(
-                onPressed: () {
-                  setState(() {
-                    days = 5;
-                    years = 0;
-                    months = 0;
-                  });
-                  setStream();
-                },
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(
-                    color: days == 5
-                        ? Theme.of(context).colorScheme.primary
-                        : Colors.transparent,
-                  ), // Set border color
+              Tooltip(
+                message: 'Show the last 5 days of prices',
+                child: OutlinedButton(
+                  onPressed: () {
+                    setState(() {
+                      days = 5;
+                      years = 0;
+                      months = 0;
+                    });
+                    setStream();
+                  },
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(
+                      color: days == 5
+                          ? Theme.of(context).colorScheme.primary
+                          : Colors.transparent,
+                    ), // Set border color
+                  ),
+                  child: const Text("5d"),
                 ),
-                child: const Text("5d"),
               ),
               ...monthButtons,
               ...yearButtons,
