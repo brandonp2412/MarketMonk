@@ -84,6 +84,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
             db.candles.date,
             db.candles.close,
             db.tickers.id,
+            db.tickers.price,
           ])
           ..where(
             db.candles.symbol.equals(symbol.text.split(' ').first) &
@@ -116,6 +117,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                   ticker: result.read(db.tickers.id) != null
                       ? TickersCompanion(
                           id: Value(result.read(db.tickers.id)!),
+                          price: Value(result.read(db.tickers.price)!),
                         )
                       : null,
                 ),
@@ -309,6 +311,41 @@ class _EditTickerPageState extends State<EditTickerPage> {
                           );
 
                         return SearchBar(
+                          trailing: [
+                            StreamBuilder(
+                              stream: stream,
+                              builder: (context, snapshot) {
+                                if (snapshot.data == null)
+                                  return const SizedBox();
+
+                                final percentChange = safePercentChange(
+                                  double.parse(price.text),
+                                  snapshot.data!.last.candle.close.value,
+                                );
+
+                                return material.Padding(
+                                  padding: const EdgeInsets.only(right: 8.0),
+                                  child: Row(
+                                    children: [
+                                      percentChange >= 0
+                                          ? const Icon(
+                                              Icons.arrow_upward,
+                                              color: Colors.green,
+                                            )
+                                          : const Icon(
+                                              Icons.arrow_downward,
+                                              color: Colors.red,
+                                            ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        "${percentChange.toStringAsFixed(2)}%",
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
                           controller: fieldTextEditingController,
                           leading: leading,
                           focusNode: fieldFocusNode,
