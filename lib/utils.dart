@@ -174,13 +174,22 @@ Future<void> syncCandles(String symbol) async {
   double totalInitialValue = 0.0;
 
   for (final ticker in tickers) {
+    if (ticker.price.isNaN || ticker.change.isNaN) continue;
+
     double currentPositionValue = ticker.amount * ticker.price;
-    double initialPositionValue =
-        currentPositionValue / (1 + (ticker.change / 100));
+    if (currentPositionValue.isNaN) continue;
+
+    double initialPositionValue = ticker.change == -100
+        ? currentPositionValue
+        : currentPositionValue / (1 + (ticker.change / 100));
+
+    if (initialPositionValue.isNaN) continue;
 
     totalCurrentValue += currentPositionValue;
     totalInitialValue += initialPositionValue;
   }
+
+  if (totalInitialValue == 0) return (0.0, 0.0);
 
   double dollarReturn = totalCurrentValue - totalInitialValue;
   double percentReturn = ((totalCurrentValue / totalInitialValue) - 1) * 100;
