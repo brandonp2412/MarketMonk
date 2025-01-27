@@ -430,7 +430,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                         context: context,
                         initialDate: DateTime.parse(createdAt.text),
                         firstDate: DateTime(0),
-                        lastDate: DateTime(999999),
+                        lastDate: DateTime.now(),
                       );
                       if (date == null) return;
                       setState(() {
