@@ -188,7 +188,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                   TextField(
                     controller: createdAt,
                     decoration: const InputDecoration(
-                      labelText: 'Created at',
+                      labelText: 'Purchased at',
                       suffixIcon: Icon(Icons.today),
                     ),
                     readOnly: true,
