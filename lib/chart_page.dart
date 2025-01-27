@@ -22,7 +22,8 @@ class ChartPage extends StatefulWidget {
 
 class _ChartPageState extends State<ChartPage>
     with AutomaticKeepAliveClientMixin {
-  TextEditingController stock = TextEditingController(text: "GME");
+  TextEditingController stock =
+      TextEditingController(text: "GME (GameStop Corporation Common Stock)");
   String? favoriteStock;
   List<Symbol> symbols = [];
   int years = 0;
@@ -248,10 +249,13 @@ class _ChartPageState extends State<ChartPage>
       spots.add(FlSpot(index.toDouble(), candles[index].close.value));
     }
 
-    return TickerLine(
-      formatter: DateFormat("d/M/yy"),
-      dates: candles.map((candle) => candle.date.value),
-      spots: spots,
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.5,
+      child: TickerLine(
+        formatter: DateFormat("d/M/yy"),
+        dates: candles.map((candle) => candle.date.value),
+        spots: spots,
+      ),
     );
   }
 
@@ -268,22 +272,7 @@ class _ChartPageState extends State<ChartPage>
     });
 
     final prefs = await SharedPreferences.getInstance();
-    stock.text = prefs.getString('favoriteStock') ?? "";
-    if (stock.text.isEmpty) {
-      final tickers = await (db.tickers.select()
-            ..orderBy(
-              [
-                (u) => OrderingTerm(
-                      expression: u.createdAt,
-                      mode: OrderingMode.desc,
-                    ),
-              ],
-            )
-            ..limit(1))
-          .get();
-      if (tickers.isNotEmpty)
-        stock.text = "${tickers.first.symbol} (${tickers.first.name})";
-    }
+    stock.text = prefs.getString('favoriteStock') ?? stock.text;
 
     updateData();
   }
