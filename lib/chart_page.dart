@@ -3,9 +3,9 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:intl/intl.dart';
+import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/candle_ticker.dart';
 import 'package:market_monk/database.dart';
-import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/symbol.dart';
@@ -433,8 +433,9 @@ class _ChartPageState extends State<ChartPage>
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) =>
-                                    EditTickerPage(ticker: ticker),
+                                builder: (context) => EditTickerPage(
+                                  symbol: ticker.symbol,
+                                ),
                               ),
                             );
                           },

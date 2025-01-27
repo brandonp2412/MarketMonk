@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:market_monk/symbol.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/material.dart';
@@ -10,35 +11,62 @@ import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
 
 class EditTickerPage extends StatefulWidget {
-  final Ticker ticker;
+  final String? symbol;
 
-  const EditTickerPage({super.key, required this.ticker});
+  const EditTickerPage({super.key, this.symbol});
 
   @override
   State<EditTickerPage> createState() => _EditTickerPageState();
 }
 
 class _EditTickerPageState extends State<EditTickerPage> {
-  Stream<List<CandleTicker>>? stream;
-
-  late final name = TextEditingController(text: widget.ticker.name);
-  late final amount =
-      TextEditingController(text: widget.ticker.amount.toStringAsFixed(2));
-  late final createdAt = TextEditingController(
-    text: widget.ticker.createdAt.toIso8601String(),
+  late var symbol = TextEditingController(text: widget.symbol);
+  final amount = TextEditingController(text: '1');
+  final createdAt = TextEditingController(
+    text: DateTime.now().subtract(const Duration(days: 100)).toIso8601String(),
   );
-  late final price =
-      TextEditingController(text: widget.ticker.price.toStringAsFixed(2));
+  final price = TextEditingController(text: '0');
+
+  Stream<List<CandleTicker>>? stream;
   bool autoSetCreated = false;
   bool autoSetPrice = false;
+  bool loading = false;
+  List<Symbol> symbols = [];
+
+  FocusNode? autocomplete;
 
   @override
   void initState() {
     super.initState();
     setStream();
+    setSymbols();
+    setTicker();
+  }
+
+  void setTicker() async {
+    if (widget.symbol == null) return;
+
+    final ticker = await (db.tickers.select()
+          ..where((tbl) => tbl.symbol.equals(widget.symbol!.split(' ').first)))
+        .getSingleOrNull();
+    if (ticker == null) return;
+
+    price.text = ticker.price.toStringAsFixed(2);
+    amount.text = ticker.amount.toStringAsFixed(2);
+    createdAt.text = ticker.createdAt.toIso8601String();
+  }
+
+  void setSymbols() async {
+    final gotSymbols = await getSymbols();
+    setState(() {
+      symbols = gotSymbols;
+    });
+    if (widget.symbol == null) autocomplete?.requestFocus();
   }
 
   void setStream() {
+    if (symbol.text.isEmpty) return;
+
     const weekExpression = CustomExpression<String>(
       "STRFTIME('%Y-%m-%W', DATE(\"date\", 'unixepoch', 'localtime'))",
     );
@@ -55,7 +83,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
             db.tickers.id,
           ])
           ..where(
-            db.candles.symbol.equals(widget.ticker.symbol) &
+            db.candles.symbol.equals(symbol.text.split(' ').first) &
                 db.candles.date.isBiggerOrEqualValue(created),
           )
           ..orderBy(
@@ -91,6 +119,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
               )
               .toList(),
         );
+    setState(() {});
   }
 
   Widget chartBuilder(
@@ -111,12 +140,12 @@ class _EditTickerPageState extends State<EditTickerPage> {
     for (var index = 0; index < candles.length; index++) {
       spots.add(FlSpot(index.toDouble(), candles[index].close.value));
     }
+
     var percentChange =
         safePercentChange(candles.first.close.value, candles.last.close.value);
 
     return material.Column(
       children: [
-        const SizedBox(height: 8),
         ListTile(
           leading: percentChange > 0
               ? const Icon(Icons.arrow_upward, color: Colors.green)
@@ -139,7 +168,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.ticker.symbol),
+        title: const Text("Edit investment"),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -148,26 +177,132 @@ class _EditTickerPageState extends State<EditTickerPage> {
             Expanded(
               child: ListView(
                 children: [
-                  TextField(
-                    controller: name,
-                    decoration: const InputDecoration(labelText: 'Stock'),
-                    textInputAction: TextInputAction.next,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: Autocomplete<String>(
+                      optionsBuilder: (TextEditingValue textEditingValue) {
+                        final filtered = symbols
+                            .where(
+                              (option) =>
+                                  option.value.toLowerCase().contains(
+                                        textEditingValue.text.toLowerCase(),
+                                      ) ||
+                                  option.name.toLowerCase().contains(
+                                        textEditingValue.text.toLowerCase(),
+                                      ),
+                            )
+                            .toList();
+                        filtered.sort((a, b) {
+                          String text = textEditingValue.text.toLowerCase();
+                          bool aStartsWithText =
+                              a.value.toLowerCase().startsWith(text);
+                          bool bStartsWithText =
+                              b.value.toLowerCase().startsWith(text);
+                          if (aStartsWithText && !bStartsWithText) return -1;
+                          if (!aStartsWithText && bStartsWithText) return 1;
+                          return 0;
+                        });
+                        return filtered.map(
+                          (option) => '${option.value} (${option.name})',
+                        );
+                      },
+                      initialValue: symbol.value,
+                      onSelected: (value) async {
+                        setStream();
+                        setState(() {
+                          loading = true;
+                        });
+                        try {
+                          await syncCandles(value.split(' ').first);
+                        } catch (error) {
+                          if (context.mounted) toast(context, error.toString());
+                        } finally {
+                          setState(() {
+                            loading = false;
+                          });
+                        }
+
+                        final results = await stream?.first;
+                        if (results == null) return;
+                        price.text =
+                            results.last.candle.close.value.toStringAsFixed(2);
+                      },
+                      fieldViewBuilder: (
+                        BuildContext context,
+                        TextEditingController fieldTextEditingController,
+                        FocusNode fieldFocusNode,
+                        VoidCallback onFieldSubmitted,
+                      ) {
+                        symbol = fieldTextEditingController;
+                        autocomplete = fieldFocusNode;
+                        Widget leading = const Padding(
+                          padding: EdgeInsets.only(left: 16.0, right: 8.0),
+                          child: Icon(Icons.search),
+                        );
+                        if (loading)
+                          leading = const Padding(
+                            padding: EdgeInsets.only(left: 16.0, right: 8.0),
+                            child: SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+
+                        return SearchBar(
+                          controller: fieldTextEditingController,
+                          leading: leading,
+                          focusNode: fieldFocusNode,
+                          hintText: 'Search...',
+                          onTap: () => selectAll(symbol),
+                          textInputAction: TextInputAction.next,
+                          onSubmitted: (text) async {
+                            selectAll(amount);
+                            String? selection;
+
+                            for (final option in symbols) {
+                              if (option.value.toLowerCase() ==
+                                  text.toLowerCase())
+                                selection = '${option.value} (${option.name})';
+                            }
+                            selection ??= text;
+                            symbol.text = selection.toUpperCase();
+                            setStream();
+
+                            setState(() {
+                              loading = true;
+                            });
+                            try {
+                              await syncCandles(selection.split(' ').first);
+                            } catch (error) {
+                              if (context.mounted)
+                                toast(context, error.toString());
+                              debugPrint(error.toString());
+                            } finally {
+                              setState(() {
+                                loading = false;
+                              });
+                            }
+                          },
+                        );
+                      },
+                    ),
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: amount,
                     decoration: const InputDecoration(labelText: 'Amount'),
-                    textInputAction: TextInputAction.next,
                     onTap: () => selectAll(amount),
                     onSubmitted: (value) => selectAll(price),
                     keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: price,
                     decoration: const InputDecoration(
                       labelText: 'Price',
-                      prefix: Text('\$'),
+                      prefix: Text("\$"),
                     ),
                     onTap: () => selectAll(price),
                     keyboardType: TextInputType.number,
@@ -176,7 +311,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                       if (autoSetPrice) return;
                       final closest = await findClosestPrice(
                         double.parse(price.text),
-                        widget.ticker.symbol,
+                        symbol.text.split(' ').first,
                       );
 
                       if (closest == null) return;
@@ -184,7 +319,6 @@ class _EditTickerPageState extends State<EditTickerPage> {
                         createdAt.text = closest.date.toIso8601String();
                         autoSetCreated = true;
                       });
-                      setStream();
                     },
                   ),
                   const SizedBox(height: 8),
@@ -198,8 +332,8 @@ class _EditTickerPageState extends State<EditTickerPage> {
                     onTap: () async {
                       final DateTime? date = await showDatePicker(
                         context: context,
-                        initialDate: widget.ticker.createdAt,
-                        firstDate: DateTime(0),
+                        initialDate: DateTime.parse(createdAt.text),
+                        firstDate: DateTime(2000),
                         lastDate: DateTime(2100),
                       );
                       if (date == null) return;
@@ -209,8 +343,10 @@ class _EditTickerPageState extends State<EditTickerPage> {
                       setStream();
 
                       if (autoSetCreated) return;
-                      final closest =
-                          await findClosestDate(date, widget.ticker.symbol);
+                      final closest = await findClosestDate(
+                        date,
+                        symbol.text.split(' ').first,
+                      );
                       if (closest == null) return;
                       setState(() {
                         price.text = closest.close.toStringAsFixed(2);
@@ -218,47 +354,8 @@ class _EditTickerPageState extends State<EditTickerPage> {
                       });
                     },
                   ),
-                  StreamBuilder(stream: stream, builder: chartBuilder),
                   const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      TextButton.icon(
-                        label: const Text('Delete'),
-                        onPressed: () async {
-                          final confirm = await showDialog<bool>(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: const Text("Are you sure?"),
-                              content: const Text("Deleting is irreversible."),
-                              actions: [
-                                TextButton.icon(
-                                  onPressed: () {
-                                    Navigator.of(context).pop(true);
-                                  },
-                                  icon: const Icon(Icons.delete),
-                                  label: const Text("OK"),
-                                ),
-                                TextButton.icon(
-                                  onPressed: () {
-                                    Navigator.of(context).pop(false);
-                                  },
-                                  icon: const Icon(Icons.close),
-                                  label: const Text("Cancel"),
-                                ),
-                              ],
-                            ),
-                          );
-                          if (confirm != true) return;
-
-                          db.tickers.deleteOne(
-                            TickersCompanion(id: Value(widget.ticker.id)),
-                          );
-                          if (context.mounted) Navigator.of(context).pop();
-                        },
-                        icon: const Icon(Icons.delete),
-                      ),
-                    ],
-                  ),
+                  StreamBuilder(stream: stream, builder: chartBuilder),
                 ],
               ),
             ),
@@ -267,6 +364,8 @@ class _EditTickerPageState extends State<EditTickerPage> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
+          Navigator.of(context).pop();
+
           final candleTickers = await stream?.first;
           if (candleTickers == null) return;
 
@@ -275,19 +374,44 @@ class _EditTickerPageState extends State<EditTickerPage> {
             candleTickers.last.candle.close.value,
           );
 
-          (db.tickers.update()..where((tbl) => tbl.id.equals(widget.ticker.id)))
-              .write(
-            TickersCompanion(
-              amount: Value(double.parse(amount.text)),
-              updatedAt: Value(DateTime.now()),
-              createdAt: Value(DateTime.parse(createdAt.text)),
-              price: Value(double.parse(price.text)),
-              name: Value(name.text),
-              change: Value(percentChange),
-            ),
-          );
+          final name = symbol.text
+              .split(' ')
+              .sublist(1)
+              .join(' ')
+              .replaceAll(RegExp(r'\(|\)'), '');
 
-          if (context.mounted) Navigator.of(context).pop();
+          final exists = await (db.tickers.select()
+                ..where(
+                  (tbl) => tbl.symbol.equals(symbol.text.split(' ').first),
+                ))
+              .getSingleOrNull();
+
+          if (exists != null) {
+            (db.tickers.update()..where((tbl) => tbl.id.equals(exists.id)))
+                .write(
+              TickersCompanion(
+                amount: Value(double.parse(amount.text)),
+                updatedAt: Value(DateTime.now()),
+                createdAt: Value(DateTime.parse(createdAt.text)),
+                price: Value(double.parse(price.text)),
+                name: Value(name),
+                symbol: Value(symbol.text.split(' ').first),
+                change: Value(percentChange),
+              ),
+            );
+          } else {
+            db.tickers.insertOne(
+              TickersCompanion(
+                amount: Value(double.parse(amount.text)),
+                updatedAt: Value(DateTime.now()),
+                createdAt: Value(DateTime.parse(createdAt.text)),
+                price: Value(double.parse(price.text)),
+                name: Value(name),
+                symbol: Value(symbol.text.split(' ').first),
+                change: Value(percentChange),
+              ),
+            );
+          }
         },
         label: const Text('Save'),
         icon: const Icon(Icons.save),

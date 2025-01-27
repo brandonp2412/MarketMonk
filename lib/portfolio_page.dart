@@ -4,9 +4,8 @@ import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:intl/intl.dart';
-import 'package:market_monk/add_ticker_page.dart';
-import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
+import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/utils.dart';
@@ -219,7 +218,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
         onPressed: () {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => const AddTickerPage(),
+              builder: (context) => const EditTickerPage(),
             ),
           );
         },
@@ -242,8 +241,8 @@ class _PortfolioPageState extends State<PortfolioPage> {
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => AddTickerPage(
-                symbol: search.text,
+              builder: (context) => EditTickerPage(
+                symbol: search.text.toUpperCase(),
               ),
             ),
           );
@@ -325,7 +324,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => EditTickerPage(ticker: ticker),
+              builder: (context) => EditTickerPage(symbol: ticker.symbol),
             ),
           );
         else {
