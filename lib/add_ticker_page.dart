@@ -21,7 +21,7 @@ class AddTickerPage extends StatefulWidget {
 
 class _AddTickerPageState extends State<AddTickerPage> {
   late var symbol = TextEditingController(text: widget.symbol);
-  final amount = TextEditingController(text: '0');
+  final amount = TextEditingController(text: '1');
   final createdAt = TextEditingController(
     text: DateTime.now().subtract(const Duration(days: 100)).toIso8601String(),
   );
@@ -308,7 +308,7 @@ class _AddTickerPageState extends State<AddTickerPage> {
                   TextField(
                     controller: createdAt,
                     decoration: const InputDecoration(
-                      labelText: 'Created at',
+                      labelText: 'Purchased at',
                       suffixIcon: Icon(Icons.today),
                     ),
                     readOnly: true,
