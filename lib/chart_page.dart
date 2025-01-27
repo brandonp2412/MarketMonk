@@ -408,10 +408,10 @@ class _ChartPageState extends State<ChartPage>
                 TextButton.icon(
                   onPressed: () async {
                     final symbol = stock.text.split(' ').first;
-                    (db.tickers.insertOne(
+                    final ticker = await (db.tickers.insertReturning(
                       TickersCompanion.insert(
                         symbol: symbol,
-                        amount: 0,
+                        amount: 1,
                         change: percentChange,
                         price: candles.last.close.value,
                         name: stock.text
@@ -419,10 +419,28 @@ class _ChartPageState extends State<ChartPage>
                             .sublist(1)
                             .join(' ')
                             .replaceAll(RegExp(r'\(|\)'), ''),
+                        createdAt: Value(
+                          DateTime.now().subtract(const Duration(days: 30)),
+                        ),
                       ),
                     ));
                     if (context.mounted)
-                      toast(context, 'Added $symbol to portfolio');
+                      toast(
+                        context,
+                        'Added $symbol to portfolio',
+                        SnackBarAction(
+                          label: 'Edit',
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    EditTickerPage(ticker: ticker),
+                              ),
+                            );
+                          },
+                        ),
+                      );
                   },
                   label: const Text("Add"),
                   icon: const Icon(Icons.add),
