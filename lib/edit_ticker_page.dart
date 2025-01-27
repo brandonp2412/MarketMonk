@@ -32,6 +32,9 @@ class _EditTickerPageState extends State<EditTickerPage> {
   bool autoSetPrice = false;
   bool loading = false;
   List<Symbol> symbols = [];
+  int years = 0;
+  int months = 0;
+  int days = 5;
 
   FocusNode? autocomplete;
 
@@ -67,14 +70,14 @@ class _EditTickerPageState extends State<EditTickerPage> {
   void setStream() {
     if (symbol.text.isEmpty) return;
 
+    final now = DateTime.now();
+    final after =
+        DateTime(now.year - years, now.month - months, now.day - days - 1);
     const weekExpression = CustomExpression<String>(
       "STRFTIME('%Y-%m-%W', DATE(\"date\", 'unixepoch', 'localtime'))",
     );
     Iterable<Expression<Object>> groupBy = [db.candles.date];
-    final now = DateTime.now();
-    final created = DateTime.parse(createdAt.text);
-    if (created.isBefore(DateTime(now.year, now.month - 6, now.day)))
-      groupBy = [weekExpression];
+    if (years > 0 || months > 5) groupBy = [weekExpression];
 
     stream = (db.selectOnly(db.candles)
           ..addColumns([
@@ -84,7 +87,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
           ])
           ..where(
             db.candles.symbol.equals(symbol.text.split(' ').first) &
-                db.candles.date.isBiggerOrEqualValue(created),
+                db.candles.date.isBiggerOrEqualValue(after),
           )
           ..orderBy(
             [
@@ -146,19 +149,19 @@ class _EditTickerPageState extends State<EditTickerPage> {
 
     return material.Column(
       children: [
-        ListTile(
-          leading: percentChange > 0
-              ? const Icon(Icons.arrow_upward, color: Colors.green)
-              : const Icon(Icons.arrow_downward, color: Colors.red),
-          title: Text("${percentChange.toStringAsFixed(2)}%"),
-        ),
         SizedBox(
-          height: MediaQuery.of(context).size.height * 0.5,
+          height: MediaQuery.of(context).size.height * 0.45,
           child: TickerLine(
             formatter: DateFormat("d/M/yy"),
             dates: candles.map((candle) => candle.date.value),
             spots: spots,
           ),
+        ),
+        ListTile(
+          leading: percentChange > 0
+              ? const Icon(Icons.arrow_upward, color: Colors.green)
+              : const Icon(Icons.arrow_downward, color: Colors.red),
+          title: Text("${percentChange.toStringAsFixed(2)}%"),
         ),
       ],
     );
@@ -166,6 +169,62 @@ class _EditTickerPageState extends State<EditTickerPage> {
 
   @override
   Widget build(BuildContext context) {
+    List<Widget> yearButtons = [];
+    final yearOptions = [1, 2, 3, 5, 10];
+    for (final option in yearOptions) {
+      yearButtons.add(
+        Tooltip(
+          message: 'Show the $option last years of prices',
+          child: OutlinedButton(
+            onPressed: () {
+              setState(() {
+                years = option;
+                months = 0;
+                days = 0;
+              });
+              setStream();
+            },
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(
+                color: option == years
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.transparent,
+              ), // Set border color
+            ),
+            child: Text("${option}y"),
+          ),
+        ),
+      );
+    }
+
+    List<Widget> monthButtons = [];
+    final monthOptions = [1, 2, 3, 6];
+    for (final option in monthOptions) {
+      monthButtons.add(
+        Tooltip(
+          message: "Show the last $option months of prices",
+          child: OutlinedButton(
+            onPressed: () {
+              setState(() {
+                months = option;
+                years = 0;
+                days = 0;
+              });
+              setStream();
+            },
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(
+                color: option == months
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.transparent,
+              ), // Set border color
+            ),
+            child: Text("${option}m"),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Edit investment"),
@@ -353,6 +412,34 @@ class _EditTickerPageState extends State<EditTickerPage> {
                         autoSetPrice = true;
                       });
                     },
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    children: [
+                      Tooltip(
+                        message: 'Show the last 5 days of prices',
+                        child: OutlinedButton(
+                          onPressed: () {
+                            setState(() {
+                              days = 5;
+                              years = 0;
+                              months = 0;
+                            });
+                            setStream();
+                          },
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                              color: days == 5
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Colors.transparent,
+                            ), // Set border color
+                          ),
+                          child: const Text("5d"),
+                        ),
+                      ),
+                      ...monthButtons,
+                      ...yearButtons,
+                    ],
                   ),
                   const SizedBox(height: 8),
                   StreamBuilder(stream: stream, builder: chartBuilder),
