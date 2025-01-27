@@ -225,6 +225,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
         },
         label: const Text('Add'),
         icon: const Icon(Icons.add),
+        tooltip: 'Add to portfolio',
       ),
     );
   }
@@ -261,16 +262,19 @@ class _PortfolioPageState extends State<PortfolioPage> {
           if (index == 0)
             return material.Column(
               children: [
-                ListTile(
-                  leading: const Icon(
-                    Icons.account_balance,
+                Tooltip(
+                  message: "Total return of the portfolio",
+                  child: ListTile(
+                    leading: const Icon(
+                      Icons.account_balance,
+                    ),
+                    title: Text(formatter.format(dollarReturn)),
+                    subtitle: Text("${percentReturn.toStringAsFixed(2)}%"),
+                    subtitleTextStyle: TextStyle(
+                      color:
+                          dollarReturn >= 0 ? Colors.green : Colors.redAccent,
+                    ),
                   ),
-                  title: Text("${percentReturn.toStringAsFixed(2)}%"),
-                  subtitle: Text(formatter.format(dollarReturn)),
-                  subtitleTextStyle: TextStyle(
-                    color: dollarReturn >= 0 ? Colors.green : Colors.redAccent,
-                  ),
-                  trailing: const Text("(Total return)"),
                 ),
                 const Divider(),
               ],
