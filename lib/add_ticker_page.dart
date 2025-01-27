@@ -204,6 +204,11 @@ class _AddTickerPageState extends State<AddTickerPage> {
                             loading = false;
                           });
                         }
+
+                        final results = await stream?.first;
+                        if (results == null) return;
+                        price.text =
+                            results.last.candle.close.value.toStringAsFixed(2);
                       },
                       fieldViewBuilder: (
                         BuildContext context,
