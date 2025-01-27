@@ -268,7 +268,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
                   title: Text("${percentReturn.toStringAsFixed(2)}%"),
                   subtitle: Text(formatter.format(dollarReturn)),
                   subtitleTextStyle: TextStyle(
-                    color: dollarReturn > 0 ? Colors.green : Colors.redAccent,
+                    color: dollarReturn >= 0 ? Colors.green : Colors.redAccent,
                   ),
                   trailing: const Text("(Total return)"),
                 ),
@@ -286,7 +286,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
   }
 
   ListTile folioTile(Ticker ticker, BuildContext context) {
-    var leading = ticker.change > 0
+    var leading = ticker.change >= 0
         ? const Icon(
             Icons.arrow_upward,
             color: Colors.green,
@@ -312,7 +312,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
             selected.add(ticker.id);
           });
       },
-      subtitleTextStyle: ticker.change > 0
+      subtitleTextStyle: ticker.change >= 0
           ? const TextStyle(color: Colors.green)
           : const TextStyle(color: Colors.red),
       leading: leading,
