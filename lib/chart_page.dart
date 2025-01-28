@@ -17,10 +17,10 @@ class ChartPage extends StatefulWidget {
   const ChartPage({super.key});
 
   @override
-  State<ChartPage> createState() => _ChartPageState();
+  State<ChartPage> createState() => ChartPageState();
 }
 
-class _ChartPageState extends State<ChartPage>
+class ChartPageState extends State<ChartPage>
     with AutomaticKeepAliveClientMixin {
   TextEditingController stock =
       TextEditingController(text: "GME (GameStop Corporation Common Stock)");
@@ -312,10 +312,6 @@ class _ChartPageState extends State<ChartPage>
             db.candles.close,
             db.tickers.id,
           ])
-          ..where(
-            db.candles.symbol.equals(stock.text.split(' ').first) &
-                db.candles.date.isBiggerThanValue(after),
-          )
           ..orderBy(
             [
               OrderingTerm(

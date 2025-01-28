@@ -9,8 +9,9 @@ import 'package:market_monk/symbol.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
 
 Future<List<Symbol>> getSymbols() async {
-  final List<dynamic> nasdaq = json
-      .decode(await rootBundle.loadString('assets/nasdaq-full-tickers.json'));
+  final nasdaqString =
+      await rootBundle.loadString('assets/nasdaq-full-tickers.json');
+  final List<dynamic> nasdaq = json.decode(nasdaqString);
   final List<dynamic> amex =
       json.decode(await rootBundle.loadString('assets/amex-full-tickers.json'));
   final List<dynamic> nyse =

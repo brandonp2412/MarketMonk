@@ -25,6 +25,9 @@ dependencies:
   provider: ^6.1.2
   package_info_plus: ^8.1.3
   url_launcher: ^6.3.1
+  golden_screenshot: ^3.1.3
+  sqlite3: ^2.7.2
+  mocktail: ^1.0.4
 
 dev_dependencies:
   flutter_test:
@@ -37,3 +40,9 @@ flutter:
   uses-material-design: true
   assets:
     - assets/
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: fonts/Roboto-Regular.ttf
+        - asset: fonts/Roboto-Bold.ttf
+          weight: 700
