@@ -418,9 +418,6 @@ class _ChartPageState extends State<ChartPage>
                             .sublist(1)
                             .join(' ')
                             .replaceAll(RegExp(r'\(|\)'), ''),
-                        createdAt: Value(
-                          DateTime.now(),
-                        ),
                       ),
                     ));
                     if (context.mounted)

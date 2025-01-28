@@ -142,7 +142,7 @@ Future<void> syncCandles(String symbol) async {
       .getSingleOrNull();
   if (ticker == null) return;
 
-  final bought = await findClosestDate(ticker.createdAt, symbol);
+  final bought = await findClosestDate(ticker.purchasedAt, symbol);
   if (bought == null) return;
 
   latest = await (db.candles.select()

@@ -42,6 +42,14 @@ class $TickersTable extends Tickers with TableInfo<$TickersTable, Ticker> {
       type: DriftSqlType.dateTime,
       requiredDuringInsert: false,
       defaultValue: currentDateAndTime);
+  static const VerificationMeta _purchasedAtMeta =
+      const VerificationMeta('purchasedAt');
+  @override
+  late final GeneratedColumn<DateTime> purchasedAt = GeneratedColumn<DateTime>(
+      'purchased_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
   static const VerificationMeta _updatedAtMeta =
       const VerificationMeta('updatedAt');
   @override
@@ -61,8 +69,17 @@ class $TickersTable extends Tickers with TableInfo<$TickersTable, Ticker> {
       'price', aliasedName, false,
       type: DriftSqlType.double, requiredDuringInsert: true);
   @override
-  List<GeneratedColumn> get $columns =>
-      [id, symbol, name, change, createdAt, updatedAt, amount, price];
+  List<GeneratedColumn> get $columns => [
+        id,
+        symbol,
+        name,
+        change,
+        createdAt,
+        purchasedAt,
+        updatedAt,
+        amount,
+        price
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -97,6 +114,12 @@ class $TickersTable extends Tickers with TableInfo<$TickersTable, Ticker> {
     if (data.containsKey('created_at')) {
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    if (data.containsKey('purchased_at')) {
+      context.handle(
+          _purchasedAtMeta,
+          purchasedAt.isAcceptableOrUnknown(
+              data['purchased_at']!, _purchasedAtMeta));
     }
     if (data.containsKey('updated_at')) {
       context.handle(_updatedAtMeta,
@@ -133,6 +156,8 @@ class $TickersTable extends Tickers with TableInfo<$TickersTable, Ticker> {
           .read(DriftSqlType.double, data['${effectivePrefix}change'])!,
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      purchasedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}purchased_at'])!,
       updatedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
       amount: attachedDatabase.typeMapping
@@ -154,6 +179,7 @@ class Ticker extends DataClass implements Insertable<Ticker> {
   final String name;
   final double change;
   final DateTime createdAt;
+  final DateTime purchasedAt;
   final DateTime updatedAt;
   final double amount;
   final double price;
@@ -163,6 +189,7 @@ class Ticker extends DataClass implements Insertable<Ticker> {
       required this.name,
       required this.change,
       required this.createdAt,
+      required this.purchasedAt,
       required this.updatedAt,
       required this.amount,
       required this.price});
@@ -174,6 +201,7 @@ class Ticker extends DataClass implements Insertable<Ticker> {
     map['name'] = Variable<String>(name);
     map['change'] = Variable<double>(change);
     map['created_at'] = Variable<DateTime>(createdAt);
+    map['purchased_at'] = Variable<DateTime>(purchasedAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     map['amount'] = Variable<double>(amount);
     map['price'] = Variable<double>(price);
@@ -187,6 +215,7 @@ class Ticker extends DataClass implements Insertable<Ticker> {
       name: Value(name),
       change: Value(change),
       createdAt: Value(createdAt),
+      purchasedAt: Value(purchasedAt),
       updatedAt: Value(updatedAt),
       amount: Value(amount),
       price: Value(price),
@@ -202,6 +231,7 @@ class Ticker extends DataClass implements Insertable<Ticker> {
       name: serializer.fromJson<String>(json['name']),
       change: serializer.fromJson<double>(json['change']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      purchasedAt: serializer.fromJson<DateTime>(json['purchasedAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       amount: serializer.fromJson<double>(json['amount']),
       price: serializer.fromJson<double>(json['price']),
@@ -216,6 +246,7 @@ class Ticker extends DataClass implements Insertable<Ticker> {
       'name': serializer.toJson<String>(name),
       'change': serializer.toJson<double>(change),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'purchasedAt': serializer.toJson<DateTime>(purchasedAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'amount': serializer.toJson<double>(amount),
       'price': serializer.toJson<double>(price),
@@ -228,6 +259,7 @@ class Ticker extends DataClass implements Insertable<Ticker> {
           String? name,
           double? change,
           DateTime? createdAt,
+          DateTime? purchasedAt,
           DateTime? updatedAt,
           double? amount,
           double? price}) =>
@@ -237,6 +269,7 @@ class Ticker extends DataClass implements Insertable<Ticker> {
         name: name ?? this.name,
         change: change ?? this.change,
         createdAt: createdAt ?? this.createdAt,
+        purchasedAt: purchasedAt ?? this.purchasedAt,
         updatedAt: updatedAt ?? this.updatedAt,
         amount: amount ?? this.amount,
         price: price ?? this.price,
@@ -248,6 +281,8 @@ class Ticker extends DataClass implements Insertable<Ticker> {
       name: data.name.present ? data.name.value : this.name,
       change: data.change.present ? data.change.value : this.change,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      purchasedAt:
+          data.purchasedAt.present ? data.purchasedAt.value : this.purchasedAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       amount: data.amount.present ? data.amount.value : this.amount,
       price: data.price.present ? data.price.value : this.price,
@@ -262,6 +297,7 @@ class Ticker extends DataClass implements Insertable<Ticker> {
           ..write('name: $name, ')
           ..write('change: $change, ')
           ..write('createdAt: $createdAt, ')
+          ..write('purchasedAt: $purchasedAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('amount: $amount, ')
           ..write('price: $price')
@@ -270,8 +306,8 @@ class Ticker extends DataClass implements Insertable<Ticker> {
   }
 
   @override
-  int get hashCode => Object.hash(
-      id, symbol, name, change, createdAt, updatedAt, amount, price);
+  int get hashCode => Object.hash(id, symbol, name, change, createdAt,
+      purchasedAt, updatedAt, amount, price);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -281,6 +317,7 @@ class Ticker extends DataClass implements Insertable<Ticker> {
           other.name == this.name &&
           other.change == this.change &&
           other.createdAt == this.createdAt &&
+          other.purchasedAt == this.purchasedAt &&
           other.updatedAt == this.updatedAt &&
           other.amount == this.amount &&
           other.price == this.price);
@@ -292,6 +329,7 @@ class TickersCompanion extends UpdateCompanion<Ticker> {
   final Value<String> name;
   final Value<double> change;
   final Value<DateTime> createdAt;
+  final Value<DateTime> purchasedAt;
   final Value<DateTime> updatedAt;
   final Value<double> amount;
   final Value<double> price;
@@ -301,6 +339,7 @@ class TickersCompanion extends UpdateCompanion<Ticker> {
     this.name = const Value.absent(),
     this.change = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.purchasedAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.amount = const Value.absent(),
     this.price = const Value.absent(),
@@ -311,6 +350,7 @@ class TickersCompanion extends UpdateCompanion<Ticker> {
     required String name,
     required double change,
     this.createdAt = const Value.absent(),
+    this.purchasedAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     required double amount,
     required double price,
@@ -325,6 +365,7 @@ class TickersCompanion extends UpdateCompanion<Ticker> {
     Expression<String>? name,
     Expression<double>? change,
     Expression<DateTime>? createdAt,
+    Expression<DateTime>? purchasedAt,
     Expression<DateTime>? updatedAt,
     Expression<double>? amount,
     Expression<double>? price,
@@ -335,6 +376,7 @@ class TickersCompanion extends UpdateCompanion<Ticker> {
       if (name != null) 'name': name,
       if (change != null) 'change': change,
       if (createdAt != null) 'created_at': createdAt,
+      if (purchasedAt != null) 'purchased_at': purchasedAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (amount != null) 'amount': amount,
       if (price != null) 'price': price,
@@ -347,6 +389,7 @@ class TickersCompanion extends UpdateCompanion<Ticker> {
       Value<String>? name,
       Value<double>? change,
       Value<DateTime>? createdAt,
+      Value<DateTime>? purchasedAt,
       Value<DateTime>? updatedAt,
       Value<double>? amount,
       Value<double>? price}) {
@@ -356,6 +399,7 @@ class TickersCompanion extends UpdateCompanion<Ticker> {
       name: name ?? this.name,
       change: change ?? this.change,
       createdAt: createdAt ?? this.createdAt,
+      purchasedAt: purchasedAt ?? this.purchasedAt,
       updatedAt: updatedAt ?? this.updatedAt,
       amount: amount ?? this.amount,
       price: price ?? this.price,
@@ -380,6 +424,9 @@ class TickersCompanion extends UpdateCompanion<Ticker> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (purchasedAt.present) {
+      map['purchased_at'] = Variable<DateTime>(purchasedAt.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -400,6 +447,7 @@ class TickersCompanion extends UpdateCompanion<Ticker> {
           ..write('name: $name, ')
           ..write('change: $change, ')
           ..write('createdAt: $createdAt, ')
+          ..write('purchasedAt: $purchasedAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('amount: $amount, ')
           ..write('price: $price')
@@ -863,6 +911,7 @@ typedef $$TickersTableCreateCompanionBuilder = TickersCompanion Function({
   required String name,
   required double change,
   Value<DateTime> createdAt,
+  Value<DateTime> purchasedAt,
   Value<DateTime> updatedAt,
   required double amount,
   required double price,
@@ -873,6 +922,7 @@ typedef $$TickersTableUpdateCompanionBuilder = TickersCompanion Function({
   Value<String> name,
   Value<double> change,
   Value<DateTime> createdAt,
+  Value<DateTime> purchasedAt,
   Value<DateTime> updatedAt,
   Value<double> amount,
   Value<double> price,
@@ -920,6 +970,9 @@ class $$TickersTableFilterComposer extends Composer<_$Database, $TickersTable> {
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get purchasedAt => $composableBuilder(
+      column: $table.purchasedAt, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnFilters(column));
@@ -976,6 +1029,9 @@ class $$TickersTableOrderingComposer
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<DateTime> get purchasedAt => $composableBuilder(
+      column: $table.purchasedAt, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
 
@@ -1009,6 +1065,9 @@ class $$TickersTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get purchasedAt => $composableBuilder(
+      column: $table.purchasedAt, builder: (column) => column);
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -1069,6 +1128,7 @@ class $$TickersTableTableManager extends RootTableManager<
             Value<String> name = const Value.absent(),
             Value<double> change = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
+            Value<DateTime> purchasedAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
             Value<double> amount = const Value.absent(),
             Value<double> price = const Value.absent(),
@@ -1079,6 +1139,7 @@ class $$TickersTableTableManager extends RootTableManager<
             name: name,
             change: change,
             createdAt: createdAt,
+            purchasedAt: purchasedAt,
             updatedAt: updatedAt,
             amount: amount,
             price: price,
@@ -1089,6 +1150,7 @@ class $$TickersTableTableManager extends RootTableManager<
             required String name,
             required double change,
             Value<DateTime> createdAt = const Value.absent(),
+            Value<DateTime> purchasedAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
             required double amount,
             required double price,
@@ -1099,6 +1161,7 @@ class $$TickersTableTableManager extends RootTableManager<
             name: name,
             change: change,
             createdAt: createdAt,
+            purchasedAt: purchasedAt,
             updatedAt: updatedAt,
             amount: amount,
             price: price,

@@ -6,6 +6,8 @@ class Tickers extends Table {
   TextColumn get name => text()();
   RealColumn get change => real()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get purchasedAt =>
+      dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
   RealColumn get amount => real()();
   RealColumn get price => real()();

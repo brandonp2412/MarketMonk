@@ -22,7 +22,7 @@ class EditTickerPage extends StatefulWidget {
 class _EditTickerPageState extends State<EditTickerPage> {
   late var symbol = TextEditingController(text: widget.symbol);
   final amount = TextEditingController(text: '1');
-  final createdAt = TextEditingController(
+  final purchasedAt = TextEditingController(
     text: DateTime.now().toIso8601String(),
   );
   final price = TextEditingController(text: '0');
@@ -56,7 +56,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
 
     price.text = ticker.price.toStringAsFixed(2);
     amount.text = ticker.amount.toStringAsFixed(2);
-    createdAt.text = ticker.createdAt.toIso8601String();
+    purchasedAt.text = ticker.purchasedAt.toIso8601String();
   }
 
   void setSymbols() async {
@@ -380,14 +380,14 @@ class _EditTickerPageState extends State<EditTickerPage> {
 
                       if (closest == null) return;
                       setState(() {
-                        createdAt.text = closest.date.toIso8601String();
+                        purchasedAt.text = closest.date.toIso8601String();
                         autoSetCreated = true;
                       });
                     },
                   ),
                   const SizedBox(height: 8),
                   TextField(
-                    controller: createdAt,
+                    controller: purchasedAt,
                     decoration: const InputDecoration(
                       labelText: 'Purchased at',
                       suffixIcon: Icon(Icons.today),
@@ -396,13 +396,13 @@ class _EditTickerPageState extends State<EditTickerPage> {
                     onTap: () async {
                       final DateTime? date = await showDatePicker(
                         context: context,
-                        initialDate: DateTime.parse(createdAt.text),
+                        initialDate: DateTime.parse(purchasedAt.text),
                         firstDate: DateTime(0),
                         lastDate: DateTime.now(),
                       );
                       if (date == null) return;
                       setState(() {
-                        createdAt.text = date.toIso8601String();
+                        purchasedAt.text = date.toIso8601String();
                       });
                       setStream();
 
@@ -484,7 +484,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
               TickersCompanion(
                 amount: Value(double.parse(amount.text)),
                 updatedAt: Value(DateTime.now()),
-                createdAt: Value(DateTime.parse(createdAt.text)),
+                purchasedAt: Value(DateTime.parse(purchasedAt.text)),
                 price: Value(double.parse(price.text)),
                 name: Value(name),
                 symbol: Value(symbol.text.split(' ').first),
@@ -496,7 +496,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
               TickersCompanion(
                 amount: Value(double.parse(amount.text)),
                 updatedAt: Value(DateTime.now()),
-                createdAt: Value(DateTime.parse(createdAt.text)),
+                purchasedAt: Value(DateTime.parse(purchasedAt.text)),
                 price: Value(double.parse(price.text)),
                 name: Value(name),
                 symbol: Value(symbol.text.split(' ').first),
