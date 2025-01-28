@@ -44,6 +44,6 @@ jobs:
         with:
           serviceAccountJson: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.codesail.market_monk
-          releaseFile: build/app/outputs/flutter-apk/app-release.apk
+          releaseFiles: build/app/outputs/flutter-apk/app-release.apk
           track: production
           status: completed
