@@ -28,7 +28,10 @@ jobs:
         run: flutter pub get
 
       - name: Build APK
-        run: flutter build apk --release
+        run: |
+          echo "${{ secrets.KEY_PROPERTIES }}" | base64 -d > android/key.properties
+          echo "${{ secrets.UPLOAD_KEYSTORE }}" | base64 -d > ./massive.jks
+          flutter build apk --release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
