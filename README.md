@@ -2,6 +2,19 @@
 
 Track stocks on any platform 📈 - No ads
 
+# Features
+
+- 💹 Line graph stocks (with Yahoo Finance Data)
+- 🥧 Build and monitor your portfolio
+- ⚙️ Customize to your hearts desires
+
+<a href='https://play.google.com/store/apps/details?id=com.codesail.market_monk'><img alt='Get it on Google Play' height="75" src='https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png'/></a>
+
+<p float="left">
+    <a href="https://github.com/brandonp2412/MarketMonk/releases/latest"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/brandonp2412/MarketMonk?style=for-the-badge&logoColor=d3bcfd&labelColor=d3bcfd&color=151218"></a>
+    <a href="#"><img alt="Release downloads" src="https://img.shields.io/github/downloads/brandonp2412/MarketMonk/total.svg?style=for-the-badge&logoColor=d3bcfd&labelColor=d3bcfd&color=151218"></a>
+</p>
+
 <p float="left">
     <img src="docs/screenshot5.jpg" height="700"/>
     <img src="docs/screenshot6.jpg" height="700"/>
