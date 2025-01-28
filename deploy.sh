@@ -38,9 +38,11 @@ if [[ $* == *-t* ]]; then
 else
   dart analyze lib
   dart format --set-exit-if-changed lib
-  ./scripts/screenshots.sh "phoneScreenshots"
-  ./scripts/screenshots.sh "sevenInchScreenshots"
-  ./scripts/screenshots.sh "tenInchScreenshots"
+  # dart run build_runner build -d
+  # dart run drift_dev make-migrations
+  # ./scripts/screenshots.sh "phoneScreenshots"
+  # ./scripts/screenshots.sh "sevenInchScreenshots"
+  # ./scripts/screenshots.sh "tenInchScreenshots"
 fi
 
 yq -yi ".version |= \"$new_flutter_version\"" pubspec.yaml
