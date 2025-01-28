@@ -146,8 +146,10 @@ class _EditTickerPageState extends State<EditTickerPage> {
       spots.add(FlSpot(index.toDouble(), candles[index].close.value));
     }
 
-    var percentChange =
-        safePercentChange(candles.first.close.value, candles.last.close.value);
+    var percentChange = safePercentChange(
+      candles.first.close.value,
+      candles.lastOrNull?.close.value ?? 0,
+    );
 
     return material.Column(
       children: [
@@ -311,41 +313,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                           );
 
                         return SearchBar(
-                          trailing: [
-                            StreamBuilder(
-                              stream: stream,
-                              builder: (context, snapshot) {
-                                if (snapshot.data == null)
-                                  return const SizedBox();
-
-                                final percentChange = safePercentChange(
-                                  double.parse(price.text),
-                                  snapshot.data!.last.candle.close.value,
-                                );
-
-                                return material.Padding(
-                                  padding: const EdgeInsets.only(right: 8.0),
-                                  child: Row(
-                                    children: [
-                                      percentChange >= 0
-                                          ? const Icon(
-                                              Icons.arrow_upward,
-                                              color: Colors.green,
-                                            )
-                                          : const Icon(
-                                              Icons.arrow_downward,
-                                              color: Colors.red,
-                                            ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        "${percentChange.toStringAsFixed(2)}%",
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
+                          trailing: getTrailing,
                           controller: fieldTextEditingController,
                           leading: leading,
                           focusNode: fieldFocusNode,
@@ -361,7 +329,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                                   text.toLowerCase())
                                 selection = '${option.value} (${option.name})';
                             }
-                            selection ??= text;
+                            selection ??= text.toUpperCase();
                             symbol.text = selection.toUpperCase();
                             setStream();
 
@@ -493,9 +461,9 @@ class _EditTickerPageState extends State<EditTickerPage> {
           final candleTickers = await stream?.first;
           if (candleTickers == null) return;
 
-          var percentChange = safePercentChange(
-            candleTickers.first.candle.close.value,
-            candleTickers.last.candle.close.value,
+          final percentChange = safePercentChange(
+            double.parse(price.text),
+            candleTickers.lastOrNull?.candle.close.value ?? 0,
           );
 
           final name = symbol.text
@@ -541,5 +509,42 @@ class _EditTickerPageState extends State<EditTickerPage> {
         icon: const Icon(Icons.save),
       ),
     );
+  }
+
+  List<material.Widget> get getTrailing {
+    return [
+      StreamBuilder(
+        stream: stream,
+        builder: (context, snapshot) {
+          if (snapshot.data == null) return const SizedBox();
+
+          final percentChange = safePercentChange(
+            double.parse(price.text),
+            snapshot.data?.lastOrNull?.candle.close.value ?? 0,
+          );
+
+          return material.Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: Row(
+              children: [
+                percentChange >= 0
+                    ? const Icon(
+                        Icons.arrow_upward,
+                        color: Colors.green,
+                      )
+                    : const Icon(
+                        Icons.arrow_downward,
+                        color: Colors.red,
+                      ),
+                const SizedBox(width: 4),
+                Text(
+                  "${percentChange.toStringAsFixed(2)}%",
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    ];
   }
 }
