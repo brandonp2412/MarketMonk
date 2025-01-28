@@ -30,7 +30,7 @@ jobs:
       - name: Build APK
         run: |
           echo "${{ secrets.KEY_PROPERTIES }}" | base64 -d > android/key.properties
-          echo "${{ secrets.UPLOAD_KEYSTORE }}" | base64 -d > ./massive.jks
+          echo "${{ secrets.UPLOAD_KEYSTORE }}" | base64 -d > ./android/massive.jks
           flutter build apk --release
 
       - name: Upload artifact
