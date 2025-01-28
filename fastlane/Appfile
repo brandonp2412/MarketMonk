@@ -1,0 +1,2 @@
+json_key_file("~/.config/googlePlay.json")
+package_name("com.codesail.market_monk")

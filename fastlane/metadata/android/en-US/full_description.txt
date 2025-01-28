@@ -1,0 +1,7 @@
+Easily monitor your investments with MarketMonk.
+
+- Graph stock gains
+- Manage your portfolio
+- Configure to your hearts desires in the Settings menu
+
+All with simple charts and an intuitive UI.
