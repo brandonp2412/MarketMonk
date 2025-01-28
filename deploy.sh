@@ -78,8 +78,8 @@ git push
 gh release create "$new_version" --notes "$changelog" \
   "$apk"/app-*-release.apk \
   "$apk/pipeline/linux/x64/release/bundle/$project-linux.zip" \
-  "$apk/$project.apk" \
-  "$HOME/windows/$project-windows.zip"
+  "$apk/$project.apk"
+  # "$HOME/windows/$project-windows.zip"
 git pull
 
 # if [[ $* == *-w* ]]; then
