@@ -38,7 +38,6 @@ if [[ $* == *-t* ]]; then
 else
   dart analyze lib
   dart format --set-exit-if-changed lib
-  ./scripts/migrate.sh
   ./scripts/screenshots.sh "phoneScreenshots"
   ./scripts/screenshots.sh "sevenInchScreenshots"
   ./scripts/screenshots.sh "tenInchScreenshots"
