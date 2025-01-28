@@ -1,6 +1,6 @@
 name: market_monk
 description: Track stocks quickly and easily
-version: 1.0.14+15
+version: 1.0.15+16
 environment:
   sdk: ^3.5.4
 dependencies:
@@ -31,4 +31,4 @@ flutter:
   assets:
     - assets/
 msix_config:
-  msix_version: null..1.
+  msix_version: null..2.
