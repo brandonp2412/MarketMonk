@@ -25,10 +25,24 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  msix:
+    git:
+      url: https://github.com/insertjokehere/msix.git
+      ref: msvc_redist
   build_runner: ^2.4.14
 flutter:
   uses-material-design: true
   assets:
     - assets/
+
 msix_config:
-  msix_version: null..3.
+  msstore_appId: 9PP4HKV1CMWC
+  display_name: MarketMonk
+  publisher_display_name: CodeSail Academy
+  identity_name: FrisbeeSoftware.MarketMonk
+  msix_version: 1.0.1.0
+  logo_path: assets/meditation.png
+  trim_logo: false
+  publisher: CN=BB0811CB-EED5-441C-BE1B-D31F391F76DE
+  store: true
+  capabilities: internetClient
