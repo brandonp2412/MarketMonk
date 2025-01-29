@@ -2,19 +2,26 @@
 
 Track stocks on any platform 📈 - No ads
 
+<p float="left">
+    <a href="https://github.com/brandonp2412/MarketMonk/releases/latest"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/brandonp2412/MarketMonk?style=for-the-badge&logoColor=d3bcfd&labelColor=d3bcfd&color=151218"></a>
+    <a href="#"><img alt="Release downloads" src="https://img.shields.io/github/downloads/brandonp2412/MarketMonk/total.svg?style=for-the-badge&logoColor=d3bcfd&labelColor=d3bcfd&color=151218"></a>
+</p>
+
 # Features
 
 - 💹 Line graph stocks (with Yahoo Finance Data)
 - 🥧 Build and monitor your portfolio
 - ⚙️ Customize to your hearts desires
 
-<a href='https://play.google.com/store/apps/details?id=com.codesail.market_monk'><img alt='Get it on Google Play' height="75" src='https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png'/></a>
-
 <p float="left">
-    <a href="https://github.com/brandonp2412/MarketMonk/releases/latest"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/brandonp2412/MarketMonk?style=for-the-badge&logoColor=d3bcfd&labelColor=d3bcfd&color=151218"></a>
-    <a href="#"><img alt="Release downloads" src="https://img.shields.io/github/downloads/brandonp2412/MarketMonk/total.svg?style=for-the-badge&logoColor=d3bcfd&labelColor=d3bcfd&color=151218"></a>
+  <a href='https://play.google.com/store/apps/details?id=com.codesail.market_monk'><img alt='Get it on Google Play' height="75" src='https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png'/></a>
 </p>
 
+<a href="https://apps.microsoft.com/detail/9PP4HKV1CMWC?mode=direct">
+  <img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200"/>
+</a>
+
+<br />
 <p float="left">
     <img src="docs/screenshot5.jpg" height="700"/>
     <img src="docs/screenshot6.jpg" height="700"/>
@@ -23,11 +30,6 @@ Track stocks on any platform 📈 - No ads
     <img src="docs/screenshot1.jpg" height="700"/>
     <img src="docs/screenshot2.jpg" height="700"/>
 </p>
-
-## Pre-publish requirements
-
-1. <strike>Offline caching</strike>
-2. <strike>Settings ⚙</strike>️
 
 ## Platforms we intend to support
 
@@ -40,12 +42,6 @@ Track stocks on any platform 📈 - No ads
 ## What about web?
 
 Might give it a shot later on but i've had trouble with the drift package on flutter web in the past.
-
-# Features
-
-1. Quickly view a stocks price graph 🤑
-2. Easily switch between periods 📅
-3. Manage a portfolio of tracked stocks 💵
 
 ## Coming soon...
 
