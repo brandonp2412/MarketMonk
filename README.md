@@ -15,11 +15,10 @@ Track stocks on any platform 📈 - No ads
 
 <p float="left">
   <a href='https://play.google.com/store/apps/details?id=com.codesail.market_monk'><img alt='Get it on Google Play' height="75" src='https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png'/></a>
+  <a href="https://apps.microsoft.com/detail/9PP4HKV1CMWC?mode=direct">
+    <img src="https://get.microsoft.com/images/en-us%20dark.svg" height="75"/>
+  </a>
 </p>
-
-<a href="https://apps.microsoft.com/detail/9PP4HKV1CMWC?mode=direct">
-  <img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200"/>
-</a>
 
 <br />
 <p float="left">
