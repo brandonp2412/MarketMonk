@@ -3,7 +3,7 @@
 # https://docs.fastlane.tools/actions/deliver/
 
 username 'brandon@presley.nz'
-app_identifier 'com.codesail.market_monk'
+app_identifier 'com.codesail.marketMonk'
 force true
 automatic_release true
 api_key_path "/Users/brandon/app-store-connect.json"

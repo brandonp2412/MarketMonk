@@ -47,6 +47,7 @@ class MyApp extends StatelessWidget {
     final settings = context.watch<SettingsState>();
 
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'MarketMonk',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2B7A78)),
@@ -85,11 +86,13 @@ class _MyHomePageState extends State<MyHomePage> {
       child: const DefaultTabController(
         length: 2,
         child: Scaffold(
-          body: TabBarView(
-            children: [
-              ChartPage(),
-              PortfolioPage(),
-            ],
+          body: SafeArea(
+            child: TabBarView(
+              children: [
+                ChartPage(),
+                PortfolioPage(),
+              ],
+            ),
           ),
           bottomNavigationBar: TabBar(
             dividerColor: Colors.transparent,

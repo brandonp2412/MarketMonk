@@ -57,82 +57,85 @@ class _SettingsPageState extends State<SettingsPage> {
               },
             ),
           ),
-          const SizedBox(height: 16),
-          const Divider(),
-          Padding(
-            padding: const EdgeInsets.only(left: 16.0, bottom: 8),
-            child:
-                Text("About", style: Theme.of(context).textTheme.headlineLarge),
-          ),
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: const Text("Version"),
-            subtitle: FutureBuilder(
-              future: packageInfo,
-              builder: (context, snapshot) =>
-                  Text(snapshot.data?.version ?? "1.0.0"),
+          if (Platform.isAndroid || Platform.isWindows) ...[
+            const SizedBox(height: 16),
+            const Divider(),
+            Padding(
+              padding: const EdgeInsets.only(left: 16.0, bottom: 8),
+              child: Text("About",
+                  style: Theme.of(context).textTheme.headlineLarge),
             ),
-            onTap: () async {
-              if (Platform.isIOS || Platform.isMacOS) return;
-              const url = 'https://github.com/brandonp2412/MarketMonk/releases';
-              if (await canLaunchUrlString(url)) await launchUrlString(url);
-            },
-          ),
-          ListTile(
-            title: const Text("Author"),
-            leading: const Icon(Icons.person),
-            subtitle: FutureBuilder(
-              future: packageInfo,
-              builder: (context, snapshot) => const Text("Brandon Presley"),
+            ListTile(
+              leading: const Icon(Icons.info_outline),
+              title: const Text("Version"),
+              subtitle: FutureBuilder(
+                future: packageInfo,
+                builder: (context, snapshot) =>
+                    Text(snapshot.data?.version ?? "1.0.0"),
+              ),
+              onTap: () async {
+                if (Platform.isIOS || Platform.isMacOS) return;
+                const url =
+                    'https://github.com/brandonp2412/MarketMonk/releases';
+                if (await canLaunchUrlString(url)) await launchUrlString(url);
+              },
             ),
-            onTap: () async {
-              if (Platform.isIOS || Platform.isMacOS) return;
-              const url = 'https://github.com/brandonp2412';
-              if (await canLaunchUrlString(url)) await launchUrlString(url);
-            },
-          ),
-          ListTile(
-            title: const Text("License"),
-            leading: const Icon(Icons.balance),
-            subtitle: FutureBuilder(
-              future: packageInfo,
-              builder: (context, snapshot) => const Text("MIT"),
+            ListTile(
+              title: const Text("Author"),
+              leading: const Icon(Icons.person),
+              subtitle: FutureBuilder(
+                future: packageInfo,
+                builder: (context, snapshot) => const Text("Brandon Presley"),
+              ),
+              onTap: () async {
+                if (Platform.isIOS || Platform.isMacOS) return;
+                const url = 'https://github.com/brandonp2412';
+                if (await canLaunchUrlString(url)) await launchUrlString(url);
+              },
             ),
-            onTap: () async {
-              if (Platform.isIOS || Platform.isMacOS) return;
-              const url =
-                  'https://github.com/brandonp2412/MarketMonk?tab=MIT-1-ov-file#readme';
-              if (await canLaunchUrlString(url)) await launchUrlString(url);
-            },
-          ),
-          ListTile(
-            title: const Text("Source code"),
-            leading: const Icon(Icons.code),
-            subtitle: FutureBuilder(
-              future: packageInfo,
-              builder: (context, snapshot) =>
-                  const Text("Check it out on GitHub"),
+            ListTile(
+              title: const Text("License"),
+              leading: const Icon(Icons.balance),
+              subtitle: FutureBuilder(
+                future: packageInfo,
+                builder: (context, snapshot) => const Text("MIT"),
+              ),
+              onTap: () async {
+                if (Platform.isIOS || Platform.isMacOS) return;
+                const url =
+                    'https://github.com/brandonp2412/MarketMonk?tab=MIT-1-ov-file#readme';
+                if (await canLaunchUrlString(url)) await launchUrlString(url);
+              },
             ),
-            onTap: () async {
-              if (Platform.isIOS || Platform.isMacOS) return;
-              const url = 'https://github.com/brandonp2412/MarketMonk';
-              if (await canLaunchUrlString(url)) await launchUrlString(url);
-            },
-          ),
-          ListTile(
-            title: const Text("Donate"),
-            leading: const Icon(Icons.favorite_outline),
-            subtitle: FutureBuilder(
-              future: packageInfo,
-              builder: (context, snapshot) =>
-                  const Text("Help support this project"),
+            ListTile(
+              title: const Text("Source code"),
+              leading: const Icon(Icons.code),
+              subtitle: FutureBuilder(
+                future: packageInfo,
+                builder: (context, snapshot) =>
+                    const Text("Check it out on GitHub"),
+              ),
+              onTap: () async {
+                if (Platform.isIOS || Platform.isMacOS) return;
+                const url = 'https://github.com/brandonp2412/MarketMonk';
+                if (await canLaunchUrlString(url)) await launchUrlString(url);
+              },
             ),
-            onTap: () async {
-              if (Platform.isIOS || Platform.isMacOS) return;
-              const url = 'https://github.com/sponsors/brandonp2412';
-              if (await canLaunchUrlString(url)) await launchUrlString(url);
-            },
-          ),
+            ListTile(
+              title: const Text("Donate"),
+              leading: const Icon(Icons.favorite_outline),
+              subtitle: FutureBuilder(
+                future: packageInfo,
+                builder: (context, snapshot) =>
+                    const Text("Help support this project"),
+              ),
+              onTap: () async {
+                if (Platform.isIOS || Platform.isMacOS) return;
+                const url = 'https://github.com/sponsors/brandonp2412';
+                if (await canLaunchUrlString(url)) await launchUrlString(url);
+              },
+            ),
+          ],
         ],
       ),
     );
