@@ -29,25 +29,6 @@ Track stocks on any platform 📈 - No ads
     <img src="docs/screenshot2.jpg" height="700"/>
 </p>
 
-## Platforms we intend to support
-
-- <strike>Android</strike>
-- iOS
-- <strike>Windows</strike>
-- MacOS
-- Linux
-
-## What about web?
-
-Might give it a shot later on but i've had trouble with the drift package on flutter web in the past.
-
-## Coming soon...
-
-4. <strike>Offline caching of stock data</strike> 😎
-5. <strike>Have portfolio amounts and track gains/losses since purchase date</strike> 🍰
-6. Customizable settings for everything! ⚙️
-7. Compare multiple stocks on line graphs
-
 # Developers
 
 Install [flutter](https://docs.flutter.dev/get-started/install) to run this app.
