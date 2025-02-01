@@ -1,6 +1,6 @@
 # MarketMonk
 
-Track stocks on any platform 📈 - No ads
+Track stocks on any platform 📈
 
 <p float="left">
   <a href="https://github.com/brandonp2412/MarketMonk/releases/latest"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/brandonp2412/MarketMonk?style=for-the-badge&logoColor=ffffff&labelColor=2B7A78&color=151218"></a>
