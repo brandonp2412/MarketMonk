@@ -1,24 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
-import 'package:market_monk/symbol.dart';
+import 'package:http/http.dart' as http;
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
-
-Future<List<Symbol>> getSymbols() async {
-  final List<dynamic> nasdaq = json
-      .decode(await rootBundle.loadString('assets/nasdaq-full-tickers.json'));
-  final List<dynamic> amex =
-      json.decode(await rootBundle.loadString('assets/amex-full-tickers.json'));
-  final List<dynamic> nyse =
-      json.decode(await rootBundle.loadString('assets/nyse-full-tickers.json'));
-  return nasdaq.map((d) => Symbol.fromJson(d)).toList() +
-      amex.map((d) => Symbol.fromJson(d)).toList() +
-      nyse.map((d) => Symbol.fromJson(d)).toList();
-}
 
 void selectAll(TextEditingController controller) => controller.selection =
     TextSelection(baseOffset: 0, extentOffset: controller.text.length);
@@ -195,4 +183,82 @@ Future<void> syncCandles(String symbol) async {
   double percentReturn = ((totalCurrentValue / totalInitialValue) - 1) * 100;
 
   return (dollarReturn, percentReturn);
+}
+
+class YahooFinanceApi {
+  static const String _baseUrl =
+      'https://query1.finance.yahoo.com/v1/finance/search';
+  Timer? _debounceTimer;
+
+  Future<List<StockResult>> searchTickers(String query) async {
+    if (query.isEmpty) return [];
+
+    return await _debounce(() async {
+      final response = await http.get(
+        Uri.parse('$_baseUrl?q=${Uri.encodeComponent(query)}'),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to fetch data: ${response.statusCode}');
+      }
+
+      final Map<String, dynamic> data = json.decode(response.body);
+      final List<dynamic> quotes = data['quotes'] ?? [];
+
+      return quotes
+          .where((quote) => quote['quoteType'] == 'EQUITY')
+          .map((quote) => StockResult.fromJson(quote))
+          .toList();
+    });
+  }
+
+  Future<T> _debounce<T>(Future<T> Function() action) {
+    final completer = Completer<T>();
+
+    if (_debounceTimer?.isActive ?? false) {
+      _debounceTimer!.cancel();
+    }
+
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
+      try {
+        final result = await action();
+        completer.complete(result);
+      } catch (e) {
+        completer.completeError(e);
+      }
+    });
+
+    return completer.future;
+  }
+
+  void dispose() {
+    _debounceTimer?.cancel();
+  }
+}
+
+class StockResult {
+  final String symbol;
+  final String shortname;
+  final String longname;
+  final String exchange;
+
+  StockResult({
+    required this.symbol,
+    required this.shortname,
+    required this.longname,
+    required this.exchange,
+  });
+
+  factory StockResult.fromJson(Map<String, dynamic> json) {
+    return StockResult(
+      symbol: json['symbol'] ?? '',
+      shortname: json['shortname'] ?? '',
+      longname: json['longname'] ?? '',
+      exchange: json['exchange'] ?? '',
+    );
+  }
+
+  @override
+  String toString() =>
+      '$symbol ($exchange) - ${longname.isNotEmpty ? longname : shortname}';
 }

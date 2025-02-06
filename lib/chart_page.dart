@@ -8,7 +8,6 @@ import 'package:market_monk/candle_ticker.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_page.dart';
-import 'package:market_monk/symbol.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -25,7 +24,6 @@ class _ChartPageState extends State<ChartPage>
   TextEditingController stock =
       TextEditingController(text: "GME (GameStop Corporation Common Stock)");
   String? favoriteStock;
-  List<Symbol> symbols = [];
   int years = 0;
   int months = 0;
   int days = 5;
@@ -101,28 +99,17 @@ class _ChartPageState extends State<ChartPage>
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
             child: Autocomplete<String>(
-              optionsBuilder: (TextEditingValue textEditingValue) {
-                final filtered = symbols
-                    .where(
-                      (option) =>
-                          option.value
-                              .toLowerCase()
-                              .contains(textEditingValue.text.toLowerCase()) ||
-                          option.name
-                              .toLowerCase()
-                              .contains(textEditingValue.text.toLowerCase()),
-                    )
-                    .toList();
-                filtered.sort((a, b) {
-                  String text = textEditingValue.text.toLowerCase();
-                  bool aStartsWithText = a.value.toLowerCase().startsWith(text);
-                  bool bStartsWithText = b.value.toLowerCase().startsWith(text);
-                  if (aStartsWithText && !bStartsWithText) return -1;
-                  if (!aStartsWithText && bStartsWithText) return 1;
-                  return 0;
+              optionsBuilder: (TextEditingValue textEditingValue) async {
+                final api = YahooFinanceApi();
+                setState(() {
+                  loading = true;
                 });
-                return filtered
-                    .map((option) => '${option.value} (${option.name})');
+                final results = await api.searchTickers(textEditingValue.text);
+                setState(() {
+                  loading = false;
+                });
+                return results
+                    .map((result) => '${result.symbol} (${result.longname})');
               },
               initialValue: stock.value,
               onSelected: (value) => updateData(),
@@ -172,14 +159,7 @@ class _ChartPageState extends State<ChartPage>
                       ),
                     ],
                     onSubmitted: (text) {
-                      String? selection;
-
-                      for (final option in symbols) {
-                        if (option.value.toLowerCase() == text.toLowerCase())
-                          selection = '${option.value} (${option.name})';
-                      }
-                      selection ??= text;
-                      stock.text = selection.toUpperCase();
+                      stock.text = text.toUpperCase();
                       updateData();
                     },
                   ),
@@ -266,11 +246,6 @@ class _ChartPageState extends State<ChartPage>
   }
 
   void initData() async {
-    final gotSymbols = await getSymbols();
-    setState(() {
-      symbols = gotSymbols;
-    });
-
     final prefs = await SharedPreferences.getInstance();
     stock.text = prefs.getString('favoriteStock') ?? stock.text;
 

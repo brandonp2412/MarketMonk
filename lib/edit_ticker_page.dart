@@ -1,5 +1,4 @@
 import 'package:drift/drift.dart';
-import 'package:market_monk/symbol.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/material.dart';
@@ -31,7 +30,6 @@ class _EditTickerPageState extends State<EditTickerPage> {
   bool autoSetCreated = false;
   bool autoSetPrice = false;
   bool loading = false;
-  List<Symbol> symbols = [];
   int years = 0;
   int months = 0;
   int days = 5;
@@ -42,7 +40,6 @@ class _EditTickerPageState extends State<EditTickerPage> {
   void initState() {
     super.initState();
     setStream();
-    setSymbols();
     setTicker();
   }
 
@@ -57,14 +54,6 @@ class _EditTickerPageState extends State<EditTickerPage> {
     price.text = ticker.price.toStringAsFixed(2);
     amount.text = ticker.amount.toStringAsFixed(2);
     purchasedAt.text = ticker.purchasedAt.toIso8601String();
-  }
-
-  void setSymbols() async {
-    final gotSymbols = await getSymbols();
-    setState(() {
-      symbols = gotSymbols;
-    });
-    if (widget.symbol == null) autocomplete?.requestFocus();
   }
 
   void setStream() {
@@ -243,30 +232,19 @@ class _EditTickerPageState extends State<EditTickerPage> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8.0),
                     child: Autocomplete<String>(
-                      optionsBuilder: (TextEditingValue textEditingValue) {
-                        final filtered = symbols
-                            .where(
-                              (option) =>
-                                  option.value.toLowerCase().contains(
-                                        textEditingValue.text.toLowerCase(),
-                                      ) ||
-                                  option.name.toLowerCase().contains(
-                                        textEditingValue.text.toLowerCase(),
-                                      ),
-                            )
-                            .toList();
-                        filtered.sort((a, b) {
-                          String text = textEditingValue.text.toLowerCase();
-                          bool aStartsWithText =
-                              a.value.toLowerCase().startsWith(text);
-                          bool bStartsWithText =
-                              b.value.toLowerCase().startsWith(text);
-                          if (aStartsWithText && !bStartsWithText) return -1;
-                          if (!aStartsWithText && bStartsWithText) return 1;
-                          return 0;
+                      optionsBuilder:
+                          (TextEditingValue textEditingValue) async {
+                        final api = YahooFinanceApi();
+                        setState(() {
+                          loading = true;
                         });
-                        return filtered.map(
-                          (option) => '${option.value} (${option.name})',
+                        final results =
+                            await api.searchTickers(textEditingValue.text);
+                        setState(() {
+                          loading = false;
+                        });
+                        return results.map(
+                          (result) => '${result.symbol} (${result.longname})',
                         );
                       },
                       initialValue: symbol.value,
@@ -322,22 +300,14 @@ class _EditTickerPageState extends State<EditTickerPage> {
                           textInputAction: TextInputAction.next,
                           onSubmitted: (text) async {
                             selectAll(amount);
-                            String? selection;
-
-                            for (final option in symbols) {
-                              if (option.value.toLowerCase() ==
-                                  text.toLowerCase())
-                                selection = '${option.value} (${option.name})';
-                            }
-                            selection ??= text.toUpperCase();
-                            symbol.text = selection.toUpperCase();
+                            symbol.text = text.toUpperCase();
                             setStream();
 
                             setState(() {
                               loading = true;
                             });
                             try {
-                              await syncCandles(selection.split(' ').first);
+                              await syncCandles(text.split(' ').first);
                             } catch (error) {
                               if (context.mounted)
                                 toast(context, error.toString());
