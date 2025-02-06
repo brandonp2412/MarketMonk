@@ -29,6 +29,19 @@ Track stocks on any platform 📈
     <img src="docs/screenshot2.jpg" height="700"/>
 </p>
 
+# Donations
+
+If you would like to support this project:
+
+- Bitcoin `bc1qzlte8featxzf7xvtp3rjv7qqtwkgpup8hu85gp`
+- Monero (XMR) `85tmLfWKbpd8nxQnUY878DDuFjmfcoCFXPWR7XYKLHBSbDZV8wxgoKYUtHtq1kHWJg4m14sdBXhYuUSbxEDA29d19XuREL5`
+- [GitHub sponsor](https://github.com/sponsors/brandonp2412)
+
+
+# Contributing
+
+All issues and pull requests are welcome! Bugs will be fixed faster if you include reproduction steps (and maybe [logs](https://developer.android.com/tools/logcat)). Any performance related pull requests will bring tears of joy to my eye.
+
 # Developers
 
 Install [flutter](https://docs.flutter.dev/get-started/install) to run this app.
