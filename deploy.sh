@@ -64,7 +64,7 @@ flutter build linux
 (cd "$apk/pipeline/linux/x64/release/bundle" && zip --quiet -r "market_monk-linux.zip" .)
 
 docker start windows
-rsync -a --delete --exclude-from=.gitignore --exclude flutter ./* .gitignore \
+rsync -a --delete --exclude-from=.gitignore --exclude ./flutter ./* .gitignore \
   "$HOME/windows/market_monk-source"
 while ! ssh windows exit; do sleep 1; done
 ssh windows 'Powershell -ExecutionPolicy bypass -File //host.lan/Data/build-market-monk.ps1'
