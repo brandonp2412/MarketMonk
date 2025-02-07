@@ -1,6 +1,6 @@
 name: market_monk
 description: Track stocks quickly and easily
-version: 1.0.23+24
+version: 1.0.24+25
 environment:
   sdk: ^3.5.4
 dependencies:
@@ -40,7 +40,7 @@ msix_config:
   display_name: MarketMonk
   publisher_display_name: CodeSail Academy
   identity_name: FrisbeeSoftware.MarketMonk
-  msix_version: 1.0.4.0
+  msix_version: 1.0.5.0
   logo_path: assets/meditation.png
   trim_logo: false
   publisher: CN=BB0811CB-EED5-441C-BE1B-D31F391F76DE
