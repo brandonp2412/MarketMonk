@@ -38,11 +38,11 @@ if [[ $* == *-t* ]]; then
 else
   dart analyze lib
   dart format --set-exit-if-changed lib
-  # dart run build_runner build -d
-  # dart run drift_dev make-migrations
-  # ./scripts/screenshots.sh "phoneScreenshots"
-  # ./scripts/screenshots.sh "sevenInchScreenshots"
-  # ./scripts/screenshots.sh "tenInchScreenshots"
+  dart run build_runner build -d
+  dart run drift_dev make-migrations
+  #./scripts/screenshots.sh "phoneScreenshots"
+  #./scripts/screenshots.sh "sevenInchScreenshots"
+  #./scripts/screenshots.sh "tenInchScreenshots"
 fi
 
 yq -yi ".version |= \"$new_flutter_version\"" pubspec.yaml
@@ -56,37 +56,36 @@ $changelog"
 flutter build apk --split-per-abi
 adb -d install "$apk"/app-arm64-v8a-release.apk || true
 flutter build apk
-project=$(basename "$PWD")
-mv "$apk"/app-release.apk "$apk/$project.apk"
+mv "$apk"/app-release.apk "$apk/market_monk.apk"
 flutter build appbundle
 
 mkdir -p build/native_assets/linux
 flutter build linux
-(cd "$apk/pipeline/linux/x64/release/bundle" && zip --quiet -r "$project-linux.zip" .)
+(cd "$apk/pipeline/linux/x64/release/bundle" && zip --quiet -r "market_monk-linux.zip" .)
 
-# docker start windows
-# rsync -a --delete --exclude-from=.gitignore --exclude flutter ./* .gitignore \
-#   "$HOME/windows/$project-source"
-# while ! ssh windows exit; do sleep 1; done
-# ssh windows 'Powershell -ExecutionPolicy bypass -File //host.lan/Data/build-fitbook.ps1'
-# sudo chown -R "$USER" "$HOME/windows/$project"
-# mv "$HOME/windows/$project/fit_book.msix" "$HOME/windows/$project.msix"
-# (cd "$HOME/windows/$project" && zip --quiet -r "$HOME/windows/$project-windows.zip" .)
-# docker stop windows
+docker start windows
+rsync -a --delete --exclude-from=.gitignore --exclude flutter ./* .gitignore \
+  "$HOME/windows/market_monk-source"
+while ! ssh windows exit; do sleep 1; done
+ssh windows 'Powershell -ExecutionPolicy bypass -File //host.lan/Data/build-market_monk.ps1'
+sudo chown -R "$USER" "$HOME/windows/market_monk"
+mv "$HOME/windows/market_monk/fit_book.msix" "$HOME/windows/market_monk.msix"
+(cd "$HOME/windows/market_monk" && zip --quiet -r "$HOME/windows/market_monk-windows.zip" .)
+docker stop windows
 
 git push
 gh release create "$new_version" --notes "$changelog" \
   "$apk"/app-*-release.apk \
-  "$apk/pipeline/linux/x64/release/bundle/$project-linux.zip" \
-  "$apk/$project.apk"
-  # "$HOME/windows/$project-windows.zip"
+  "$apk/pipeline/linux/x64/release/bundle/market_monk-linux.zip" \
+  "$apk/market_monk.apk" \
+  "$HOME/windows/market_monk-windows.zip"
 git pull
 
-# if [[ $* == *-w* ]]; then
-#   echo "Skipping Windows store..."
-# else
-#   ./scripts/msstore.sh "$HOME/windows/$project.msix" || true
-# fi
+if [[ $* == *-w* ]]; then
+  echo "Skipping Windows store..."
+else
+  ./scripts/msstore.sh "$HOME/windows/market_monk.msix" || true
+fi
 
 if [[ $* == *-p* ]]; then
   echo "Skipping Google play..."
@@ -95,13 +94,13 @@ else
     build/app/outputs/bundle/release/app-release.aab || true
 fi
 
-# if [[ $* == *-m* ]]; then
-#   echo "Skipping MacOS..."
-# else
-#   set +x
-#   ip=$(arp | grep "$MACBOOK_MAC" | cut -d ' ' -f 1)
-#   rsync -a --exclude-from=.gitignore ./* .gitignore \
-#     --exclude=flutter "$ip":~/fitbook
-#   # shellcheck disable=SC2029
-#   ssh "$ip" "security unlock-keychain -p '$(pass macbook)' && cd fitbook && ./scripts/macos.sh"
-# fi
+if [[ $* == *-m* ]]; then
+  echo "Skipping MacOS..."
+else
+  set +x
+  ip=$(arp | grep "$MACBOOK_MAC" | cut -d ' ' -f 1)
+  rsync -a --exclude-from=.gitignore ./* .gitignore \
+    --exclude=flutter "$ip":~/market_monk
+  # shellcheck disable=SC2029
+  ssh "$ip" "security unlock-keychain -p '$(pass macbook)' && cd market_monk && ./scripts/macos.sh"
+fi
