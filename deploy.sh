@@ -67,7 +67,7 @@ docker start windows
 rsync -a --delete --exclude-from=.gitignore --exclude flutter ./* .gitignore \
   "$HOME/windows/market_monk-source"
 while ! ssh windows exit; do sleep 1; done
-ssh windows 'Powershell -ExecutionPolicy bypass -File //host.lan/Data/build-market_monk.ps1'
+ssh windows 'Powershell -ExecutionPolicy bypass -File //host.lan/Data/build-market-monk.ps1'
 sudo chown -R "$USER" "$HOME/windows/market_monk"
 mv "$HOME/windows/market_monk/fit_book.msix" "$HOME/windows/market_monk.msix"
 (cd "$HOME/windows/market_monk" && zip --quiet -r "$HOME/windows/market_monk-windows.zip" .)
