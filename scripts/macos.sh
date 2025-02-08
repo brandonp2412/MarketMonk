@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/zsh
 
 source $HOME/.zprofile
 source $HOME/.zshrc
