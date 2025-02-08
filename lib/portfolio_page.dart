@@ -182,7 +182,6 @@ class _PortfolioPageState extends State<PortfolioPage> {
         padding: const EdgeInsets.all(8.0),
         child: material.Column(
           children: [
-            if (Platform.isAndroid) const SizedBox(height: 40),
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: SearchBar(
