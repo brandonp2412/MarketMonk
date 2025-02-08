@@ -2,7 +2,6 @@ import 'package:drift/drift.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:market_monk/candle_ticker.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
@@ -145,7 +144,6 @@ class _EditTickerPageState extends State<EditTickerPage> {
         SizedBox(
           height: MediaQuery.of(context).size.height * 0.45,
           child: TickerLine(
-            formatter: DateFormat("d/M/yy"),
             dates: candles.map((candle) => candle.date.value),
             spots: spots,
           ),

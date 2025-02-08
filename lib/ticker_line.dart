@@ -3,15 +3,15 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import 'package:market_monk/settings_state.dart';
+import 'package:provider/provider.dart';
 
 class TickerLine extends StatelessWidget {
-  final DateFormat formatter;
   final List<FlSpot> spots;
   final Iterable<DateTime> dates;
 
   const TickerLine({
     super.key,
-    required this.formatter,
     required this.spots,
     required this.dates,
   });
@@ -20,6 +20,7 @@ class TickerLine extends StatelessWidget {
     double value,
     TitleMeta meta,
     BuildContext context,
+    DateFormat formatter,
   ) {
     const style = TextStyle(
       fontWeight: FontWeight.bold,
@@ -54,6 +55,9 @@ class TickerLine extends StatelessWidget {
       Theme.of(context).colorScheme.surface,
     ];
 
+    final settings = context.watch<SettingsState>();
+    final formatter = DateFormat(settings.dateFormat);
+
     return Padding(
       padding: const EdgeInsets.only(right: 32.0, top: 16.0),
       child: LineChart(
@@ -74,7 +78,7 @@ class TickerLine extends StatelessWidget {
                 reservedSize: 27,
                 interval: 1,
                 getTitlesWidget: (value, meta) =>
-                    getBottomTitles(value, meta, context),
+                    getBottomTitles(value, meta, context, formatter),
               ),
             ),
           ),
@@ -82,6 +86,8 @@ class TickerLine extends StatelessWidget {
             LineChartBarData(
               spots: spots,
               color: Theme.of(context).colorScheme.primary,
+              isCurved: settings.curveLines,
+              curveSmoothness: settings.curveSmoothness,
               barWidth: 3,
               dotData: const FlDotData(
                 show: false,
@@ -102,7 +108,7 @@ class TickerLine extends StatelessWidget {
               getTooltipColor: (touchedSpot) =>
                   Theme.of(context).colorScheme.surface,
               getTooltipItems: (touchedSpots) =>
-                  getTooltip(touchedSpots, context),
+                  getTooltip(touchedSpots, context, formatter),
             ),
           ),
         ),
@@ -113,6 +119,7 @@ class TickerLine extends StatelessWidget {
   List<LineTooltipItem> getTooltip(
     List<LineBarSpot> touchedSpots,
     BuildContext context,
+    DateFormat formatter,
   ) {
     final price = '\$${touchedSpots.first.y.toStringAsFixed(2)}';
     final dateStr = dates.elementAtOrNull(touchedSpots.first.x.toInt());

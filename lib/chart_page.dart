@@ -2,14 +2,15 @@ import 'package:drift/drift.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/material.dart' as material;
-import 'package:intl/intl.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/candle_ticker.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_page.dart';
+import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ChartPage extends StatefulWidget {
@@ -91,6 +92,8 @@ class _ChartPageState extends State<ChartPage>
         ),
       );
     }
+
+    final settings = context.watch<SettingsState>();
 
     return Padding(
       padding: const EdgeInsets.all(8.0),
@@ -197,7 +200,8 @@ class _ChartPageState extends State<ChartPage>
           ),
           StreamBuilder(
             stream: stream,
-            builder: chartBuilder,
+            builder: (context, snapshot) =>
+                chartBuilder(context, snapshot, settings),
           ),
           const SizedBox(height: 8),
           StreamBuilder(
@@ -212,6 +216,7 @@ class _ChartPageState extends State<ChartPage>
   Widget chartBuilder(
     BuildContext context,
     AsyncSnapshot<List<CandleTicker>> snapshot,
+    SettingsState settings,
   ) {
     if (snapshot.hasError) return ErrorWidget(snapshot.error.toString());
     if (loading && snapshot.data?.isEmpty == true) return const SizedBox();
@@ -232,7 +237,6 @@ class _ChartPageState extends State<ChartPage>
     return SizedBox(
       height: MediaQuery.of(context).size.height * 0.5,
       child: TickerLine(
-        formatter: DateFormat("d/M/yy"),
         dates: candles.map((candle) => candle.date.value),
         spots: spots,
       ),

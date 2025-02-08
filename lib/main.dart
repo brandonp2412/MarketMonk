@@ -1,3 +1,4 @@
+import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:market_monk/chart_page.dart';
@@ -5,30 +6,10 @@ import 'package:market_monk/database.dart';
 import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final prefs = await SharedPreferences.getInstance();
-  final theme = prefs.getString('theme');
-
-  ThemeMode themeMode;
-  switch (theme) {
-    case 'ThemeMode.system':
-      themeMode = ThemeMode.system;
-      break;
-    case 'ThemeMode.dark':
-      themeMode = ThemeMode.dark;
-      break;
-    case 'ThemeMode.light':
-      themeMode = ThemeMode.light;
-      break;
-    default:
-      themeMode = ThemeMode.system;
-      break;
-  }
-
-  final settings = SettingsState(themeMode);
+  final settings = SettingsState();
   runApp(
     ChangeNotifierProvider.value(
       value: settings,
@@ -39,6 +20,12 @@ void main() async {
 
 Database db = Database();
 
+final defaultTheme = ColorScheme.fromSeed(seedColor: const Color(0xFF2B7A78));
+final defaultDark = ColorScheme.fromSeed(
+  seedColor: const Color(0xFF2B7A78),
+  brightness: Brightness.dark,
+);
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -46,21 +33,21 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsState>();
 
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'MarketMonk',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2B7A78)),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2B7A78),
-          brightness: Brightness.dark,
+    return DynamicColorBuilder(
+      builder: (lightDynamic, darkDynamic) => MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'MarketMonk',
+        theme: ThemeData(
+          colorScheme: settings.systemColors ? lightDynamic : defaultTheme,
+          useMaterial3: true,
         ),
+        darkTheme: ThemeData(
+          colorScheme: settings.systemColors ? darkDynamic : defaultDark,
+          useMaterial3: true,
+        ),
+        themeMode: settings.theme,
+        home: const MyHomePage(),
       ),
-      themeMode: settings.theme,
-      home: const MyHomePage(),
     );
   }
 }
