@@ -134,7 +134,6 @@ else
 
   if [ "$submission_id" = "null" ]; then
     echo "Submission failed to create"
-    exit 1
   fi
 
   curl -X PUT "$file_upload_url" \
