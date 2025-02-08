@@ -160,5 +160,5 @@ else
     set +x
     ip=$(arp | grep "$MACBOOK_MAC" | cut -d ' ' -f 1)
     # shellcheck disable=SC2029
-    ssh "$ip" "security unlock-keychain -p '$(pass macbook)' && cd market_monk && git pull && ./scripts/macos.sh"
+    ssh "$ip" "zsh -l -c 'security unlock-keychain -p \"\$(pass macbook)\" && cd market_monk && git pull && ./scripts/macos.sh'"
 fi
