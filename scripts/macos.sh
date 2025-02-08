@@ -1,6 +1,7 @@
 #!/bin/sh
 
 source $HOME/.zprofile
+source $HOME/.zshrc
 
 set -ex
 
