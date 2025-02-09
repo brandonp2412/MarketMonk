@@ -121,7 +121,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
   ) {
     if (snapshot.hasError) return ErrorWidget(snapshot.error.toString());
     if (snapshot.data == null) return const SizedBox();
-    if (snapshot.data!.isEmpty)
+    if (snapshot.data!.isEmpty && !loading)
       return const ListTile(
         title: Text("No data found"),
         subtitle: Text("Are you sure you typed it correctly?"),
@@ -233,14 +233,8 @@ class _EditTickerPageState extends State<EditTickerPage> {
                       optionsBuilder:
                           (TextEditingValue textEditingValue) async {
                         final api = YahooFinanceApi();
-                        setState(() {
-                          loading = true;
-                        });
                         final results =
                             await api.searchTickers(textEditingValue.text);
-                        setState(() {
-                          loading = false;
-                        });
                         return results.map(
                           (result) => '${result.symbol} (${result.longname})',
                         );
