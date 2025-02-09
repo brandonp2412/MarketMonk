@@ -198,9 +198,7 @@ class YahooFinanceApi {
         Uri.parse('$_baseUrl?q=${Uri.encodeComponent(query)}'),
       );
 
-      if (response.statusCode != 200) {
-        throw Exception('Failed to fetch data: ${response.statusCode}');
-      }
+      if (response.statusCode != 200) return [];
 
       final Map<String, dynamic> data = json.decode(response.body);
       final List<dynamic> quotes = data['quotes'] ?? [];
