@@ -72,27 +72,27 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       child: const DefaultTabController(
         length: 2,
-        child: Scaffold(
-          body: SafeArea(
-            child: TabBarView(
+        child: SafeArea(
+          child: Scaffold(
+            body: TabBarView(
               children: [
                 ChartPage(),
                 PortfolioPage(),
               ],
             ),
-          ),
-          bottomNavigationBar: TabBar(
-            dividerColor: Colors.transparent,
-            tabs: [
-              Tab(
-                icon: Icon(Icons.insights),
-                text: "Charts",
-              ),
-              Tab(
-                icon: Icon(Icons.pie_chart),
-                text: "Portfolio",
-              ),
-            ],
+            bottomNavigationBar: TabBar(
+              dividerColor: Colors.transparent,
+              tabs: [
+                Tab(
+                  icon: Icon(Icons.insights),
+                  text: "Charts",
+                ),
+                Tab(
+                  icon: Icon(Icons.pie_chart),
+                  text: "Portfolio",
+                ),
+              ],
+            ),
           ),
         ),
       ),
