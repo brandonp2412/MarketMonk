@@ -17,10 +17,10 @@ class ChartPage extends StatefulWidget {
   const ChartPage({super.key});
 
   @override
-  State<ChartPage> createState() => _ChartPageState();
+  State<ChartPage> createState() => ChartPageState();
 }
 
-class _ChartPageState extends State<ChartPage>
+class ChartPageState extends State<ChartPage>
     with AutomaticKeepAliveClientMixin {
   TextEditingController stock =
       TextEditingController(text: "GME (GameStop Corporation Common Stock)");
@@ -235,7 +235,7 @@ class _ChartPageState extends State<ChartPage>
     }
 
     return SizedBox(
-      height: MediaQuery.of(context).size.height * 0.5,
+      height: MediaQuery.of(context).size.height * 0.3,
       child: TickerLine(
         dates: candles.map((candle) => candle.date.value),
         spots: spots,

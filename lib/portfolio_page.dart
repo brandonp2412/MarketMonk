@@ -12,10 +12,10 @@ class PortfolioPage extends StatefulWidget {
   const PortfolioPage({super.key});
 
   @override
-  State<PortfolioPage> createState() => _PortfolioPageState();
+  State<PortfolioPage> createState() => PortfolioPageState();
 }
 
-class _PortfolioPageState extends State<PortfolioPage> {
+class PortfolioPageState extends State<PortfolioPage> {
   late Stream<List<Ticker>> stream;
   final search = TextEditingController();
   List<int> selected = [];
