@@ -187,14 +187,11 @@ class _SettingsPageState extends State<SettingsPage> {
                 if (result == null) return;
 
                 File sourceFile = File(result.files.single.path!);
-                final dbFolder = await getApplicationDocumentsDirectory();
+                final dbFolder = await getApplicationSupportDirectory();
                 await db.close();
                 await sourceFile
                     .copy(p.join(dbFolder.path, 'market-monk.sqlite'));
                 db = Database();
-                if (!context.mounted) return;
-                final settingsState = context.read<SettingsState>();
-                await settingsState.init();
                 if (!context.mounted) return;
                 Navigator.pushNamedAndRemoveUntil(context, '/', (_) => false);
               },
