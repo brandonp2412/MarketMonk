@@ -134,17 +134,17 @@ else
 
   if [ "$submission_id" = "null" ]; then
     echo "Submission failed to create"
+  else
+    curl -X PUT "$file_upload_url" \
+      -H "Content-Type: application/octet-stream" \
+      -H "x-ms-blob-type: BlockBlob" \
+      --data-binary "$HOME/windows/market_monk.msix"
+
+    curl -X POST "$api/v1.0/my/applications/$app_id/submissions/$submission_id/commit" \
+      -H "Authorization: Bearer $access_token" \
+      -H "Content-Type: application/json" \
+      -H "Content-Length: 0"
   fi
-
-  curl -X PUT "$file_upload_url" \
-    -H "Content-Type: application/octet-stream" \
-    -H "x-ms-blob-type: BlockBlob" \
-    --data-binary "$HOME/windows/market_monk.msix"
-
-  curl -X POST "$api/v1.0/my/applications/$app_id/submissions/$submission_id/commit" \
-    -H "Authorization: Bearer $access_token" \
-    -H "Content-Type: application/json" \
-    -H "Content-Length: 0"
 fi
 
 if [[ $* == *-p* ]]; then
