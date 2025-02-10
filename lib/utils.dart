@@ -130,9 +130,6 @@ Future<void> syncCandles(String symbol) async {
       .getSingleOrNull();
   if (ticker == null) return;
 
-  final bought = await findClosestDate(ticker.purchasedAt, symbol);
-  if (bought == null) return;
-
   latest = await (db.candles.select()
         ..where((tbl) => tbl.symbol.equals(symbol))
         ..orderBy(
@@ -147,7 +144,7 @@ Future<void> syncCandles(String symbol) async {
       .getSingleOrNull();
   if (latest == null) return;
 
-  final newChange = safePercentChange(bought.close, latest.close);
+  final newChange = safePercentChange(ticker.price, latest.close);
   await (db.tickers.update()..where((u) => u.symbol.equals(symbol))).write(
     TickersCompanion(
       change: Value(newChange),
