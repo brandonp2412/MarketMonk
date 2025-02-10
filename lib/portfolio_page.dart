@@ -250,6 +250,7 @@ class PortfolioPageState extends State<PortfolioPage> {
     final tickers = snapshot.data!;
     final formatter = NumberFormat.simpleCurrency();
     final (dollarReturn, percentReturn) = calculateTotalReturns(tickers);
+    final total = calculateTotal(tickers);
 
     return Expanded(
       child: ListView.builder(
@@ -265,7 +266,13 @@ class PortfolioPageState extends State<PortfolioPage> {
                       Icons.account_balance,
                     ),
                     title: Text(formatter.format(dollarReturn)),
-                    subtitle: Text("${percentReturn.toStringAsFixed(2)}%"),
+                    trailing: Text(
+                      formatter.format(total),
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    subtitle: Text(
+                      "${percentReturn.toStringAsFixed(2)}%",
+                    ),
                     subtitleTextStyle: TextStyle(
                       color:
                           dollarReturn >= 0 ? Colors.green : Colors.redAccent,

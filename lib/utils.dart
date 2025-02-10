@@ -152,6 +152,16 @@ Future<void> syncCandles(String symbol) async {
   );
 }
 
+double calculateTotal(List<Ticker> tickers) {
+  var total = 0.0;
+
+  for (final ticker in tickers) {
+    total += ticker.amount * ticker.price;
+  }
+
+  return total;
+}
+
 (double dollarReturn, double percentReturn) calculateTotalReturns(
   List<Ticker> tickers,
 ) {
