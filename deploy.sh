@@ -70,14 +70,14 @@ $changelog"
 # Build and Package 🛠️
 ###########################################
 
-flutter build apk --split-per-abi
+./flutter/bin/flutter build apk --split-per-abi
 adb -d install "$apk"/app-arm64-v8a-release.apk || true
-flutter build apk
+./flutter/bin/flutter build apk
 mv "$apk"/app-release.apk "$apk/market_monk.apk"
-flutter build appbundle
+./flutter/bin/flutter build appbundle
 
 mkdir -p build/native_assets/linux
-flutter build linux
+./flutter/bin/flutter build linux
 (cd "$apk/pipeline/linux/x64/release/bundle" && zip --quiet -r "market_monk-linux.zip" .)
 
 ###########################################
@@ -85,7 +85,7 @@ flutter build linux
 ###########################################
 
 docker start windows
-rsync -a --delete --exclude-from=.gitignore --exclude ./flutter ./* .gitignore \
+rsync -a --delete --exclude-from=.gitignore --exclude ././flutter/bin/flutter ./* .gitignore \
     "$HOME/windows/market_monk-source"
 
 while ! ssh windows exit; do sleep 1; done
