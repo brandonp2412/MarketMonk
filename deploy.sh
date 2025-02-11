@@ -51,9 +51,9 @@ else
     dart format --set-exit-if-changed lib
     dart run build_runner build -d
     dart run drift_dev make-migrations
-    #./scripts/screenshots.sh "phoneScreenshots"
-    #./scripts/screenshots.sh "sevenInchScreenshots"
-    #./scripts/screenshots.sh "tenInchScreenshots"
+    ./scripts/screenshots.sh "phoneScreenshots"
+    ./scripts/screenshots.sh "sevenInchScreenshots"
+    ./scripts/screenshots.sh "tenInchScreenshots"
 fi
 
 ###########################################
