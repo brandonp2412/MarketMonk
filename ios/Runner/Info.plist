@@ -5,7 +5,7 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Pick a database to import</string>
 	<key>LSApplicationCategoryType</key>
-	<string></string>
+	<string>public.app-category.finance</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
