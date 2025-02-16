@@ -1,10 +1,10 @@
 import 'package:drift/drift.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/material.dart' as material;
-import 'package:market_monk/edit_ticker_page.dart';
+import 'package:flutter/material.dart';
 import 'package:market_monk/candle_ticker.dart';
 import 'package:market_monk/database.dart';
+import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
@@ -28,7 +28,7 @@ class ChartPageState extends State<ChartPage>
   int years = 0;
   int months = 0;
   int days = 5;
-  bool loading = false;
+  bool loadingChart = false;
 
   Stream<List<CandleTicker>>? stream;
 
@@ -104,13 +104,7 @@ class ChartPageState extends State<ChartPage>
             child: Autocomplete<String>(
               optionsBuilder: (TextEditingValue textEditingValue) async {
                 final api = YahooFinanceApi();
-                setState(() {
-                  loading = true;
-                });
                 final results = await api.searchTickers(textEditingValue.text);
-                setState(() {
-                  loading = false;
-                });
                 return results
                     .map((result) => '${result.symbol} (${result.longname})');
               },
@@ -127,15 +121,6 @@ class ChartPageState extends State<ChartPage>
                   padding: EdgeInsets.only(left: 16.0, right: 8.0),
                   child: Icon(Icons.search),
                 );
-                if (loading)
-                  leading = const Padding(
-                    padding: EdgeInsets.only(left: 16.0, right: 8.0),
-                    child: SizedBox(
-                      height: 24,
-                      width: 24,
-                      child: CircularProgressIndicator(),
-                    ),
-                  );
 
                 return Padding(
                   padding: const EdgeInsets.all(8.0),
@@ -219,13 +204,8 @@ class ChartPageState extends State<ChartPage>
     SettingsState settings,
   ) {
     if (snapshot.hasError) return ErrorWidget(snapshot.error.toString());
-    if (loading && snapshot.data?.isEmpty == true) return const SizedBox();
-    if (snapshot.data == null) return const SizedBox();
-    if (snapshot.data!.isEmpty)
-      return const ListTile(
-        title: Text("No data found"),
-        subtitle: Text("Are you sure you typed it correctly?"),
-      );
+    if (snapshot.data == null || snapshot.data?.isEmpty == true || loadingChart)
+      return const Center(child: CircularProgressIndicator());
 
     final candles =
         snapshot.data!.map((tickerCandle) => tickerCandle.candle).toList();
@@ -256,23 +236,11 @@ class ChartPageState extends State<ChartPage>
     updateData();
   }
 
-  void updateData() async {
+  Future<void> updateData() async {
     if (stock.text.isEmpty) return;
     setStream();
-    setState(() {
-      loading = true;
-    });
-
-    try {
-      final symbol = stock.text.split(' ').first;
-      await syncCandles(symbol);
-    } catch (error) {
-      if (mounted) toast(context, error.toString());
-    } finally {
-      setState(() {
-        loading = false;
-      });
-    }
+    final symbol = stock.text.split(' ').first;
+    await syncCandles(symbol);
   }
 
   void setStream() {
@@ -444,7 +412,15 @@ class ChartPageState extends State<ChartPage>
                     : const Icon(Icons.favorite_border),
               ),
               TextButton.icon(
-                onPressed: () => updateData(),
+                onPressed: () async {
+                  setState(() {
+                    loadingChart = true;
+                  });
+                  await updateData();
+                  setState(() {
+                    loadingChart = false;
+                  });
+                },
                 label: const Text("Refresh"),
                 icon: const Icon(Icons.refresh),
               ),
