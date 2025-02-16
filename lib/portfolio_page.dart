@@ -1,9 +1,9 @@
 import 'package:drift/drift.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/database.dart';
+import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/utils.dart';
@@ -19,26 +19,19 @@ class PortfolioPageState extends State<PortfolioPage> {
   late Stream<List<Ticker>> stream;
   final search = TextEditingController();
   List<int> selected = [];
-  bool loading = true;
 
   @override
   void initState() {
     super.initState();
     updateStream();
-    updateCandles();
+    Future.delayed(kThemeAnimationDuration).then((_) => updateCandles());
   }
 
-  void updateCandles() async {
-    setState(() {
-      loading = true;
-    });
+  Future<void> updateCandles() async {
     final tickers = await (db.tickers.select()).get();
     for (final ticker in tickers) {
       await syncCandles(ticker.symbol);
     }
-    setState(() {
-      loading = false;
-    });
   }
 
   void updateStream() {
@@ -165,15 +158,6 @@ class PortfolioPageState extends State<PortfolioPage> {
               right: 8.0,
             ),
           );
-    if (loading)
-      leading = const Padding(
-        padding: EdgeInsets.only(left: 16.0, right: 8.0),
-        child: SizedBox(
-          height: 24,
-          width: 24,
-          child: CircularProgressIndicator(),
-        ),
-      );
 
     return Scaffold(
       body: Padding(
@@ -253,41 +237,44 @@ class PortfolioPageState extends State<PortfolioPage> {
     final total = calculateTotal(tickers);
 
     return Expanded(
-      child: ListView.builder(
-        padding: const EdgeInsets.all(0),
-        itemBuilder: (context, index) {
-          if (index == 0)
-            return material.Column(
-              children: [
-                Tooltip(
-                  message: "Total return of the portfolio",
-                  child: ListTile(
-                    leading: const Icon(
-                      Icons.account_balance,
-                    ),
-                    title: Text(formatter.format(dollarReturn)),
-                    trailing: Text(
-                      formatter.format(total),
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    subtitle: Text(
-                      "${percentReturn.toStringAsFixed(2)}%",
-                    ),
-                    subtitleTextStyle: TextStyle(
-                      color:
-                          dollarReturn >= 0 ? Colors.green : Colors.redAccent,
+      child: RefreshIndicator(
+        onRefresh: updateCandles,
+        child: ListView.builder(
+          padding: const EdgeInsets.all(0),
+          itemBuilder: (context, index) {
+            if (index == 0)
+              return material.Column(
+                children: [
+                  Tooltip(
+                    message: "Total return of the portfolio",
+                    child: ListTile(
+                      leading: const Icon(
+                        Icons.account_balance,
+                      ),
+                      title: Text(formatter.format(dollarReturn)),
+                      trailing: Text(
+                        formatter.format(total),
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      subtitle: Text(
+                        "${percentReturn.toStringAsFixed(2)}%",
+                      ),
+                      subtitleTextStyle: TextStyle(
+                        color:
+                            dollarReturn >= 0 ? Colors.green : Colors.redAccent,
+                      ),
                     ),
                   ),
-                ),
-                const Divider(),
-              ],
-            );
+                  const Divider(),
+                ],
+              );
 
-          final ticker = tickers[index - 1];
+            final ticker = tickers[index - 1];
 
-          return folioTile(ticker, context);
-        },
-        itemCount: tickers.length + 1,
+            return folioTile(ticker, context);
+          },
+          itemCount: tickers.length + 1,
+        ),
       ),
     );
   }
