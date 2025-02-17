@@ -15,8 +15,9 @@ Track stocks on any platform 📈
 
 <p float="left">
   <a href='https://play.google.com/store/apps/details?id=com.codesail.market_monk'><img alt='Get it on Google Play' height="75" src='https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png'/></a>
-  <a href='https://apps.apple.com/us/app/market-monk-by-codesail/id6741134414?itscg=30200&itsct=apps_box_link&mttnsubad=6741134414'><img alt='Get it on Google Play' height="75" src='docs/download-apple.svg'/></a>
-  <a href="https://apps.microsoft.com/detail/9PP4HKV1CMWC?mode=direct"><img src="https://get.microsoft.com/images/en-us%20dark.svg" height="75"/></a>
+  <a href="https://f-droid.org/packages/com.codesail.market_monk"><img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" alt="Get it on F-Droid" height="75"></a>
+  <a href='https://apps.apple.com/us/app/market-monk-by-codesail/id6741134414?itscg=30200&itsct=apps_box_link&mttnsubad=6741134414'><img alt='Get it on the App Store' height="75" src='docs/download-apple.svg'/></a>
+  <a href="https://apps.microsoft.com/detail/9PP4HKV1CMWC?mode=direct"><img src="https://get.microsoft.com/images/en-us%20dark.svg" height="75" alt='Get it on the Microsoft Store'/></a> <a href="https://f-droid.org/packages/com.presley.flexify">
 </p>
 
 <br />
@@ -36,7 +37,6 @@ If you would like to support this project:
 - Bitcoin `bc1qzlte8featxzf7xvtp3rjv7qqtwkgpup8hu85gp`
 - Monero (XMR) `85tmLfWKbpd8nxQnUY878DDuFjmfcoCFXPWR7XYKLHBSbDZV8wxgoKYUtHtq1kHWJg4m14sdBXhYuUSbxEDA29d19XuREL5`
 - [GitHub sponsor](https://github.com/sponsors/brandonp2412)
-
 
 # Contributing
 
