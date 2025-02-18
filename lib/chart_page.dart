@@ -296,6 +296,7 @@ class ChartPageState extends State<ChartPage>
               )
               .toList(),
         );
+    setState(() {});
   }
 
   Widget summaryBuilder(
