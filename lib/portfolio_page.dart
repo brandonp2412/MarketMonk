@@ -19,6 +19,7 @@ class PortfolioPageState extends State<PortfolioPage> {
   late Stream<List<Ticker>> stream;
   final search = TextEditingController();
   List<int> selected = [];
+  final formatter = NumberFormat.simpleCurrency();
 
   @override
   void initState() {
@@ -165,7 +166,7 @@ class PortfolioPageState extends State<PortfolioPage> {
         child: material.Column(
           children: [
             Padding(
-              padding: const EdgeInsets.all(8.0),
+              padding: const EdgeInsets.only(left: 16, right: 16, top: 16),
               child: SearchBar(
                 controller: search,
                 hintText: 'Search...',
@@ -232,7 +233,6 @@ class PortfolioPageState extends State<PortfolioPage> {
     if (snapshot.hasError) return ErrorWidget(snapshot.error.toString());
 
     final tickers = snapshot.data!;
-    final formatter = NumberFormat.simpleCurrency();
     final (dollarReturn, percentReturn) = calculateTotalReturns(tickers);
     final total = calculateTotal(tickers);
 
@@ -245,6 +245,7 @@ class PortfolioPageState extends State<PortfolioPage> {
             if (index == 0)
               return material.Column(
                 children: [
+                  const SizedBox(height: 8),
                   Tooltip(
                     message: "Total return of the portfolio",
                     child: ListTile(
@@ -271,7 +272,12 @@ class PortfolioPageState extends State<PortfolioPage> {
 
             final ticker = tickers[index - 1];
 
-            return folioTile(ticker, context);
+            return material.Column(
+              children: [
+                folioTile(ticker, context),
+                if (index == tickers.length) const SizedBox(height: 50),
+              ],
+            );
           },
           itemCount: tickers.length + 1,
         ),
@@ -295,6 +301,10 @@ class PortfolioPageState extends State<PortfolioPage> {
     return ListTile(
       title: Text(ticker.symbol),
       subtitle: Text('${ticker.change.toStringAsFixed(2)}%'),
+      trailing: Text(
+        "${formatter.format(ticker.price)} (${ticker.amount})",
+        style: Theme.of(context).textTheme.bodyMedium,
+      ),
       selected: selected.contains(ticker.id),
       onLongPress: () {
         if (selected.contains(ticker.id))
