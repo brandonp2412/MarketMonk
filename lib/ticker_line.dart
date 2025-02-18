@@ -1,9 +1,10 @@
 // ignore_for_file: prefer_interpolation_to_compose_strings
 
-import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/settings_state.dart';
+import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 
 class TickerLine extends StatelessWidget {
@@ -121,7 +122,7 @@ class TickerLine extends StatelessWidget {
     BuildContext context,
     DateFormat formatter,
   ) {
-    final price = '\$${touchedSpots.first.y.toStringAsFixed(2)}';
+    final price = currency.format(touchedSpots.first.y);
     final dateStr = dates.elementAtOrNull(touchedSpots.first.x.toInt());
     if (dateStr == null) return [];
     final date = formatter.format(dateStr);

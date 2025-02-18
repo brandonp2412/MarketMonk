@@ -1,7 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/main.dart';
@@ -19,7 +18,6 @@ class PortfolioPageState extends State<PortfolioPage> {
   late Stream<List<Ticker>> stream;
   final search = TextEditingController();
   List<int> selected = [];
-  final formatter = NumberFormat.simpleCurrency();
 
   @override
   void initState() {
@@ -252,9 +250,9 @@ class PortfolioPageState extends State<PortfolioPage> {
                       leading: const Icon(
                         Icons.account_balance,
                       ),
-                      title: Text(formatter.format(dollarReturn)),
+                      title: Text(currency.format(dollarReturn)),
                       trailing: Text(
-                        formatter.format(total),
+                        currency.format(total),
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       subtitle: Text(
@@ -302,7 +300,7 @@ class PortfolioPageState extends State<PortfolioPage> {
       title: Text(ticker.symbol),
       subtitle: Text('${ticker.change.toStringAsFixed(2)}%'),
       trailing: Text(
-        "${formatter.format(ticker.price)} (${ticker.amount})",
+        "${currency.format(ticker.price)} (${ticker.amount})",
         style: Theme.of(context).textTheme.bodyMedium,
       ),
       selected: selected.contains(ticker.id),

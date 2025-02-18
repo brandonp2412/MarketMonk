@@ -3,10 +3,13 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
-import 'package:http/http.dart' as http;
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
+
+final currency = NumberFormat.simpleCurrency();
 
 void selectAll(TextEditingController controller) => controller.selection =
     TextSelection(baseOffset: 0, extentOffset: controller.text.length);
