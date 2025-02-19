@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class SettingsState extends ChangeNotifier {
   ThemeMode theme = ThemeMode.system;
   bool systemColors = false;
-  bool curveLines = true;
+  bool curveLines = false;
   double curveSmoothness = 0.35;
   String dateFormat = 'd/M/yy';
 
@@ -32,7 +32,7 @@ class SettingsState extends ChangeNotifier {
     }
 
     systemColors = prefs.getBool('systemColors') ?? false;
-    curveLines = prefs.getBool('curveLines') ?? true;
+    curveLines = prefs.getBool('curveLines') ?? false;
     curveSmoothness = prefs.getDouble('curveSmoothness') ?? 0.35;
     dateFormat = prefs.getString('dateFormat') ?? 'd/M/yy';
 
