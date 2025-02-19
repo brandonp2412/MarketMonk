@@ -26,8 +26,8 @@ class ChartPageState extends State<ChartPage>
       TextEditingController(text: "GME (GameStop Corporation Common Stock)");
   String? favoriteStock;
   int years = 0;
-  int months = 0;
-  int days = 5;
+  int months = 1;
+  int days = 0;
   bool loadingChart = false;
 
   Stream<List<CandleTicker>>? stream;
