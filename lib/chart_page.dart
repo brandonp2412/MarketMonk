@@ -85,7 +85,7 @@ class ChartPageState extends State<ChartPage>
                 color: option == months
                     ? Theme.of(context).colorScheme.primary
                     : Colors.transparent,
-              ), // Set border color
+              ),
             ),
             child: Text("${option}m"),
           ),
@@ -157,6 +157,7 @@ class ChartPageState extends State<ChartPage>
           ),
           const SizedBox(height: 16),
           Wrap(
+            alignment: WrapAlignment.center,
             children: [
               Tooltip(
                 message: 'Show the last 5 days of prices',
@@ -317,7 +318,7 @@ class ChartPageState extends State<ChartPage>
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: material.Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Wrap(
             children: [
