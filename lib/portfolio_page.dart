@@ -284,19 +284,54 @@ class PortfolioPageState extends State<PortfolioPage> {
   }
 
   ListTile folioTile(Ticker ticker, BuildContext context) {
-    var leading = ticker.change >= 0
-        ? const Icon(
-            Icons.arrow_upward,
-            color: Colors.green,
-          )
-        : const Icon(
-            Icons.arrow_downward,
-            color: Colors.red,
-          );
-
-    if (selected.contains(ticker.id)) leading = const Icon(Icons.check_circle);
+    final isSelected = selected.contains(ticker.id);
 
     return ListTile(
+      leading: material.SizedBox(
+        height: 30,
+        width: 30,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            AnimatedScale(
+              duration: const Duration(milliseconds: 150),
+              scale: isSelected ? 0.0 : 1.0,
+              child: Visibility(
+                visible: !isSelected,
+                child: ticker.change >= 0
+                    ? const Icon(
+                        Icons.arrow_upward,
+                        color: Colors.green,
+                      )
+                    : const Icon(
+                        Icons.arrow_downward,
+                        color: Colors.red,
+                      ),
+              ),
+            ),
+            AnimatedScale(
+              duration: const Duration(milliseconds: 150),
+              scale: isSelected ? 1.0 : 0.0,
+              child: Visibility(
+                visible: isSelected,
+                child: Checkbox(
+                  value: isSelected,
+                  onChanged: (value) {
+                    if (value == true)
+                      setState(() {
+                        selected.add(ticker.id);
+                      });
+                    else
+                      setState(() {
+                        selected.remove(ticker.id);
+                      });
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
       title: Text(ticker.symbol),
       subtitle: Text('${ticker.change.toStringAsFixed(2)}%'),
       trailing: Text(
@@ -317,7 +352,6 @@ class PortfolioPageState extends State<PortfolioPage> {
       subtitleTextStyle: ticker.change >= 0
           ? const TextStyle(color: Colors.green)
           : const TextStyle(color: Colors.red),
-      leading: leading,
       onTap: () {
         if (selected.isEmpty)
           Navigator.push(
