@@ -111,7 +111,7 @@ class PortfolioPageState extends State<PortfolioPage> {
         if (selected.isNotEmpty)
           PopupMenuItem(
             child: ListTile(
-              leading: const Icon(Icons.clear_all),
+              leading: const Icon(Icons.clear),
               title: const Text('Clear'),
               onTap: () async {
                 setState(() {
