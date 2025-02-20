@@ -6,6 +6,7 @@ import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/utils.dart';
+import 'package:share_plus/share_plus.dart';
 
 class PortfolioPage extends StatefulWidget {
   const PortfolioPage({super.key});
@@ -108,19 +109,27 @@ class PortfolioPageState extends State<PortfolioPage> {
             },
           ),
         ),
-        if (selected.isNotEmpty)
-          PopupMenuItem(
-            child: ListTile(
-              leading: const Icon(Icons.clear),
-              title: const Text('Clear'),
-              onTap: () async {
-                setState(() {
-                  selected = [];
-                });
-                Navigator.pop(context);
-              },
-            ),
+        PopupMenuItem(
+          child: ListTile(
+            title: const Text("Share"),
+            leading: const Icon(Icons.share),
+            onTap: () async {
+              List<Ticker> tickers;
+              if (selected.isEmpty)
+                tickers = await stream.first;
+              else
+                tickers = await (db.tickers.select()
+                      ..where((u) => u.id.isIn(selected)))
+                    .get();
+              var csv = "";
+
+              for (final ticker in tickers)
+                csv += "${ticker.symbol},${ticker.amount},${ticker.price}\n";
+
+              await Share.share(csv);
+            },
           ),
+        ),
         if (selected.isEmpty)
           PopupMenuItem(
             child: ListTile(
@@ -157,6 +166,19 @@ class PortfolioPageState extends State<PortfolioPage> {
               right: 8.0,
             ),
           );
+    if (selected.isNotEmpty)
+      leading = IconButton(
+        onPressed: () {
+          setState(() {
+            selected.clear();
+          });
+        },
+        icon: const Icon(Icons.arrow_back),
+        padding: const EdgeInsets.only(
+          left: 16.0,
+          right: 8.0,
+        ),
+      );
 
     return Scaffold(
       body: Padding(
@@ -168,6 +190,9 @@ class PortfolioPageState extends State<PortfolioPage> {
               child: SearchBar(
                 controller: search,
                 hintText: 'Search...',
+                padding: WidgetStateProperty.all(
+                  const EdgeInsets.only(right: 8.0),
+                ),
                 leading: leading,
                 onTap: () => search.selection = TextSelection(
                   baseOffset: 0,
