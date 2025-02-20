@@ -27,6 +27,7 @@ dependencies:
   file_picker: ^8.3.2
   integration_test:
     sdk: flutter
+  share_plus: ^10.1.4
 dev_dependencies:
   flutter_test:
     sdk: flutter
