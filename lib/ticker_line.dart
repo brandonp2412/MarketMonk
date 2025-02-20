@@ -89,6 +89,7 @@ class TickerLine extends StatelessWidget {
               color: Theme.of(context).colorScheme.primary,
               isCurved: settings.curveLines,
               curveSmoothness: settings.curveSmoothness,
+              preventCurveOverShooting: true,
               barWidth: 3,
               dotData: const FlDotData(
                 show: false,
