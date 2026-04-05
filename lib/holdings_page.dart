@@ -224,9 +224,9 @@ class _HoldingsPageState extends State<HoldingsPage> {
 
     final summaries = snap.data!;
     if (_summaries != summaries) {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => setState(() => _summaries = summaries),
-      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _summaries = summaries);
+      });
     }
     if (summaries.isEmpty) {
       return ListTile(
