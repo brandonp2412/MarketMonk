@@ -495,17 +495,40 @@ class _EditTickerPageState extends State<EditTickerPage> {
               ),
             );
           } else if (!_isSell) {
-            db.tickers.insertOne(
-              TickersCompanion(
-                amount: Value(double.parse(amount.text)),
-                updatedAt: Value(DateTime.now()),
-                purchasedAt: Value(_purchasedDate),
-                price: Value(double.parse(price.text)),
-                name: Value(name),
-                symbol: Value(tickerSymbol),
-                change: Value(percentChange),
-              ),
-            );
+            final existing = await (db.tickers.select()
+                  ..where((tbl) => tbl.symbol.equals(tickerSymbol)))
+                .getSingleOrNull();
+            if (existing != null) {
+              final newAmount = existing.amount + qty;
+              final newAvgPrice =
+                  (existing.amount * existing.price + qty * double.parse(price.text)) /
+                      newAmount;
+              final currentPrice =
+                  candleTickers.lastOrNull?.candle.close.value ?? newAvgPrice;
+              final newChange = safePercentChange(newAvgPrice, currentPrice);
+              (db.tickers.update()
+                    ..where((tbl) => tbl.id.equals(existing.id)))
+                  .write(
+                TickersCompanion(
+                  amount: Value(newAmount),
+                  price: Value(newAvgPrice),
+                  change: Value(newChange),
+                  updatedAt: Value(DateTime.now()),
+                ),
+              );
+            } else {
+              db.tickers.insertOne(
+                TickersCompanion(
+                  amount: Value(double.parse(amount.text)),
+                  updatedAt: Value(DateTime.now()),
+                  purchasedAt: Value(_purchasedDate),
+                  price: Value(double.parse(price.text)),
+                  name: Value(name),
+                  symbol: Value(tickerSymbol),
+                  change: Value(percentChange),
+                ),
+              );
+            }
           }
         },
         label: const Text('Save'),
