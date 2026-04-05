@@ -172,7 +172,8 @@ double calculateTotal(List<Ticker> tickers) {
   double totalInitialValue = 0.0;
 
   for (final ticker in tickers) {
-    if (ticker.price.isNaN || ticker.change.isNaN) continue;
+    if (ticker.price.isNaN || ticker.change.isNaN || ticker.price == 0) continue;
+    if (ticker.change < -100) continue;
 
     double currentPositionValue = ticker.amount * ticker.price;
     if (currentPositionValue.isNaN) continue;

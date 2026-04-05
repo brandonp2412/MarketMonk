@@ -380,7 +380,7 @@ class ChartPageState extends State<ChartPage>
                               context,
                               MaterialPageRoute(
                                 builder: (context) => EditTickerPage(
-                                  symbol: ticker.symbol,
+                                  tickerId: ticker.id,
                                 ),
                               ),
                             );

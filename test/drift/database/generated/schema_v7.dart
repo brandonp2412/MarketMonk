@@ -14,37 +14,68 @@ class Tickers extends Table with TableInfo {
       hasAutoIncrement: true,
       type: DriftSqlType.int,
       requiredDuringInsert: false,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+      $customConstraints: 'NOT NULL PRIMARY KEY AUTOINCREMENT');
   late final GeneratedColumn<String> symbol = GeneratedColumn<String>(
       'symbol', aliasedName, false,
       type: DriftSqlType.string,
       requiredDuringInsert: true,
-      defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'));
+      $customConstraints: 'NOT NULL');
   late final GeneratedColumn<String> name = GeneratedColumn<String>(
       'name', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
+      type: DriftSqlType.string,
+      requiredDuringInsert: true,
+      $customConstraints: 'NOT NULL');
   late final GeneratedColumn<double> change = GeneratedColumn<double>(
       'change', aliasedName, false,
-      type: DriftSqlType.double, requiredDuringInsert: true);
-  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      type: DriftSqlType.double,
+      requiredDuringInsert: true,
+      $customConstraints: 'NOT NULL');
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
       'created_at', aliasedName, false,
-      type: DriftSqlType.dateTime,
+      type: DriftSqlType.int,
       requiredDuringInsert: false,
+      $customConstraints:
+          'NOT NULL DEFAULT (CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER))',
       defaultValue: const CustomExpression(
           'CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER)'));
-  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
-      'updated_at', aliasedName, false,
-      type: DriftSqlType.dateTime,
+  late final GeneratedColumn<int> purchasedAt = GeneratedColumn<int>(
+      'purchased_at', aliasedName, false,
+      type: DriftSqlType.int,
       requiredDuringInsert: false,
+      $customConstraints:
+          'NOT NULL DEFAULT (CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER))',
+      defaultValue: const CustomExpression(
+          'CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER)'));
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      $customConstraints:
+          'NOT NULL DEFAULT (CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER))',
       defaultValue: const CustomExpression(
           'CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER)'));
   late final GeneratedColumn<double> amount = GeneratedColumn<double>(
       'amount', aliasedName, false,
-      type: DriftSqlType.double, requiredDuringInsert: true);
+      type: DriftSqlType.double,
+      requiredDuringInsert: true,
+      $customConstraints: 'NOT NULL');
+  late final GeneratedColumn<double> price = GeneratedColumn<double>(
+      'price', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: true,
+      $customConstraints: 'NOT NULL');
   @override
-  List<GeneratedColumn> get $columns =>
-      [id, symbol, name, change, createdAt, updatedAt, amount];
+  List<GeneratedColumn> get $columns => [
+        id,
+        symbol,
+        name,
+        change,
+        createdAt,
+        purchasedAt,
+        updatedAt,
+        amount,
+        price
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -61,6 +92,9 @@ class Tickers extends Table with TableInfo {
   Tickers createAlias(String alias) {
     return Tickers(attachedDatabase, alias);
   }
+
+  @override
+  bool get dontWriteConstraints => true;
 }
 
 class Candles extends Table with TableInfo {
@@ -73,46 +107,52 @@ class Candles extends Table with TableInfo {
       hasAutoIncrement: true,
       type: DriftSqlType.int,
       requiredDuringInsert: false,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+      $customConstraints: 'NOT NULL PRIMARY KEY AUTOINCREMENT');
   late final GeneratedColumn<String> symbol = GeneratedColumn<String>(
       'symbol', aliasedName, false,
       type: DriftSqlType.string,
       requiredDuringInsert: true,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('REFERENCES tickers (symbol)'));
-  late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
+      $customConstraints: 'NOT NULL REFERENCES tickers(symbol)');
+  late final GeneratedColumn<int> date = GeneratedColumn<int>(
       'date', aliasedName, false,
-      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+      type: DriftSqlType.int,
+      requiredDuringInsert: true,
+      $customConstraints: 'NOT NULL');
   late final GeneratedColumn<double> open = GeneratedColumn<double>(
       'open', aliasedName, false,
       type: DriftSqlType.double,
       requiredDuringInsert: false,
+      $customConstraints: 'NOT NULL DEFAULT (-1.0)',
       defaultValue: const CustomExpression('-1.0'));
   late final GeneratedColumn<double> high = GeneratedColumn<double>(
       'high', aliasedName, false,
       type: DriftSqlType.double,
       requiredDuringInsert: false,
+      $customConstraints: 'NOT NULL DEFAULT (-1.0)',
       defaultValue: const CustomExpression('-1.0'));
   late final GeneratedColumn<double> low = GeneratedColumn<double>(
       'low', aliasedName, false,
       type: DriftSqlType.double,
       requiredDuringInsert: false,
+      $customConstraints: 'NOT NULL DEFAULT (-1.0)',
       defaultValue: const CustomExpression('-1.0'));
   late final GeneratedColumn<double> close = GeneratedColumn<double>(
       'close', aliasedName, false,
       type: DriftSqlType.double,
       requiredDuringInsert: false,
+      $customConstraints: 'NOT NULL DEFAULT (-1.0)',
       defaultValue: const CustomExpression('-1.0'));
   late final GeneratedColumn<int> volume = GeneratedColumn<int>(
       'volume', aliasedName, false,
       type: DriftSqlType.int,
       requiredDuringInsert: false,
+      $customConstraints: 'NOT NULL DEFAULT 0',
       defaultValue: const CustomExpression('0'));
   late final GeneratedColumn<double> adjClose = GeneratedColumn<double>(
       'adj_close', aliasedName, false,
       type: DriftSqlType.double,
       requiredDuringInsert: false,
+      $customConstraints: 'NOT NULL DEFAULT (-1.0)',
       defaultValue: const CustomExpression('-1.0'));
   @override
   List<GeneratedColumn> get $columns =>
@@ -133,10 +173,13 @@ class Candles extends Table with TableInfo {
   Candles createAlias(String alias) {
     return Candles(attachedDatabase, alias);
   }
+
+  @override
+  bool get dontWriteConstraints => true;
 }
 
-class DatabaseAtV4 extends GeneratedDatabase {
-  DatabaseAtV4(QueryExecutor e) : super(e);
+class DatabaseAtV7 extends GeneratedDatabase {
+  DatabaseAtV7(QueryExecutor e) : super(e);
   late final Tickers tickers = Tickers(this);
   late final Candles candles = Candles(this);
   @override
@@ -145,5 +188,5 @@ class DatabaseAtV4 extends GeneratedDatabase {
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [tickers, candles];
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 7;
 }

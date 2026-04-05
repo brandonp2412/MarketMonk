@@ -21,9 +21,7 @@ class $TickersTable extends Tickers with TableInfo<$TickersTable, Ticker> {
   @override
   late final GeneratedColumn<String> symbol = GeneratedColumn<String>(
       'symbol', aliasedName, false,
-      type: DriftSqlType.string,
-      requiredDuringInsert: true,
-      defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'));
+      type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _nameMeta = const VerificationMeta('name');
   @override
   late final GeneratedColumn<String> name = GeneratedColumn<String>(
@@ -939,8 +937,8 @@ final class $$TickersTableReferences
               $_aliasNameGenerator(db.tickers.symbol, db.candles.symbol));
 
   $$CandlesTableProcessedTableManager get candlesRefs {
-    final manager = $$CandlesTableTableManager($_db, $_db.candles)
-        .filter((f) => f.symbol.symbol($_item.symbol));
+    final manager = $$CandlesTableTableManager($_db, $_db.candles).filter(
+        (f) => f.symbol.symbol.sqlEquals($_itemColumn<String>('symbol')!));
 
     final cache = $_typedResult.readTableOrNull(_candlesRefsTable($_db));
     return ProcessedTableManager(
@@ -1178,7 +1176,7 @@ class $$TickersTableTableManager extends RootTableManager<
               getPrefetchedDataCallback: (items) async {
                 return [
                   if (candlesRefs)
-                    await $_getPrefetchedData(
+                    await $_getPrefetchedData<Ticker, $TickersTable, Candle>(
                         currentTable: table,
                         referencedTable:
                             $$TickersTableReferences._candlesRefsTable(db),
@@ -1238,8 +1236,10 @@ final class $$CandlesTableReferences
       .createAlias($_aliasNameGenerator(db.candles.symbol, db.tickers.symbol));
 
   $$TickersTableProcessedTableManager get symbol {
+    final $_column = $_itemColumn<String>('symbol')!;
+
     final manager = $$TickersTableTableManager($_db, $_db.tickers)
-        .filter((f) => f.symbol($_item.symbol));
+        .filter((f) => f.symbol.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_symbolTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(

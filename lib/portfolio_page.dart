@@ -382,7 +382,7 @@ class PortfolioPageState extends State<PortfolioPage> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => EditTickerPage(symbol: ticker.symbol),
+              builder: (context) => EditTickerPage(tickerId: ticker.id),
             ),
           );
         else {

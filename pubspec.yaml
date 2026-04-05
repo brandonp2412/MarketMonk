@@ -32,6 +32,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  sqlite3: ^2.9.4
   msix:
     git:
       url: https://github.com/insertjokehere/msix.git

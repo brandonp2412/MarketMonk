@@ -10,8 +10,9 @@ import 'package:market_monk/utils.dart';
 
 class EditTickerPage extends StatefulWidget {
   final String? symbol;
+  final int? tickerId;
 
-  const EditTickerPage({super.key, this.symbol});
+  const EditTickerPage({super.key, this.symbol, this.tickerId});
 
   @override
   State<EditTickerPage> createState() => _EditTickerPageState();
@@ -43,13 +44,15 @@ class _EditTickerPageState extends State<EditTickerPage> {
   }
 
   void setTicker() async {
-    if (widget.symbol == null) return;
+    final tickerId = widget.tickerId;
+    if (tickerId == null) return;
 
     final ticker = await (db.tickers.select()
-          ..where((tbl) => tbl.symbol.equals(widget.symbol!.split(' ').first)))
+          ..where((tbl) => tbl.id.equals(tickerId)))
         .getSingleOrNull();
     if (ticker == null) return;
 
+    symbol.text = ticker.symbol;
     price.text = ticker.price.toStringAsFixed(2);
     amount.text = ticker.amount.toStringAsFixed(2);
     purchasedAt.text = ticker.purchasedAt.toIso8601String();
@@ -434,14 +437,9 @@ class _EditTickerPageState extends State<EditTickerPage> {
               .join(' ')
               .replaceAll(RegExp(r'\(|\)'), '');
 
-          final exists = await (db.tickers.select()
-                ..where(
-                  (tbl) => tbl.symbol.equals(symbol.text.split(' ').first),
-                ))
-              .getSingleOrNull();
-
-          if (exists != null) {
-            (db.tickers.update()..where((tbl) => tbl.id.equals(exists.id)))
+          final tickerId = widget.tickerId;
+          if (tickerId != null) {
+            (db.tickers.update()..where((tbl) => tbl.id.equals(tickerId)))
                 .write(
               TickersCompanion(
                 amount: Value(double.parse(amount.text)),

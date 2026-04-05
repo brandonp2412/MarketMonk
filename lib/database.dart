@@ -12,7 +12,7 @@ part 'database.g.dart';
 @DriftDatabase(tables: [Tickers, Candles])
 class Database extends _$Database {
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   Database() : super(_openConnection());
 
@@ -83,6 +83,9 @@ class Database extends _$Database {
       await m.drop(schema.candles);
       await m.drop(schema.tickers);
       await m.createTable(schema.tickers);
+    },
+    from6To7: (Migrator m, Schema7 schema) async {
+      await m.alterTable(TableMigration(schema.tickers));
     },
   );
 }
