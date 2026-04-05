@@ -1,5 +1,6 @@
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:market_monk/chart_page.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/holdings_page.dart';
@@ -62,18 +63,28 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    SystemChrome.setSystemUIOverlayStyle(
+      SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+      ),
+    );
     return const DefaultTabController(
       length: 3,
-      child: SafeArea(
-        child: Scaffold(
-          body: TabBarView(
+      child: Scaffold(
+        body: SafeArea(
+          child: TabBarView(
             children: [
               ChartPage(),
               PortfolioPage(),
               HoldingsPage(),
             ],
           ),
-          bottomNavigationBar: TabBar(
+        ),
+        bottomNavigationBar: SafeArea(
+          top: false,
+          child: TabBar(
             dividerColor: Colors.transparent,
             tabs: [
               Tab(
