@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/material.dart';
@@ -21,9 +22,8 @@ class EditTickerPage extends StatefulWidget {
 class _EditTickerPageState extends State<EditTickerPage> {
   late var symbol = TextEditingController(text: widget.symbol);
   final amount = TextEditingController(text: '1');
-  final purchasedAt = TextEditingController(
-    text: DateTime.now().toIso8601String(),
-  );
+  final purchasedAt = TextEditingController();
+  DateTime _purchasedDate = DateTime.now();
   final price = TextEditingController(text: '0');
 
   Stream<List<CandleTicker>>? stream;
@@ -36,9 +36,12 @@ class _EditTickerPageState extends State<EditTickerPage> {
 
   FocusNode? autocomplete;
 
+  static final _dateDisplay = DateFormat('dd MMM yyyy');
+
   @override
   void initState() {
     super.initState();
+    purchasedAt.text = _dateDisplay.format(_purchasedDate);
     setStream();
     setTicker();
   }
@@ -55,7 +58,9 @@ class _EditTickerPageState extends State<EditTickerPage> {
     symbol.text = ticker.symbol;
     price.text = ticker.price.toStringAsFixed(2);
     amount.text = ticker.amount.toStringAsFixed(2);
-    purchasedAt.text = ticker.purchasedAt.toIso8601String();
+    _purchasedDate = ticker.purchasedAt;
+    purchasedAt.text = _dateDisplay.format(_purchasedDate);
+    setState(() {});
   }
 
   void setStream() {
@@ -345,7 +350,8 @@ class _EditTickerPageState extends State<EditTickerPage> {
 
                       if (closest == null) return;
                       setState(() {
-                        purchasedAt.text = closest.date.toIso8601String();
+                        _purchasedDate = closest.date;
+                        purchasedAt.text = _dateDisplay.format(closest.date);
                         autoSetCreated = true;
                       });
                     },
@@ -361,13 +367,14 @@ class _EditTickerPageState extends State<EditTickerPage> {
                     onTap: () async {
                       final DateTime? date = await showDatePicker(
                         context: context,
-                        initialDate: DateTime.parse(purchasedAt.text),
+                        initialDate: _purchasedDate,
                         firstDate: DateTime(0),
                         lastDate: DateTime.now(),
                       );
                       if (date == null) return;
                       setState(() {
-                        purchasedAt.text = date.toIso8601String();
+                        _purchasedDate = date;
+                        purchasedAt.text = _dateDisplay.format(date);
                       });
                       setStream();
 
@@ -380,6 +387,8 @@ class _EditTickerPageState extends State<EditTickerPage> {
                       setState(() {
                         price.text = closest.close.toStringAsFixed(2);
                         autoSetPrice = true;
+                        _purchasedDate = closest.date;
+                        purchasedAt.text = _dateDisplay.format(closest.date);
                       });
                     },
                   ),
@@ -444,7 +453,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
               TickersCompanion(
                 amount: Value(double.parse(amount.text)),
                 updatedAt: Value(DateTime.now()),
-                purchasedAt: Value(DateTime.parse(purchasedAt.text)),
+                purchasedAt: Value(_purchasedDate),
                 price: Value(double.parse(price.text)),
                 name: Value(name),
                 symbol: Value(symbol.text.split(' ').first),
@@ -456,7 +465,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
               TickersCompanion(
                 amount: Value(double.parse(amount.text)),
                 updatedAt: Value(DateTime.now()),
-                purchasedAt: Value(DateTime.parse(purchasedAt.text)),
+                purchasedAt: Value(_purchasedDate),
                 price: Value(double.parse(price.text)),
                 name: Value(name),
                 symbol: Value(symbol.text.split(' ').first),
