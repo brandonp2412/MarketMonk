@@ -346,6 +346,40 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           Tooltip(
+            message: 'Permanently delete all holdings, trades, and candles',
+            child: ListTile(
+              leading: const Icon(Icons.delete_forever),
+              title: const Text('Delete all data'),
+              onTap: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Delete all data?'),
+                    content: const Text(
+                      'This will permanently delete all holdings, trades, and chart data. This cannot be undone.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Delete'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed != true || !context.mounted) return;
+                await db.delete(db.tickers).go();
+                await db.delete(db.trades).go();
+                await db.delete(db.candles).go();
+                if (!context.mounted) return;
+                toast(context, 'All data deleted');
+              },
+            ),
+          ),
+          Tooltip(
             message: 'Import a .sqlite database',
             child: ListTile(
               leading: const Icon(Icons.upload),
