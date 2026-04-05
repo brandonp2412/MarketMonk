@@ -30,6 +30,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
   bool autoSetCreated = false;
   bool autoSetPrice = false;
   bool loading = false;
+  bool _isSell = false;
   int years = 0;
   int months = 0;
   int days = 5;
@@ -322,6 +323,24 @@ class _EditTickerPageState extends State<EditTickerPage> {
                       },
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(
+                        value: false,
+                        label: Text('Buy'),
+                        icon: Icon(Icons.arrow_downward),
+                      ),
+                      ButtonSegment(
+                        value: true,
+                        label: Text('Sell'),
+                        icon: Icon(Icons.arrow_upward),
+                      ),
+                    ],
+                    selected: {_isSell},
+                    onSelectionChanged: (v) =>
+                        setState(() => _isSell = v.first),
+                  ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: amount,
@@ -446,6 +465,21 @@ class _EditTickerPageState extends State<EditTickerPage> {
               .join(' ')
               .replaceAll(RegExp(r'\(|\)'), '');
 
+          final tickerSymbol = symbol.text.split(' ').first;
+          final qty = double.parse(amount.text);
+
+          // Always record a trade entry
+          await db.trades.insertOne(
+            TradesCompanion.insert(
+              symbol: tickerSymbol,
+              name: name.isNotEmpty ? name : tickerSymbol,
+              quantity: _isSell ? -qty : qty,
+              price: double.parse(price.text),
+              tradeType: _isSell ? 'close' : 'open',
+              tradeDate: _purchasedDate,
+            ),
+          );
+
           final tickerId = widget.tickerId;
           if (tickerId != null) {
             (db.tickers.update()..where((tbl) => tbl.id.equals(tickerId)))
@@ -456,11 +490,11 @@ class _EditTickerPageState extends State<EditTickerPage> {
                 purchasedAt: Value(_purchasedDate),
                 price: Value(double.parse(price.text)),
                 name: Value(name),
-                symbol: Value(symbol.text.split(' ').first),
+                symbol: Value(tickerSymbol),
                 change: Value(percentChange),
               ),
             );
-          } else {
+          } else if (!_isSell) {
             db.tickers.insertOne(
               TickersCompanion(
                 amount: Value(double.parse(amount.text)),
@@ -468,7 +502,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                 purchasedAt: Value(_purchasedDate),
                 price: Value(double.parse(price.text)),
                 name: Value(name),
-                symbol: Value(symbol.text.split(' ').first),
+                symbol: Value(tickerSymbol),
                 change: Value(percentChange),
               ),
             );
