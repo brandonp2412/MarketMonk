@@ -33,8 +33,7 @@ class PortfolioPageState extends State<PortfolioPage> {
 
   /// Current market value of a holding.
   /// price = purchase price; change = % gain since purchase.
-  double _currentValue(Ticker t) =>
-      t.amount * t.price * (1 + t.change / 100);
+  double _currentValue(Ticker t) => t.amount * t.price * (1 + t.change / 100);
 
   @override
   Widget build(BuildContext context) {
@@ -73,13 +72,10 @@ class PortfolioPageState extends State<PortfolioPage> {
       );
     }
 
-    final totalValue =
-        tickers.fold(0.0, (sum, t) => sum + _currentValue(t));
-    final totalCost =
-        tickers.fold(0.0, (sum, t) => sum + t.amount * t.price);
+    final totalValue = tickers.fold(0.0, (sum, t) => sum + _currentValue(t));
+    final totalCost = tickers.fold(0.0, (sum, t) => sum + t.amount * t.price);
     final totalGain = totalValue - totalCost;
-    final totalGainPct =
-        totalCost > 0 ? (totalGain / totalCost) * 100 : 0.0;
+    final totalGainPct = totalCost > 0 ? (totalGain / totalCost) * 100 : 0.0;
 
     // Sort by value descending for consistent colours
     final sorted = [...tickers]
@@ -141,8 +137,9 @@ class PortfolioPageState extends State<PortfolioPage> {
                               touchedIndex = null;
                               return;
                             }
-                            touchedIndex =
+                            final idx =
                                 response.touchedSection!.touchedSectionIndex;
+                            touchedIndex = idx >= 0 ? idx : null;
                           });
                         },
                       ),
@@ -251,7 +248,8 @@ class _PieHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _PieHeaderDelegate oldDelegate) =>
-      child != oldDelegate.child || backgroundColor != oldDelegate.backgroundColor;
+      child != oldDelegate.child ||
+      backgroundColor != oldDelegate.backgroundColor;
 }
 
 class _SummaryCard extends StatelessWidget {
@@ -338,7 +336,10 @@ class _LegendTile extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Text(currency.format(value)),
+          Text(
+            currency.format(value),
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
           Text(
             '${allocationPct.toStringAsFixed(1)}%  '
             '${changePct >= 0 ? '+' : ''}${changePct.toStringAsFixed(2)}%',
