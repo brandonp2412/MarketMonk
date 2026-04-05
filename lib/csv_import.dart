@@ -55,7 +55,8 @@ class TigerBrokersParser extends BrokerCsvParser {
       final date = DateTime.tryParse(settleStr);
       if (date == null) continue;
 
-      if (!earliestDates.containsKey(symbol) || date.isBefore(earliestDates[symbol]!)) {
+      if (!earliestDates.containsKey(symbol) ||
+          date.isBefore(earliestDates[symbol]!)) {
         earliestDates[symbol] = date;
       }
     }
@@ -64,7 +65,8 @@ class TigerBrokersParser extends BrokerCsvParser {
     final List<ImportedHolding> holdings = [];
     for (final row in rows) {
       if (row.length < 14) continue;
-      if (row[0] != 'Holdings' || row[1] != 'Stock' || row[3] != 'DATA') continue;
+      if (row[0] != 'Holdings' || row[1] != 'Stock' || row[3] != 'DATA')
+        continue;
 
       final match = _symbolRegex.firstMatch(row[4].trim());
       if (match == null) continue;
@@ -102,7 +104,8 @@ final List<BrokerCsvParser> supportedBrokers = [
 Future<int> importHoldings(List<ImportedHolding> holdings) async {
   int count = 0;
   for (final holding in holdings) {
-    final change = safePercentChange(holding.purchasePrice, holding.currentPrice);
+    final change =
+        safePercentChange(holding.purchasePrice, holding.currentPrice);
     await db.tickers.insertOne(
       TickersCompanion(
         symbol: Value(holding.symbol),
@@ -113,7 +116,6 @@ Future<int> importHoldings(List<ImportedHolding> holdings) async {
         purchasedAt: Value(holding.purchasedAt),
         updatedAt: Value(DateTime.now()),
       ),
-
     );
     count++;
   }

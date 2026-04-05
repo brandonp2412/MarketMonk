@@ -320,8 +320,22 @@ class _SettingsPageState extends State<SettingsPage> {
                 final header = await raf.read(16);
                 await raf.close();
                 const sqliteMagic = [
-                  0x53, 0x51, 0x4C, 0x69, 0x74, 0x65, 0x20, 0x66,
-                  0x6F, 0x72, 0x6D, 0x61, 0x74, 0x20, 0x33, 0x00,
+                  0x53,
+                  0x51,
+                  0x4C,
+                  0x69,
+                  0x74,
+                  0x65,
+                  0x20,
+                  0x66,
+                  0x6F,
+                  0x72,
+                  0x6D,
+                  0x61,
+                  0x74,
+                  0x20,
+                  0x33,
+                  0x00,
                 ];
                 final isValid = header.length == 16 &&
                     List.generate(16, (i) => header[i] == sqliteMagic[i])
