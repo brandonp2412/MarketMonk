@@ -27,14 +27,14 @@ class _SymbolSummary {
   bool get hasActivity => holding != null || trades.isNotEmpty;
 }
 
-class TradesPage extends StatefulWidget {
-  const TradesPage({super.key});
+class HoldingsPage extends StatefulWidget {
+  const HoldingsPage({super.key});
 
   @override
-  State<TradesPage> createState() => _TradesPageState();
+  State<HoldingsPage> createState() => _HoldingsPageState();
 }
 
-class _TradesPageState extends State<TradesPage> {
+class _HoldingsPageState extends State<HoldingsPage> {
   final _search = TextEditingController();
   final List<int> _selected = [];
   List<_SymbolSummary> _summaries = [];
@@ -75,15 +75,16 @@ class _TradesPageState extends State<TradesPage> {
         if (existing != null) {
           existing.trades.add(trade);
         } else {
-          bySymbol.putIfAbsent(
-            trade.symbol,
-            () => _SymbolSummary(
-              symbol: trade.symbol,
-              name: trade.name,
-              holding: null,
-              trades: [],
-            ),
-          )
+          bySymbol
+              .putIfAbsent(
+                trade.symbol,
+                () => _SymbolSummary(
+                  symbol: trade.symbol,
+                  name: trade.name,
+                  holding: null,
+                  trades: [],
+                ),
+              )
               .trades
               .add(trade);
         }
@@ -255,8 +256,7 @@ class _TradesPageState extends State<TradesPage> {
           final s = summaries[index - 1];
           return _SymbolTile(
             summary: s,
-            isSelected: s.holding != null &&
-                _selected.contains(s.holding!.id),
+            isSelected: s.holding != null && _selected.contains(s.holding!.id),
             onTap: () {
               if (_selected.isNotEmpty && s.holding != null) {
                 _toggleSelect(s.holding!.id);
@@ -264,9 +264,8 @@ class _TradesPageState extends State<TradesPage> {
                 _openDetail(s);
               }
             },
-            onLongPress: s.holding != null
-                ? () => _toggleSelect(s.holding!.id)
-                : null,
+            onLongPress:
+                s.holding != null ? () => _toggleSelect(s.holding!.id) : null,
           );
         },
       ),
@@ -376,9 +375,8 @@ class _SymbolTile extends StatelessWidget {
                           changePct >= 0
                               ? Icons.arrow_upward
                               : Icons.arrow_downward,
-                          color: changePct >= 0
-                              ? Colors.green
-                              : Colors.redAccent,
+                          color:
+                              changePct >= 0 ? Colors.green : Colors.redAccent,
                         )
                       : const Icon(Icons.history, color: Colors.grey),
                 ),
@@ -452,8 +450,7 @@ class _TradeHistoryPage extends StatelessWidget {
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) =>
-                      EditTickerPage(tickerId: holding.id),
+                  builder: (_) => EditTickerPage(tickerId: holding.id),
                 ),
               ),
             ),
@@ -499,9 +496,8 @@ class _TradeHistoryPage extends StatelessWidget {
                       value:
                           '${unrealizedGain >= 0 ? '+' : ''}${currency.format(unrealizedGain)}'
                           ' (${holding.change.toStringAsFixed(2)}%)',
-                      color: unrealizedGain >= 0
-                          ? Colors.green
-                          : Colors.redAccent,
+                      color:
+                          unrealizedGain >= 0 ? Colors.green : Colors.redAccent,
                     ),
                   ],
                   if (trades.isNotEmpty) ...[
@@ -509,9 +505,8 @@ class _TradeHistoryPage extends StatelessWidget {
                       label: 'Realized P/L',
                       value:
                           '${totalRealized >= 0 ? '+' : ''}${currency.format(totalRealized)}',
-                      color: totalRealized >= 0
-                          ? Colors.green
-                          : Colors.redAccent,
+                      color:
+                          totalRealized >= 0 ? Colors.green : Colors.redAccent,
                     ),
                   ],
                   if (holding != null || trades.isNotEmpty)
@@ -519,9 +514,7 @@ class _TradeHistoryPage extends StatelessWidget {
                       label: 'Total gain',
                       value:
                           '${totalGain >= 0 ? '+' : ''}${currency.format(totalGain)}',
-                      color: totalGain >= 0
-                          ? Colors.green
-                          : Colors.redAccent,
+                      color: totalGain >= 0 ? Colors.green : Colors.redAccent,
                     ),
                 ],
               ),
@@ -584,8 +577,7 @@ class _TradeTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isBuy = trade.tradeType == 'open';
-    final dateStr =
-        DateFormat('dd MMM yyyy').format(trade.tradeDate);
+    final dateStr = DateFormat('dd MMM yyyy').format(trade.tradeDate);
     final qty = trade.quantity.abs();
     final total = (qty * trade.price).abs();
 
@@ -629,9 +621,8 @@ class _TradeTile extends StatelessWidget {
                 '${trade.realizedPL >= 0 ? '+' : ''}${currency.format(trade.realizedPL)}',
                 style: TextStyle(
                   fontSize: 11,
-                  color: trade.realizedPL >= 0
-                      ? Colors.green
-                      : Colors.redAccent,
+                  color:
+                      trade.realizedPL >= 0 ? Colors.green : Colors.redAccent,
                 ),
               ),
           ],

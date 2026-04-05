@@ -2,9 +2,9 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:market_monk/chart_page.dart';
 import 'package:market_monk/database.dart';
+import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/settings_state.dart';
-import 'package:market_monk/trades_page.dart';
 import 'package:provider/provider.dart';
 
 void main() async {
@@ -70,7 +70,7 @@ class _MyHomePageState extends State<MyHomePage> {
             children: [
               ChartPage(),
               PortfolioPage(),
-              TradesPage(),
+              HoldingsPage(),
             ],
           ),
           bottomNavigationBar: TabBar(
