@@ -1,5 +1,19 @@
 import 'package:drift/drift.dart';
 
+class Trades extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get symbol => text()();
+  TextColumn get name => text()();
+  // Positive = buy (open), negative = sell (close)
+  RealColumn get quantity => real()();
+  RealColumn get price => real()();
+  // 'open' or 'close'
+  TextColumn get tradeType => text()();
+  DateTimeColumn get tradeDate => dateTime()();
+  RealColumn get realizedPL => real().withDefault(const Constant(0.0))();
+  RealColumn get commission => real().withDefault(const Constant(0.0))();
+}
+
 class Tickers extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get symbol => text()();

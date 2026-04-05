@@ -4,6 +4,7 @@ import 'package:market_monk/chart_page.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/settings_state.dart';
+import 'package:market_monk/trades_page.dart';
 import 'package:provider/provider.dart';
 
 void main() async {
@@ -61,13 +62,14 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return const DefaultTabController(
-      length: 2,
+      length: 3,
       child: SafeArea(
         child: Scaffold(
           body: TabBarView(
             children: [
               ChartPage(),
               PortfolioPage(),
+              TradesPage(),
             ],
           ),
           bottomNavigationBar: TabBar(
@@ -80,6 +82,10 @@ class _MyHomePageState extends State<MyHomePage> {
               Tab(
                 icon: Icon(Icons.pie_chart),
                 text: "Portfolio",
+              ),
+              Tab(
+                icon: Icon(Icons.list_alt),
+                text: "Holdings",
               ),
             ],
           ),

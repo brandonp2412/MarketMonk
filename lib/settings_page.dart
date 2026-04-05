@@ -74,20 +74,20 @@ class _SettingsPageState extends State<SettingsPage> {
     if (result == null || !context.mounted) return;
 
     // Step 3: parse
-    List<ImportedHolding> holdings;
+    ParseResult parsed;
     try {
       final file = File(result.files.single.path!);
       final content = await file.readAsString();
-      holdings = selectedParser!.parse(content);
+      parsed = selectedParser!.parse(content);
     } catch (e) {
       if (!context.mounted) return;
       toast(context, 'Failed to parse CSV: $e');
       return;
     }
 
-    if (holdings.isEmpty) {
+    if (parsed.holdings.isEmpty && parsed.trades.isEmpty) {
       if (!context.mounted) return;
-      toast(context, 'No holdings found in the selected file');
+      toast(context, 'No data found in the selected file');
       return;
     }
 
@@ -97,23 +97,62 @@ class _SettingsPageState extends State<SettingsPage> {
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Import ${holdings.length} holdings'),
+        title: Text(
+          'Import ${parsed.holdings.length} holdings'
+          '${parsed.trades.isNotEmpty ? ' & ${parsed.trades.length} trades' : ''}',
+        ),
         content: SizedBox(
           width: double.maxFinite,
-          child: ListView.builder(
+          child: ListView(
             shrinkWrap: true,
-            itemCount: holdings.length,
-            itemBuilder: (context, index) {
-              final h = holdings[index];
-              return ListTile(
-                dense: true,
-                title: Text(h.symbol),
-                subtitle: Text(h.name),
-                trailing: Text(
-                  '${h.amount.toStringAsFixed(2)} @ \$${h.purchasePrice.toStringAsFixed(2)}',
+            children: [
+              if (parsed.holdings.isNotEmpty) ...[
+                const ListTile(
+                  dense: true,
+                  title: Text(
+                    'Holdings',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
-              );
-            },
+                ...parsed.holdings.map(
+                  (h) => ListTile(
+                    dense: true,
+                    title: Text(h.symbol),
+                    subtitle: Text(h.name),
+                    trailing: Text(
+                      '${h.amount.toStringAsFixed(2)} @ \$${h.purchasePrice.toStringAsFixed(2)}',
+                    ),
+                  ),
+                ),
+              ],
+              if (parsed.trades.isNotEmpty) ...[
+                const ListTile(
+                  dense: true,
+                  title: Text(
+                    'Trades',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                ...parsed.trades.take(10).map(
+                  (t) => ListTile(
+                    dense: true,
+                    title: Text('${t.symbol} — ${t.tradeType.toUpperCase()}'),
+                    subtitle: Text(t.tradeDate.toIso8601String().substring(0, 10)),
+                    trailing: Text(
+                      '${t.quantity.abs().toStringAsFixed(2)} @ \$${t.price.toStringAsFixed(2)}',
+                    ),
+                  ),
+                ),
+                if (parsed.trades.length > 10)
+                  ListTile(
+                    dense: true,
+                    title: Text(
+                      '... and ${parsed.trades.length - 10} more trades',
+                      style: const TextStyle(fontStyle: FontStyle.italic),
+                    ),
+                  ),
+              ],
+            ],
           ),
         ),
         actions: [
@@ -135,9 +174,13 @@ class _SettingsPageState extends State<SettingsPage> {
     if (!confirmed || !context.mounted) return;
 
     // Step 5: insert into DB
-    final count = await importHoldings(holdings);
+    final holdingsCount = await importHoldings(parsed.holdings);
+    final tradesCount = await importTrades(parsed.trades);
     if (!context.mounted) return;
-    toast(context, 'Imported $count holdings successfully');
+    toast(
+      context,
+      'Imported $holdingsCount holdings and $tradesCount trades',
+    );
   }
 
   @override

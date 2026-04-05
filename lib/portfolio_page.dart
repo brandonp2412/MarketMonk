@@ -1,12 +1,10 @@
-import 'package:drift/drift.dart';
-import 'package:flutter/material.dart' as material;
+import 'package:drift/drift.dart' hide Column, Table;
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:market_monk/database.dart';
-import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/utils.dart';
-import 'package:share_plus/share_plus.dart';
 
 class PortfolioPage extends StatefulWidget {
   const PortfolioPage({super.key});
@@ -17,385 +15,276 @@ class PortfolioPage extends StatefulWidget {
 
 class PortfolioPageState extends State<PortfolioPage> {
   late Stream<List<Ticker>> stream;
-  final search = TextEditingController();
-  List<int> selected = [];
+  int? touchedIndex;
 
   @override
   void initState() {
     super.initState();
-    updateStream();
-    Future.delayed(kThemeAnimationDuration).then((_) => updateCandles());
+    stream = db.tickers.select().watch();
+    Future.delayed(kThemeAnimationDuration).then((_) => _updateCandles());
   }
 
-  Future<void> updateCandles() async {
-    final tickers = await (db.tickers.select()).get();
+  Future<void> _updateCandles() async {
+    final tickers = await db.tickers.select().get();
     for (final ticker in tickers) {
       await syncCandles(ticker.symbol);
     }
   }
 
-  void updateStream() {
-    setState(() {
-      stream = (db.tickers.select()
-            ..where(
-              (tbl) => tbl.symbol.contains(search.text.toLowerCase()),
-            )
-            ..orderBy(
-              [
-                (u) => OrderingTerm(
-                      expression: u.createdAt,
-                      mode: OrderingMode.desc,
-                    ),
-              ],
-            ))
-          .watch();
-    });
-  }
+  /// Current market value of a holding.
+  /// price = purchase price; change = % gain since purchase.
+  double _currentValue(Ticker t) =>
+      t.amount * t.price * (1 + t.change / 100);
 
   @override
   Widget build(BuildContext context) {
-    var deleteButton = IconButton(
-      icon: const Icon(Icons.delete),
-      tooltip: "Delete selected",
-      onPressed: () {
-        showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: const Text('Confirm Delete'),
-              content: Text(
-                'Are you sure you want to delete ${selected.length} stocks? This action is not reversible.',
-              ),
-              actions: <Widget>[
-                TextButton(
-                  child: const Text('Cancel'),
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                ),
-                TextButton(
-                  child: const Text('Delete'),
-                  onPressed: () async {
-                    Navigator.pop(context);
-                    await (db.tickers.delete()
-                          ..where((u) => u.id.isIn(selected)))
-                        .go();
-                    setState(() {
-                      selected = [];
-                    });
-                  },
-                ),
-              ],
-            );
-          },
-        );
-      },
+    return Scaffold(
+      body: SafeArea(
+        child: StreamBuilder<List<Ticker>>(
+          stream: stream,
+          builder: _buildBody,
+        ),
+      ),
     );
+  }
 
-    var menuButton = PopupMenuButton(
-      icon: const Icon(Icons.more_vert),
-      tooltip: "Show menu",
-      itemBuilder: (context) => [
-        PopupMenuItem(
-          child: ListTile(
-            leading: const Icon(Icons.done_all),
-            title: const Text('Select all'),
-            onTap: () async {
-              Navigator.pop(context);
-              final tickers = await stream.first;
-              setState(() {
-                selected = tickers.map((ticker) => ticker.id).toList();
-              });
-            },
-          ),
+  Widget _buildBody(BuildContext context, AsyncSnapshot<List<Ticker>> snap) {
+    if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+    if (snap.hasError) return Center(child: Text(snap.error.toString()));
+
+    final tickers = snap.data!;
+    if (tickers.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('No holdings yet'),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsPage()),
+              ),
+              icon: const Icon(Icons.upload_file),
+              label: const Text('Import CSV'),
+            ),
+          ],
         ),
-        PopupMenuItem(
-          child: ListTile(
-            title: const Text("Share"),
-            leading: const Icon(Icons.share),
-            onTap: () async {
-              List<Ticker> tickers;
-              if (selected.isEmpty)
-                tickers = await stream.first;
-              else
-                tickers = await (db.tickers.select()
-                      ..where((u) => u.id.isIn(selected)))
-                    .get();
-              var csv = "";
+      );
+    }
 
-              for (final ticker in tickers)
-                csv += "${ticker.symbol},${ticker.amount},${ticker.price}\n";
+    final totalValue =
+        tickers.fold(0.0, (sum, t) => sum + _currentValue(t));
+    final totalCost =
+        tickers.fold(0.0, (sum, t) => sum + t.amount * t.price);
+    final totalGain = totalValue - totalCost;
+    final totalGainPct =
+        totalCost > 0 ? (totalGain / totalCost) * 100 : 0.0;
 
-              await Share.share(csv);
-            },
-          ),
+    // Sort by value descending for consistent colours
+    final sorted = [...tickers]
+      ..sort((a, b) => _currentValue(b).compareTo(_currentValue(a)));
+
+    final colors = _buildColors(context, sorted.length);
+
+    final sections = List.generate(sorted.length, (i) {
+      final t = sorted[i];
+      final val = _currentValue(t);
+      final pct = totalValue > 0 ? val / totalValue * 100 : 0.0;
+      final isTouched = i == touchedIndex;
+      return PieChartSectionData(
+        value: val,
+        color: colors[i],
+        radius: isTouched ? 90 : 75,
+        title: isTouched ? '${pct.toStringAsFixed(1)}%' : '',
+        titleStyle: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
         ),
-        if (selected.isEmpty)
-          PopupMenuItem(
-            child: ListTile(
-              leading: const Icon(Icons.settings),
-              title: const Text('Settings'),
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const SettingsPage(),
+      );
+    });
+
+    return RefreshIndicator(
+      onRefresh: _updateCandles,
+      child: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: _SummaryCard(
+                totalValue: totalValue,
+                totalGain: totalGain,
+                totalGainPct: totalGainPct,
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 260,
+              child: PieChart(
+                PieChartData(
+                  sections: sections,
+                  centerSpaceRadius: 50,
+                  sectionsSpace: 2,
+                  pieTouchData: PieTouchData(
+                    touchCallback: (event, response) {
+                      setState(() {
+                        if (!event.isInterestedForInteractions ||
+                            response == null ||
+                            response.touchedSection == null) {
+                          touchedIndex = null;
+                          return;
+                        }
+                        touchedIndex =
+                            response.touchedSection!.touchedSectionIndex;
+                      });
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: SliverList.builder(
+              itemCount: sorted.length,
+              itemBuilder: (context, i) {
+                final t = sorted[i];
+                final val = _currentValue(t);
+                final pct = totalValue > 0 ? val / totalValue * 100 : 0.0;
+                return _LegendTile(
+                  color: colors[i],
+                  symbol: t.symbol,
+                  name: t.name,
+                  value: val,
+                  allocationPct: pct,
+                  changePct: t.change,
+                  isHighlighted: i == touchedIndex,
+                  onTap: () => setState(
+                    () => touchedIndex = touchedIndex == i ? null : i,
                   ),
                 );
-                if (!context.mounted) return;
-                Navigator.pop(context);
               },
             ),
           ),
-      ],
-    );
-
-    var leading = search.text.isEmpty
-        ? const Padding(
-            padding: EdgeInsets.only(left: 16.0, right: 8.0),
-            child: Icon(Icons.search),
-          )
-        : IconButton(
-            onPressed: () {
-              search.text = '';
-              updateStream();
-            },
-            icon: const Icon(Icons.arrow_back),
-            padding: const EdgeInsets.only(
-              left: 16.0,
-              right: 8.0,
-            ),
-          );
-    if (selected.isNotEmpty)
-      leading = IconButton(
-        onPressed: () {
-          setState(() {
-            selected.clear();
-          });
-        },
-        icon: const Icon(Icons.arrow_back),
-        padding: const EdgeInsets.only(
-          left: 16.0,
-          right: 8.0,
-        ),
-      );
-
-    return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: material.Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(left: 16, right: 16, top: 16),
-              child: SearchBar(
-                controller: search,
-                hintText: 'Search...',
-                padding: WidgetStateProperty.all(
-                  const EdgeInsets.only(right: 8.0),
-                ),
-                leading: leading,
-                onTap: () => search.selection = TextSelection(
-                  baseOffset: 0,
-                  extentOffset: search.text.length,
-                ),
-                onChanged: (text) {
-                  updateStream();
-                },
-                trailing: [
-                  if (selected.isNotEmpty) deleteButton,
-                  Badge.count(
-                    count: selected.length,
-                    isLabelVisible: selected.isNotEmpty,
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    child: menuButton,
-                  ),
-                ],
-              ),
-            ),
-            StreamBuilder(
-              stream: stream,
-              builder: streamBuilder,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => const EditTickerPage(),
-            ),
-          );
-        },
-        label: const Text('Add'),
-        icon: const Icon(Icons.add),
-        tooltip: 'Add to portfolio',
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+        ],
       ),
     );
   }
 
-  Widget streamBuilder(
-    BuildContext context,
-    AsyncSnapshot<List<Ticker>> snapshot,
-  ) {
-    if (!snapshot.hasData) return const SizedBox();
-    if (snapshot.data?.isEmpty == true)
-      return ListTile(
-        title: const Text("No stock found"),
-        subtitle: Text("Tap to add ${search.text}"),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => EditTickerPage(
-                symbol: search.text.toUpperCase(),
-              ),
-            ),
-          );
-        },
-      );
-    if (snapshot.hasError) return ErrorWidget(snapshot.error.toString());
+  List<Color> _buildColors(BuildContext context, int count) {
+    final base = Theme.of(context).colorScheme.primary;
+    // Generate visually distinct hues around the theme's primary hue
+    final hsl = HSLColor.fromColor(base);
+    return List.generate(count, (i) {
+      final hue = (hsl.hue + i * (360 / count)) % 360;
+      return HSLColor.fromAHSL(
+        1.0,
+        hue,
+        hsl.saturation.clamp(0.4, 0.8),
+        hsl.lightness.clamp(0.35, 0.65),
+      ).toColor();
+    });
+  }
+}
 
-    final tickers = snapshot.data!;
-    final (dollarReturn, percentReturn) = calculateTotalReturns(tickers);
-    final total = calculateTotal(tickers);
+class _SummaryCard extends StatelessWidget {
+  final double totalValue;
+  final double totalGain;
+  final double totalGainPct;
 
-    return Expanded(
-      child: RefreshIndicator(
-        onRefresh: updateCandles,
-        child: ListView.builder(
-          padding: const EdgeInsets.all(0),
-          itemBuilder: (context, index) {
-            if (index == 0)
-              return material.Column(
-                children: [
-                  const SizedBox(height: 8),
-                  Tooltip(
-                    message: "Total return of the portfolio",
-                    child: ListTile(
-                      leading: const Icon(
-                        Icons.account_balance,
-                      ),
-                      title: Text(currency.format(dollarReturn)),
-                      trailing: Text(
-                        currency.format(total),
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      subtitle: Text(
-                        "${percentReturn.toStringAsFixed(2)}%",
-                      ),
-                      subtitleTextStyle: TextStyle(
-                        color:
-                            dollarReturn >= 0 ? Colors.green : Colors.redAccent,
-                      ),
-                    ),
-                  ),
-                  const Divider(),
-                ],
-              );
+  const _SummaryCard({
+    required this.totalValue,
+    required this.totalGain,
+    required this.totalGainPct,
+  });
 
-            final ticker = tickers[index - 1];
-
-            return material.Column(
+  @override
+  Widget build(BuildContext context) {
+    final gainColor = totalGain >= 0 ? Colors.green : Colors.redAccent;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Row(
+          children: [
+            const Icon(Icons.account_balance, size: 32),
+            const SizedBox(width: 16),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                folioTile(ticker, context),
-                if (index == tickers.length) const SizedBox(height: 50),
-              ],
-            );
-          },
-          itemCount: tickers.length + 1,
-        ),
-      ),
-    );
-  }
-
-  ListTile folioTile(Ticker ticker, BuildContext context) {
-    final isSelected = selected.contains(ticker.id);
-
-    return ListTile(
-      leading: material.SizedBox(
-        height: 30,
-        width: 30,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            AnimatedScale(
-              duration: const Duration(milliseconds: 150),
-              scale: isSelected ? 0.0 : 1.0,
-              child: Visibility(
-                visible: !isSelected,
-                child: ticker.change >= 0
-                    ? const Icon(
-                        Icons.arrow_upward,
-                        color: Colors.green,
-                      )
-                    : const Icon(
-                        Icons.arrow_downward,
-                        color: Colors.red,
-                      ),
-              ),
-            ),
-            AnimatedScale(
-              duration: const Duration(milliseconds: 150),
-              scale: isSelected ? 1.0 : 0.0,
-              child: Visibility(
-                visible: isSelected,
-                child: Checkbox(
-                  value: isSelected,
-                  onChanged: (value) {
-                    if (value == true)
-                      setState(() {
-                        selected.add(ticker.id);
-                      });
-                    else
-                      setState(() {
-                        selected.remove(ticker.id);
-                      });
-                  },
+                Text(
+                  currency.format(totalValue),
+                  style: Theme.of(context).textTheme.headlineSmall,
                 ),
-              ),
+                Text(
+                  '${totalGain >= 0 ? '+' : ''}${currency.format(totalGain)}'
+                  '  (${totalGainPct.toStringAsFixed(2)}%)',
+                  style: TextStyle(color: gainColor, fontSize: 13),
+                ),
+              ],
             ),
           ],
         ),
       ),
-      title: Text(ticker.symbol),
-      subtitle: Text('${ticker.change.toStringAsFixed(2)}%'),
-      trailing: Text(
-        "${currency.format(ticker.price)} (${ticker.amount})",
-        style: Theme.of(context).textTheme.bodyMedium,
+    );
+  }
+}
+
+class _LegendTile extends StatelessWidget {
+  final Color color;
+  final String symbol;
+  final String name;
+  final double value;
+  final double allocationPct;
+  final double changePct;
+  final bool isHighlighted;
+  final VoidCallback onTap;
+
+  const _LegendTile({
+    required this.color,
+    required this.symbol,
+    required this.name,
+    required this.value,
+    required this.allocationPct,
+    required this.changePct,
+    required this.isHighlighted,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+      onTap: onTap,
+      selected: isHighlighted,
+      leading: Container(
+        width: 14,
+        height: 14,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       ),
-      selected: selected.contains(ticker.id),
-      onLongPress: () {
-        if (selected.contains(ticker.id))
-          setState(() {
-            selected.remove(ticker.id);
-          });
-        else
-          setState(() {
-            selected.add(ticker.id);
-          });
-      },
-      subtitleTextStyle: ticker.change >= 0
-          ? const TextStyle(color: Colors.green)
-          : const TextStyle(color: Colors.red),
-      onTap: () {
-        if (selected.isEmpty)
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => EditTickerPage(tickerId: ticker.id),
+      title: Text(symbol),
+      subtitle: Text(
+        name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(currency.format(value)),
+          Text(
+            '${allocationPct.toStringAsFixed(1)}%  '
+            '${changePct >= 0 ? '+' : ''}${changePct.toStringAsFixed(2)}%',
+            style: TextStyle(
+              fontSize: 11,
+              color: changePct >= 0 ? Colors.green : Colors.redAccent,
             ),
-          );
-        else {
-          if (selected.contains(ticker.id))
-            setState(() {
-              selected.remove(ticker.id);
-            });
-          else
-            setState(() {
-              selected.add(ticker.id);
-            });
-        }
-      },
+          ),
+        ],
+      ),
     );
   }
 }

@@ -9,10 +9,10 @@ import 'package:path_provider/path_provider.dart';
 
 part 'database.g.dart';
 
-@DriftDatabase(tables: [Tickers, Candles])
+@DriftDatabase(tables: [Tickers, Candles, Trades])
 class Database extends _$Database {
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   Database() : super(_openConnection());
 
@@ -86,6 +86,9 @@ class Database extends _$Database {
     },
     from6To7: (Migrator m, Schema7 schema) async {
       await m.alterTable(TableMigration(schema.tickers));
+    },
+    from7To8: (Migrator m, Schema8 schema) async {
+      await m.createTable(schema.trades);
     },
   );
 }

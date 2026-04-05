@@ -1,7 +1,5 @@
 // dart format width=80
 // ignore_for_file: unused_local_variable, unused_import
-import 'dart:io';
-
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:drift_dev/api/migrations_native.dart';
@@ -9,8 +7,8 @@ import 'package:market_monk/database.dart';
 import 'package:test/test.dart';
 import 'generated/schema.dart';
 
-import 'generated/schema_v1.dart' as v1;
-import 'generated/schema_v2.dart' as v2;
+import 'generated/schema_v7.dart' as v7;
+import 'generated/schema_v8.dart' as v8;
 import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
 
 void main() {
@@ -21,18 +19,17 @@ void main() {
     verifier = SchemaVerifier(GeneratedHelper());
   });
 
+  // ─── Simple schema-shape migrations (all versions) ────────────────────────
   group('simple database migrations', () {
-    // These simple tests verify all possible schema updates with a simple (no
-    // data) migration. This is a quick way to ensure that written database
-    // migrations properly alter the schema.
+    // Verifies all version-to-version schema transitions produce the correct
+    // final table shape.
     const versions = GeneratedHelper.versions;
     for (final (i, fromVersion) in versions.indexed) {
       group('from $fromVersion', () {
         for (final toVersion in versions.skip(i + 1)) {
           test('to $toVersion', () async {
-            final schema = await verifier.schemaAt(fromVersion);
+            await verifier.schemaAt(fromVersion);
             final db = Database.connect(NativeDatabase.memory());
-
             await verifier.migrateAndValidate(db, toVersion);
             await db.close();
           });
@@ -41,34 +38,123 @@ void main() {
     }
   });
 
-  // The following template shows how to write tests ensuring your migrations
-  // preserve existing data.
-  // Testing this can be useful for migrations that change existing columns
-  // (e.g. by alterating their type or constraints). Migrations that only add
-  // tables or columns typically don't need these advanced tests. For more
-  // information, see https://drift.simonbinder.eu/migrations/tests/#verifying-data-integrity
-  // TODO: This generated template shows how these tests could be written. Adopt
-  // it to your own needs when testing migrations with data integrity.
-  test("migration from v1 to v2 does not corrupt data", () async {
-    // Add data to insert into the old database, and the expected rows after the
-    // migration.
-    // TODO: Fill these lists
-    final oldTickersData = <v1.TickersData>[];
-    final expectedNewTickersData = <v2.TickersData>[];
+  // ─── v7 → v8: trades table created; existing tickers survive ──────────────
+  group('v7 → v8 data integrity', () {
+    test('existing tickers are preserved after migration', () async {
+      final schema = await verifier.schemaAt(7);
 
-    await verifier.testWithDataIntegrity(
-      oldVersion: 1,
-      newVersion: 2,
-      createOld: v1.DatabaseAtV1.new,
-      createNew: v2.DatabaseAtV2.new,
-      openTestedDatabase: (executor) =>
-          Database.connect(NativeDatabase.memory()),
-      createItems: (batch, oldDb) {
-        batch.insertAll(oldDb.tickers, oldTickersData);
-      },
-      validateItems: (newDb) async {
-        expect(expectedNewTickersData, await newDb.select(newDb.tickers).get());
-      },
-    );
+      // Populate the v7 database via the versioned schema
+      final oldDb = v7.DatabaseAtV7(schema.newConnection());
+      await oldDb.into(oldDb.tickers).insert(
+            v7.TickersCompanion.insert(
+              symbol: 'AAPL',
+              name: 'Apple',
+              change: 5.0,
+              amount: 10.0,
+              price: 150.0,
+            ),
+          );
+      await oldDb.into(oldDb.tickers).insert(
+            v7.TickersCompanion.insert(
+              symbol: 'GOOG',
+              name: 'Alphabet',
+              change: 12.0,
+              amount: 5.0,
+              price: 200.0,
+            ),
+          );
+      await oldDb.close();
+
+      // Run the migration on the real database
+      final migratingDb = Database.connect(schema.newConnection());
+      await verifier.migrateAndValidate(migratingDb, 8);
+      await migratingDb.close();
+
+      // Verify with a v8 view of the same database
+      final checkDb = v8.DatabaseAtV8(schema.newConnection());
+      final tickers =
+          await checkDb.select(checkDb.tickers).get();
+      expect(tickers, hasLength(2));
+
+      final aapl = tickers.firstWhere((t) => t.symbol == 'AAPL');
+      expect(aapl.amount, closeTo(10.0, 0.001));
+      expect(aapl.price, closeTo(150.0, 0.001));
+      expect(aapl.change, closeTo(5.0, 0.001));
+
+      await checkDb.close();
+    });
+
+    test('trades table is empty after migration (no data loss)', () async {
+      final schema = await verifier.schemaAt(7);
+
+      final migratingDb = Database.connect(schema.newConnection());
+      await verifier.migrateAndValidate(migratingDb, 8);
+      await migratingDb.close();
+
+      final checkDb = v8.DatabaseAtV8(schema.newConnection());
+      final trades = await checkDb.select(checkDb.trades).get();
+      expect(
+        trades,
+        isEmpty,
+        reason: 'trades table must be created empty; no old data to migrate',
+      );
+      await checkDb.close();
+    });
+
+    test('can insert trades after v7→v8 migration', () async {
+      final schema = await verifier.schemaAt(7);
+
+      final migratingDb = Database.connect(schema.newConnection());
+      await verifier.migrateAndValidate(migratingDb, 8);
+      await migratingDb.close();
+
+      // Open with the app's live database and try a full round-trip
+      final appDb = Database.connect(schema.newConnection());
+      await appDb.trades.insertOne(
+        TradesCompanion.insert(
+          symbol: 'NVDA',
+          name: 'NVIDIA',
+          quantity: 10.0,
+          price: 100.0,
+          tradeType: 'open',
+          tradeDate: DateTime(2025, 1, 10),
+        ),
+      );
+
+      final stored = await appDb.trades.select().get();
+      expect(stored, hasLength(1));
+      expect(stored.first.symbol, 'NVDA');
+      expect(stored.first.realizedPL, equals(0.0));
+      expect(stored.first.commission, equals(0.0));
+
+      await appDb.close();
+    });
+
+    test('tickers table still accepts inserts after v7→v8 migration', () async {
+      final schema = await verifier.schemaAt(7);
+
+      final migratingDb = Database.connect(schema.newConnection());
+      await verifier.migrateAndValidate(migratingDb, 8);
+      await migratingDb.close();
+
+      final appDb = Database.connect(schema.newConnection());
+      final now = DateTime.now();
+      await appDb.tickers.insertOne(
+        TickersCompanion.insert(
+          symbol: 'TSLA',
+          name: 'Tesla',
+          change: 8.0,
+          amount: 3.0,
+          price: 250.0,
+          purchasedAt: Value(now),
+        ),
+      );
+
+      final rows = await appDb.tickers.select().get();
+      expect(rows, hasLength(1));
+      expect(rows.first.symbol, 'TSLA');
+
+      await appDb.close();
+    });
   });
 }

@@ -14,40 +14,68 @@ class Tickers extends Table with TableInfo<Tickers, TickersData> {
       hasAutoIncrement: true,
       type: DriftSqlType.int,
       requiredDuringInsert: false,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+      $customConstraints: 'NOT NULL PRIMARY KEY AUTOINCREMENT');
   late final GeneratedColumn<String> symbol = GeneratedColumn<String>(
       'symbol', aliasedName, false,
       type: DriftSqlType.string,
       requiredDuringInsert: true,
-      defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'));
+      $customConstraints: 'NOT NULL');
   late final GeneratedColumn<String> name = GeneratedColumn<String>(
       'name', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
+      type: DriftSqlType.string,
+      requiredDuringInsert: true,
+      $customConstraints: 'NOT NULL');
   late final GeneratedColumn<double> change = GeneratedColumn<double>(
       'change', aliasedName, false,
-      type: DriftSqlType.double, requiredDuringInsert: true);
-  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      type: DriftSqlType.double,
+      requiredDuringInsert: true,
+      $customConstraints: 'NOT NULL');
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
       'created_at', aliasedName, false,
-      type: DriftSqlType.dateTime,
+      type: DriftSqlType.int,
       requiredDuringInsert: false,
+      $customConstraints:
+          'NOT NULL DEFAULT (CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER))',
       defaultValue: const CustomExpression(
           'CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER)'));
-  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
-      'updated_at', aliasedName, false,
-      type: DriftSqlType.dateTime,
+  late final GeneratedColumn<int> purchasedAt = GeneratedColumn<int>(
+      'purchased_at', aliasedName, false,
+      type: DriftSqlType.int,
       requiredDuringInsert: false,
+      $customConstraints:
+          'NOT NULL DEFAULT (CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER))',
+      defaultValue: const CustomExpression(
+          'CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER)'));
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      $customConstraints:
+          'NOT NULL DEFAULT (CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER))',
       defaultValue: const CustomExpression(
           'CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER)'));
   late final GeneratedColumn<double> amount = GeneratedColumn<double>(
       'amount', aliasedName, false,
-      type: DriftSqlType.double, requiredDuringInsert: true);
+      type: DriftSqlType.double,
+      requiredDuringInsert: true,
+      $customConstraints: 'NOT NULL');
   late final GeneratedColumn<double> price = GeneratedColumn<double>(
       'price', aliasedName, false,
-      type: DriftSqlType.double, requiredDuringInsert: true);
+      type: DriftSqlType.double,
+      requiredDuringInsert: true,
+      $customConstraints: 'NOT NULL');
   @override
-  List<GeneratedColumn> get $columns =>
-      [id, symbol, name, change, createdAt, updatedAt, amount, price];
+  List<GeneratedColumn> get $columns => [
+        id,
+        symbol,
+        name,
+        change,
+        createdAt,
+        purchasedAt,
+        updatedAt,
+        amount,
+        price
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -68,9 +96,11 @@ class Tickers extends Table with TableInfo<Tickers, TickersData> {
       change: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}change'])!,
       createdAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+          .read(DriftSqlType.int, data['${effectivePrefix}created_at'])!,
+      purchasedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}purchased_at'])!,
       updatedAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+          .read(DriftSqlType.int, data['${effectivePrefix}updated_at'])!,
       amount: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}amount'])!,
       price: attachedDatabase.typeMapping
@@ -82,6 +112,9 @@ class Tickers extends Table with TableInfo<Tickers, TickersData> {
   Tickers createAlias(String alias) {
     return Tickers(attachedDatabase, alias);
   }
+
+  @override
+  bool get dontWriteConstraints => true;
 }
 
 class TickersData extends DataClass implements Insertable<TickersData> {
@@ -89,8 +122,9 @@ class TickersData extends DataClass implements Insertable<TickersData> {
   final String symbol;
   final String name;
   final double change;
-  final DateTime createdAt;
-  final DateTime updatedAt;
+  final int createdAt;
+  final int purchasedAt;
+  final int updatedAt;
   final double amount;
   final double price;
   const TickersData(
@@ -99,6 +133,7 @@ class TickersData extends DataClass implements Insertable<TickersData> {
       required this.name,
       required this.change,
       required this.createdAt,
+      required this.purchasedAt,
       required this.updatedAt,
       required this.amount,
       required this.price});
@@ -109,8 +144,9 @@ class TickersData extends DataClass implements Insertable<TickersData> {
     map['symbol'] = Variable<String>(symbol);
     map['name'] = Variable<String>(name);
     map['change'] = Variable<double>(change);
-    map['created_at'] = Variable<DateTime>(createdAt);
-    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['created_at'] = Variable<int>(createdAt);
+    map['purchased_at'] = Variable<int>(purchasedAt);
+    map['updated_at'] = Variable<int>(updatedAt);
     map['amount'] = Variable<double>(amount);
     map['price'] = Variable<double>(price);
     return map;
@@ -123,6 +159,7 @@ class TickersData extends DataClass implements Insertable<TickersData> {
       name: Value(name),
       change: Value(change),
       createdAt: Value(createdAt),
+      purchasedAt: Value(purchasedAt),
       updatedAt: Value(updatedAt),
       amount: Value(amount),
       price: Value(price),
@@ -137,8 +174,9 @@ class TickersData extends DataClass implements Insertable<TickersData> {
       symbol: serializer.fromJson<String>(json['symbol']),
       name: serializer.fromJson<String>(json['name']),
       change: serializer.fromJson<double>(json['change']),
-      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
-      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+      purchasedAt: serializer.fromJson<int>(json['purchasedAt']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
       amount: serializer.fromJson<double>(json['amount']),
       price: serializer.fromJson<double>(json['price']),
     );
@@ -151,8 +189,9 @@ class TickersData extends DataClass implements Insertable<TickersData> {
       'symbol': serializer.toJson<String>(symbol),
       'name': serializer.toJson<String>(name),
       'change': serializer.toJson<double>(change),
-      'createdAt': serializer.toJson<DateTime>(createdAt),
-      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'createdAt': serializer.toJson<int>(createdAt),
+      'purchasedAt': serializer.toJson<int>(purchasedAt),
+      'updatedAt': serializer.toJson<int>(updatedAt),
       'amount': serializer.toJson<double>(amount),
       'price': serializer.toJson<double>(price),
     };
@@ -163,8 +202,9 @@ class TickersData extends DataClass implements Insertable<TickersData> {
           String? symbol,
           String? name,
           double? change,
-          DateTime? createdAt,
-          DateTime? updatedAt,
+          int? createdAt,
+          int? purchasedAt,
+          int? updatedAt,
           double? amount,
           double? price}) =>
       TickersData(
@@ -173,6 +213,7 @@ class TickersData extends DataClass implements Insertable<TickersData> {
         name: name ?? this.name,
         change: change ?? this.change,
         createdAt: createdAt ?? this.createdAt,
+        purchasedAt: purchasedAt ?? this.purchasedAt,
         updatedAt: updatedAt ?? this.updatedAt,
         amount: amount ?? this.amount,
         price: price ?? this.price,
@@ -184,6 +225,8 @@ class TickersData extends DataClass implements Insertable<TickersData> {
       name: data.name.present ? data.name.value : this.name,
       change: data.change.present ? data.change.value : this.change,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      purchasedAt:
+          data.purchasedAt.present ? data.purchasedAt.value : this.purchasedAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       amount: data.amount.present ? data.amount.value : this.amount,
       price: data.price.present ? data.price.value : this.price,
@@ -198,6 +241,7 @@ class TickersData extends DataClass implements Insertable<TickersData> {
           ..write('name: $name, ')
           ..write('change: $change, ')
           ..write('createdAt: $createdAt, ')
+          ..write('purchasedAt: $purchasedAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('amount: $amount, ')
           ..write('price: $price')
@@ -206,8 +250,8 @@ class TickersData extends DataClass implements Insertable<TickersData> {
   }
 
   @override
-  int get hashCode => Object.hash(
-      id, symbol, name, change, createdAt, updatedAt, amount, price);
+  int get hashCode => Object.hash(id, symbol, name, change, createdAt,
+      purchasedAt, updatedAt, amount, price);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -217,6 +261,7 @@ class TickersData extends DataClass implements Insertable<TickersData> {
           other.name == this.name &&
           other.change == this.change &&
           other.createdAt == this.createdAt &&
+          other.purchasedAt == this.purchasedAt &&
           other.updatedAt == this.updatedAt &&
           other.amount == this.amount &&
           other.price == this.price);
@@ -227,8 +272,9 @@ class TickersCompanion extends UpdateCompanion<TickersData> {
   final Value<String> symbol;
   final Value<String> name;
   final Value<double> change;
-  final Value<DateTime> createdAt;
-  final Value<DateTime> updatedAt;
+  final Value<int> createdAt;
+  final Value<int> purchasedAt;
+  final Value<int> updatedAt;
   final Value<double> amount;
   final Value<double> price;
   const TickersCompanion({
@@ -237,6 +283,7 @@ class TickersCompanion extends UpdateCompanion<TickersData> {
     this.name = const Value.absent(),
     this.change = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.purchasedAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.amount = const Value.absent(),
     this.price = const Value.absent(),
@@ -247,6 +294,7 @@ class TickersCompanion extends UpdateCompanion<TickersData> {
     required String name,
     required double change,
     this.createdAt = const Value.absent(),
+    this.purchasedAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     required double amount,
     required double price,
@@ -260,8 +308,9 @@ class TickersCompanion extends UpdateCompanion<TickersData> {
     Expression<String>? symbol,
     Expression<String>? name,
     Expression<double>? change,
-    Expression<DateTime>? createdAt,
-    Expression<DateTime>? updatedAt,
+    Expression<int>? createdAt,
+    Expression<int>? purchasedAt,
+    Expression<int>? updatedAt,
     Expression<double>? amount,
     Expression<double>? price,
   }) {
@@ -271,6 +320,7 @@ class TickersCompanion extends UpdateCompanion<TickersData> {
       if (name != null) 'name': name,
       if (change != null) 'change': change,
       if (createdAt != null) 'created_at': createdAt,
+      if (purchasedAt != null) 'purchased_at': purchasedAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (amount != null) 'amount': amount,
       if (price != null) 'price': price,
@@ -282,8 +332,9 @@ class TickersCompanion extends UpdateCompanion<TickersData> {
       Value<String>? symbol,
       Value<String>? name,
       Value<double>? change,
-      Value<DateTime>? createdAt,
-      Value<DateTime>? updatedAt,
+      Value<int>? createdAt,
+      Value<int>? purchasedAt,
+      Value<int>? updatedAt,
       Value<double>? amount,
       Value<double>? price}) {
     return TickersCompanion(
@@ -292,6 +343,7 @@ class TickersCompanion extends UpdateCompanion<TickersData> {
       name: name ?? this.name,
       change: change ?? this.change,
       createdAt: createdAt ?? this.createdAt,
+      purchasedAt: purchasedAt ?? this.purchasedAt,
       updatedAt: updatedAt ?? this.updatedAt,
       amount: amount ?? this.amount,
       price: price ?? this.price,
@@ -314,10 +366,13 @@ class TickersCompanion extends UpdateCompanion<TickersData> {
       map['change'] = Variable<double>(change.value);
     }
     if (createdAt.present) {
-      map['created_at'] = Variable<DateTime>(createdAt.value);
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (purchasedAt.present) {
+      map['purchased_at'] = Variable<int>(purchasedAt.value);
     }
     if (updatedAt.present) {
-      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+      map['updated_at'] = Variable<int>(updatedAt.value);
     }
     if (amount.present) {
       map['amount'] = Variable<double>(amount.value);
@@ -336,6 +391,7 @@ class TickersCompanion extends UpdateCompanion<TickersData> {
           ..write('name: $name, ')
           ..write('change: $change, ')
           ..write('createdAt: $createdAt, ')
+          ..write('purchasedAt: $purchasedAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('amount: $amount, ')
           ..write('price: $price')
@@ -354,46 +410,52 @@ class Candles extends Table with TableInfo<Candles, CandlesData> {
       hasAutoIncrement: true,
       type: DriftSqlType.int,
       requiredDuringInsert: false,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+      $customConstraints: 'NOT NULL PRIMARY KEY AUTOINCREMENT');
   late final GeneratedColumn<String> symbol = GeneratedColumn<String>(
       'symbol', aliasedName, false,
       type: DriftSqlType.string,
       requiredDuringInsert: true,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('REFERENCES tickers (symbol)'));
-  late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
+      $customConstraints: 'NOT NULL REFERENCES tickers(symbol)');
+  late final GeneratedColumn<int> date = GeneratedColumn<int>(
       'date', aliasedName, false,
-      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+      type: DriftSqlType.int,
+      requiredDuringInsert: true,
+      $customConstraints: 'NOT NULL');
   late final GeneratedColumn<double> open = GeneratedColumn<double>(
       'open', aliasedName, false,
       type: DriftSqlType.double,
       requiredDuringInsert: false,
+      $customConstraints: 'NOT NULL DEFAULT (-1.0)',
       defaultValue: const CustomExpression('-1.0'));
   late final GeneratedColumn<double> high = GeneratedColumn<double>(
       'high', aliasedName, false,
       type: DriftSqlType.double,
       requiredDuringInsert: false,
+      $customConstraints: 'NOT NULL DEFAULT (-1.0)',
       defaultValue: const CustomExpression('-1.0'));
   late final GeneratedColumn<double> low = GeneratedColumn<double>(
       'low', aliasedName, false,
       type: DriftSqlType.double,
       requiredDuringInsert: false,
+      $customConstraints: 'NOT NULL DEFAULT (-1.0)',
       defaultValue: const CustomExpression('-1.0'));
   late final GeneratedColumn<double> close = GeneratedColumn<double>(
       'close', aliasedName, false,
       type: DriftSqlType.double,
       requiredDuringInsert: false,
+      $customConstraints: 'NOT NULL DEFAULT (-1.0)',
       defaultValue: const CustomExpression('-1.0'));
   late final GeneratedColumn<int> volume = GeneratedColumn<int>(
       'volume', aliasedName, false,
       type: DriftSqlType.int,
       requiredDuringInsert: false,
+      $customConstraints: 'NOT NULL DEFAULT 0',
       defaultValue: const CustomExpression('0'));
   late final GeneratedColumn<double> adjClose = GeneratedColumn<double>(
       'adj_close', aliasedName, false,
       type: DriftSqlType.double,
       requiredDuringInsert: false,
+      $customConstraints: 'NOT NULL DEFAULT (-1.0)',
       defaultValue: const CustomExpression('-1.0'));
   @override
   List<GeneratedColumn> get $columns =>
@@ -414,7 +476,7 @@ class Candles extends Table with TableInfo<Candles, CandlesData> {
       symbol: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}symbol'])!,
       date: attachedDatabase.typeMapping
-          .read(DriftSqlType.dateTime, data['${effectivePrefix}date'])!,
+          .read(DriftSqlType.int, data['${effectivePrefix}date'])!,
       open: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}open'])!,
       high: attachedDatabase.typeMapping
@@ -434,12 +496,15 @@ class Candles extends Table with TableInfo<Candles, CandlesData> {
   Candles createAlias(String alias) {
     return Candles(attachedDatabase, alias);
   }
+
+  @override
+  bool get dontWriteConstraints => true;
 }
 
 class CandlesData extends DataClass implements Insertable<CandlesData> {
   final int id;
   final String symbol;
-  final DateTime date;
+  final int date;
   final double open;
   final double high;
   final double low;
@@ -461,7 +526,7 @@ class CandlesData extends DataClass implements Insertable<CandlesData> {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['symbol'] = Variable<String>(symbol);
-    map['date'] = Variable<DateTime>(date);
+    map['date'] = Variable<int>(date);
     map['open'] = Variable<double>(open);
     map['high'] = Variable<double>(high);
     map['low'] = Variable<double>(low);
@@ -491,7 +556,7 @@ class CandlesData extends DataClass implements Insertable<CandlesData> {
     return CandlesData(
       id: serializer.fromJson<int>(json['id']),
       symbol: serializer.fromJson<String>(json['symbol']),
-      date: serializer.fromJson<DateTime>(json['date']),
+      date: serializer.fromJson<int>(json['date']),
       open: serializer.fromJson<double>(json['open']),
       high: serializer.fromJson<double>(json['high']),
       low: serializer.fromJson<double>(json['low']),
@@ -506,7 +571,7 @@ class CandlesData extends DataClass implements Insertable<CandlesData> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'symbol': serializer.toJson<String>(symbol),
-      'date': serializer.toJson<DateTime>(date),
+      'date': serializer.toJson<int>(date),
       'open': serializer.toJson<double>(open),
       'high': serializer.toJson<double>(high),
       'low': serializer.toJson<double>(low),
@@ -519,7 +584,7 @@ class CandlesData extends DataClass implements Insertable<CandlesData> {
   CandlesData copyWith(
           {int? id,
           String? symbol,
-          DateTime? date,
+          int? date,
           double? open,
           double? high,
           double? low,
@@ -588,7 +653,7 @@ class CandlesData extends DataClass implements Insertable<CandlesData> {
 class CandlesCompanion extends UpdateCompanion<CandlesData> {
   final Value<int> id;
   final Value<String> symbol;
-  final Value<DateTime> date;
+  final Value<int> date;
   final Value<double> open;
   final Value<double> high;
   final Value<double> low;
@@ -609,7 +674,7 @@ class CandlesCompanion extends UpdateCompanion<CandlesData> {
   CandlesCompanion.insert({
     this.id = const Value.absent(),
     required String symbol,
-    required DateTime date,
+    required int date,
     this.open = const Value.absent(),
     this.high = const Value.absent(),
     this.low = const Value.absent(),
@@ -621,7 +686,7 @@ class CandlesCompanion extends UpdateCompanion<CandlesData> {
   static Insertable<CandlesData> custom({
     Expression<int>? id,
     Expression<String>? symbol,
-    Expression<DateTime>? date,
+    Expression<int>? date,
     Expression<double>? open,
     Expression<double>? high,
     Expression<double>? low,
@@ -645,7 +710,7 @@ class CandlesCompanion extends UpdateCompanion<CandlesData> {
   CandlesCompanion copyWith(
       {Value<int>? id,
       Value<String>? symbol,
-      Value<DateTime>? date,
+      Value<int>? date,
       Value<double>? open,
       Value<double>? high,
       Value<double>? low,
@@ -675,7 +740,7 @@ class CandlesCompanion extends UpdateCompanion<CandlesData> {
       map['symbol'] = Variable<String>(symbol.value);
     }
     if (date.present) {
-      map['date'] = Variable<DateTime>(date.value);
+      map['date'] = Variable<int>(date.value);
     }
     if (open.present) {
       map['open'] = Variable<double>(open.value);
@@ -715,15 +780,408 @@ class CandlesCompanion extends UpdateCompanion<CandlesData> {
   }
 }
 
-class DatabaseAtV5 extends GeneratedDatabase {
-  DatabaseAtV5(QueryExecutor e) : super(e);
+class Trades extends Table with TableInfo<Trades, TradesData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  Trades(this.attachedDatabase, [this._alias]);
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      $customConstraints: 'NOT NULL PRIMARY KEY AUTOINCREMENT');
+  late final GeneratedColumn<String> symbol = GeneratedColumn<String>(
+      'symbol', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: true,
+      $customConstraints: 'NOT NULL');
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+      'name', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: true,
+      $customConstraints: 'NOT NULL');
+  late final GeneratedColumn<double> quantity = GeneratedColumn<double>(
+      'quantity', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: true,
+      $customConstraints: 'NOT NULL');
+  late final GeneratedColumn<double> price = GeneratedColumn<double>(
+      'price', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: true,
+      $customConstraints: 'NOT NULL');
+  late final GeneratedColumn<String> tradeType = GeneratedColumn<String>(
+      'trade_type', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: true,
+      $customConstraints: 'NOT NULL');
+  late final GeneratedColumn<int> tradeDate = GeneratedColumn<int>(
+      'trade_date', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: true,
+      $customConstraints: 'NOT NULL');
+  late final GeneratedColumn<double> realizedPL = GeneratedColumn<double>(
+      'realized_p_l', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      $customConstraints: 'NOT NULL DEFAULT 0.0',
+      defaultValue: const CustomExpression('0.0'));
+  late final GeneratedColumn<double> commission = GeneratedColumn<double>(
+      'commission', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      $customConstraints: 'NOT NULL DEFAULT 0.0',
+      defaultValue: const CustomExpression('0.0'));
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        symbol,
+        name,
+        quantity,
+        price,
+        tradeType,
+        tradeDate,
+        realizedPL,
+        commission
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'trades';
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TradesData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TradesData(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      symbol: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}symbol'])!,
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      quantity: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}quantity'])!,
+      price: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}price'])!,
+      tradeType: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}trade_type'])!,
+      tradeDate: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}trade_date'])!,
+      realizedPL: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}realized_p_l'])!,
+      commission: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}commission'])!,
+    );
+  }
+
+  @override
+  Trades createAlias(String alias) {
+    return Trades(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class TradesData extends DataClass implements Insertable<TradesData> {
+  final int id;
+  final String symbol;
+  final String name;
+  final double quantity;
+  final double price;
+  final String tradeType;
+  final int tradeDate;
+  final double realizedPL;
+  final double commission;
+  const TradesData(
+      {required this.id,
+      required this.symbol,
+      required this.name,
+      required this.quantity,
+      required this.price,
+      required this.tradeType,
+      required this.tradeDate,
+      required this.realizedPL,
+      required this.commission});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['symbol'] = Variable<String>(symbol);
+    map['name'] = Variable<String>(name);
+    map['quantity'] = Variable<double>(quantity);
+    map['price'] = Variable<double>(price);
+    map['trade_type'] = Variable<String>(tradeType);
+    map['trade_date'] = Variable<int>(tradeDate);
+    map['realized_p_l'] = Variable<double>(realizedPL);
+    map['commission'] = Variable<double>(commission);
+    return map;
+  }
+
+  TradesCompanion toCompanion(bool nullToAbsent) {
+    return TradesCompanion(
+      id: Value(id),
+      symbol: Value(symbol),
+      name: Value(name),
+      quantity: Value(quantity),
+      price: Value(price),
+      tradeType: Value(tradeType),
+      tradeDate: Value(tradeDate),
+      realizedPL: Value(realizedPL),
+      commission: Value(commission),
+    );
+  }
+
+  factory TradesData.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TradesData(
+      id: serializer.fromJson<int>(json['id']),
+      symbol: serializer.fromJson<String>(json['symbol']),
+      name: serializer.fromJson<String>(json['name']),
+      quantity: serializer.fromJson<double>(json['quantity']),
+      price: serializer.fromJson<double>(json['price']),
+      tradeType: serializer.fromJson<String>(json['tradeType']),
+      tradeDate: serializer.fromJson<int>(json['tradeDate']),
+      realizedPL: serializer.fromJson<double>(json['realizedPL']),
+      commission: serializer.fromJson<double>(json['commission']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'symbol': serializer.toJson<String>(symbol),
+      'name': serializer.toJson<String>(name),
+      'quantity': serializer.toJson<double>(quantity),
+      'price': serializer.toJson<double>(price),
+      'tradeType': serializer.toJson<String>(tradeType),
+      'tradeDate': serializer.toJson<int>(tradeDate),
+      'realizedPL': serializer.toJson<double>(realizedPL),
+      'commission': serializer.toJson<double>(commission),
+    };
+  }
+
+  TradesData copyWith(
+          {int? id,
+          String? symbol,
+          String? name,
+          double? quantity,
+          double? price,
+          String? tradeType,
+          int? tradeDate,
+          double? realizedPL,
+          double? commission}) =>
+      TradesData(
+        id: id ?? this.id,
+        symbol: symbol ?? this.symbol,
+        name: name ?? this.name,
+        quantity: quantity ?? this.quantity,
+        price: price ?? this.price,
+        tradeType: tradeType ?? this.tradeType,
+        tradeDate: tradeDate ?? this.tradeDate,
+        realizedPL: realizedPL ?? this.realizedPL,
+        commission: commission ?? this.commission,
+      );
+  TradesData copyWithCompanion(TradesCompanion data) {
+    return TradesData(
+      id: data.id.present ? data.id.value : this.id,
+      symbol: data.symbol.present ? data.symbol.value : this.symbol,
+      name: data.name.present ? data.name.value : this.name,
+      quantity: data.quantity.present ? data.quantity.value : this.quantity,
+      price: data.price.present ? data.price.value : this.price,
+      tradeType: data.tradeType.present ? data.tradeType.value : this.tradeType,
+      tradeDate: data.tradeDate.present ? data.tradeDate.value : this.tradeDate,
+      realizedPL:
+          data.realizedPL.present ? data.realizedPL.value : this.realizedPL,
+      commission:
+          data.commission.present ? data.commission.value : this.commission,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TradesData(')
+          ..write('id: $id, ')
+          ..write('symbol: $symbol, ')
+          ..write('name: $name, ')
+          ..write('quantity: $quantity, ')
+          ..write('price: $price, ')
+          ..write('tradeType: $tradeType, ')
+          ..write('tradeDate: $tradeDate, ')
+          ..write('realizedPL: $realizedPL, ')
+          ..write('commission: $commission')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, symbol, name, quantity, price, tradeType,
+      tradeDate, realizedPL, commission);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TradesData &&
+          other.id == this.id &&
+          other.symbol == this.symbol &&
+          other.name == this.name &&
+          other.quantity == this.quantity &&
+          other.price == this.price &&
+          other.tradeType == this.tradeType &&
+          other.tradeDate == this.tradeDate &&
+          other.realizedPL == this.realizedPL &&
+          other.commission == this.commission);
+}
+
+class TradesCompanion extends UpdateCompanion<TradesData> {
+  final Value<int> id;
+  final Value<String> symbol;
+  final Value<String> name;
+  final Value<double> quantity;
+  final Value<double> price;
+  final Value<String> tradeType;
+  final Value<int> tradeDate;
+  final Value<double> realizedPL;
+  final Value<double> commission;
+  const TradesCompanion({
+    this.id = const Value.absent(),
+    this.symbol = const Value.absent(),
+    this.name = const Value.absent(),
+    this.quantity = const Value.absent(),
+    this.price = const Value.absent(),
+    this.tradeType = const Value.absent(),
+    this.tradeDate = const Value.absent(),
+    this.realizedPL = const Value.absent(),
+    this.commission = const Value.absent(),
+  });
+  TradesCompanion.insert({
+    this.id = const Value.absent(),
+    required String symbol,
+    required String name,
+    required double quantity,
+    required double price,
+    required String tradeType,
+    required int tradeDate,
+    this.realizedPL = const Value.absent(),
+    this.commission = const Value.absent(),
+  })  : symbol = Value(symbol),
+        name = Value(name),
+        quantity = Value(quantity),
+        price = Value(price),
+        tradeType = Value(tradeType),
+        tradeDate = Value(tradeDate);
+  static Insertable<TradesData> custom({
+    Expression<int>? id,
+    Expression<String>? symbol,
+    Expression<String>? name,
+    Expression<double>? quantity,
+    Expression<double>? price,
+    Expression<String>? tradeType,
+    Expression<int>? tradeDate,
+    Expression<double>? realizedPL,
+    Expression<double>? commission,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (symbol != null) 'symbol': symbol,
+      if (name != null) 'name': name,
+      if (quantity != null) 'quantity': quantity,
+      if (price != null) 'price': price,
+      if (tradeType != null) 'trade_type': tradeType,
+      if (tradeDate != null) 'trade_date': tradeDate,
+      if (realizedPL != null) 'realized_p_l': realizedPL,
+      if (commission != null) 'commission': commission,
+    });
+  }
+
+  TradesCompanion copyWith(
+      {Value<int>? id,
+      Value<String>? symbol,
+      Value<String>? name,
+      Value<double>? quantity,
+      Value<double>? price,
+      Value<String>? tradeType,
+      Value<int>? tradeDate,
+      Value<double>? realizedPL,
+      Value<double>? commission}) {
+    return TradesCompanion(
+      id: id ?? this.id,
+      symbol: symbol ?? this.symbol,
+      name: name ?? this.name,
+      quantity: quantity ?? this.quantity,
+      price: price ?? this.price,
+      tradeType: tradeType ?? this.tradeType,
+      tradeDate: tradeDate ?? this.tradeDate,
+      realizedPL: realizedPL ?? this.realizedPL,
+      commission: commission ?? this.commission,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (symbol.present) {
+      map['symbol'] = Variable<String>(symbol.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (quantity.present) {
+      map['quantity'] = Variable<double>(quantity.value);
+    }
+    if (price.present) {
+      map['price'] = Variable<double>(price.value);
+    }
+    if (tradeType.present) {
+      map['trade_type'] = Variable<String>(tradeType.value);
+    }
+    if (tradeDate.present) {
+      map['trade_date'] = Variable<int>(tradeDate.value);
+    }
+    if (realizedPL.present) {
+      map['realized_p_l'] = Variable<double>(realizedPL.value);
+    }
+    if (commission.present) {
+      map['commission'] = Variable<double>(commission.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TradesCompanion(')
+          ..write('id: $id, ')
+          ..write('symbol: $symbol, ')
+          ..write('name: $name, ')
+          ..write('quantity: $quantity, ')
+          ..write('price: $price, ')
+          ..write('tradeType: $tradeType, ')
+          ..write('tradeDate: $tradeDate, ')
+          ..write('realizedPL: $realizedPL, ')
+          ..write('commission: $commission')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class DatabaseAtV8 extends GeneratedDatabase {
+  DatabaseAtV8(QueryExecutor e) : super(e);
   late final Tickers tickers = Tickers(this);
   late final Candles candles = Candles(this);
+  late final Trades trades = Trades(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [tickers, candles];
+  List<DatabaseSchemaEntity> get allSchemaEntities =>
+      [tickers, candles, trades];
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 8;
 }

@@ -21,14 +21,43 @@ class ImportedHolding {
   });
 }
 
+class ImportedTrade {
+  final String symbol;
+  final String name;
+  final double quantity;
+  final double price;
+  final String tradeType;
+  final DateTime tradeDate;
+  final double realizedPL;
+  final double commission;
+
+  ImportedTrade({
+    required this.symbol,
+    required this.name,
+    required this.quantity,
+    required this.price,
+    required this.tradeType,
+    required this.tradeDate,
+    required this.realizedPL,
+    required this.commission,
+  });
+}
+
+class ParseResult {
+  final List<ImportedHolding> holdings;
+  final List<ImportedTrade> trades;
+
+  ParseResult({required this.holdings, required this.trades});
+}
+
 abstract class BrokerCsvParser {
   String get name;
-  List<ImportedHolding> parse(String csvContent);
+  ParseResult parse(String csvContent);
 }
 
 /// Parses activity statement CSVs exported from Tiger Brokers.
 /// Reads the Holdings section for current positions and the Trades section
-/// to determine the earliest purchase date per symbol.
+/// for individual buy/sell transactions.
 class TigerBrokersParser extends BrokerCsvParser {
   @override
   String get name => 'Tiger Brokers';
@@ -36,28 +65,63 @@ class TigerBrokersParser extends BrokerCsvParser {
   static final _symbolRegex = RegExp(r'^(.*)\s+\(([^)]+)\)\s*$');
 
   @override
-  List<ImportedHolding> parse(String csvContent) {
+  ParseResult parse(String csvContent) {
     final rows = _parseCsv(csvContent);
 
-    // Collect earliest open-trade settle date per symbol
-    final Map<String, DateTime> earliestDates = {};
+    // Parse Trades DATA rows (both Open and Close)
+    final List<ImportedTrade> trades = [];
     for (final row in rows) {
       if (row.length < 53) continue;
-      if (row[0] != 'Trades' || row[1] != 'Stock' || row[3] != 'DATA') continue;
-      if (row[7] != 'Open') continue;
+      if (row[0] != 'Trades' || row[1] != 'Stock' || row[3] != 'DATA')
+        continue;
+      final activityType = row[7].trim();
+      if (activityType != 'Open' && activityType != 'Close') continue;
 
       final match = _symbolRegex.firstMatch(row[4].trim());
       if (match == null) continue;
+      final name = match.group(1)!.trim();
       final symbol = match.group(2)!.trim();
 
-      // Settle Date is the second-to-last field; Currency is last
-      final settleStr = row[row.length - 2].trim();
-      final date = DateTime.tryParse(settleStr);
-      if (date == null) continue;
+      final quantity = double.tryParse(row[8].replaceAll(',', ''));
+      final tradePrice = double.tryParse(row[9].replaceAll(',', ''));
+      if (quantity == null || tradePrice == null) continue;
 
-      if (!earliestDates.containsKey(symbol) ||
-          date.isBefore(earliestDates[symbol]!)) {
-        earliestDates[symbol] = date;
+      // Realized P/L is at column 48; only meaningful for Close trades
+      final realizedPL =
+          double.tryParse(row[48].replaceAll(',', '')) ?? 0.0;
+
+      // Tiger Brokers places the broker fee in the second "Transaction Fee"
+      // column (index 33), not in the "Commission" column (index 23).
+      final commission =
+          (double.tryParse(row[33].replaceAll(',', '')) ?? 0.0).abs();
+
+      // Trade date: first 10 chars of Trade Time field (row[50] = "YYYY-MM-DD\n...")
+      final tradeTimeRaw = row[row.length - 3].trim();
+      final tradeDateStr =
+          tradeTimeRaw.length >= 10 ? tradeTimeRaw.substring(0, 10) : '';
+      final tradeDate = DateTime.tryParse(tradeDateStr) ?? DateTime.now();
+
+      trades.add(
+        ImportedTrade(
+          symbol: symbol,
+          name: name,
+          quantity: quantity,
+          price: tradePrice,
+          tradeType: activityType.toLowerCase(),
+          tradeDate: tradeDate,
+          realizedPL: activityType == 'Close' ? realizedPL : 0.0,
+          commission: commission,
+        ),
+      );
+    }
+
+    // Collect earliest open-trade date per symbol (for purchasedAt)
+    final Map<String, DateTime> earliestDates = {};
+    for (final trade in trades) {
+      if (trade.tradeType != 'open') continue;
+      if (!earliestDates.containsKey(trade.symbol) ||
+          trade.tradeDate.isBefore(earliestDates[trade.symbol]!)) {
+        earliestDates[trade.symbol] = trade.tradeDate;
       }
     }
 
@@ -93,7 +157,7 @@ class TigerBrokersParser extends BrokerCsvParser {
       );
     }
 
-    return holdings;
+    return ParseResult(holdings: holdings, trades: trades);
   }
 }
 
@@ -115,6 +179,26 @@ Future<int> importHoldings(List<ImportedHolding> holdings) async {
         change: Value(change),
         purchasedAt: Value(holding.purchasedAt),
         updatedAt: Value(DateTime.now()),
+      ),
+    );
+    count++;
+  }
+  return count;
+}
+
+Future<int> importTrades(List<ImportedTrade> trades) async {
+  int count = 0;
+  for (final trade in trades) {
+    await db.trades.insertOne(
+      TradesCompanion(
+        symbol: Value(trade.symbol),
+        name: Value(trade.name),
+        quantity: Value(trade.quantity),
+        price: Value(trade.price),
+        tradeType: Value(trade.tradeType),
+        tradeDate: Value(trade.tradeDate),
+        realizedPL: Value(trade.realizedPL),
+        commission: Value(trade.commission),
       ),
     );
     count++;
