@@ -279,7 +279,7 @@ class _LegendTile extends StatelessWidget {
             '${allocationPct.toStringAsFixed(1)}%  '
             '${changePct >= 0 ? '+' : ''}${changePct.toStringAsFixed(2)}%',
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 13,
               color: changePct >= 0 ? Colors.green : Colors.redAccent,
             ),
           ),
