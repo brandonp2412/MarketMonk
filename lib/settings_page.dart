@@ -264,6 +264,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
           ),
+          if (!settings.systemColors) _ColorPicker(settings: settings),
           Tooltip(
             message: 'Use wavy curves in the graphs page',
             child: ListTile(
@@ -480,6 +481,67 @@ class _SettingsPageState extends State<SettingsPage> {
               },
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ColorPicker extends StatelessWidget {
+  static const _colors = [
+    Color(0xFF2B7A78), // default teal
+    Color(0xFF6750A4), // purple
+    Color(0xFF1976D2), // blue
+    Color(0xFF388E3C), // green
+    Color(0xFFD32F2F), // red
+    Color(0xFFF57C00), // orange
+    Color(0xFF7B1FA2), // violet
+    Color(0xFF0097A7), // cyan
+    Color(0xFF5D4037), // brown
+    Color(0xFF455A64), // blue-grey
+  ];
+
+  final SettingsState settings;
+
+  const _ColorPicker({required this.settings});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('App color', style: Theme.of(context).textTheme.bodyMedium),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _colors.map((color) {
+              final isSelected = settings.seedColor.toARGB32() == color.toARGB32();
+              return GestureDetector(
+                onTap: () => settings.setSeedColor(color),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isSelected
+                          ? Theme.of(context).colorScheme.onSurface
+                          : Colors.transparent,
+                      width: 3,
+                    ),
+                  ),
+                  child: isSelected
+                      ? const Icon(Icons.check, color: Colors.white, size: 20)
+                      : null,
+                ),
+              );
+            }).toList(),
+          ),
         ],
       ),
     );

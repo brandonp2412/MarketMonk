@@ -20,12 +20,6 @@ void main() async {
 
 Database db = Database();
 
-final defaultTheme = ColorScheme.fromSeed(seedColor: const Color(0xFF2B7A78));
-final defaultDark = ColorScheme.fromSeed(
-  seedColor: const Color(0xFF2B7A78),
-  brightness: Brightness.dark,
-);
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -37,11 +31,18 @@ class MyApp extends StatelessWidget {
       builder: (lightDynamic, darkDynamic) => MaterialApp(
         title: 'MarketMonk',
         theme: ThemeData(
-          colorScheme: settings.systemColors ? lightDynamic : defaultTheme,
+          colorScheme: settings.systemColors
+              ? lightDynamic
+              : ColorScheme.fromSeed(seedColor: settings.seedColor),
           useMaterial3: true,
         ),
         darkTheme: ThemeData(
-          colorScheme: settings.systemColors ? darkDynamic : defaultDark,
+          colorScheme: settings.systemColors
+              ? darkDynamic
+              : ColorScheme.fromSeed(
+                  seedColor: settings.seedColor,
+                  brightness: Brightness.dark,
+                ),
           useMaterial3: true,
         ),
         themeMode: settings.theme,

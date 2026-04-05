@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+const _defaultSeedColor = Color(0xFF2B7A78);
+
 class SettingsState extends ChangeNotifier {
   ThemeMode theme = ThemeMode.system;
   bool systemColors = false;
   bool curveLines = false;
   double curveSmoothness = 0.35;
   String dateFormat = 'd/M/yy';
+  Color seedColor = _defaultSeedColor;
 
   SettingsState() {
     init();
@@ -35,6 +38,8 @@ class SettingsState extends ChangeNotifier {
     curveLines = prefs.getBool('curveLines') ?? false;
     curveSmoothness = prefs.getDouble('curveSmoothness') ?? 0.35;
     dateFormat = prefs.getString('dateFormat') ?? 'd/M/yy';
+    final colorVal = prefs.getInt('seedColor');
+    seedColor = colorVal != null ? Color(colorVal) : _defaultSeedColor;
 
     notifyListeners();
   }
@@ -70,5 +75,12 @@ class SettingsState extends ChangeNotifier {
   void setTheme(ThemeMode value) {
     theme = value;
     notifyListeners();
+  }
+
+  void setSeedColor(Color value) async {
+    seedColor = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setInt('seedColor', value.toARGB32());
   }
 }
