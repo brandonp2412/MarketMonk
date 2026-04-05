@@ -316,7 +316,14 @@ class _HoldingsPageState extends State<HoldingsPage> {
       ),
     );
     if (confirmed != true) return;
-    await (db.tickers.delete()..where((t) => t.id.isIn(_selected))).go();
+    final symbolsToDelete = _summaries
+        .where((s) => s.holding != null && _selected.contains(s.holding!.id))
+        .map((s) => s.symbol)
+        .toSet()
+        .toList();
+    await (db.tickers.delete()
+          ..where((t) => t.symbol.isIn(symbolsToDelete)))
+        .go();
     setState(() => _selected.clear());
   }
 }
