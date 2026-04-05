@@ -518,7 +518,7 @@ class _ColorPicker extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: _colors.map((color) {
-              final isSelected = settings.seedColor.toARGB32() == color.toARGB32();
+              final isSelected = settings.seedColor == color;
               return GestureDetector(
                 onTap: () => settings.setSeedColor(color),
                 child: AnimatedContainer(

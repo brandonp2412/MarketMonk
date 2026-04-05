@@ -3,6 +3,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const _defaultSeedColor = Color(0xFF2B7A78);
 
+int _colorToInt(Color c) =>
+    ((c.a * 255).round() << 24) |
+    ((c.r * 255).round() << 16) |
+    ((c.g * 255).round() << 8) |
+    (c.b * 255).round();
+
 class SettingsState extends ChangeNotifier {
   ThemeMode theme = ThemeMode.system;
   bool systemColors = false;
@@ -81,6 +87,6 @@ class SettingsState extends ChangeNotifier {
     seedColor = value;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    prefs.setInt('seedColor', value.toARGB32());
+    prefs.setInt('seedColor', _colorToInt(value));
   }
 }
