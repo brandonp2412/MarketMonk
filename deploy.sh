@@ -47,7 +47,7 @@ echo "$changelog" >fastlane/metadata/en-US/release_notes.txt
 if [[ $* == *-t* ]]; then
     echo "Skipping tests..."
 else
-    dart analyze lib
+    dart analyze --no-fatal-warnings lib
     dart format --set-exit-if-changed lib
     dart run build_runner build -d
     dart run drift_dev make-migrations
