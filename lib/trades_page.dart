@@ -357,19 +357,32 @@ class _SymbolTile extends StatelessWidget {
         ),
       ),
       title: Text(summary.symbol),
-      subtitle: Text(
-        holding != null
-            ? '${changePct.toStringAsFixed(2)}%'
-                '${hasRealizedPL ? '  ·  Realized: ${realizedPL >= 0 ? '+' : ''}${currency.format(realizedPL)}' : ''}'
-            : '${summary.trades.length} trade(s) — closed position',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitleTextStyle: holding != null
-          ? TextStyle(
-              color: changePct >= 0 ? Colors.green : Colors.redAccent,
+      subtitle: holding != null
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${changePct >= 0 ? '+' : ''}${changePct.toStringAsFixed(2)}%',
+                  style: TextStyle(
+                    color: changePct >= 0 ? Colors.green : Colors.redAccent,
+                    fontSize: 13,
+                  ),
+                ),
+                if (hasRealizedPL)
+                  Text(
+                    'Realized: ${realizedPL >= 0 ? '+' : ''}${currency.format(realizedPL)}',
+                    style: TextStyle(
+                      color: realizedPL >= 0 ? Colors.green : Colors.redAccent,
+                      fontSize: 12,
+                    ),
+                  ),
+              ],
             )
-          : const TextStyle(color: Colors.grey),
+          : Text(
+              '${summary.trades.length} trade(s) — closed position',
+              style: const TextStyle(color: Colors.grey),
+            ),
       trailing: holding != null
           ? Text(
               currency.format(holding.amount * holding.price),
