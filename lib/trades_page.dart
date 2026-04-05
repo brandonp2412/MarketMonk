@@ -37,6 +37,7 @@ class TradesPage extends StatefulWidget {
 class _TradesPageState extends State<TradesPage> {
   final _search = TextEditingController();
   final List<int> _selected = [];
+  List<_SymbolSummary> _summaries = [];
 
   Stream<List<_SymbolSummary>> get _stream {
     return (db.tickers.select()
@@ -132,6 +133,25 @@ class _TradesPageState extends State<TradesPage> {
       icon: const Icon(Icons.more_vert),
       tooltip: 'Show menu',
       itemBuilder: (context) => [
+        if (_summaries.any((s) => s.holding != null))
+          PopupMenuItem(
+            child: ListTile(
+              leading: const Icon(Icons.select_all),
+              title: const Text('Select all'),
+              onTap: () {
+                Navigator.pop(context);
+                setState(() {
+                  _selected
+                    ..clear()
+                    ..addAll(
+                      _summaries
+                          .where((s) => s.holding != null)
+                          .map((s) => s.holding!.id),
+                    );
+                });
+              },
+            ),
+          ),
         PopupMenuItem(
           child: ListTile(
             leading: const Icon(Icons.settings),
@@ -202,6 +222,11 @@ class _TradesPageState extends State<TradesPage> {
     if (snap.hasError) return Center(child: Text(snap.error.toString()));
 
     final summaries = snap.data!;
+    if (_summaries != summaries) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => setState(() => _summaries = summaries),
+      );
+    }
     if (summaries.isEmpty) {
       return ListTile(
         title: const Text('No stocks found'),
@@ -319,41 +344,44 @@ class _SymbolTile extends StatelessWidget {
 
     return ListTile(
       selected: isSelected,
-      leading: SizedBox(
-        width: 30,
-        height: 30,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            AnimatedScale(
-              duration: const Duration(milliseconds: 150),
-              scale: isSelected ? 0.0 : 1.0,
-              child: Visibility(
-                visible: !isSelected,
-                child: holding != null
-                    ? Icon(
-                        changePct >= 0
-                            ? Icons.arrow_upward
-                            : Icons.arrow_downward,
-                        color: changePct >= 0
-                            ? Colors.green
-                            : Colors.redAccent,
-                      )
-                    : const Icon(Icons.history, color: Colors.grey),
-              ),
-            ),
-            AnimatedScale(
-              duration: const Duration(milliseconds: 150),
-              scale: isSelected ? 1.0 : 0.0,
-              child: Visibility(
-                visible: isSelected,
-                child: Checkbox(
-                  value: isSelected,
-                  onChanged: (v) => onLongPress?.call(),
+      leading: GestureDetector(
+        onTap: onLongPress,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          transitionBuilder: (child, animation) => ScaleTransition(
+            scale: animation,
+            child: child,
+          ),
+          child: isSelected
+              ? Container(
+                  key: const ValueKey('selected'),
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.check,
+                    color: Theme.of(context).colorScheme.onPrimary,
+                    size: 18,
+                  ),
+                )
+              : SizedBox(
+                  key: const ValueKey('unselected'),
+                  width: 30,
+                  height: 30,
+                  child: holding != null
+                      ? Icon(
+                          changePct >= 0
+                              ? Icons.arrow_upward
+                              : Icons.arrow_downward,
+                          color: changePct >= 0
+                              ? Colors.green
+                              : Colors.redAccent,
+                        )
+                      : const Icon(Icons.history, color: Colors.grey),
                 ),
-              ),
-            ),
-          ],
         ),
       ),
       title: Text(summary.symbol),
