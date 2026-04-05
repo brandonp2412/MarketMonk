@@ -119,29 +119,62 @@ class PortfolioPageState extends State<PortfolioPage> {
               ),
             ),
           ),
-          SliverToBoxAdapter(
-            child: SizedBox(
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _PieHeaderDelegate(
               height: 260,
-              child: PieChart(
-                PieChartData(
-                  sections: sections,
-                  centerSpaceRadius: 50,
-                  sectionsSpace: 2,
-                  pieTouchData: PieTouchData(
-                    touchCallback: (event, response) {
-                      setState(() {
-                        if (!event.isInterestedForInteractions ||
-                            response == null ||
-                            response.touchedSection == null) {
-                          touchedIndex = null;
-                          return;
-                        }
-                        touchedIndex =
-                            response.touchedSection!.touchedSectionIndex;
-                      });
-                    },
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  PieChart(
+                    PieChartData(
+                      sections: sections,
+                      centerSpaceRadius: 55,
+                      sectionsSpace: 2,
+                      pieTouchData: PieTouchData(
+                        touchCallback: (event, response) {
+                          setState(() {
+                            if (!event.isInterestedForInteractions ||
+                                response == null ||
+                                response.touchedSection == null) {
+                              touchedIndex = null;
+                              return;
+                            }
+                            touchedIndex =
+                                response.touchedSection!.touchedSectionIndex;
+                          });
+                        },
+                      ),
+                    ),
                   ),
-                ),
+                  if (touchedIndex != null)
+                    IgnorePointer(
+                      child: SizedBox(
+                        width: 100,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              sorted[touchedIndex!].symbol,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                            Text(
+                              sorted[touchedIndex!].name,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 10),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -188,6 +221,37 @@ class PortfolioPageState extends State<PortfolioPage> {
       ).toColor();
     });
   }
+}
+
+class _PieHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+  final double height;
+  final Color backgroundColor;
+
+  const _PieHeaderDelegate({
+    required this.child,
+    required this.height,
+    required this.backgroundColor,
+  });
+
+  @override
+  double get minExtent => height;
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return ColoredBox(color: backgroundColor, child: child);
+  }
+
+  @override
+  bool shouldRebuild(covariant _PieHeaderDelegate oldDelegate) =>
+      child != oldDelegate.child || backgroundColor != oldDelegate.backgroundColor;
 }
 
 class _SummaryCard extends StatelessWidget {
