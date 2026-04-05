@@ -4,10 +4,12 @@ import 'package:file_picker/file_picker.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:market_monk/csv_import.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/ticker_line.dart';
+import 'package:market_monk/utils.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -23,6 +25,121 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  Future<void> _importCsv(BuildContext context) async {
+    // Step 1: broker selection dialog
+    BrokerCsvParser? selectedParser;
+    BrokerCsvParser currentSelection = supportedBrokers.first;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Select broker'),
+          content: DropdownButton<BrokerCsvParser>(
+            value: currentSelection,
+            isExpanded: true,
+            items: supportedBrokers
+                .map(
+                  (parser) => DropdownMenuItem(
+                    value: parser,
+                    child: Text(parser.name),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) {
+              if (value != null) setState(() => currentSelection = value);
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                selectedParser = currentSelection;
+                Navigator.pop(context);
+              },
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (selectedParser == null || !context.mounted) return;
+
+    // Step 2: pick the CSV file
+    final result = await FilePicker.platform.pickFiles();
+    if (result == null || !context.mounted) return;
+
+    // Step 3: parse
+    List<ImportedHolding> holdings;
+    try {
+      final file = File(result.files.single.path!);
+      final content = await file.readAsString();
+      holdings = selectedParser!.parse(content);
+    } catch (e) {
+      if (!context.mounted) return;
+      toast(context, 'Failed to parse CSV: $e');
+      return;
+    }
+
+    if (holdings.isEmpty) {
+      if (!context.mounted) return;
+      toast(context, 'No holdings found in the selected file');
+      return;
+    }
+
+    // Step 4: preview dialog
+    bool confirmed = false;
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Import ${holdings.length} holdings'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: holdings.length,
+            itemBuilder: (context, index) {
+              final h = holdings[index];
+              return ListTile(
+                dense: true,
+                title: Text(h.symbol),
+                subtitle: Text(h.name),
+                trailing: Text(
+                  '${h.amount.toStringAsFixed(2)} @ \$${h.purchasePrice.toStringAsFixed(2)}',
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              confirmed = true;
+              Navigator.pop(context);
+            },
+            child: const Text('Import'),
+          ),
+        ],
+      ),
+    );
+
+    if (!confirmed || !context.mounted) return;
+
+    // Step 5: insert into DB
+    final count = await importHoldings(holdings);
+    if (!context.mounted) return;
+    toast(context, 'Imported $count holdings successfully');
+  }
+
   @override
   Widget build(BuildContext context) {
     final packageInfo = PackageInfo.fromPlatform();
@@ -177,6 +294,14 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           Tooltip(
+            message: 'Import holdings from a broker CSV export',
+            child: ListTile(
+              leading: const Icon(Icons.table_chart),
+              title: const Text('Import CSV'),
+              onTap: () => _importCsv(context),
+            ),
+          ),
+          Tooltip(
             message: 'Import a .sqlite database',
             child: ListTile(
               leading: const Icon(Icons.upload),
@@ -188,6 +313,25 @@ class _SettingsPageState extends State<SettingsPage> {
                 if (result == null) return;
 
                 File sourceFile = File(result.files.single.path!);
+
+                // Validate SQLite magic header before overwriting the database.
+                // SQLite files start with "SQLite format 3\0" (16 bytes).
+                final raf = await sourceFile.open();
+                final header = await raf.read(16);
+                await raf.close();
+                const sqliteMagic = [
+                  0x53, 0x51, 0x4C, 0x69, 0x74, 0x65, 0x20, 0x66,
+                  0x6F, 0x72, 0x6D, 0x61, 0x74, 0x20, 0x33, 0x00,
+                ];
+                final isValid = header.length == 16 &&
+                    List.generate(16, (i) => header[i] == sqliteMagic[i])
+                        .every((b) => b);
+                if (!isValid) {
+                  if (!context.mounted) return;
+                  toast(context, 'Selected file is not a valid database');
+                  return;
+                }
+
                 final dbFolder = await getApplicationSupportDirectory();
                 await db.close();
                 await sourceFile
