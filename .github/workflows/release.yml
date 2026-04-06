@@ -1,0 +1,330 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "pubspec.yaml"
+  workflow_dispatch:
+
+jobs:
+  quality-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Flutter from submodule
+        run: |
+          export PATH="$PATH:$PWD/flutter/bin"
+          echo "$PWD/flutter/bin" >> $GITHUB_PATH
+          flutter --version
+          flutter config --no-analytics
+          flutter precache
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Run build_runner
+        run: dart run build_runner build -d
+
+      - name: Verify formatting
+        run: dart format --set-exit-if-changed lib test
+
+      - name: Analyze code
+        run: dart analyze --no-fatal-warnings lib
+
+      - name: Run tests
+        run: flutter test
+
+  version-bump:
+    needs: quality-checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      build_number: ${{ steps.version.outputs.build_number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: Get current version from pubspec.yaml
+        id: current_version
+        run: |
+          CURRENT_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
+          CURRENT_BUILD_NUMBER=$(grep '^version:' pubspec.yaml | sed 's/.*+//')
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "current_build_number=$CURRENT_BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION+$CURRENT_BUILD_NUMBER"
+
+      - name: Bump version
+        id: version
+        run: |
+          CURRENT_VERSION=${{ steps.current_version.outputs.current_version }}
+          CURRENT_BUILD_NUMBER=${{ steps.current_version.outputs.current_build_number }}
+
+          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+          MAJOR=${VERSION_PARTS[0]}
+          MINOR=${VERSION_PARTS[1]}
+          PATCH=${VERSION_PARTS[2]}
+          PATCH=$((PATCH + 1))
+
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          NEW_BUILD_NUMBER=$((CURRENT_BUILD_NUMBER + 1))
+
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "build_number=$NEW_BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION+$NEW_BUILD_NUMBER"
+
+          sed -i "s/^version: .*/version: $NEW_VERSION+$NEW_BUILD_NUMBER/" pubspec.yaml
+          echo "Updated pubspec.yaml with new version"
+
+      - name: Commit and push version bump
+        run: |
+          git add pubspec.yaml
+          git commit -m "Bump version to ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }} [skip ci]"
+          git push origin main
+
+      - name: Create and push tag
+        run: |
+          git tag -a "v${{ steps.version.outputs.version }}" -m "Release version ${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
+
+  build-android:
+    needs: version-bump
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+
+      - name: Setup Flutter from submodule
+        run: |
+          export PATH="$PATH:$PWD/flutter/bin"
+          echo "$PWD/flutter/bin" >> $GITHUB_PATH
+          flutter --version
+          flutter config --no-analytics
+          flutter precache
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Run build_runner
+        run: dart run build_runner build -d
+
+      - name: Decode Android keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/keystore.jks
+          echo "storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}" > android/key.properties
+          echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> android/key.properties
+          echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> android/key.properties
+          echo "storeFile=keystore.jks" >> android/key.properties
+
+      - name: Build APK for x86_64
+        run: flutter build apk --release --build-name=${{ needs.version-bump.outputs.version }} --build-number=${{ needs.version-bump.outputs.build_number }} --target-platform android-x64 --split-per-abi
+
+      - name: Build APK for armeabi-v7a
+        run: flutter build apk --release --build-name=${{ needs.version-bump.outputs.version }} --build-number=${{ needs.version-bump.outputs.build_number }} --target-platform android-arm --split-per-abi
+
+      - name: Build APK for arm64-v8a
+        run: flutter build apk --release --build-name=${{ needs.version-bump.outputs.version }} --build-number=${{ needs.version-bump.outputs.build_number }} --target-platform android-arm64 --split-per-abi
+
+      - name: Build universal APK
+        run: |
+          flutter build apk --release --build-name=${{ needs.version-bump.outputs.version }} --build-number=${{ needs.version-bump.outputs.build_number }}
+          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/market_monk.apk
+
+      - name: Build App Bundle
+        run: flutter build appbundle --release --build-name=${{ needs.version-bump.outputs.version }} --build-number=${{ needs.version-bump.outputs.build_number }}
+
+      - name: Upload APK artifact
+        if: github.actor != 'nektos/act'
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: |
+            build/app/outputs/flutter-apk/app-*-release.apk
+            build/app/outputs/flutter-apk/market_monk.apk
+
+      - name: Upload AAB artifact
+        if: github.actor != 'nektos/act'
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+
+  build-linux:
+    needs: version-bump
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev
+
+      - name: Setup Flutter from submodule
+        run: |
+          export PATH="$PATH:$PWD/flutter/bin"
+          echo "$PWD/flutter/bin" >> $GITHUB_PATH
+          flutter --version
+          flutter config --no-analytics
+          flutter precache --linux
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Run build_runner
+        run: dart run build_runner build -d
+
+      - name: Build Linux
+        run: flutter build linux --release --build-name=${{ needs.version-bump.outputs.version }} --build-number=${{ needs.version-bump.outputs.build_number }}
+
+      - name: Create Linux archive
+        run: |
+          cd build/linux/x64/release/bundle
+          zip -r ../../../../../market_monk-linux-${{ needs.version-bump.outputs.version }}.zip .
+
+      - name: Upload Linux artifact
+        if: github.actor != 'nektos/act'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-app
+          path: market_monk-linux-${{ needs.version-bump.outputs.version }}.zip
+
+  build-windows:
+    needs: version-bump
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup Flutter from submodule
+        run: |
+          $env:PATH = "$env:PATH;$PWD\flutter\bin"
+          echo "$PWD\flutter\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          flutter --version
+          flutter config --no-analytics
+          flutter precache --windows
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Run build_runner
+        run: dart run build_runner build -d
+
+      - name: Build Windows
+        run: flutter build windows --release --build-name=${{ needs.version-bump.outputs.version }} --build-number=${{ needs.version-bump.outputs.build_number }}
+
+      - name: Create Windows archive
+        run: |
+          cd build/windows/x64/runner/Release
+          7z a ../../../../../market_monk-windows-${{ needs.version-bump.outputs.version }}.zip *
+
+      - name: Upload Windows artifact
+        if: github.actor != 'nektos/act'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-app
+          path: market_monk-windows-${{ needs.version-bump.outputs.version }}.zip
+
+  build-macos:
+    needs: version-bump
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup Flutter from submodule
+        run: |
+          export PATH="$PATH:$PWD/flutter/bin"
+          echo "$PWD/flutter/bin" >> $GITHUB_PATH
+          flutter --version
+          flutter config --no-analytics
+          flutter precache --macos
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Run build_runner
+        run: dart run build_runner build -d
+
+      - name: Build macOS
+        run: flutter build macos --release --build-name=${{ needs.version-bump.outputs.version }} --build-number=${{ needs.version-bump.outputs.build_number }}
+
+      - name: Create macOS archive
+        run: |
+          cd build/macos/Build/Products/Release
+          zip -r ../../../../../market_monk-macos-${{ needs.version-bump.outputs.version }}.zip MarketMonk.app
+
+      - name: Upload macOS artifact
+        if: github.actor != 'nektos/act'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-app
+          path: market_monk-macos-${{ needs.version-bump.outputs.version }}.zip
+
+  create-release:
+    needs: [version-bump, build-android, build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.version-bump.outputs.version }}
+          name: Market Monk v${{ needs.version-bump.outputs.version }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: |
+            artifacts/android-apk/app-*-release.apk
+            artifacts/android-apk/market_monk.apk
+            artifacts/android-aab/app-release.aab
+            artifacts/linux-app/market_monk-linux-${{ needs.version-bump.outputs.version }}.zip
+            artifacts/windows-app/market_monk-windows-${{ needs.version-bump.outputs.version }}.zip
+            artifacts/macos-app/market_monk-macos-${{ needs.version-bump.outputs.version }}.zip
