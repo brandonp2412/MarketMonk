@@ -91,22 +91,42 @@ class Database extends _$Database {
     ''');
 
     // Recreate candles without the FK constraint that references tickers.
-    await customStatement('''
-      CREATE TABLE new_candles (
-        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-        symbol TEXT NOT NULL,
-        date INTEGER NOT NULL,
-        open REAL NOT NULL DEFAULT (-1.0),
-        high REAL NOT NULL DEFAULT (-1.0),
-        low REAL NOT NULL DEFAULT (-1.0),
-        close REAL NOT NULL DEFAULT (-1.0),
-        volume INTEGER NOT NULL DEFAULT 0,
-        adj_close REAL NOT NULL DEFAULT (-1.0)
-      )
-    ''');
-    await customStatement('INSERT INTO new_candles SELECT * FROM candles');
-    await customStatement('DROP TABLE candles');
-    await customStatement('ALTER TABLE new_candles RENAME TO candles');
+    // Guard: candles may not exist on very old schema versions (pre-v4).
+    final candlesExists = await customSelect(
+      "SELECT 1 FROM sqlite_master WHERE type='table' AND name='candles'",
+    ).get();
+    if (candlesExists.isNotEmpty) {
+      await customStatement('''
+        CREATE TABLE new_candles (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          symbol TEXT NOT NULL,
+          date INTEGER NOT NULL,
+          open REAL NOT NULL DEFAULT (-1.0),
+          high REAL NOT NULL DEFAULT (-1.0),
+          low REAL NOT NULL DEFAULT (-1.0),
+          close REAL NOT NULL DEFAULT (-1.0),
+          volume INTEGER NOT NULL DEFAULT 0,
+          adj_close REAL NOT NULL DEFAULT (-1.0)
+        )
+      ''');
+      await customStatement('INSERT INTO new_candles SELECT * FROM candles');
+      await customStatement('DROP TABLE candles');
+      await customStatement('ALTER TABLE new_candles RENAME TO candles');
+    } else {
+      await customStatement('''
+        CREATE TABLE candles (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          symbol TEXT NOT NULL,
+          date INTEGER NOT NULL,
+          open REAL NOT NULL DEFAULT (-1.0),
+          high REAL NOT NULL DEFAULT (-1.0),
+          low REAL NOT NULL DEFAULT (-1.0),
+          close REAL NOT NULL DEFAULT (-1.0),
+          volume INTEGER NOT NULL DEFAULT 0,
+          adj_close REAL NOT NULL DEFAULT (-1.0)
+        )
+      ''');
+    }
 
     await customStatement('DROP TABLE tickers');
   }
@@ -130,6 +150,7 @@ class Database extends _$Database {
       await m.drop(schema.candles);
       await m.drop(schema.tickers);
       await m.createTable(schema.tickers);
+      await m.createTable(schema.candles);
     },
     from6To7: (Migrator m, Schema7 schema) async {
       await m.alterTable(TableMigration(schema.tickers));

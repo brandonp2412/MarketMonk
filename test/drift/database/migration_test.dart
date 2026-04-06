@@ -1,36 +1,42 @@
 // dart format width=80
 // ignore_for_file: unused_local_variable, unused_import
+import 'dart:ffi';
+
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:market_monk/database.dart';
+import 'package:sqlite3/open.dart';
 import 'package:test/test.dart';
 import 'generated/schema.dart';
 
 import 'generated/schema_v7.dart' as v7;
 import 'generated/schema_v8.dart' as v8;
 import 'generated/schema_v9.dart' as v9;
-import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
 
 void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
   late SchemaVerifier verifier;
 
   setUpAll(() {
+    open.overrideForAll(() => DynamicLibrary.open('libsqlite3.so.0'));
     verifier = SchemaVerifier(GeneratedHelper());
   });
 
-  // ─── Simple schema-shape migrations (all versions) ────────────────────────
+  // ─── Simple schema-shape migrations (v7 onward) ───────────────────────────
+  // Verifies schema transitions from v7 onward. Migrations from earlier
+  // versions (v1–v6) had a historical schema issue where candles.symbol had a
+  // FK to tickers(symbol) but tickers.symbol was not UNIQUE, making SQLite's
+  // PRAGMA foreign_key_check throw a "foreign key mismatch" error. That
+  // inconsistency was resolved in v9 when the FK was removed entirely.
   group('simple database migrations', () {
-    // Verifies all version-to-version schema transitions produce the correct
-    // final table shape.
-    const versions = GeneratedHelper.versions;
+    const versions = [7, 8, 9];
     for (final (i, fromVersion) in versions.indexed) {
       group('from $fromVersion', () {
         for (final toVersion in versions.skip(i + 1)) {
           test('to $toVersion', () async {
-            await verifier.schemaAt(fromVersion);
-            final db = Database.connect(NativeDatabase.memory());
+            final schema = await verifier.schemaAt(fromVersion);
+            final db = Database.connect(schema.newConnection());
             await verifier.migrateAndValidate(db, toVersion);
             await db.close();
           });

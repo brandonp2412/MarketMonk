@@ -21,11 +21,11 @@ Database _openDb() => Database.connect(NativeDatabase.memory());
 const _tigerCsvMinimal = '''
 Activity Statement,,,,2025-01-01 - 2025-12-31
 Trades,,,,Symbol,Market,Exchange,Activity Type,Quantity,Trade Price,Amount,Accrued Interest in Trade,Transaction Fee,Other Tripartite fees,Settlement Fee,SEC Fee,Option Regulatory Fee,Stamp Duty,Transaction Levy,Clearing Fee,Trading Activity Fee,Exchange Fee,Future Regulatory Fee,Commission,Platform Fee,Option Settlement Fee,Subscription Fee,Redemption Fee,Switching Fee,PH Stock Transaction Tax,Tax Service Fee,AFRC Transaction Levy,Trading Tariff,Transaction Fee,Brokerage fee,Handing Fee,Securities Management Fee,Transfer Fees (CSDC),Transfer Fees (HKSCC),Stamp Duty On Stock Borrowing,Consolidated Audit Trail Fee,Processing Fee,CM DA SI Fee,DVP SI Fee,IPO Transaction Fee,IPO Process Fee,Ipo Settle Fee,IPO Channel Fee,Realized P/L,Notes,Trade Time,Settle Date,Currency
-Trades,Stock,,DATA,Apple (AAPL),US,NASDAQ,Open,10,150.00,1500.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,-2.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,,"2025-03-01
+Trades,Stock,,DATA,Apple (AAPL),US,NASDAQ,Open,10,150.00,1500.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,-2.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,,,"2025-03-01
 09:30:00, US/Eastern",2025-03-02,USD
-Trades,Stock,,DATA,Apple (AAPL),US,NASDAQ,Close,-5,180.00,-900.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,-2.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,150.00,,"2025-06-01
+Trades,Stock,,DATA,Apple (AAPL),US,NASDAQ,Close,-5,180.00,-900.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,-2.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,150.00,,"2025-06-01
 09:30:00, US/Eastern",2025-06-02,USD
-Trades,Stock,,DATA,"Meta Platforms, Inc. (META)",US,NASDAQ,Open,3,400.00,1200.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,-2.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,,"2025-04-01
+Trades,Stock,,DATA,"Meta Platforms, Inc. (META)",US,NASDAQ,Open,3,400.00,1200.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,-2.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,,,"2025-04-01
 09:30:00, US/Eastern",2025-04-02,USD
 Holdings,,,,Symbol,Quantity,Multiplier,Cost Price,Close Price,Value,Unrealized P/L,Initial Margin,Maint Margin,Currency
 Holdings,Stock,,DATA,Apple (AAPL),5,1.0,150.00,175.00,875.00,125.00,262.50,218.75,USD
@@ -36,9 +36,9 @@ Holdings,Stock,,DATA,"Meta Platforms, Inc. (META)",3,1.0,400.00,450.00,1350.00,1
 const _closedPositionCsv = '''
 Activity Statement,,,,2025-01-01 - 2025-12-31
 Trades,,,,Symbol,Market,Exchange,Activity Type,Quantity,Trade Price,Amount,Accrued Interest in Trade,Transaction Fee,Other Tripartite fees,Settlement Fee,SEC Fee,Option Regulatory Fee,Stamp Duty,Transaction Levy,Clearing Fee,Trading Activity Fee,Exchange Fee,Future Regulatory Fee,Commission,Platform Fee,Option Settlement Fee,Subscription Fee,Redemption Fee,Switching Fee,PH Stock Transaction Tax,Tax Service Fee,AFRC Transaction Levy,Trading Tariff,Transaction Fee,Brokerage fee,Handing Fee,Securities Management Fee,Transfer Fees (CSDC),Transfer Fees (HKSCC),Stamp Duty On Stock Borrowing,Consolidated Audit Trail Fee,Processing Fee,CM DA SI Fee,DVP SI Fee,IPO Transaction Fee,IPO Process Fee,Ipo Settle Fee,IPO Channel Fee,Realized P/L,Notes,Trade Time,Settle Date,Currency
-Trades,Stock,,DATA,NVIDIA (NVDA),US,NASDAQ,Open,10,100.00,1000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,-2.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,,"2025-01-10
+Trades,Stock,,DATA,NVIDIA (NVDA),US,NASDAQ,Open,10,100.00,1000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,-2.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,,,"2025-01-10
 09:30:00, US/Eastern",2025-01-11,USD
-Trades,Stock,,DATA,NVIDIA (NVDA),US,NASDAQ,Close,-10,200.00,-2000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,-2.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,"1,000.00",,"2025-03-10
+Trades,Stock,,DATA,NVIDIA (NVDA),US,NASDAQ,Close,-10,200.00,-2000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,-2.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,"1,000.00",,"2025-03-10
 09:30:00, US/Eastern",2025-03-11,USD
 Holdings,,,,Symbol,Quantity,Multiplier,Cost Price,Close Price,Value,Unrealized P/L,Initial Margin,Maint Margin,Currency
 ''';
