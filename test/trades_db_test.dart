@@ -186,7 +186,8 @@ void main() {
     setUp(() => db = _openDb());
     tearDown(() => db.close());
 
-    test('can insert trade for any symbol without a prior dependency', () async {
+    test('can insert trade for any symbol without a prior dependency',
+        () async {
       final inserted = await _insertTrade(db, symbol: 'CLOSED_POS');
       expect(inserted.symbol, 'CLOSED_POS');
 
