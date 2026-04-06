@@ -69,13 +69,11 @@ List<Position> computePositions(
     final symbol = entry.key;
     final symbolTrades = entry.value;
 
-    final netShares =
-        symbolTrades.fold(0.0, (sum, t) => sum + t.quantity);
+    final netShares = symbolTrades.fold(0.0, (sum, t) => sum + t.quantity);
     if (netShares <= 0) continue; // closed position
 
     final buyTrades = symbolTrades.where((t) => t.quantity > 0).toList();
-    final totalBuyQty =
-        buyTrades.fold(0.0, (sum, t) => sum + t.quantity);
+    final totalBuyQty = buyTrades.fold(0.0, (sum, t) => sum + t.quantity);
     final weightedCost =
         buyTrades.fold(0.0, (sum, t) => sum + t.quantity * t.price);
     final avgCost = totalBuyQty > 0 ? weightedCost / totalBuyQty : 0.0;
@@ -88,14 +86,16 @@ List<Position> computePositions(
             .reduce((a, b) => a.isBefore(b) ? a : b)
         : DateTime.now();
 
-    positions.add(Position(
-      symbol: symbol,
-      name: name,
-      netShares: netShares,
-      avgCost: avgCost,
-      currentPrice: currentPrice,
-      firstBuyDate: firstBuyDate,
-    ),);
+    positions.add(
+      Position(
+        symbol: symbol,
+        name: name,
+        netShares: netShares,
+        avgCost: avgCost,
+        currentPrice: currentPrice,
+        firstBuyDate: firstBuyDate,
+      ),
+    );
   }
 
   return positions;
@@ -133,7 +133,9 @@ Future<Map<String, double>> fetchLatestPrices(List<String> symbols) async {
       final c = await (db.candles.select()
             ..where((r) => r.symbol.equals(s))
             ..orderBy(
-              [(r) => OrderingTerm(expression: r.date, mode: OrderingMode.desc)],
+              [
+                (r) => OrderingTerm(expression: r.date, mode: OrderingMode.desc)
+              ],
             )
             ..limit(1))
           .getSingleOrNull();

@@ -104,16 +104,16 @@ class _SettingsPageState extends State<SettingsPage> {
             shrinkWrap: true,
             children: [
               ...parsed.trades.take(10).map(
-                (t) => ListTile(
-                  dense: true,
-                  title: Text('${t.symbol} — ${t.tradeType.toUpperCase()}'),
-                  subtitle:
-                      Text(t.tradeDate.toIso8601String().substring(0, 10)),
-                  trailing: Text(
-                    '${t.quantity.abs().toStringAsFixed(2)} @ \$${t.price.toStringAsFixed(2)}',
+                    (t) => ListTile(
+                      dense: true,
+                      title: Text('${t.symbol} — ${t.tradeType.toUpperCase()}'),
+                      subtitle:
+                          Text(t.tradeDate.toIso8601String().substring(0, 10)),
+                      trailing: Text(
+                        '${t.quantity.abs().toStringAsFixed(2)} @ \$${t.price.toStringAsFixed(2)}',
+                      ),
+                    ),
                   ),
-                ),
-              ),
               if (parsed.trades.length > 10)
                 ListTile(
                   dense: true,

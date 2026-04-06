@@ -50,8 +50,7 @@ class TigerBrokersParser extends BrokerCsvParser {
     final List<ImportedTrade> trades = [];
     for (final row in rows) {
       if (row.length < 53) continue;
-      if (row[0] != 'Trades' || row[1] != 'Stock' || row[3] != 'DATA')
-        continue;
+      if (row[0] != 'Trades' || row[1] != 'Stock' || row[3] != 'DATA') continue;
       final activityType = row[7].trim();
       if (activityType != 'Open' && activityType != 'Close') continue;
 
@@ -64,8 +63,7 @@ class TigerBrokersParser extends BrokerCsvParser {
       final tradePrice = double.tryParse(row[9].replaceAll(',', ''));
       if (quantity == null || tradePrice == null) continue;
 
-      final realizedPL =
-          double.tryParse(row[48].replaceAll(',', '')) ?? 0.0;
+      final realizedPL = double.tryParse(row[48].replaceAll(',', '')) ?? 0.0;
       final commission =
           (double.tryParse(row[33].replaceAll(',', '')) ?? 0.0).abs();
 

@@ -655,6 +655,7 @@ i1.GeneratedColumn<double> _column_38(String aliasedName) =>
         type: i1.DriftSqlType.double,
         $customConstraints: 'NOT NULL DEFAULT 0.0',
         defaultValue: const i1.CustomExpression('0.0'));
+
 // Schema9: tickers table removed; candles no longer has FK to tickers.
 final class Schema9 extends i0.VersionedSchema {
   Schema9({required super.database}) : super(version: 9);

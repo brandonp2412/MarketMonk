@@ -96,12 +96,14 @@ class _HoldingsPageState extends State<HoldingsPage>
       final symbolTrades = entry.value;
       final position = positionMap[symbol];
       final name = position?.name ?? symbolTrades.first.name;
-      summaries.add(_SymbolSummary(
-        symbol: symbol,
-        name: name,
-        position: position,
-        trades: symbolTrades,
-      ),);
+      summaries.add(
+        _SymbolSummary(
+          symbol: symbol,
+          name: name,
+          position: position,
+          trades: symbolTrades,
+        ),
+      );
     }
 
     summaries.sort((a, b) {
@@ -315,8 +317,7 @@ class _SymbolTile extends StatelessWidget {
                   Text(
                     'Realized: ${realizedPL >= 0 ? '+' : ''}${currency.format(realizedPL)}',
                     style: TextStyle(
-                      color:
-                          realizedPL >= 0 ? Colors.green : Colors.redAccent,
+                      color: realizedPL >= 0 ? Colors.green : Colors.redAccent,
                       fontSize: 12,
                     ),
                   ),

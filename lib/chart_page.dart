@@ -333,8 +333,7 @@ class ChartPageState extends State<ChartPage>
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) =>
-                          EditTickerPage(symbol: stock.text),
+                      builder: (context) => EditTickerPage(symbol: stock.text),
                     ),
                   );
                 },

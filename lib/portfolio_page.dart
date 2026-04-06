@@ -1,7 +1,6 @@
 import 'package:drift/drift.dart' hide Column, Table;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/utils.dart';
