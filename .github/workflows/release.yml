@@ -256,47 +256,8 @@ jobs:
           name: windows-app
           path: market_monk-windows-${{ needs.version-bump.outputs.version }}.zip
 
-  build-macos:
-    needs: version-bump
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-          submodules: recursive
-          fetch-depth: 0
-
-      - name: Setup Flutter from submodule
-        run: |
-          export PATH="$PATH:$PWD/flutter/bin"
-          echo "$PWD/flutter/bin" >> $GITHUB_PATH
-          flutter --version
-          flutter config --no-analytics
-          flutter precache --macos
-
-      - name: Get dependencies
-        run: flutter pub get
-
-      - name: Run build_runner
-        run: dart run build_runner build -d
-
-      - name: Build macOS
-        run: flutter build macos --release --build-name=${{ needs.version-bump.outputs.version }} --build-number=${{ needs.version-bump.outputs.build_number }}
-
-      - name: Create macOS archive
-        run: |
-          cd build/macos/Build/Products/Release
-          zip -r ../../../../../market_monk-macos-${{ needs.version-bump.outputs.version }}.zip MarketMonk.app
-
-      - name: Upload macOS artifact
-        if: github.actor != 'nektos/act'
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-app
-          path: market_monk-macos-${{ needs.version-bump.outputs.version }}.zip
-
   create-release:
-    needs: [version-bump, build-android, build-linux, build-windows, build-macos]
+    needs: [version-bump, build-android, build-linux, build-windows]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     permissions:
@@ -327,4 +288,3 @@ jobs:
             artifacts/android-aab/app-release.aab
             artifacts/linux-app/market_monk-linux-${{ needs.version-bump.outputs.version }}.zip
             artifacts/windows-app/market_monk-windows-${{ needs.version-bump.outputs.version }}.zip
-            artifacts/macos-app/market_monk-macos-${{ needs.version-bump.outputs.version }}.zip
