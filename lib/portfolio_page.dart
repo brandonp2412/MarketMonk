@@ -13,33 +13,65 @@ class PortfolioPage extends StatefulWidget {
   State<PortfolioPage> createState() => PortfolioPageState();
 }
 
-class PortfolioPageState extends State<PortfolioPage> {
-  late Stream<List<Ticker>> stream;
+class PortfolioPageState extends State<PortfolioPage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  late Stream<List<Position>> stream;
+  List<Position> _positions = [];
   int? touchedIndex;
 
   @override
   void initState() {
     super.initState();
-    stream = db.tickers.select().watch();
-    Future.delayed(kThemeAnimationDuration).then((_) => _updateCandles());
+    stream = _buildStream();
+    _preload();
+    _syncAllInBackground();
+  }
+
+  Future<void> _preload() async {
+    try {
+      final trades = await db.trades.select().get();
+      final symbols = trades.map((t) => t.symbol).toSet().toList();
+      final prices = await fetchLatestPrices(symbols);
+      final positions = computePositions(trades, prices);
+      if (mounted) setState(() => _positions = positions);
+    } catch (_) {}
+  }
+
+  Future<void> _syncAllInBackground() async {
+    try {
+      final trades = await db.trades.select().get();
+      final symbols = trades.map((t) => t.symbol).toSet();
+      for (final symbol in symbols) {
+        await syncCandles(symbol);
+      }
+    } catch (_) {
+      // Silently ignore network errors
+    }
+    if (mounted) setState(() => stream = _buildStream());
+  }
+
+  Stream<List<Position>> _buildStream() {
+    return db.trades.select().watch().asyncMap((trades) async {
+      final symbols = trades.map((t) => t.symbol).toSet().toList();
+      final prices = await fetchLatestPrices(symbols);
+      return computePositions(trades, prices);
+    });
   }
 
   Future<void> _updateCandles() async {
-    final tickers = await db.tickers.select().get();
-    for (final ticker in tickers) {
-      await syncCandles(ticker.symbol);
-    }
+    clearAllSyncCache();
+    await _syncAllInBackground();
   }
-
-  /// Current market value of a holding.
-  /// price = purchase price; change = % gain since purchase.
-  double _currentValue(Ticker t) => t.amount * t.price * (1 + t.change / 100);
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Scaffold(
       body: SafeArea(
-        child: StreamBuilder<List<Ticker>>(
+        child: StreamBuilder<List<Position>>(
           stream: stream,
           builder: _buildBody,
         ),
@@ -47,12 +79,21 @@ class PortfolioPageState extends State<PortfolioPage> {
     );
   }
 
-  Widget _buildBody(BuildContext context, AsyncSnapshot<List<Ticker>> snap) {
-    if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+  Widget _buildBody(BuildContext context, AsyncSnapshot<List<Position>> snap) {
     if (snap.hasError) return Center(child: Text(snap.error.toString()));
 
-    final tickers = snap.data!;
-    if (tickers.isEmpty) {
+    final positions = snap.data ?? _positions;
+
+    if (positions.isEmpty && !snap.hasData) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (snap.hasData && snap.data != _positions) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _positions = snap.data!);
+      });
+    }
+    if (positions.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -72,20 +113,20 @@ class PortfolioPageState extends State<PortfolioPage> {
       );
     }
 
-    final totalValue = tickers.fold(0.0, (sum, t) => sum + _currentValue(t));
-    final totalCost = tickers.fold(0.0, (sum, t) => sum + t.amount * t.price);
+    final totalValue = positions.fold(0.0, (sum, p) => sum + p.currentValue);
+    final totalCost = positions.fold(0.0, (sum, p) => sum + p.costBasis);
     final totalGain = totalValue - totalCost;
     final totalGainPct = totalCost > 0 ? (totalGain / totalCost) * 100 : 0.0;
 
     // Sort by value descending for consistent colours
-    final sorted = [...tickers]
-      ..sort((a, b) => _currentValue(b).compareTo(_currentValue(a)));
+    final sorted = [...positions]
+      ..sort((a, b) => b.currentValue.compareTo(a.currentValue));
 
     final colors = _buildColors(context, sorted.length);
 
     final sections = List.generate(sorted.length, (i) {
-      final t = sorted[i];
-      final val = _currentValue(t);
+      final p = sorted[i];
+      final val = p.currentValue;
       final pct = totalValue > 0 ? val / totalValue * 100 : 0.0;
       final isTouched = i == touchedIndex;
       return PieChartSectionData(
@@ -180,16 +221,16 @@ class PortfolioPageState extends State<PortfolioPage> {
             sliver: SliverList.builder(
               itemCount: sorted.length,
               itemBuilder: (context, i) {
-                final t = sorted[i];
-                final val = _currentValue(t);
+                final p = sorted[i];
+                final val = p.currentValue;
                 final pct = totalValue > 0 ? val / totalValue * 100 : 0.0;
                 return _LegendTile(
                   color: colors[i],
-                  symbol: t.symbol,
-                  name: t.name,
+                  symbol: p.symbol,
+                  name: p.name,
                   value: val,
                   allocationPct: pct,
-                  changePct: t.change,
+                  changePct: p.change,
                   isHighlighted: i == touchedIndex,
                   onTap: () => setState(
                     () => touchedIndex = touchedIndex == i ? null : i,
@@ -206,7 +247,6 @@ class PortfolioPageState extends State<PortfolioPage> {
 
   List<Color> _buildColors(BuildContext context, int count) {
     final base = Theme.of(context).colorScheme.primary;
-    // Generate visually distinct hues around the theme's primary hue
     final hsl = HSLColor.fromColor(base);
     return List.generate(count, (i) {
       final hue = (hsl.hue + i * (360 / count)) % 360;

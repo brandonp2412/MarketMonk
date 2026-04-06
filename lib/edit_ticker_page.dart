@@ -1,8 +1,8 @@
 import 'package:drift/drift.dart';
-import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:market_monk/candle_ticker.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
@@ -11,9 +11,8 @@ import 'package:market_monk/utils.dart';
 
 class EditTickerPage extends StatefulWidget {
   final String? symbol;
-  final int? tickerId;
 
-  const EditTickerPage({super.key, this.symbol, this.tickerId});
+  const EditTickerPage({super.key, this.symbol});
 
   @override
   State<EditTickerPage> createState() => _EditTickerPageState();
@@ -44,24 +43,6 @@ class _EditTickerPageState extends State<EditTickerPage> {
     super.initState();
     purchasedAt.text = _dateDisplay.format(_purchasedDate);
     setStream();
-    setTicker();
-  }
-
-  void setTicker() async {
-    final tickerId = widget.tickerId;
-    if (tickerId == null) return;
-
-    final ticker = await (db.tickers.select()
-          ..where((tbl) => tbl.id.equals(tickerId)))
-        .getSingleOrNull();
-    if (ticker == null) return;
-
-    symbol.text = ticker.symbol;
-    price.text = ticker.price.toStringAsFixed(2);
-    amount.text = ticker.amount.toStringAsFixed(2);
-    _purchasedDate = ticker.purchasedAt;
-    purchasedAt.text = _dateDisplay.format(_purchasedDate);
-    setState(() {});
   }
 
   void setStream() {
@@ -80,8 +61,6 @@ class _EditTickerPageState extends State<EditTickerPage> {
           ..addColumns([
             db.candles.date,
             db.candles.close,
-            db.tickers.id,
-            db.tickers.price,
           ])
           ..where(
             db.candles.symbol.equals(symbol.text.split(' ').first) &
@@ -96,12 +75,6 @@ class _EditTickerPageState extends State<EditTickerPage> {
             ],
           )
           ..groupBy(groupBy))
-        .join([
-          leftOuterJoin(
-            db.tickers,
-            db.tickers.symbol.equalsExp(db.candles.symbol),
-          ),
-        ])
         .watch()
         .map(
           (results) => results
@@ -111,12 +84,6 @@ class _EditTickerPageState extends State<EditTickerPage> {
                     date: Value(result.read(db.candles.date)!),
                     close: Value(result.read(db.candles.close)!),
                   ),
-                  ticker: result.read(db.tickers.id) != null
-                      ? TickersCompanion(
-                          id: Value(result.read(db.tickers.id)!),
-                          price: Value(result.read(db.tickers.price)!),
-                        )
-                      : null,
                 ),
               )
               .toList(),
@@ -189,7 +156,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                 color: option == years
                     ? Theme.of(context).colorScheme.primary
                     : Colors.transparent,
-              ), // Set border color
+              ),
             ),
             child: Text("${option}y"),
           ),
@@ -217,7 +184,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                 color: option == months
                     ? Theme.of(context).colorScheme.primary
                     : Colors.transparent,
-              ), // Set border color
+              ),
             ),
             child: Text("${option}m"),
           ),
@@ -227,7 +194,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Edit investment"),
+        title: const Text("Add trade"),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -430,7 +397,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                               color: days == 5
                                   ? Theme.of(context).colorScheme.primary
                                   : Colors.transparent,
-                            ), // Set border color
+                            ),
                           ),
                           child: const Text("5d"),
                         ),
@@ -451,14 +418,6 @@ class _EditTickerPageState extends State<EditTickerPage> {
         onPressed: () async {
           Navigator.of(context).pop();
 
-          final candleTickers = await stream?.first;
-          if (candleTickers == null) return;
-
-          final percentChange = safePercentChange(
-            double.parse(price.text),
-            candleTickers.lastOrNull?.candle.close.value ?? 0,
-          );
-
           final name = symbol.text
               .split(' ')
               .sublist(1)
@@ -468,7 +427,6 @@ class _EditTickerPageState extends State<EditTickerPage> {
           final tickerSymbol = symbol.text.split(' ').first;
           final qty = double.parse(amount.text);
 
-          // Always record a trade entry
           await db.trades.insertOne(
             TradesCompanion.insert(
               symbol: tickerSymbol,
@@ -480,56 +438,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
             ),
           );
 
-          final tickerId = widget.tickerId;
-          if (tickerId != null) {
-            (db.tickers.update()..where((tbl) => tbl.id.equals(tickerId)))
-                .write(
-              TickersCompanion(
-                amount: Value(double.parse(amount.text)),
-                updatedAt: Value(DateTime.now()),
-                purchasedAt: Value(_purchasedDate),
-                price: Value(double.parse(price.text)),
-                name: Value(name),
-                symbol: Value(tickerSymbol),
-                change: Value(percentChange),
-              ),
-            );
-          } else if (!_isSell) {
-            final existing = await (db.tickers.select()
-                  ..where((tbl) => tbl.symbol.equals(tickerSymbol)))
-                .getSingleOrNull();
-            if (existing != null) {
-              final newAmount = existing.amount + qty;
-              final newAvgPrice =
-                  (existing.amount * existing.price + qty * double.parse(price.text)) /
-                      newAmount;
-              final currentPrice =
-                  candleTickers.lastOrNull?.candle.close.value ?? newAvgPrice;
-              final newChange = safePercentChange(newAvgPrice, currentPrice);
-              (db.tickers.update()
-                    ..where((tbl) => tbl.id.equals(existing.id)))
-                  .write(
-                TickersCompanion(
-                  amount: Value(newAmount),
-                  price: Value(newAvgPrice),
-                  change: Value(newChange),
-                  updatedAt: Value(DateTime.now()),
-                ),
-              );
-            } else {
-              db.tickers.insertOne(
-                TickersCompanion(
-                  amount: Value(double.parse(amount.text)),
-                  updatedAt: Value(DateTime.now()),
-                  purchasedAt: Value(_purchasedDate),
-                  price: Value(double.parse(price.text)),
-                  name: Value(name),
-                  symbol: Value(tickerSymbol),
-                  change: Value(percentChange),
-                ),
-              );
-            }
-          }
+          await syncCandles(tickerSymbol);
         },
         label: const Text('Save'),
         icon: const Icon(Icons.save),

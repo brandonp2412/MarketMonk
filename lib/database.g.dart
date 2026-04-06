@@ -3,457 +3,6 @@
 part of 'database.dart';
 
 // ignore_for_file: type=lint
-class $TickersTable extends Tickers with TableInfo<$TickersTable, Ticker> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  $TickersTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  @override
-  late final GeneratedColumn<int> id = GeneratedColumn<int>(
-      'id', aliasedName, false,
-      hasAutoIncrement: true,
-      type: DriftSqlType.int,
-      requiredDuringInsert: false,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
-  static const VerificationMeta _symbolMeta = const VerificationMeta('symbol');
-  @override
-  late final GeneratedColumn<String> symbol = GeneratedColumn<String>(
-      'symbol', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _nameMeta = const VerificationMeta('name');
-  @override
-  late final GeneratedColumn<String> name = GeneratedColumn<String>(
-      'name', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _changeMeta = const VerificationMeta('change');
-  @override
-  late final GeneratedColumn<double> change = GeneratedColumn<double>(
-      'change', aliasedName, false,
-      type: DriftSqlType.double, requiredDuringInsert: true);
-  static const VerificationMeta _createdAtMeta =
-      const VerificationMeta('createdAt');
-  @override
-  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
-      'created_at', aliasedName, false,
-      type: DriftSqlType.dateTime,
-      requiredDuringInsert: false,
-      defaultValue: currentDateAndTime);
-  static const VerificationMeta _purchasedAtMeta =
-      const VerificationMeta('purchasedAt');
-  @override
-  late final GeneratedColumn<DateTime> purchasedAt = GeneratedColumn<DateTime>(
-      'purchased_at', aliasedName, false,
-      type: DriftSqlType.dateTime,
-      requiredDuringInsert: false,
-      defaultValue: currentDateAndTime);
-  static const VerificationMeta _updatedAtMeta =
-      const VerificationMeta('updatedAt');
-  @override
-  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
-      'updated_at', aliasedName, false,
-      type: DriftSqlType.dateTime,
-      requiredDuringInsert: false,
-      defaultValue: currentDateAndTime);
-  static const VerificationMeta _amountMeta = const VerificationMeta('amount');
-  @override
-  late final GeneratedColumn<double> amount = GeneratedColumn<double>(
-      'amount', aliasedName, false,
-      type: DriftSqlType.double, requiredDuringInsert: true);
-  static const VerificationMeta _priceMeta = const VerificationMeta('price');
-  @override
-  late final GeneratedColumn<double> price = GeneratedColumn<double>(
-      'price', aliasedName, false,
-      type: DriftSqlType.double, requiredDuringInsert: true);
-  @override
-  List<GeneratedColumn> get $columns => [
-        id,
-        symbol,
-        name,
-        change,
-        createdAt,
-        purchasedAt,
-        updatedAt,
-        amount,
-        price
-      ];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'tickers';
-  @override
-  VerificationContext validateIntegrity(Insertable<Ticker> instance,
-      {bool isInserting = false}) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    }
-    if (data.containsKey('symbol')) {
-      context.handle(_symbolMeta,
-          symbol.isAcceptableOrUnknown(data['symbol']!, _symbolMeta));
-    } else if (isInserting) {
-      context.missing(_symbolMeta);
-    }
-    if (data.containsKey('name')) {
-      context.handle(
-          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
-    } else if (isInserting) {
-      context.missing(_nameMeta);
-    }
-    if (data.containsKey('change')) {
-      context.handle(_changeMeta,
-          change.isAcceptableOrUnknown(data['change']!, _changeMeta));
-    } else if (isInserting) {
-      context.missing(_changeMeta);
-    }
-    if (data.containsKey('created_at')) {
-      context.handle(_createdAtMeta,
-          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
-    }
-    if (data.containsKey('purchased_at')) {
-      context.handle(
-          _purchasedAtMeta,
-          purchasedAt.isAcceptableOrUnknown(
-              data['purchased_at']!, _purchasedAtMeta));
-    }
-    if (data.containsKey('updated_at')) {
-      context.handle(_updatedAtMeta,
-          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
-    }
-    if (data.containsKey('amount')) {
-      context.handle(_amountMeta,
-          amount.isAcceptableOrUnknown(data['amount']!, _amountMeta));
-    } else if (isInserting) {
-      context.missing(_amountMeta);
-    }
-    if (data.containsKey('price')) {
-      context.handle(
-          _priceMeta, price.isAcceptableOrUnknown(data['price']!, _priceMeta));
-    } else if (isInserting) {
-      context.missing(_priceMeta);
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  Ticker map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Ticker(
-      id: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
-      symbol: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}symbol'])!,
-      name: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
-      change: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}change'])!,
-      createdAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
-      purchasedAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.dateTime, data['${effectivePrefix}purchased_at'])!,
-      updatedAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
-      amount: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}amount'])!,
-      price: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}price'])!,
-    );
-  }
-
-  @override
-  $TickersTable createAlias(String alias) {
-    return $TickersTable(attachedDatabase, alias);
-  }
-}
-
-class Ticker extends DataClass implements Insertable<Ticker> {
-  final int id;
-  final String symbol;
-  final String name;
-  final double change;
-  final DateTime createdAt;
-  final DateTime purchasedAt;
-  final DateTime updatedAt;
-  final double amount;
-  final double price;
-  const Ticker(
-      {required this.id,
-      required this.symbol,
-      required this.name,
-      required this.change,
-      required this.createdAt,
-      required this.purchasedAt,
-      required this.updatedAt,
-      required this.amount,
-      required this.price});
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['id'] = Variable<int>(id);
-    map['symbol'] = Variable<String>(symbol);
-    map['name'] = Variable<String>(name);
-    map['change'] = Variable<double>(change);
-    map['created_at'] = Variable<DateTime>(createdAt);
-    map['purchased_at'] = Variable<DateTime>(purchasedAt);
-    map['updated_at'] = Variable<DateTime>(updatedAt);
-    map['amount'] = Variable<double>(amount);
-    map['price'] = Variable<double>(price);
-    return map;
-  }
-
-  TickersCompanion toCompanion(bool nullToAbsent) {
-    return TickersCompanion(
-      id: Value(id),
-      symbol: Value(symbol),
-      name: Value(name),
-      change: Value(change),
-      createdAt: Value(createdAt),
-      purchasedAt: Value(purchasedAt),
-      updatedAt: Value(updatedAt),
-      amount: Value(amount),
-      price: Value(price),
-    );
-  }
-
-  factory Ticker.fromJson(Map<String, dynamic> json,
-      {ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return Ticker(
-      id: serializer.fromJson<int>(json['id']),
-      symbol: serializer.fromJson<String>(json['symbol']),
-      name: serializer.fromJson<String>(json['name']),
-      change: serializer.fromJson<double>(json['change']),
-      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
-      purchasedAt: serializer.fromJson<DateTime>(json['purchasedAt']),
-      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
-      amount: serializer.fromJson<double>(json['amount']),
-      price: serializer.fromJson<double>(json['price']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'id': serializer.toJson<int>(id),
-      'symbol': serializer.toJson<String>(symbol),
-      'name': serializer.toJson<String>(name),
-      'change': serializer.toJson<double>(change),
-      'createdAt': serializer.toJson<DateTime>(createdAt),
-      'purchasedAt': serializer.toJson<DateTime>(purchasedAt),
-      'updatedAt': serializer.toJson<DateTime>(updatedAt),
-      'amount': serializer.toJson<double>(amount),
-      'price': serializer.toJson<double>(price),
-    };
-  }
-
-  Ticker copyWith(
-          {int? id,
-          String? symbol,
-          String? name,
-          double? change,
-          DateTime? createdAt,
-          DateTime? purchasedAt,
-          DateTime? updatedAt,
-          double? amount,
-          double? price}) =>
-      Ticker(
-        id: id ?? this.id,
-        symbol: symbol ?? this.symbol,
-        name: name ?? this.name,
-        change: change ?? this.change,
-        createdAt: createdAt ?? this.createdAt,
-        purchasedAt: purchasedAt ?? this.purchasedAt,
-        updatedAt: updatedAt ?? this.updatedAt,
-        amount: amount ?? this.amount,
-        price: price ?? this.price,
-      );
-  Ticker copyWithCompanion(TickersCompanion data) {
-    return Ticker(
-      id: data.id.present ? data.id.value : this.id,
-      symbol: data.symbol.present ? data.symbol.value : this.symbol,
-      name: data.name.present ? data.name.value : this.name,
-      change: data.change.present ? data.change.value : this.change,
-      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
-      purchasedAt:
-          data.purchasedAt.present ? data.purchasedAt.value : this.purchasedAt,
-      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
-      amount: data.amount.present ? data.amount.value : this.amount,
-      price: data.price.present ? data.price.value : this.price,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('Ticker(')
-          ..write('id: $id, ')
-          ..write('symbol: $symbol, ')
-          ..write('name: $name, ')
-          ..write('change: $change, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('purchasedAt: $purchasedAt, ')
-          ..write('updatedAt: $updatedAt, ')
-          ..write('amount: $amount, ')
-          ..write('price: $price')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode => Object.hash(id, symbol, name, change, createdAt,
-      purchasedAt, updatedAt, amount, price);
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is Ticker &&
-          other.id == this.id &&
-          other.symbol == this.symbol &&
-          other.name == this.name &&
-          other.change == this.change &&
-          other.createdAt == this.createdAt &&
-          other.purchasedAt == this.purchasedAt &&
-          other.updatedAt == this.updatedAt &&
-          other.amount == this.amount &&
-          other.price == this.price);
-}
-
-class TickersCompanion extends UpdateCompanion<Ticker> {
-  final Value<int> id;
-  final Value<String> symbol;
-  final Value<String> name;
-  final Value<double> change;
-  final Value<DateTime> createdAt;
-  final Value<DateTime> purchasedAt;
-  final Value<DateTime> updatedAt;
-  final Value<double> amount;
-  final Value<double> price;
-  const TickersCompanion({
-    this.id = const Value.absent(),
-    this.symbol = const Value.absent(),
-    this.name = const Value.absent(),
-    this.change = const Value.absent(),
-    this.createdAt = const Value.absent(),
-    this.purchasedAt = const Value.absent(),
-    this.updatedAt = const Value.absent(),
-    this.amount = const Value.absent(),
-    this.price = const Value.absent(),
-  });
-  TickersCompanion.insert({
-    this.id = const Value.absent(),
-    required String symbol,
-    required String name,
-    required double change,
-    this.createdAt = const Value.absent(),
-    this.purchasedAt = const Value.absent(),
-    this.updatedAt = const Value.absent(),
-    required double amount,
-    required double price,
-  })  : symbol = Value(symbol),
-        name = Value(name),
-        change = Value(change),
-        amount = Value(amount),
-        price = Value(price);
-  static Insertable<Ticker> custom({
-    Expression<int>? id,
-    Expression<String>? symbol,
-    Expression<String>? name,
-    Expression<double>? change,
-    Expression<DateTime>? createdAt,
-    Expression<DateTime>? purchasedAt,
-    Expression<DateTime>? updatedAt,
-    Expression<double>? amount,
-    Expression<double>? price,
-  }) {
-    return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (symbol != null) 'symbol': symbol,
-      if (name != null) 'name': name,
-      if (change != null) 'change': change,
-      if (createdAt != null) 'created_at': createdAt,
-      if (purchasedAt != null) 'purchased_at': purchasedAt,
-      if (updatedAt != null) 'updated_at': updatedAt,
-      if (amount != null) 'amount': amount,
-      if (price != null) 'price': price,
-    });
-  }
-
-  TickersCompanion copyWith(
-      {Value<int>? id,
-      Value<String>? symbol,
-      Value<String>? name,
-      Value<double>? change,
-      Value<DateTime>? createdAt,
-      Value<DateTime>? purchasedAt,
-      Value<DateTime>? updatedAt,
-      Value<double>? amount,
-      Value<double>? price}) {
-    return TickersCompanion(
-      id: id ?? this.id,
-      symbol: symbol ?? this.symbol,
-      name: name ?? this.name,
-      change: change ?? this.change,
-      createdAt: createdAt ?? this.createdAt,
-      purchasedAt: purchasedAt ?? this.purchasedAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-      amount: amount ?? this.amount,
-      price: price ?? this.price,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<int>(id.value);
-    }
-    if (symbol.present) {
-      map['symbol'] = Variable<String>(symbol.value);
-    }
-    if (name.present) {
-      map['name'] = Variable<String>(name.value);
-    }
-    if (change.present) {
-      map['change'] = Variable<double>(change.value);
-    }
-    if (createdAt.present) {
-      map['created_at'] = Variable<DateTime>(createdAt.value);
-    }
-    if (purchasedAt.present) {
-      map['purchased_at'] = Variable<DateTime>(purchasedAt.value);
-    }
-    if (updatedAt.present) {
-      map['updated_at'] = Variable<DateTime>(updatedAt.value);
-    }
-    if (amount.present) {
-      map['amount'] = Variable<double>(amount.value);
-    }
-    if (price.present) {
-      map['price'] = Variable<double>(price.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('TickersCompanion(')
-          ..write('id: $id, ')
-          ..write('symbol: $symbol, ')
-          ..write('name: $name, ')
-          ..write('change: $change, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('purchasedAt: $purchasedAt, ')
-          ..write('updatedAt: $updatedAt, ')
-          ..write('amount: $amount, ')
-          ..write('price: $price')
-          ..write(')'))
-        .toString();
-  }
-}
-
 class $CandlesTable extends Candles with TableInfo<$CandlesTable, Candle> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -472,10 +21,7 @@ class $CandlesTable extends Candles with TableInfo<$CandlesTable, Candle> {
   @override
   late final GeneratedColumn<String> symbol = GeneratedColumn<String>(
       'symbol', aliasedName, false,
-      type: DriftSqlType.string,
-      requiredDuringInsert: true,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('REFERENCES tickers (symbol)'));
+      type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _dateMeta = const VerificationMeta('date');
   @override
   late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
@@ -1351,319 +897,15 @@ class TradesCompanion extends UpdateCompanion<Trade> {
 abstract class _$Database extends GeneratedDatabase {
   _$Database(QueryExecutor e) : super(e);
   $DatabaseManager get managers => $DatabaseManager(this);
-  late final $TickersTable tickers = $TickersTable(this);
   late final $CandlesTable candles = $CandlesTable(this);
   late final $TradesTable trades = $TradesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities =>
-      [tickers, candles, trades];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [candles, trades];
 }
 
-typedef $$TickersTableCreateCompanionBuilder = TickersCompanion Function({
-  Value<int> id,
-  required String symbol,
-  required String name,
-  required double change,
-  Value<DateTime> createdAt,
-  Value<DateTime> purchasedAt,
-  Value<DateTime> updatedAt,
-  required double amount,
-  required double price,
-});
-typedef $$TickersTableUpdateCompanionBuilder = TickersCompanion Function({
-  Value<int> id,
-  Value<String> symbol,
-  Value<String> name,
-  Value<double> change,
-  Value<DateTime> createdAt,
-  Value<DateTime> purchasedAt,
-  Value<DateTime> updatedAt,
-  Value<double> amount,
-  Value<double> price,
-});
-
-final class $$TickersTableReferences
-    extends BaseReferences<_$Database, $TickersTable, Ticker> {
-  $$TickersTableReferences(super.$_db, super.$_table, super.$_typedResult);
-
-  static MultiTypedResultKey<$CandlesTable, List<Candle>> _candlesRefsTable(
-          _$Database db) =>
-      MultiTypedResultKey.fromTable(db.candles,
-          aliasName:
-              $_aliasNameGenerator(db.tickers.symbol, db.candles.symbol));
-
-  $$CandlesTableProcessedTableManager get candlesRefs {
-    final manager = $$CandlesTableTableManager($_db, $_db.candles).filter(
-        (f) => f.symbol.symbol.sqlEquals($_itemColumn<String>('symbol')!));
-
-    final cache = $_typedResult.readTableOrNull(_candlesRefsTable($_db));
-    return ProcessedTableManager(
-        manager.$state.copyWith(prefetchedData: cache));
-  }
-}
-
-class $$TickersTableFilterComposer extends Composer<_$Database, $TickersTable> {
-  $$TickersTableFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<int> get id => $composableBuilder(
-      column: $table.id, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get symbol => $composableBuilder(
-      column: $table.symbol, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get name => $composableBuilder(
-      column: $table.name, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<double> get change => $composableBuilder(
-      column: $table.change, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<DateTime> get createdAt => $composableBuilder(
-      column: $table.createdAt, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<DateTime> get purchasedAt => $composableBuilder(
-      column: $table.purchasedAt, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
-      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<double> get amount => $composableBuilder(
-      column: $table.amount, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<double> get price => $composableBuilder(
-      column: $table.price, builder: (column) => ColumnFilters(column));
-
-  Expression<bool> candlesRefs(
-      Expression<bool> Function($$CandlesTableFilterComposer f) f) {
-    final $$CandlesTableFilterComposer composer = $composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.symbol,
-        referencedTable: $db.candles,
-        getReferencedColumn: (t) => t.symbol,
-        builder: (joinBuilder,
-                {$addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer}) =>
-            $$CandlesTableFilterComposer(
-              $db: $db,
-              $table: $db.candles,
-              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-              joinBuilder: joinBuilder,
-              $removeJoinBuilderFromRootComposer:
-                  $removeJoinBuilderFromRootComposer,
-            ));
-    return f(composer);
-  }
-}
-
-class $$TickersTableOrderingComposer
-    extends Composer<_$Database, $TickersTable> {
-  $$TickersTableOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<int> get id => $composableBuilder(
-      column: $table.id, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get symbol => $composableBuilder(
-      column: $table.symbol, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get name => $composableBuilder(
-      column: $table.name, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<double> get change => $composableBuilder(
-      column: $table.change, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
-      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<DateTime> get purchasedAt => $composableBuilder(
-      column: $table.purchasedAt, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
-      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<double> get amount => $composableBuilder(
-      column: $table.amount, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<double> get price => $composableBuilder(
-      column: $table.price, builder: (column) => ColumnOrderings(column));
-}
-
-class $$TickersTableAnnotationComposer
-    extends Composer<_$Database, $TickersTable> {
-  $$TickersTableAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<int> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<String> get symbol =>
-      $composableBuilder(column: $table.symbol, builder: (column) => column);
-
-  GeneratedColumn<String> get name =>
-      $composableBuilder(column: $table.name, builder: (column) => column);
-
-  GeneratedColumn<double> get change =>
-      $composableBuilder(column: $table.change, builder: (column) => column);
-
-  GeneratedColumn<DateTime> get createdAt =>
-      $composableBuilder(column: $table.createdAt, builder: (column) => column);
-
-  GeneratedColumn<DateTime> get purchasedAt => $composableBuilder(
-      column: $table.purchasedAt, builder: (column) => column);
-
-  GeneratedColumn<DateTime> get updatedAt =>
-      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
-
-  GeneratedColumn<double> get amount =>
-      $composableBuilder(column: $table.amount, builder: (column) => column);
-
-  GeneratedColumn<double> get price =>
-      $composableBuilder(column: $table.price, builder: (column) => column);
-
-  Expression<T> candlesRefs<T extends Object>(
-      Expression<T> Function($$CandlesTableAnnotationComposer a) f) {
-    final $$CandlesTableAnnotationComposer composer = $composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.symbol,
-        referencedTable: $db.candles,
-        getReferencedColumn: (t) => t.symbol,
-        builder: (joinBuilder,
-                {$addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer}) =>
-            $$CandlesTableAnnotationComposer(
-              $db: $db,
-              $table: $db.candles,
-              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-              joinBuilder: joinBuilder,
-              $removeJoinBuilderFromRootComposer:
-                  $removeJoinBuilderFromRootComposer,
-            ));
-    return f(composer);
-  }
-}
-
-class $$TickersTableTableManager extends RootTableManager<
-    _$Database,
-    $TickersTable,
-    Ticker,
-    $$TickersTableFilterComposer,
-    $$TickersTableOrderingComposer,
-    $$TickersTableAnnotationComposer,
-    $$TickersTableCreateCompanionBuilder,
-    $$TickersTableUpdateCompanionBuilder,
-    (Ticker, $$TickersTableReferences),
-    Ticker,
-    PrefetchHooks Function({bool candlesRefs})> {
-  $$TickersTableTableManager(_$Database db, $TickersTable table)
-      : super(TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $$TickersTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $$TickersTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $$TickersTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback: ({
-            Value<int> id = const Value.absent(),
-            Value<String> symbol = const Value.absent(),
-            Value<String> name = const Value.absent(),
-            Value<double> change = const Value.absent(),
-            Value<DateTime> createdAt = const Value.absent(),
-            Value<DateTime> purchasedAt = const Value.absent(),
-            Value<DateTime> updatedAt = const Value.absent(),
-            Value<double> amount = const Value.absent(),
-            Value<double> price = const Value.absent(),
-          }) =>
-              TickersCompanion(
-            id: id,
-            symbol: symbol,
-            name: name,
-            change: change,
-            createdAt: createdAt,
-            purchasedAt: purchasedAt,
-            updatedAt: updatedAt,
-            amount: amount,
-            price: price,
-          ),
-          createCompanionCallback: ({
-            Value<int> id = const Value.absent(),
-            required String symbol,
-            required String name,
-            required double change,
-            Value<DateTime> createdAt = const Value.absent(),
-            Value<DateTime> purchasedAt = const Value.absent(),
-            Value<DateTime> updatedAt = const Value.absent(),
-            required double amount,
-            required double price,
-          }) =>
-              TickersCompanion.insert(
-            id: id,
-            symbol: symbol,
-            name: name,
-            change: change,
-            createdAt: createdAt,
-            purchasedAt: purchasedAt,
-            updatedAt: updatedAt,
-            amount: amount,
-            price: price,
-          ),
-          withReferenceMapper: (p0) => p0
-              .map((e) =>
-                  (e.readTable(table), $$TickersTableReferences(db, table, e)))
-              .toList(),
-          prefetchHooksCallback: ({candlesRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [if (candlesRefs) db.candles],
-              addJoins: null,
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (candlesRefs)
-                    await $_getPrefetchedData<Ticker, $TickersTable, Candle>(
-                        currentTable: table,
-                        referencedTable:
-                            $$TickersTableReferences._candlesRefsTable(db),
-                        managerFromTypedResult: (p0) =>
-                            $$TickersTableReferences(db, table, p0).candlesRefs,
-                        referencedItemsForCurrentItem:
-                            (item, referencedItems) => referencedItems
-                                .where((e) => e.symbol == item.symbol),
-                        typedResults: items)
-                ];
-              },
-            );
-          },
-        ));
-}
-
-typedef $$TickersTableProcessedTableManager = ProcessedTableManager<
-    _$Database,
-    $TickersTable,
-    Ticker,
-    $$TickersTableFilterComposer,
-    $$TickersTableOrderingComposer,
-    $$TickersTableAnnotationComposer,
-    $$TickersTableCreateCompanionBuilder,
-    $$TickersTableUpdateCompanionBuilder,
-    (Ticker, $$TickersTableReferences),
-    Ticker,
-    PrefetchHooks Function({bool candlesRefs})>;
 typedef $$CandlesTableCreateCompanionBuilder = CandlesCompanion Function({
   Value<int> id,
   required String symbol,
@@ -1690,20 +932,6 @@ typedef $$CandlesTableUpdateCompanionBuilder = CandlesCompanion Function({
 final class $$CandlesTableReferences
     extends BaseReferences<_$Database, $CandlesTable, Candle> {
   $$CandlesTableReferences(super.$_db, super.$_table, super.$_typedResult);
-
-  static $TickersTable _symbolTable(_$Database db) => db.tickers
-      .createAlias($_aliasNameGenerator(db.candles.symbol, db.tickers.symbol));
-
-  $$TickersTableProcessedTableManager get symbol {
-    final $_column = $_itemColumn<String>('symbol')!;
-
-    final manager = $$TickersTableTableManager($_db, $_db.tickers)
-        .filter((f) => f.symbol.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_symbolTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-        manager.$state.copyWith(prefetchedData: [item]));
-  }
 }
 
 class $$CandlesTableFilterComposer extends Composer<_$Database, $CandlesTable> {
@@ -1716,6 +944,9 @@ class $$CandlesTableFilterComposer extends Composer<_$Database, $CandlesTable> {
   });
   ColumnFilters<int> get id => $composableBuilder(
       column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get symbol => $composableBuilder(
+      column: $table.symbol, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get date => $composableBuilder(
       column: $table.date, builder: (column) => ColumnFilters(column));
@@ -1737,26 +968,6 @@ class $$CandlesTableFilterComposer extends Composer<_$Database, $CandlesTable> {
 
   ColumnFilters<double> get adjClose => $composableBuilder(
       column: $table.adjClose, builder: (column) => ColumnFilters(column));
-
-  $$TickersTableFilterComposer get symbol {
-    final $$TickersTableFilterComposer composer = $composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.symbol,
-        referencedTable: $db.tickers,
-        getReferencedColumn: (t) => t.symbol,
-        builder: (joinBuilder,
-                {$addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer}) =>
-            $$TickersTableFilterComposer(
-              $db: $db,
-              $table: $db.tickers,
-              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-              joinBuilder: joinBuilder,
-              $removeJoinBuilderFromRootComposer:
-                  $removeJoinBuilderFromRootComposer,
-            ));
-    return composer;
-  }
 }
 
 class $$CandlesTableOrderingComposer
@@ -1770,6 +981,9 @@ class $$CandlesTableOrderingComposer
   });
   ColumnOrderings<int> get id => $composableBuilder(
       column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get symbol => $composableBuilder(
+      column: $table.symbol, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<DateTime> get date => $composableBuilder(
       column: $table.date, builder: (column) => ColumnOrderings(column));
@@ -1791,26 +1005,6 @@ class $$CandlesTableOrderingComposer
 
   ColumnOrderings<double> get adjClose => $composableBuilder(
       column: $table.adjClose, builder: (column) => ColumnOrderings(column));
-
-  $$TickersTableOrderingComposer get symbol {
-    final $$TickersTableOrderingComposer composer = $composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.symbol,
-        referencedTable: $db.tickers,
-        getReferencedColumn: (t) => t.symbol,
-        builder: (joinBuilder,
-                {$addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer}) =>
-            $$TickersTableOrderingComposer(
-              $db: $db,
-              $table: $db.tickers,
-              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-              joinBuilder: joinBuilder,
-              $removeJoinBuilderFromRootComposer:
-                  $removeJoinBuilderFromRootComposer,
-            ));
-    return composer;
-  }
 }
 
 class $$CandlesTableAnnotationComposer
@@ -1824,6 +1018,9 @@ class $$CandlesTableAnnotationComposer
   });
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get symbol =>
+      $composableBuilder(column: $table.symbol, builder: (column) => column);
 
   GeneratedColumn<DateTime> get date =>
       $composableBuilder(column: $table.date, builder: (column) => column);
@@ -1845,26 +1042,6 @@ class $$CandlesTableAnnotationComposer
 
   GeneratedColumn<double> get adjClose =>
       $composableBuilder(column: $table.adjClose, builder: (column) => column);
-
-  $$TickersTableAnnotationComposer get symbol {
-    final $$TickersTableAnnotationComposer composer = $composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.symbol,
-        referencedTable: $db.tickers,
-        getReferencedColumn: (t) => t.symbol,
-        builder: (joinBuilder,
-                {$addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer}) =>
-            $$TickersTableAnnotationComposer(
-              $db: $db,
-              $table: $db.tickers,
-              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-              joinBuilder: joinBuilder,
-              $removeJoinBuilderFromRootComposer:
-                  $removeJoinBuilderFromRootComposer,
-            ));
-    return composer;
-  }
 }
 
 class $$CandlesTableTableManager extends RootTableManager<
@@ -1878,7 +1055,7 @@ class $$CandlesTableTableManager extends RootTableManager<
     $$CandlesTableUpdateCompanionBuilder,
     (Candle, $$CandlesTableReferences),
     Candle,
-    PrefetchHooks Function({bool symbol})> {
+    PrefetchHooks Function()> {
   $$CandlesTableTableManager(_$Database db, $CandlesTable table)
       : super(TableManagerState(
           db: db,
@@ -1937,40 +1114,7 @@ class $$CandlesTableTableManager extends RootTableManager<
               .map((e) =>
                   (e.readTable(table), $$CandlesTableReferences(db, table, e)))
               .toList(),
-          prefetchHooksCallback: ({symbol = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [],
-              addJoins: <
-                  T extends TableManagerState<
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic>>(state) {
-                if (symbol) {
-                  state = state.withJoin(
-                    currentTable: table,
-                    currentColumn: table.symbol,
-                    referencedTable: $$CandlesTableReferences._symbolTable(db),
-                    referencedColumn:
-                        $$CandlesTableReferences._symbolTable(db).symbol,
-                  ) as T;
-                }
-
-                return state;
-              },
-              getPrefetchedDataCallback: (items) async {
-                return [];
-              },
-            );
-          },
+          prefetchHooksCallback: null,
         ));
 }
 
@@ -1985,7 +1129,7 @@ typedef $$CandlesTableProcessedTableManager = ProcessedTableManager<
     $$CandlesTableUpdateCompanionBuilder,
     (Candle, $$CandlesTableReferences),
     Candle,
-    PrefetchHooks Function({bool symbol})>;
+    PrefetchHooks Function()>;
 typedef $$TradesTableCreateCompanionBuilder = TradesCompanion Function({
   Value<int> id,
   required String symbol,
@@ -2207,8 +1351,6 @@ typedef $$TradesTableProcessedTableManager = ProcessedTableManager<
 class $DatabaseManager {
   final _$Database _db;
   $DatabaseManager(this._db);
-  $$TickersTableTableManager get tickers =>
-      $$TickersTableTableManager(_db, _db.tickers);
   $$CandlesTableTableManager get candles =>
       $$CandlesTableTableManager(_db, _db.candles);
   $$TradesTableTableManager get trades =>

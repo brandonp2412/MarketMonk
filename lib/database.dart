@@ -9,10 +9,10 @@ import 'package:path_provider/path_provider.dart';
 
 part 'database.g.dart';
 
-@DriftDatabase(tables: [Tickers, Candles, Trades])
+@DriftDatabase(tables: [Candles, Trades])
 class Database extends _$Database {
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   Database() : super(_openConnection());
 
@@ -31,7 +31,6 @@ class Database extends _$Database {
   MigrationStrategy get migration {
     return MigrationStrategy(
       onUpgrade: (m, from, to) async {
-        // Following the advice from https://drift.simonbinder.eu/Migrations/api/#general-tips
         await customStatement('PRAGMA foreign_keys = OFF');
 
         await transaction(
@@ -42,6 +41,13 @@ class Database extends _$Database {
             steps: _upgrade,
           ),
         );
+
+        // The actual data/schema work for 8→9 happens here where we have
+        // access to customStatement. The step registered in _upgrade is a
+        // no-op that only advances the version number.
+        if (from < 9 && to >= 9) {
+          await _migrateTickersToTrades();
+        }
 
         if (kDebugMode) {
           final wrongForeignKeys =
@@ -60,13 +66,54 @@ class Database extends _$Database {
     );
   }
 
+  /// Converts tickers with no corresponding buy trades into open trades,
+  /// recreates the candles table without the FK to tickers, then drops tickers.
+  Future<void> _migrateTickersToTrades() async {
+    // Guard: tickers might not exist if schema was already clean.
+    final tableExists = await customSelect(
+      "SELECT 1 FROM sqlite_master WHERE type='table' AND name='tickers'",
+    ).get();
+    if (tableExists.isEmpty) return;
+
+    // Preserve any tickers that have no buy trades by recording them.
+    await customStatement('''
+      INSERT OR IGNORE INTO trades
+        (symbol, name, quantity, price, trade_type, trade_date, realized_p_l, commission)
+      SELECT
+        symbol, name, amount, price, 'open',
+        COALESCE(purchased_at, CAST(strftime('%s', CURRENT_TIMESTAMP) AS INTEGER)),
+        0.0, 0.0
+      FROM tickers
+      WHERE NOT EXISTS (
+        SELECT 1 FROM trades t2
+        WHERE t2.symbol = tickers.symbol AND t2.trade_type = 'open'
+      )
+    ''');
+
+    // Recreate candles without the FK constraint that references tickers.
+    await customStatement('''
+      CREATE TABLE new_candles (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        symbol TEXT NOT NULL,
+        date INTEGER NOT NULL,
+        open REAL NOT NULL DEFAULT (-1.0),
+        high REAL NOT NULL DEFAULT (-1.0),
+        low REAL NOT NULL DEFAULT (-1.0),
+        close REAL NOT NULL DEFAULT (-1.0),
+        volume INTEGER NOT NULL DEFAULT 0,
+        adj_close REAL NOT NULL DEFAULT (-1.0)
+      )
+    ''');
+    await customStatement('INSERT INTO new_candles SELECT * FROM candles');
+    await customStatement('DROP TABLE candles');
+    await customStatement('ALTER TABLE new_candles RENAME TO candles');
+
+    await customStatement('DROP TABLE tickers');
+  }
+
   static final _upgrade = migrationSteps(
     from1To2: (m, schema) async {
-      await m.alterTable(
-        TableMigration(
-          schema.tickers,
-        ),
-      );
+      await m.alterTable(TableMigration(schema.tickers));
     },
     from2To3: (Migrator m, Schema3 schema) async {
       await schema.tickers.deleteAll();
@@ -90,5 +137,7 @@ class Database extends _$Database {
     from7To8: (Migrator m, Schema8 schema) async {
       await m.createTable(schema.trades);
     },
+    // No-op: version bump only. Real work done in _migrateTickersToTrades().
+    from8To9: (Migrator m, Schema9 schema) async {},
   );
 }

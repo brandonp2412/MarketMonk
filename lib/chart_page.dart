@@ -258,7 +258,6 @@ class ChartPageState extends State<ChartPage>
           ..addColumns([
             db.candles.date,
             db.candles.close,
-            db.tickers.id,
           ])
           ..where(
             db.candles.symbol.equals(stock.text.split(' ').first) &
@@ -273,12 +272,6 @@ class ChartPageState extends State<ChartPage>
             ],
           )
           ..groupBy(groupBy))
-        .join([
-          leftOuterJoin(
-            db.tickers,
-            db.tickers.symbol.equalsExp(db.candles.symbol),
-          ),
-        ])
         .watch()
         .map(
           (results) => results
@@ -288,11 +281,6 @@ class ChartPageState extends State<ChartPage>
                     date: Value(result.read(db.candles.date)!),
                     close: Value(result.read(db.candles.close)!),
                   ),
-                  ticker: result.read(db.tickers.id) != null
-                      ? TickersCompanion(
-                          id: Value(result.read(db.tickers.id)!),
-                        )
-                      : null,
                 ),
               )
               .toList(),
@@ -340,57 +328,19 @@ class ChartPageState extends State<ChartPage>
           const SizedBox(height: 16),
           Wrap(
             children: [
-              if (snapshot.data?.first.ticker != null)
-                TextButton.icon(
-                  onPressed: () async {
-                    final symbol = stock.text.split(' ').first;
-                    (db.tickers.delete()..where((u) => u.symbol.equals(symbol)))
-                        .go();
-                    if (context.mounted)
-                      toast(context, 'Removed $symbol from portfolio');
-                  },
-                  label: const Text("Remove"),
-                  icon: const Icon(Icons.remove),
-                ),
-              if (snapshot.data?.first.ticker == null)
-                TextButton.icon(
-                  onPressed: () async {
-                    final symbol = stock.text.split(' ').first;
-                    final ticker = await (db.tickers.insertReturning(
-                      TickersCompanion.insert(
-                        symbol: symbol,
-                        amount: 1,
-                        change: percentChange,
-                        price: candles.last.close.value,
-                        name: stock.text
-                            .split(' ')
-                            .sublist(1)
-                            .join(' ')
-                            .replaceAll(RegExp(r'\(|\)'), ''),
-                      ),
-                    ));
-                    if (context.mounted)
-                      toast(
-                        context,
-                        'Added $symbol to portfolio',
-                        SnackBarAction(
-                          label: 'Edit',
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => EditTickerPage(
-                                  tickerId: ticker.id,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      );
-                  },
-                  label: const Text("Add"),
-                  icon: const Icon(Icons.add),
-                ),
+              TextButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          EditTickerPage(symbol: stock.text),
+                    ),
+                  );
+                },
+                label: const Text("Add trade"),
+                icon: const Icon(Icons.add),
+              ),
               TextButton.icon(
                 onPressed: () async {
                   final prefs = await SharedPreferences.getInstance();

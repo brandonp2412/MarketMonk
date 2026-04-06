@@ -82,14 +82,16 @@ void main() {
     });
 
     test('commission is stored as positive absolute value', () {
-      final buy =
-          result.trades.firstWhere((t) => t.symbol == 'AAPL' && t.tradeType == 'open');
+      final buy = result.trades.firstWhere(
+        (t) => t.symbol == 'AAPL' && t.tradeType == 'open',
+      );
       expect(buy.commission, closeTo(2.0, 0.001));
     });
 
     test('tradeDate is parsed from Trade Time field', () {
-      final buy =
-          result.trades.firstWhere((t) => t.symbol == 'AAPL' && t.tradeType == 'open');
+      final buy = result.trades.firstWhere(
+        (t) => t.symbol == 'AAPL' && t.tradeType == 'open',
+      );
       expect(buy.tradeDate.year, 2025);
       expect(buy.tradeDate.month, 3);
       expect(buy.tradeDate.day, 1);
@@ -101,8 +103,7 @@ void main() {
     });
 
     test('name extracted correctly (handles comma in quoted name)', () {
-      final meta =
-          result.trades.firstWhere((t) => t.symbol == 'META');
+      final meta = result.trades.firstWhere((t) => t.symbol == 'META');
       expect(meta.name, contains('Meta Platforms'));
     });
 
@@ -110,40 +111,6 @@ void main() {
       for (final t in result.trades.where((t) => t.tradeType == 'open')) {
         expect(t.realizedPL, equals(0.0));
       }
-    });
-  });
-
-  // ─── TigerBrokersParser — Holdings section ─────────────────────────────────
-  group('TigerBrokersParser — holdings', () {
-    late ParseResult result;
-
-    setUpAll(() {
-      result = TigerBrokersParser().parse(_tigerCsvMinimal);
-    });
-
-    test('parses correct number of holdings', () {
-      expect(result.holdings, hasLength(2));
-    });
-
-    test('holding amount and purchase price are correct', () {
-      final aapl = result.holdings.firstWhere((h) => h.symbol == 'AAPL');
-      expect(aapl.amount, closeTo(5.0, 0.001));
-      expect(aapl.purchasePrice, closeTo(150.0, 0.001));
-      expect(aapl.currentPrice, closeTo(175.0, 0.001));
-    });
-
-    test('purchasedAt uses earliest open-trade date for that symbol', () {
-      final aapl = result.holdings.firstWhere((h) => h.symbol == 'AAPL');
-      // The open trade was on 2025-03-01 (settle 2025-03-02 not used)
-      expect(aapl.purchasedAt.year, 2025);
-      expect(aapl.purchasedAt.month, 3);
-      expect(aapl.purchasedAt.day, 1);
-    });
-
-    test('holding with comma in company name parsed correctly', () {
-      final meta = result.holdings.firstWhere((h) => h.symbol == 'META');
-      expect(meta.symbol, 'META');
-      expect(meta.name, contains('Meta Platforms'));
     });
   });
 
@@ -159,13 +126,8 @@ void main() {
       expect(result.trades, hasLength(2));
     });
 
-    test('no holdings for a closed position', () {
-      expect(result.holdings, isEmpty);
-    });
-
     test('sell trade for closed position has correct realizedPL', () {
-      final sell =
-          result.trades.firstWhere((t) => t.tradeType == 'close');
+      final sell = result.trades.firstWhere((t) => t.tradeType == 'close');
       expect(sell.realizedPL, closeTo(1000.0, 0.01));
     });
   });
@@ -174,18 +136,16 @@ void main() {
   group('TigerBrokersParser — empty CSV', () {
     test('empty CSV returns empty ParseResult without throwing', () {
       final result = TigerBrokersParser().parse(_emptyCsv);
-      expect(result.holdings, isEmpty);
       expect(result.trades, isEmpty);
     });
 
     test('completely empty string returns empty ParseResult', () {
       final result = TigerBrokersParser().parse('');
-      expect(result.holdings, isEmpty);
       expect(result.trades, isEmpty);
     });
   });
 
-  // ─── importTrades / importHoldings — database round-trip ──────────────────
+  // ─── importTrades — database round-trip ───────────────────────────────────
   group('importTrades — database round-trip', () {
     late Database testDb;
 
@@ -223,44 +183,12 @@ void main() {
       expect(sell.commission, closeTo(2.0, 0.001));
     });
 
-    test('importHoldings and importTrades together populate both tables',
-        () async {
-      final result = TigerBrokersParser().parse(_tigerCsvMinimal);
-      final hCount = await importHoldings(result.holdings);
-      final tCount = await importTrades(result.trades);
-
-      expect(hCount, equals(2));
-      expect(tCount, equals(3));
-
-      final tickers = await testDb.tickers.select().get();
-      final trades = await testDb.trades.select().get();
-
-      expect(tickers, hasLength(2));
-      expect(trades, hasLength(3));
-    });
-
-    test('change% is calculated from purchasePrice→currentPrice on import',
-        () async {
-      final result = TigerBrokersParser().parse(_tigerCsvMinimal);
-      await importHoldings(result.holdings);
-
-      final aapl =
-          await (testDb.tickers.select()
-                ..where((t) => t.symbol.equals('AAPL')))
-              .getSingle();
-
-      // purchasePrice=150, currentPrice=175 → change ≈ 16.67%
-      expect(aapl.change, closeTo(16.67, 0.01));
-    });
-
     test('closed-position trades stored even with no matching holding',
         () async {
       final result = TigerBrokersParser().parse(_closedPositionCsv);
       final tCount = await importTrades(result.trades);
 
       expect(tCount, equals(2));
-      final tickers = await testDb.tickers.select().get();
-      expect(tickers, isEmpty, reason: 'no holdings for closed positions');
     });
   });
 }

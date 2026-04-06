@@ -85,9 +85,9 @@ class _SettingsPageState extends State<SettingsPage> {
       return;
     }
 
-    if (parsed.holdings.isEmpty && parsed.trades.isEmpty) {
+    if (parsed.trades.isEmpty) {
       if (!context.mounted) return;
-      toast(context, 'No data found in the selected file');
+      toast(context, 'No trades found in the selected file');
       return;
     }
 
@@ -97,61 +97,31 @@ class _SettingsPageState extends State<SettingsPage> {
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(
-          'Import ${parsed.holdings.length} holdings'
-          '${parsed.trades.isNotEmpty ? ' & ${parsed.trades.length} trades' : ''}',
-        ),
+        title: Text('Import ${parsed.trades.length} trades'),
         content: SizedBox(
           width: double.maxFinite,
           child: ListView(
             shrinkWrap: true,
             children: [
-              if (parsed.holdings.isNotEmpty) ...[
-                const ListTile(
+              ...parsed.trades.take(10).map(
+                (t) => ListTile(
+                  dense: true,
+                  title: Text('${t.symbol} — ${t.tradeType.toUpperCase()}'),
+                  subtitle:
+                      Text(t.tradeDate.toIso8601String().substring(0, 10)),
+                  trailing: Text(
+                    '${t.quantity.abs().toStringAsFixed(2)} @ \$${t.price.toStringAsFixed(2)}',
+                  ),
+                ),
+              ),
+              if (parsed.trades.length > 10)
+                ListTile(
                   dense: true,
                   title: Text(
-                    'Holdings',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                    '... and ${parsed.trades.length - 10} more trades',
+                    style: const TextStyle(fontStyle: FontStyle.italic),
                   ),
                 ),
-                ...parsed.holdings.map(
-                  (h) => ListTile(
-                    dense: true,
-                    title: Text(h.symbol),
-                    subtitle: Text(h.name),
-                    trailing: Text(
-                      '${h.amount.toStringAsFixed(2)} @ \$${h.purchasePrice.toStringAsFixed(2)}',
-                    ),
-                  ),
-                ),
-              ],
-              if (parsed.trades.isNotEmpty) ...[
-                const ListTile(
-                  dense: true,
-                  title: Text(
-                    'Trades',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                ...parsed.trades.take(10).map(
-                  (t) => ListTile(
-                    dense: true,
-                    title: Text('${t.symbol} — ${t.tradeType.toUpperCase()}'),
-                    subtitle: Text(t.tradeDate.toIso8601String().substring(0, 10)),
-                    trailing: Text(
-                      '${t.quantity.abs().toStringAsFixed(2)} @ \$${t.price.toStringAsFixed(2)}',
-                    ),
-                  ),
-                ),
-                if (parsed.trades.length > 10)
-                  ListTile(
-                    dense: true,
-                    title: Text(
-                      '... and ${parsed.trades.length - 10} more trades',
-                      style: const TextStyle(fontStyle: FontStyle.italic),
-                    ),
-                  ),
-              ],
             ],
           ),
         ),
@@ -174,13 +144,9 @@ class _SettingsPageState extends State<SettingsPage> {
     if (!confirmed || !context.mounted) return;
 
     // Step 5: insert into DB
-    final holdingsCount = await importHoldings(parsed.holdings);
     final tradesCount = await importTrades(parsed.trades);
     if (!context.mounted) return;
-    toast(
-      context,
-      'Imported $holdingsCount holdings and $tradesCount trades',
-    );
+    toast(context, 'Imported $tradesCount trades');
   }
 
   @override
@@ -371,7 +337,6 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 );
                 if (confirmed != true || !context.mounted) return;
-                await db.delete(db.tickers).go();
                 await db.delete(db.trades).go();
                 await db.delete(db.candles).go();
                 if (!context.mounted) return;

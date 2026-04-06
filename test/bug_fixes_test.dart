@@ -3,7 +3,6 @@ import 'dart:ffi';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:market_monk/database.dart';
-import 'package:market_monk/utils.dart';
 import 'package:sqlite3/open.dart';
 import 'package:test/test.dart';
 
@@ -18,105 +17,33 @@ void _overrideSqlite3() {
   );
 }
 
-/// Builds a minimal [Ticker] for use in [calculateTotalReturns] tests.
-Ticker _ticker({
-  required double price,
-  required double amount,
-  required double change,
-}) {
-  final now = DateTime.now();
-  return Ticker(
-    id: 1,
-    symbol: 'TEST',
-    name: 'Test',
-    price: price,
-    amount: amount,
-    change: change,
-    createdAt: now,
-    updatedAt: now,
-    purchasedAt: now,
-  );
-}
+Future<Trade> _insertTrade(
+  Database db, {
+  String symbol = 'AAPL',
+  String name = 'Apple',
+  double quantity = 10,
+  double price = 150.0,
+  String tradeType = 'open',
+}) =>
+    db.trades.insertReturning(
+      TradesCompanion.insert(
+        symbol: symbol,
+        name: name,
+        quantity: quantity,
+        price: price,
+        tradeType: tradeType,
+        tradeDate: DateTime(2025, 3, 1),
+      ),
+    );
 
 void main() {
   setUpAll(_overrideSqlite3);
 
-  // ─── Issue #14 ────────────────────────────────────────────────────────────
-  //
-  // Root cause: when a stock's candle `close` defaults to -1.0 (the Candles
-  // table default for missing data), syncCandles computes:
-  //   change = safePercentChange(purchasePrice=5, close=-1) = -120%
-  //
-  // A change < -100 makes the denominator (1 + change/100) negative.
-  // For example with change=-120%: denominator = 1 - 1.2 = -0.2
-  //
-  //   initialPositionValue = currentPositionValue / -0.2
-  //                        = -5 * currentPositionValue  (wrong sign!)
-  //
-  // This flips the sign of that position's contribution to totalInitialValue,
-  // which in turn makes dollarReturn and percentReturn wildly wrong — the
-  // "negative six figures" the issue reporter saw.
-  group('Issue #14 — change<-100 (bad candle data) does not corrupt totals',
-      () {
-    // THE KEY REGRESSION TEST:
-    // On OLD code (no change<-100 guard) this fails because the bad ticker
-    // flips the sign of totalInitialValue, corrupting the entire result.
-    // On NEW code it is skipped and the healthy ticker's return is correct.
-    test('ticker with change<-100 (bad candle default) is excluded from totals',
-        () {
-      // Healthy stock: 10 shares at current price $125, up 25% from purchase.
-      // Expected: dollarReturn = +$250, percentReturn = +25%.
-      final healthy = _ticker(price: 125, amount: 10, change: 25);
-
-      // Broken ticker: candle close defaulted to -1.0, so syncCandles stored
-      // change = safePercentChange(purchasePrice=5, close=-1) = -120%.
-      // This should NOT corrupt the portfolio totals.
-      final badCandle = _ticker(price: 5, amount: 1, change: -120);
-
-      final (dollar, percent) = calculateTotalReturns([healthy, badCandle]);
-
-      // OLD code: badCandle causes initialPositionValue = 5 / (1-1.2) = -25,
-      // so totalInitialValue = 1000 + (-25) = 975. But totalCurrentValue =
-      // 1250 + 5 = 1255. dollarReturn = 280, percentReturn = 28.7% — wrong.
-      // Worse: if badCandle amount is large the numbers go into six figures.
-      //
-      // NEW code: badCandle is skipped. Only healthy contributes.
-      // dollarReturn = 1250 - 1000 = 250, percentReturn = 25%.
-      expect(dollar, closeTo(250.0, 0.01),
-          reason: 'bad-candle ticker must not affect the dollar return');
-      expect(percent, closeTo(25.0, 0.01),
-          reason: 'bad-candle ticker must not affect the percent return');
-    });
-
-    test('large bad-candle position drives result to absurd values on old code',
-        () {
-      // Demonstrate the "negative six figures" scenario:
-      // 10,000 shares with bad candle → change=-120%, price=$100.
-      // OLD code: initialPositionValue = 1,000,000 / -0.2 = -5,000,000
-      //           dollarReturn = 1,000,000 - (-5,000,000) = +6,000,000  (wrong!)
-      // NEW code: bad ticker skipped → (0.0, 0.0).
-      final badCandle = _ticker(price: 100, amount: 10000, change: -120);
-
-      final (dollar, percent) = calculateTotalReturns([badCandle]);
-
-      expect(dollar, equals(0.0),
-          reason: 'ticker with change<-100 must be skipped entirely');
-      expect(percent, equals(0.0));
-    });
-
-    test('ticker with price==0 is excluded', () {
-      final healthy = _ticker(price: 100, amount: 10, change: 25);
-      final zeroPriced = _ticker(price: 0, amount: 1, change: -100);
-
-      final (dollar, percent) = calculateTotalReturns([healthy, zeroPriced]);
-
-      expect(dollar, greaterThan(0));
-      expect(percent, greaterThan(0));
-    });
-  });
-
   // ─── Issue #16 ────────────────────────────────────────────────────────────
-  group('Issue #16 — multiple positions for the same stock symbol', () {
+  //
+  // Multiple trades for the same symbol must all be stored independently.
+  // Each trade has its own row and ID — no UNIQUE constraint on symbol.
+  group('Issue #16 — multiple trades for the same stock symbol', () {
     late Database db;
 
     setUp(() {
@@ -125,100 +52,49 @@ void main() {
 
     tearDown(() => db.close());
 
-    test('inserting two rows with the same symbol succeeds (no unique error)',
-        () async {
-      final now = DateTime.now();
+    test('inserting two trades with the same symbol succeeds', () async {
+      await _insertTrade(db, symbol: 'AAPL', quantity: 10, price: 150.0);
 
-      await db.tickers.insertOne(TickersCompanion.insert(
-        symbol: 'AAPL',
-        name: 'Apple Inc.',
-        change: 5.0,
-        amount: 10,
-        price: 150.0,
-        purchasedAt: Value(now),
-      ));
-
-      // On the OLD schema this second insert would throw a UNIQUE constraint
-      // violation.  On the new schema it must succeed.
       await expectLater(
-        db.tickers.insertOne(TickersCompanion.insert(
-          symbol: 'AAPL',
-          name: 'Apple Inc.',
-          change: 2.0,
-          amount: 5,
-          price: 170.0,
-          purchasedAt: Value(now),
-        )),
+        _insertTrade(db, symbol: 'AAPL', quantity: 5, price: 170.0),
         completes,
-        reason: 'should be able to insert a second AAPL position',
+        reason: 'should be able to insert a second AAPL trade',
       );
 
-      final rows = await db.tickers.select().get();
-      expect(rows.length, equals(2),
-          reason: 'both positions must be stored separately');
+      final rows = await db.trades.select().get();
+      expect(rows.length, equals(2));
       expect(rows.map((r) => r.symbol).toList(), everyElement('AAPL'));
     });
 
-    test('two positions for the same symbol have different IDs', () async {
-      final now = DateTime.now();
-
-      final a = await db.tickers.insertReturning(TickersCompanion.insert(
-        symbol: 'TSLA',
-        name: 'Tesla',
-        change: 10.0,
-        amount: 3,
-        price: 200.0,
-        purchasedAt: Value(now),
-      ));
-
-      final b = await db.tickers.insertReturning(TickersCompanion.insert(
-        symbol: 'TSLA',
-        name: 'Tesla',
-        change: -3.0,
-        amount: 7,
-        price: 220.0,
-        purchasedAt: Value(now),
-      ));
+    test('two trades for the same symbol have different IDs', () async {
+      final a = await _insertTrade(db, symbol: 'TSLA', quantity: 3);
+      final b = await _insertTrade(db, symbol: 'TSLA', quantity: 7);
 
       expect(a.id, isNot(equals(b.id)));
-      expect(a.price, equals(200.0));
-      expect(b.price, equals(220.0));
+      expect(a.quantity, closeTo(3.0, 0.001));
+      expect(b.quantity, closeTo(7.0, 0.001));
     });
 
-    test('editing one position by ID does not affect the other', () async {
-      final now = DateTime.now();
+    test('editing one trade by ID does not affect the other', () async {
+      final first = await _insertTrade(db, symbol: 'MSFT', quantity: 2);
+      await _insertTrade(db, symbol: 'MSFT', quantity: 5);
 
-      final first = await db.tickers.insertReturning(TickersCompanion.insert(
-        symbol: 'MSFT',
-        name: 'Microsoft',
-        change: 8.0,
-        amount: 2,
-        price: 300.0,
-        purchasedAt: Value(now),
-      ));
+      // Edit ONLY the first trade
+      await (db.trades.update()..where((t) => t.id.equals(first.id)))
+          .write(const TradesCompanion(quantity: Value(99)));
 
-      await db.tickers.insertReturning(TickersCompanion.insert(
-        symbol: 'MSFT',
-        name: 'Microsoft',
-        change: 4.0,
-        amount: 5,
-        price: 310.0,
-        purchasedAt: Value(now),
-      ));
-
-      // Edit ONLY the first position (as the new tickerId-based save does)
-      await (db.tickers.update()..where((t) => t.id.equals(first.id)))
-          .write(TickersCompanion(amount: const Value(99)));
-
-      final rows = await db.tickers.select().get();
+      final rows = await db.trades.select().get();
       expect(rows.length, equals(2));
 
       final updated = rows.firstWhere((r) => r.id == first.id);
       final untouched = rows.firstWhere((r) => r.id != first.id);
 
-      expect(updated.amount, equals(99));
-      expect(untouched.amount, equals(5),
-          reason: 'second position must not be affected by the edit');
+      expect(updated.quantity, closeTo(99.0, 0.001));
+      expect(
+        untouched.quantity,
+        closeTo(5.0, 0.001),
+        reason: 'second trade must not be affected by the edit',
+      );
     });
   });
 }

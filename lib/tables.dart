@@ -14,22 +14,9 @@ class Trades extends Table {
   RealColumn get commission => real().withDefault(const Constant(0.0))();
 }
 
-class Tickers extends Table {
-  IntColumn get id => integer().autoIncrement()();
-  TextColumn get symbol => text()();
-  TextColumn get name => text()();
-  RealColumn get change => real()();
-  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
-  DateTimeColumn get purchasedAt =>
-      dateTime().withDefault(currentDateAndTime)();
-  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
-  RealColumn get amount => real()();
-  RealColumn get price => real()();
-}
-
 class Candles extends Table {
   IntColumn get id => integer().autoIncrement()();
-  TextColumn get symbol => text().references(Tickers, #symbol)();
+  TextColumn get symbol => text()();
   DateTimeColumn get date => dateTime()();
   RealColumn get open => real().withDefault(const Constant(-1.0))();
   RealColumn get high => real().withDefault(const Constant(-1.0))();

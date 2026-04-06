@@ -121,7 +121,6 @@ void main() {
 
     setUp(() async {
       db = _openDb();
-      // Insert a mix of trades for AAPL and META
       await _insertTrade(
         db,
         symbol: 'AAPL',
@@ -181,50 +180,28 @@ void main() {
     });
   });
 
-  // ─── Trades table independence from tickers ────────────────────────────────
-  group('Trades table — no FK to tickers (closed positions)', () {
+  // ─── Trades table independence (no FK requirement) ─────────────────────────
+  group('Trades table — no FK constraints', () {
     late Database db;
     setUp(() => db = _openDb());
     tearDown(() => db.close());
 
-    test('can insert trade for a symbol not in tickers table', () async {
-      // Don't insert into tickers first
+    test('can insert trade for any symbol without a prior dependency', () async {
       final inserted = await _insertTrade(db, symbol: 'CLOSED_POS');
-
       expect(inserted.symbol, 'CLOSED_POS');
 
-      final tickerCount = await db.tickers.select().get();
-      expect(
-        tickerCount,
-        isEmpty,
-        reason: 'trades should not require a corresponding ticker',
-      );
+      final all = await db.trades.select().get();
+      expect(all, hasLength(1));
     });
 
-    test('deleting tickers does not cascade-delete trades', () async {
-      final now = DateTime.now();
-      await db.tickers.insertOne(
-        TickersCompanion.insert(
-          symbol: 'AAPL',
-          name: 'Apple',
-          change: 5.0,
-          amount: 10,
-          price: 150.0,
-          purchasedAt: Value(now),
-        ),
-      );
-      await _insertTrade(db, symbol: 'AAPL');
+    test('can insert multiple trades for the same symbol', () async {
+      await _insertTrade(db, symbol: 'AAPL', quantity: 10);
+      await _insertTrade(db, symbol: 'AAPL', quantity: -5, tradeType: 'close');
 
-      // Delete the ticker
-      await (db.tickers.delete()..where((t) => t.symbol.equals('AAPL'))).go();
-
-      // Trade should still exist
-      final trades = await db.trades.select().get();
-      expect(
-        trades,
-        hasLength(1),
-        reason: 'trades must survive ticker deletion',
-      );
+      final trades = await (db.trades.select()
+            ..where((t) => t.symbol.equals('AAPL')))
+          .get();
+      expect(trades, hasLength(2));
     });
   });
 
@@ -267,58 +244,6 @@ void main() {
       final trades = await db.trades.select().get();
       final total = trades.fold(0.0, (s, t) => s + t.realizedPL);
       expect(total, closeTo(120.0, 0.01));
-    });
-  });
-
-  // ─── Tickers table — still works after schema v8 ──────────────────────────
-  group('Tickers table — unchanged behaviour after v8 migration', () {
-    late Database db;
-    setUp(() => db = _openDb());
-    tearDown(() => db.close());
-
-    test('can insert and retrieve a ticker', () async {
-      final now = DateTime.now();
-      final inserted = await db.tickers.insertReturning(
-        TickersCompanion.insert(
-          symbol: 'TSLA',
-          name: 'Tesla',
-          change: 12.5,
-          amount: 3,
-          price: 250.0,
-          purchasedAt: Value(now),
-        ),
-      );
-
-      expect(inserted.symbol, 'TSLA');
-      expect(inserted.change, closeTo(12.5, 0.001));
-    });
-
-    test('multiple tickers for same symbol allowed (no UNIQUE constraint)',
-        () async {
-      final now = DateTime.now();
-      await db.tickers.insertOne(
-        TickersCompanion.insert(
-          symbol: 'AAPL',
-          name: 'Apple',
-          change: 5.0,
-          amount: 10,
-          price: 150.0,
-          purchasedAt: Value(now),
-        ),
-      );
-      await db.tickers.insertOne(
-        TickersCompanion.insert(
-          symbol: 'AAPL',
-          name: 'Apple',
-          change: 3.0,
-          amount: 5,
-          price: 160.0,
-          purchasedAt: Value(now),
-        ),
-      );
-
-      final rows = await db.tickers.select().get();
-      expect(rows, hasLength(2));
     });
   });
 }

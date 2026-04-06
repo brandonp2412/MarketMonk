@@ -9,6 +9,7 @@ import 'generated/schema.dart';
 
 import 'generated/schema_v7.dart' as v7;
 import 'generated/schema_v8.dart' as v8;
+import 'generated/schema_v9.dart' as v9;
 import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
 
 void main() {
@@ -72,8 +73,7 @@ void main() {
 
       // Verify with a v8 view of the same database
       final checkDb = v8.DatabaseAtV8(schema.newConnection());
-      final tickers =
-          await checkDb.select(checkDb.tickers).get();
+      final tickers = await checkDb.select(checkDb.tickers).get();
       expect(tickers, hasLength(2));
 
       final aapl = tickers.firstWhere((t) => t.symbol == 'AAPL');
@@ -108,7 +108,101 @@ void main() {
       await verifier.migrateAndValidate(migratingDb, 8);
       await migratingDb.close();
 
-      // Open with the app's live database and try a full round-trip
+      // Open with a v8 view and insert a trade
+      final checkDb = v8.DatabaseAtV8(schema.newConnection());
+      await checkDb.into(checkDb.trades).insert(
+            v8.TradesCompanion.insert(
+              symbol: 'NVDA',
+              name: 'NVIDIA',
+              quantity: 10.0,
+              price: 100.0,
+              tradeType: 'open',
+              tradeDate: DateTime(2025, 1, 10)
+                  .millisecondsSinceEpoch ~/
+                  1000,
+            ),
+          );
+
+      final stored = await checkDb.select(checkDb.trades).get();
+      expect(stored, hasLength(1));
+      expect(stored.first.symbol, 'NVDA');
+      expect(stored.first.realizedPL, equals(0.0));
+      expect(stored.first.commission, equals(0.0));
+
+      await checkDb.close();
+    });
+  });
+
+  // ─── v8 → v9: tickers removed; candles FK dropped; trades preserved ───────
+  group('v8 → v9 data integrity', () {
+    test('trades are preserved after v8→v9 migration', () async {
+      final schema = await verifier.schemaAt(8);
+
+      // Seed v8 with a ticker and a trade
+      final oldDb = v8.DatabaseAtV8(schema.newConnection());
+      await oldDb.into(oldDb.tickers).insert(
+            v8.TickersCompanion.insert(
+              symbol: 'AAPL',
+              name: 'Apple',
+              change: 5.0,
+              amount: 10.0,
+              price: 150.0,
+            ),
+          );
+      await oldDb.into(oldDb.trades).insert(
+            v8.TradesCompanion.insert(
+              symbol: 'AAPL',
+              name: 'Apple',
+              quantity: 10.0,
+              price: 150.0,
+              tradeType: 'open',
+              tradeDate: DateTime(2025, 3, 1).millisecondsSinceEpoch ~/ 1000,
+            ),
+          );
+      await oldDb.close();
+
+      // Migrate to v9
+      final migratingDb = Database.connect(schema.newConnection());
+      await verifier.migrateAndValidate(migratingDb, 9);
+      await migratingDb.close();
+
+      // Verify trades survived via a v9 view
+      final checkDb = v9.DatabaseAtV9(schema.newConnection());
+      final trades = await checkDb.select(checkDb.trades).get();
+      expect(trades, hasLength(1));
+      expect(trades.first.symbol, 'AAPL');
+      expect(trades.first.quantity, closeTo(10.0, 0.001));
+      await checkDb.close();
+    });
+
+    test('candles can be inserted without a tickers FK after v8→v9', () async {
+      final schema = await verifier.schemaAt(8);
+
+      final migratingDb = Database.connect(schema.newConnection());
+      await verifier.migrateAndValidate(migratingDb, 9);
+      await migratingDb.close();
+
+      final checkDb = v9.DatabaseAtV9(schema.newConnection());
+      // No ticker row required — the FK is gone in v9
+      await checkDb.into(checkDb.candles).insert(
+            v9.CandlesCompanion.insert(
+              symbol: 'TSLA',
+              date: DateTime(2025, 1, 1).millisecondsSinceEpoch ~/ 1000,
+            ),
+          );
+      final candles = await checkDb.select(checkDb.candles).get();
+      expect(candles, hasLength(1));
+      expect(candles.first.symbol, 'TSLA');
+      await checkDb.close();
+    });
+
+    test('app DB inserts trades correctly after v8→v9 migration', () async {
+      final schema = await verifier.schemaAt(8);
+
+      final migratingDb = Database.connect(schema.newConnection());
+      await verifier.migrateAndValidate(migratingDb, 9);
+      await migratingDb.close();
+
       final appDb = Database.connect(schema.newConnection());
       await appDb.trades.insertOne(
         TradesCompanion.insert(
@@ -124,36 +218,6 @@ void main() {
       final stored = await appDb.trades.select().get();
       expect(stored, hasLength(1));
       expect(stored.first.symbol, 'NVDA');
-      expect(stored.first.realizedPL, equals(0.0));
-      expect(stored.first.commission, equals(0.0));
-
-      await appDb.close();
-    });
-
-    test('tickers table still accepts inserts after v7→v8 migration', () async {
-      final schema = await verifier.schemaAt(7);
-
-      final migratingDb = Database.connect(schema.newConnection());
-      await verifier.migrateAndValidate(migratingDb, 8);
-      await migratingDb.close();
-
-      final appDb = Database.connect(schema.newConnection());
-      final now = DateTime.now();
-      await appDb.tickers.insertOne(
-        TickersCompanion.insert(
-          symbol: 'TSLA',
-          name: 'Tesla',
-          change: 8.0,
-          amount: 3.0,
-          price: 250.0,
-          purchasedAt: Value(now),
-        ),
-      );
-
-      final rows = await appDb.tickers.select().get();
-      expect(rows, hasLength(1));
-      expect(rows.first.symbol, 'TSLA');
-
       await appDb.close();
     });
   });
