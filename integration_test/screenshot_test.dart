@@ -11,6 +11,8 @@ import 'package:market_monk/main.dart' as app;
 import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
+import 'package:market_monk/trade_history_page.dart';
+import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -184,7 +186,6 @@ Future<void> generateScreenshot({
   required String screenshotName,
   required TabBarState tabBarState,
   Future<void> Function(BuildContext context)? navigateToPage,
-  bool skipSettle = false,
 }) async {
   await appWrapper();
   await tester.pumpAndSettle();
@@ -198,9 +199,9 @@ Future<void> generateScreenshot({
     await navigateToPage(navState);
   }
 
-  skipSettle ? await tester.pump() : await tester.pumpAndSettle();
+  await tester.pumpAndSettle();
   await binding.convertFlutterSurfaceToImage();
-  skipSettle ? await tester.pump() : await tester.pumpAndSettle();
+  await tester.pumpAndSettle();
   await binding.takeScreenshot(screenshotName);
 }
 
@@ -231,10 +232,6 @@ void main() {
         binding: binding,
         tester: tester,
         screenshotName: '2_en-US',
-        navigateToPage: (context) async => navigateTo(
-          context: context,
-          page: const PortfolioPage(),
-        ),
         tabBarState: TabBarState.portfolio,
       ),
     );
@@ -273,11 +270,47 @@ void main() {
         binding: binding,
         tester: tester,
         screenshotName: '5_en-US',
+        tabBarState: TabBarState.holdings,
+      ),
+    );
+
+    testWidgets(
+      "HoldingHistoryPage",
+      (tester) async => await generateScreenshot(
+        binding: binding,
+        tester: tester,
+        screenshotName: '6_en-US',
+        tabBarState: TabBarState.holdings,
         navigateToPage: (context) async => navigateTo(
           context: context,
-          page: const HoldingsPage(),
+          page: TradeHistoryPage(
+            summary: SymbolSummary(
+              symbol: 'GME',
+              name: "GameStop",
+              position: Position(
+                symbol: 'GME',
+                name: 'GameStop',
+                netShares: 5,
+                avgCost: 30.23,
+                currentPrice: 30.23,
+                firstBuyDate: DateTime.now(),
+              ),
+              trades: [
+                Trade(
+                  id: 1,
+                  symbol: 'GME',
+                  name: 'GameStop',
+                  quantity: 5,
+                  price: 30.23,
+                  tradeType: 'open',
+                  tradeDate: DateTime.now(),
+                  realizedPL: 0.5,
+                  commission: 0.02,
+                ),
+              ],
+            ),
+          ),
         ),
-        tabBarState: TabBarState.holdings,
       ),
     );
   });

@@ -134,7 +134,8 @@ Future<Map<String, double>> fetchLatestPrices(List<String> symbols) async {
             ..where((r) => r.symbol.equals(s))
             ..orderBy(
               [
-                (r) => OrderingTerm(expression: r.date, mode: OrderingMode.desc)
+                (r) =>
+                    OrderingTerm(expression: r.date, mode: OrderingMode.desc),
               ],
             )
             ..limit(1))
