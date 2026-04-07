@@ -316,11 +316,11 @@ class _SummaryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  currency.format(totalValue),
+                  fmtCurrency(totalValue),
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 Text(
-                  '${totalGain >= 0 ? '+' : ''}${currency.format(totalGain)}'
+                  '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}'
                   '  (${totalGainPct.toStringAsFixed(2)}%)',
                   style: TextStyle(color: gainColor, fontSize: 13),
                 ),
@@ -376,7 +376,7 @@ class _LegendTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Text(
-            currency.format(value),
+            fmtCurrency(value),
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           Text(

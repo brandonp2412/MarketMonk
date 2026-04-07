@@ -88,16 +88,16 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                           ),
                           _SummaryRow(
                             label: 'Avg cost',
-                            value: currency.format(position.avgCost),
+                            value: fmtCurrency(position.avgCost),
                           ),
                           _SummaryRow(
                             label: 'Current value',
-                            value: currency.format(position.currentValue),
+                            value: fmtCurrency(position.currentValue),
                           ),
                           _SummaryRow(
                             label: 'Unrealized P/L',
                             value:
-                                '${unrealizedPL >= 0 ? '+' : ''}${currency.format(unrealizedPL)}'
+                                '${unrealizedPL >= 0 ? '+' : ''}${fmtCurrency(unrealizedPL)}'
                                 ' (${position.change.toStringAsFixed(2)}%)',
                             color: unrealizedPL >= 0
                                 ? Colors.green
@@ -108,7 +108,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                           _SummaryRow(
                             label: 'Realized P/L',
                             value:
-                                '${totalRealized >= 0 ? '+' : ''}${currency.format(totalRealized)}',
+                                '${totalRealized >= 0 ? '+' : ''}${fmtCurrency(totalRealized)}',
                             color: totalRealized >= 0
                                 ? Colors.green
                                 : Colors.redAccent,
@@ -118,7 +118,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                           _SummaryRow(
                             label: 'Total gain',
                             value:
-                                '${totalGain >= 0 ? '+' : ''}${currency.format(totalGain)}',
+                                '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}',
                             color: totalGain >= 0
                                 ? Colors.green
                                 : Colors.redAccent,
@@ -281,16 +281,16 @@ class _TradeTile extends StatelessWidget {
           ),
         ),
         subtitle: Text(
-          '${qty.toStringAsFixed(4)} @ ${currency.format(trade.price)}  ·  $dateStr',
+          '${qty.toStringAsFixed(4)} @ ${fmtCurrency(trade.price)}  ·  $dateStr',
         ),
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(currency.format(total)),
+            Text(fmtCurrency(total)),
             if (!isBuy && trade.realizedPL != 0)
               Text(
-                '${trade.realizedPL >= 0 ? '+' : ''}${currency.format(trade.realizedPL)}',
+                '${trade.realizedPL >= 0 ? '+' : ''}${fmtCurrency(trade.realizedPL)}',
                 style: TextStyle(
                   fontSize: 11,
                   color:

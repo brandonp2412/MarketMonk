@@ -9,7 +9,11 @@ import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
 
-final currency = NumberFormat.simpleCurrency();
+var currency = NumberFormat.simpleCurrency();
+double exchangeRate = 1.0;
+
+/// Formats [v] in the user's display currency, applying the current exchange rate.
+String fmtCurrency(double v) => currency.format(v * exchangeRate);
 
 void selectAll(TextEditingController controller) => controller.selection =
     TextSelection(baseOffset: 0, extentOffset: controller.text.length);

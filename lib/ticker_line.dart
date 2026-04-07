@@ -123,7 +123,7 @@ class TickerLine extends StatelessWidget {
     BuildContext context,
     DateFormat formatter,
   ) {
-    final price = currency.format(touchedSpots.first.y);
+    final price = fmtCurrency(touchedSpots.first.y);
     final dateStr = dates.elementAtOrNull(touchedSpots.first.x.toInt());
     if (dateStr == null) return [];
     final date = formatter.format(dateStr);

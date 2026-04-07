@@ -303,7 +303,7 @@ class _ReturnsPageState extends State<ReturnsPage>
                 ],
               ),
               Text(
-                currency.format(last),
+                fmtCurrency(last),
                 style: Theme.of(context).textTheme.titleLarge,
               ),
             ],
@@ -311,7 +311,7 @@ class _ReturnsPageState extends State<ReturnsPage>
           const SizedBox(height: 12),
           Text(
             'Unrealized P/L: '
-            '${unrealized >= 0 ? '+' : ''}${currency.format(unrealized)}'
+            '${unrealized >= 0 ? '+' : ''}${fmtCurrency(unrealized)}'
             ' (${unrealizedPct.toStringAsFixed(2)}%)',
             style: TextStyle(
               color: unrealized >= 0 ? Colors.green : Colors.redAccent,

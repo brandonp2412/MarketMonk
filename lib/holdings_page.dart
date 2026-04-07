@@ -315,7 +315,7 @@ class _SymbolTile extends StatelessWidget {
                 ),
                 if (hasRealizedPL)
                   Text(
-                    'Realized: ${realizedPL >= 0 ? '+' : ''}${currency.format(realizedPL)}',
+                    'Realized: ${realizedPL >= 0 ? '+' : ''}${fmtCurrency(realizedPL)}',
                     style: TextStyle(
                       color: realizedPL >= 0 ? Colors.green : Colors.redAccent,
                       fontSize: 12,
@@ -329,7 +329,7 @@ class _SymbolTile extends StatelessWidget {
             ),
       trailing: position != null
           ? Text(
-              currency.format(position.currentValue),
+              fmtCurrency(position.currentValue),
               style: Theme.of(context).textTheme.bodyMedium,
             )
           : null,
