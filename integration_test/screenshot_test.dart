@@ -13,39 +13,44 @@ import 'package:market_monk/settings_state.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-List<TickersCompanion> mockTickers = [
-  TickersCompanion.insert(
-    amount: 5,
-    change: 0.66,
+List<TradesCompanion> mockTrades = [
+  TradesCompanion.insert(
+    quantity: 5,
+    tradeDate: DateTime.now(),
+    tradeType: 'open',
     name: 'GameStop',
     symbol: 'GME',
     price: 30.25,
   ),
-  TickersCompanion.insert(
-    amount: 10,
-    change: -0.85,
+  TradesCompanion.insert(
+    quantity: 10,
+    tradeDate: DateTime.now(),
+    tradeType: 'open',
     name: 'Apple Inc.',
     symbol: 'AAPL',
     price: 176.75,
   ),
-  TickersCompanion.insert(
-    amount: 3,
-    change: 1.15,
+  TradesCompanion.insert(
+    quantity: 3,
+    tradeDate: DateTime.now(),
+    tradeType: 'open',
     name: 'Tesla Inc.',
     symbol: 'TSLA',
     price: 243.00,
   ),
-  TickersCompanion.insert(
-    amount: 15,
-    change: 0.24,
+  TradesCompanion.insert(
+    quantity: 15,
+    tradeDate: DateTime.now(),
+    tradeType: 'open',
     name: 'Microsoft Corporation',
     symbol: 'MSFT',
     price: 337.35,
   ),
-  TickersCompanion.insert(
-    amount: 8,
-    change: -0.39,
-    name: 'Amazon.com Inc.',
+  TradesCompanion.insert(
+    quantity: 8,
+    tradeDate: DateTime.now(),
+    tradeType: 'open',
+    name: 'Amazon.com Inc',
     symbol: 'AMZN',
     price: 129.40,
   ),
@@ -202,9 +207,7 @@ void main() {
   setUpAll(() async {
     app.db = Database.connect(NativeDatabase.memory());
     await app.db.candles.insertAll(mockCandles);
-    await app.db.tickers.insertAll(mockTickers);
-
-    print(await (app.db.tickers.select()).get());
+    await app.db.trades.insertAll(mockTrades);
   });
 
   group("Generate default screenshots ", () {
