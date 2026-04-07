@@ -61,6 +61,17 @@ class Database extends _$Database {
         await customStatement('PRAGMA foreign_keys = ON');
       },
       beforeOpen: (details) async {
+        // Create performance indices if they don't exist yet.
+        // IF NOT EXISTS makes this idempotent across fresh installs and upgrades.
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_candles_symbol_date '
+          'ON candles (symbol, date)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_trades_symbol_trade_date '
+          'ON trades (symbol, trade_date)',
+        );
+
         if (kDebugMode) await validateDatabaseSchema();
       },
     );

@@ -22,7 +22,6 @@ class _ReturnsPageState extends State<ReturnsPage>
   int years = 1;
   int months = 0;
   int days = 0;
-  bool loading = false;
 
   List<_DateValue>? _series;
   List<Position> _positions = [];
@@ -38,7 +37,6 @@ class _ReturnsPageState extends State<ReturnsPage>
     if (!mounted) return;
     // Don't clear _series — keep the previous chart visible while reloading.
     setState(() {
-      loading = true;
       _error = null;
     });
 
@@ -53,13 +51,11 @@ class _ReturnsPageState extends State<ReturnsPage>
       setState(() {
         _positions = positions;
         _series = series;
-        loading = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _error = e.toString();
-        loading = false;
       });
     }
   }
@@ -80,8 +76,7 @@ class _ReturnsPageState extends State<ReturnsPage>
     for (final symbol in sharesMap.keys) {
       final rows = await (db.candles.select()
             ..where(
-              (c) =>
-                  c.symbol.equals(symbol) & c.date.isBiggerThanValue(after),
+              (c) => c.symbol.equals(symbol) & c.date.isBiggerThanValue(after),
             )
             ..orderBy([
               (c) => OrderingTerm(expression: c.date, mode: OrderingMode.asc),
@@ -263,14 +258,6 @@ class _ReturnsPageState extends State<ReturnsPage>
       child: Stack(
         children: [
           inner,
-          // Thin progress bar at the top while reloading — doesn't shift layout.
-          if (loading)
-            const Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: LinearProgressIndicator(minHeight: 2),
-            ),
         ],
       ),
     );
@@ -288,8 +275,7 @@ class _ReturnsPageState extends State<ReturnsPage>
     final totalValue = _positions.fold(0.0, (s, p) => s + p.currentValue);
     final totalCost = _positions.fold(0.0, (s, p) => s + p.costBasis);
     final unrealized = totalValue - totalCost;
-    final unrealizedPct =
-        totalCost > 0 ? (unrealized / totalCost) * 100 : 0.0;
+    final unrealizedPct = totalCost > 0 ? (unrealized / totalCost) * 100 : 0.0;
 
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -334,7 +320,6 @@ class _ReturnsPageState extends State<ReturnsPage>
           const SizedBox(height: 8),
           TextButton.icon(
             onPressed: () async {
-              setState(() => loading = true);
               clearAllSyncCache();
               final trades = await db.trades.select().get();
               final symbols = trades.map((t) => t.symbol).toSet();
