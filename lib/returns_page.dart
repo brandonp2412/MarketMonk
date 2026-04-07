@@ -226,7 +226,16 @@ class _ReturnsPageState extends State<ReturnsPage>
       child: ListView(
         children: [
           const SizedBox(height: 8),
-          Wrap(alignment: WrapAlignment.center, children: timeButtons),
+          Row(
+            children: [
+              Expanded(
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  children: timeButtons,
+                ),
+              ),
+            ],
+          ),
           _buildChart(context, settings),
           _buildSummary(context),
         ],
@@ -235,7 +244,7 @@ class _ReturnsPageState extends State<ReturnsPage>
   }
 
   Widget _buildChart(BuildContext context, SettingsState settings) {
-    final chartHeight = MediaQuery.of(context).size.height * 0.3;
+    final chartHeight = MediaQuery.of(context).size.height * 0.4;
 
     Widget inner;
     if (_error != null) {
@@ -276,6 +285,7 @@ class _ReturnsPageState extends State<ReturnsPage>
     final totalCost = _positions.fold(0.0, (s, p) => s + p.costBasis);
     final unrealized = totalValue - totalCost;
     final unrealizedPct = totalCost > 0 ? (unrealized / totalCost) * 100 : 0.0;
+    final settings = context.watch<SettingsState>();
 
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -317,19 +327,34 @@ class _ReturnsPageState extends State<ReturnsPage>
               color: unrealized >= 0 ? Colors.green : Colors.redAccent,
             ),
           ),
-          const SizedBox(height: 8),
-          TextButton.icon(
-            onPressed: () async {
-              clearAllSyncCache();
-              final trades = await db.trades.select().get();
-              final symbols = trades.map((t) => t.symbol).toSet();
-              for (final symbol in symbols) {
-                await syncCandles(symbol);
-              }
-              await _load();
-            },
-            label: const Text('Refresh'),
-            icon: const Icon(Icons.refresh),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              DropdownButton<String>(
+                value: settings.displayCurrency,
+                isDense: true,
+                underline: const SizedBox(),
+                items: supportedCurrencies
+                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) settings.setDisplayCurrency(value);
+                },
+              ),
+              TextButton.icon(
+                onPressed: () async {
+                  clearAllSyncCache();
+                  final trades = await db.trades.select().get();
+                  final symbols = trades.map((t) => t.symbol).toSet();
+                  for (final symbol in symbols) {
+                    await syncCandles(symbol);
+                  }
+                  await _load();
+                },
+                label: const Text('Refresh'),
+                icon: const Icon(Icons.refresh),
+              ),
+            ],
           ),
         ],
       ),

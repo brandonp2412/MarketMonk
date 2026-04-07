@@ -1,15 +1,13 @@
-// GENERATED CODE - DO NOT MODIFY BY HAND
-
-part of 'database.dart';
-
+// dart format width=80
+// GENERATED CODE, DO NOT EDIT BY HAND.
 // ignore_for_file: type=lint
-class $CandlesTable extends Candles with TableInfo<$CandlesTable, Candle> {
+import 'package:drift/drift.dart';
+
+class Candles extends Table with TableInfo<Candles, CandlesData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $CandlesTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  @override
+  Candles(this.attachedDatabase, [this._alias]);
   late final GeneratedColumn<int> id = GeneratedColumn<int>(
       'id', aliasedName, false,
       hasAutoIncrement: true,
@@ -17,59 +15,42 @@ class $CandlesTable extends Candles with TableInfo<$CandlesTable, Candle> {
       requiredDuringInsert: false,
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
-  static const VerificationMeta _symbolMeta = const VerificationMeta('symbol');
-  @override
   late final GeneratedColumn<String> symbol = GeneratedColumn<String>(
       'symbol', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _dateMeta = const VerificationMeta('date');
-  @override
   late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
       'date', aliasedName, false,
       type: DriftSqlType.dateTime, requiredDuringInsert: true);
-  static const VerificationMeta _openMeta = const VerificationMeta('open');
-  @override
   late final GeneratedColumn<double> open = GeneratedColumn<double>(
       'open', aliasedName, false,
       type: DriftSqlType.double,
       requiredDuringInsert: false,
-      defaultValue: const Constant(-1.0));
-  static const VerificationMeta _highMeta = const VerificationMeta('high');
-  @override
+      defaultValue: const CustomExpression('-1.0'));
   late final GeneratedColumn<double> high = GeneratedColumn<double>(
       'high', aliasedName, false,
       type: DriftSqlType.double,
       requiredDuringInsert: false,
-      defaultValue: const Constant(-1.0));
-  static const VerificationMeta _lowMeta = const VerificationMeta('low');
-  @override
+      defaultValue: const CustomExpression('-1.0'));
   late final GeneratedColumn<double> low = GeneratedColumn<double>(
       'low', aliasedName, false,
       type: DriftSqlType.double,
       requiredDuringInsert: false,
-      defaultValue: const Constant(-1.0));
-  static const VerificationMeta _closeMeta = const VerificationMeta('close');
-  @override
+      defaultValue: const CustomExpression('-1.0'));
   late final GeneratedColumn<double> close = GeneratedColumn<double>(
       'close', aliasedName, false,
       type: DriftSqlType.double,
       requiredDuringInsert: false,
-      defaultValue: const Constant(-1.0));
-  static const VerificationMeta _volumeMeta = const VerificationMeta('volume');
-  @override
+      defaultValue: const CustomExpression('-1.0'));
   late final GeneratedColumn<int> volume = GeneratedColumn<int>(
       'volume', aliasedName, false,
       type: DriftSqlType.int,
       requiredDuringInsert: false,
-      defaultValue: const Constant(0));
-  static const VerificationMeta _adjCloseMeta =
-      const VerificationMeta('adjClose');
-  @override
+      defaultValue: const CustomExpression('0'));
   late final GeneratedColumn<double> adjClose = GeneratedColumn<double>(
       'adj_close', aliasedName, false,
       type: DriftSqlType.double,
       requiredDuringInsert: false,
-      defaultValue: const Constant(-1.0));
+      defaultValue: const CustomExpression('-1.0'));
   @override
   List<GeneratedColumn> get $columns =>
       [id, symbol, date, open, high, low, close, volume, adjClose];
@@ -79,58 +60,11 @@ class $CandlesTable extends Candles with TableInfo<$CandlesTable, Candle> {
   String get actualTableName => $name;
   static const String $name = 'candles';
   @override
-  VerificationContext validateIntegrity(Insertable<Candle> instance,
-      {bool isInserting = false}) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    }
-    if (data.containsKey('symbol')) {
-      context.handle(_symbolMeta,
-          symbol.isAcceptableOrUnknown(data['symbol']!, _symbolMeta));
-    } else if (isInserting) {
-      context.missing(_symbolMeta);
-    }
-    if (data.containsKey('date')) {
-      context.handle(
-          _dateMeta, date.isAcceptableOrUnknown(data['date']!, _dateMeta));
-    } else if (isInserting) {
-      context.missing(_dateMeta);
-    }
-    if (data.containsKey('open')) {
-      context.handle(
-          _openMeta, open.isAcceptableOrUnknown(data['open']!, _openMeta));
-    }
-    if (data.containsKey('high')) {
-      context.handle(
-          _highMeta, high.isAcceptableOrUnknown(data['high']!, _highMeta));
-    }
-    if (data.containsKey('low')) {
-      context.handle(
-          _lowMeta, low.isAcceptableOrUnknown(data['low']!, _lowMeta));
-    }
-    if (data.containsKey('close')) {
-      context.handle(
-          _closeMeta, close.isAcceptableOrUnknown(data['close']!, _closeMeta));
-    }
-    if (data.containsKey('volume')) {
-      context.handle(_volumeMeta,
-          volume.isAcceptableOrUnknown(data['volume']!, _volumeMeta));
-    }
-    if (data.containsKey('adj_close')) {
-      context.handle(_adjCloseMeta,
-          adjClose.isAcceptableOrUnknown(data['adj_close']!, _adjCloseMeta));
-    }
-    return context;
-  }
-
-  @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Candle map(Map<String, dynamic> data, {String? tablePrefix}) {
+  CandlesData map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Candle(
+    return CandlesData(
       id: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
       symbol: attachedDatabase.typeMapping
@@ -153,12 +87,12 @@ class $CandlesTable extends Candles with TableInfo<$CandlesTable, Candle> {
   }
 
   @override
-  $CandlesTable createAlias(String alias) {
-    return $CandlesTable(attachedDatabase, alias);
+  Candles createAlias(String alias) {
+    return Candles(attachedDatabase, alias);
   }
 }
 
-class Candle extends DataClass implements Insertable<Candle> {
+class CandlesData extends DataClass implements Insertable<CandlesData> {
   final int id;
   final String symbol;
   final DateTime date;
@@ -168,7 +102,7 @@ class Candle extends DataClass implements Insertable<Candle> {
   final double close;
   final int volume;
   final double adjClose;
-  const Candle(
+  const CandlesData(
       {required this.id,
       required this.symbol,
       required this.date,
@@ -207,10 +141,10 @@ class Candle extends DataClass implements Insertable<Candle> {
     );
   }
 
-  factory Candle.fromJson(Map<String, dynamic> json,
+  factory CandlesData.fromJson(Map<String, dynamic> json,
       {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return Candle(
+    return CandlesData(
       id: serializer.fromJson<int>(json['id']),
       symbol: serializer.fromJson<String>(json['symbol']),
       date: serializer.fromJson<DateTime>(json['date']),
@@ -238,7 +172,7 @@ class Candle extends DataClass implements Insertable<Candle> {
     };
   }
 
-  Candle copyWith(
+  CandlesData copyWith(
           {int? id,
           String? symbol,
           DateTime? date,
@@ -248,7 +182,7 @@ class Candle extends DataClass implements Insertable<Candle> {
           double? close,
           int? volume,
           double? adjClose}) =>
-      Candle(
+      CandlesData(
         id: id ?? this.id,
         symbol: symbol ?? this.symbol,
         date: date ?? this.date,
@@ -259,8 +193,8 @@ class Candle extends DataClass implements Insertable<Candle> {
         volume: volume ?? this.volume,
         adjClose: adjClose ?? this.adjClose,
       );
-  Candle copyWithCompanion(CandlesCompanion data) {
-    return Candle(
+  CandlesData copyWithCompanion(CandlesCompanion data) {
+    return CandlesData(
       id: data.id.present ? data.id.value : this.id,
       symbol: data.symbol.present ? data.symbol.value : this.symbol,
       date: data.date.present ? data.date.value : this.date,
@@ -275,7 +209,7 @@ class Candle extends DataClass implements Insertable<Candle> {
 
   @override
   String toString() {
-    return (StringBuffer('Candle(')
+    return (StringBuffer('CandlesData(')
           ..write('id: $id, ')
           ..write('symbol: $symbol, ')
           ..write('date: $date, ')
@@ -295,7 +229,7 @@ class Candle extends DataClass implements Insertable<Candle> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is Candle &&
+      (other is CandlesData &&
           other.id == this.id &&
           other.symbol == this.symbol &&
           other.date == this.date &&
@@ -307,7 +241,7 @@ class Candle extends DataClass implements Insertable<Candle> {
           other.adjClose == this.adjClose);
 }
 
-class CandlesCompanion extends UpdateCompanion<Candle> {
+class CandlesCompanion extends UpdateCompanion<CandlesData> {
   final Value<int> id;
   final Value<String> symbol;
   final Value<DateTime> date;
@@ -340,7 +274,7 @@ class CandlesCompanion extends UpdateCompanion<Candle> {
     this.adjClose = const Value.absent(),
   })  : symbol = Value(symbol),
         date = Value(date);
-  static Insertable<Candle> custom({
+  static Insertable<CandlesData> custom({
     Expression<int>? id,
     Expression<String>? symbol,
     Expression<DateTime>? date,
@@ -437,13 +371,11 @@ class CandlesCompanion extends UpdateCompanion<Candle> {
   }
 }
 
-class $TradesTable extends Trades with TableInfo<$TradesTable, Trade> {
+class Trades extends Table with TableInfo<Trades, TradesData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $TradesTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  @override
+  Trades(this.attachedDatabase, [this._alias]);
   late final GeneratedColumn<int> id = GeneratedColumn<int>(
       'id', aliasedName, false,
       hasAutoIncrement: true,
@@ -451,55 +383,34 @@ class $TradesTable extends Trades with TableInfo<$TradesTable, Trade> {
       requiredDuringInsert: false,
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
-  static const VerificationMeta _symbolMeta = const VerificationMeta('symbol');
-  @override
   late final GeneratedColumn<String> symbol = GeneratedColumn<String>(
       'symbol', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _nameMeta = const VerificationMeta('name');
-  @override
   late final GeneratedColumn<String> name = GeneratedColumn<String>(
       'name', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _quantityMeta =
-      const VerificationMeta('quantity');
-  @override
   late final GeneratedColumn<double> quantity = GeneratedColumn<double>(
       'quantity', aliasedName, false,
       type: DriftSqlType.double, requiredDuringInsert: true);
-  static const VerificationMeta _priceMeta = const VerificationMeta('price');
-  @override
   late final GeneratedColumn<double> price = GeneratedColumn<double>(
       'price', aliasedName, false,
       type: DriftSqlType.double, requiredDuringInsert: true);
-  static const VerificationMeta _tradeTypeMeta =
-      const VerificationMeta('tradeType');
-  @override
   late final GeneratedColumn<String> tradeType = GeneratedColumn<String>(
       'trade_type', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _tradeDateMeta =
-      const VerificationMeta('tradeDate');
-  @override
   late final GeneratedColumn<DateTime> tradeDate = GeneratedColumn<DateTime>(
       'trade_date', aliasedName, false,
       type: DriftSqlType.dateTime, requiredDuringInsert: true);
-  static const VerificationMeta _realizedPLMeta =
-      const VerificationMeta('realizedPL');
-  @override
   late final GeneratedColumn<double> realizedPL = GeneratedColumn<double>(
       'realized_p_l', aliasedName, false,
       type: DriftSqlType.double,
       requiredDuringInsert: false,
-      defaultValue: const Constant(0.0));
-  static const VerificationMeta _commissionMeta =
-      const VerificationMeta('commission');
-  @override
+      defaultValue: const CustomExpression('0.0'));
   late final GeneratedColumn<double> commission = GeneratedColumn<double>(
       'commission', aliasedName, false,
       type: DriftSqlType.double,
       requiredDuringInsert: false,
-      defaultValue: const Constant(0.0));
+      defaultValue: const CustomExpression('0.0'));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -518,70 +429,11 @@ class $TradesTable extends Trades with TableInfo<$TradesTable, Trade> {
   String get actualTableName => $name;
   static const String $name = 'trades';
   @override
-  VerificationContext validateIntegrity(Insertable<Trade> instance,
-      {bool isInserting = false}) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    }
-    if (data.containsKey('symbol')) {
-      context.handle(_symbolMeta,
-          symbol.isAcceptableOrUnknown(data['symbol']!, _symbolMeta));
-    } else if (isInserting) {
-      context.missing(_symbolMeta);
-    }
-    if (data.containsKey('name')) {
-      context.handle(
-          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
-    } else if (isInserting) {
-      context.missing(_nameMeta);
-    }
-    if (data.containsKey('quantity')) {
-      context.handle(_quantityMeta,
-          quantity.isAcceptableOrUnknown(data['quantity']!, _quantityMeta));
-    } else if (isInserting) {
-      context.missing(_quantityMeta);
-    }
-    if (data.containsKey('price')) {
-      context.handle(
-          _priceMeta, price.isAcceptableOrUnknown(data['price']!, _priceMeta));
-    } else if (isInserting) {
-      context.missing(_priceMeta);
-    }
-    if (data.containsKey('trade_type')) {
-      context.handle(_tradeTypeMeta,
-          tradeType.isAcceptableOrUnknown(data['trade_type']!, _tradeTypeMeta));
-    } else if (isInserting) {
-      context.missing(_tradeTypeMeta);
-    }
-    if (data.containsKey('trade_date')) {
-      context.handle(_tradeDateMeta,
-          tradeDate.isAcceptableOrUnknown(data['trade_date']!, _tradeDateMeta));
-    } else if (isInserting) {
-      context.missing(_tradeDateMeta);
-    }
-    if (data.containsKey('realized_p_l')) {
-      context.handle(
-          _realizedPLMeta,
-          realizedPL.isAcceptableOrUnknown(
-              data['realized_p_l']!, _realizedPLMeta));
-    }
-    if (data.containsKey('commission')) {
-      context.handle(
-          _commissionMeta,
-          commission.isAcceptableOrUnknown(
-              data['commission']!, _commissionMeta));
-    }
-    return context;
-  }
-
-  @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Trade map(Map<String, dynamic> data, {String? tablePrefix}) {
+  TradesData map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Trade(
+    return TradesData(
       id: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
       symbol: attachedDatabase.typeMapping
@@ -604,12 +456,12 @@ class $TradesTable extends Trades with TableInfo<$TradesTable, Trade> {
   }
 
   @override
-  $TradesTable createAlias(String alias) {
-    return $TradesTable(attachedDatabase, alias);
+  Trades createAlias(String alias) {
+    return Trades(attachedDatabase, alias);
   }
 }
 
-class Trade extends DataClass implements Insertable<Trade> {
+class TradesData extends DataClass implements Insertable<TradesData> {
   final int id;
   final String symbol;
   final String name;
@@ -619,7 +471,7 @@ class Trade extends DataClass implements Insertable<Trade> {
   final DateTime tradeDate;
   final double realizedPL;
   final double commission;
-  const Trade(
+  const TradesData(
       {required this.id,
       required this.symbol,
       required this.name,
@@ -658,10 +510,10 @@ class Trade extends DataClass implements Insertable<Trade> {
     );
   }
 
-  factory Trade.fromJson(Map<String, dynamic> json,
+  factory TradesData.fromJson(Map<String, dynamic> json,
       {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return Trade(
+    return TradesData(
       id: serializer.fromJson<int>(json['id']),
       symbol: serializer.fromJson<String>(json['symbol']),
       name: serializer.fromJson<String>(json['name']),
@@ -689,7 +541,7 @@ class Trade extends DataClass implements Insertable<Trade> {
     };
   }
 
-  Trade copyWith(
+  TradesData copyWith(
           {int? id,
           String? symbol,
           String? name,
@@ -699,7 +551,7 @@ class Trade extends DataClass implements Insertable<Trade> {
           DateTime? tradeDate,
           double? realizedPL,
           double? commission}) =>
-      Trade(
+      TradesData(
         id: id ?? this.id,
         symbol: symbol ?? this.symbol,
         name: name ?? this.name,
@@ -710,8 +562,8 @@ class Trade extends DataClass implements Insertable<Trade> {
         realizedPL: realizedPL ?? this.realizedPL,
         commission: commission ?? this.commission,
       );
-  Trade copyWithCompanion(TradesCompanion data) {
-    return Trade(
+  TradesData copyWithCompanion(TradesCompanion data) {
+    return TradesData(
       id: data.id.present ? data.id.value : this.id,
       symbol: data.symbol.present ? data.symbol.value : this.symbol,
       name: data.name.present ? data.name.value : this.name,
@@ -728,7 +580,7 @@ class Trade extends DataClass implements Insertable<Trade> {
 
   @override
   String toString() {
-    return (StringBuffer('Trade(')
+    return (StringBuffer('TradesData(')
           ..write('id: $id, ')
           ..write('symbol: $symbol, ')
           ..write('name: $name, ')
@@ -748,7 +600,7 @@ class Trade extends DataClass implements Insertable<Trade> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is Trade &&
+      (other is TradesData &&
           other.id == this.id &&
           other.symbol == this.symbol &&
           other.name == this.name &&
@@ -760,7 +612,7 @@ class Trade extends DataClass implements Insertable<Trade> {
           other.commission == this.commission);
 }
 
-class TradesCompanion extends UpdateCompanion<Trade> {
+class TradesCompanion extends UpdateCompanion<TradesData> {
   final Value<int> id;
   final Value<String> symbol;
   final Value<String> name;
@@ -797,7 +649,7 @@ class TradesCompanion extends UpdateCompanion<Trade> {
         price = Value(price),
         tradeType = Value(tradeType),
         tradeDate = Value(tradeDate);
-  static Insertable<Trade> custom({
+  static Insertable<TradesData> custom({
     Expression<int>? id,
     Expression<String>? symbol,
     Expression<String>? name,
@@ -894,11 +746,10 @@ class TradesCompanion extends UpdateCompanion<Trade> {
   }
 }
 
-abstract class _$Database extends GeneratedDatabase {
-  _$Database(QueryExecutor e) : super(e);
-  $DatabaseManager get managers => $DatabaseManager(this);
-  late final $CandlesTable candles = $CandlesTable(this);
-  late final $TradesTable trades = $TradesTable(this);
+class DatabaseAtV10 extends GeneratedDatabase {
+  DatabaseAtV10(QueryExecutor e) : super(e);
+  late final Candles candles = Candles(this);
+  late final Trades trades = Trades(this);
   late final Index idxCandlesSymbolDate = Index('idx_candles_symbol_date',
       'CREATE INDEX idx_candles_symbol_date ON candles (symbol, date)');
   late final Index idxTradesSymbolTradeDate = Index(
@@ -910,449 +761,6 @@ abstract class _$Database extends GeneratedDatabase {
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities =>
       [candles, trades, idxCandlesSymbolDate, idxTradesSymbolTradeDate];
-}
-
-typedef $$CandlesTableCreateCompanionBuilder = CandlesCompanion Function({
-  Value<int> id,
-  required String symbol,
-  required DateTime date,
-  Value<double> open,
-  Value<double> high,
-  Value<double> low,
-  Value<double> close,
-  Value<int> volume,
-  Value<double> adjClose,
-});
-typedef $$CandlesTableUpdateCompanionBuilder = CandlesCompanion Function({
-  Value<int> id,
-  Value<String> symbol,
-  Value<DateTime> date,
-  Value<double> open,
-  Value<double> high,
-  Value<double> low,
-  Value<double> close,
-  Value<int> volume,
-  Value<double> adjClose,
-});
-
-class $$CandlesTableFilterComposer extends Composer<_$Database, $CandlesTable> {
-  $$CandlesTableFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<int> get id => $composableBuilder(
-      column: $table.id, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get symbol => $composableBuilder(
-      column: $table.symbol, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<DateTime> get date => $composableBuilder(
-      column: $table.date, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<double> get open => $composableBuilder(
-      column: $table.open, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<double> get high => $composableBuilder(
-      column: $table.high, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<double> get low => $composableBuilder(
-      column: $table.low, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<double> get close => $composableBuilder(
-      column: $table.close, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<int> get volume => $composableBuilder(
-      column: $table.volume, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<double> get adjClose => $composableBuilder(
-      column: $table.adjClose, builder: (column) => ColumnFilters(column));
-}
-
-class $$CandlesTableOrderingComposer
-    extends Composer<_$Database, $CandlesTable> {
-  $$CandlesTableOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<int> get id => $composableBuilder(
-      column: $table.id, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get symbol => $composableBuilder(
-      column: $table.symbol, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<DateTime> get date => $composableBuilder(
-      column: $table.date, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<double> get open => $composableBuilder(
-      column: $table.open, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<double> get high => $composableBuilder(
-      column: $table.high, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<double> get low => $composableBuilder(
-      column: $table.low, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<double> get close => $composableBuilder(
-      column: $table.close, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<int> get volume => $composableBuilder(
-      column: $table.volume, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<double> get adjClose => $composableBuilder(
-      column: $table.adjClose, builder: (column) => ColumnOrderings(column));
-}
-
-class $$CandlesTableAnnotationComposer
-    extends Composer<_$Database, $CandlesTable> {
-  $$CandlesTableAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<int> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<String> get symbol =>
-      $composableBuilder(column: $table.symbol, builder: (column) => column);
-
-  GeneratedColumn<DateTime> get date =>
-      $composableBuilder(column: $table.date, builder: (column) => column);
-
-  GeneratedColumn<double> get open =>
-      $composableBuilder(column: $table.open, builder: (column) => column);
-
-  GeneratedColumn<double> get high =>
-      $composableBuilder(column: $table.high, builder: (column) => column);
-
-  GeneratedColumn<double> get low =>
-      $composableBuilder(column: $table.low, builder: (column) => column);
-
-  GeneratedColumn<double> get close =>
-      $composableBuilder(column: $table.close, builder: (column) => column);
-
-  GeneratedColumn<int> get volume =>
-      $composableBuilder(column: $table.volume, builder: (column) => column);
-
-  GeneratedColumn<double> get adjClose =>
-      $composableBuilder(column: $table.adjClose, builder: (column) => column);
-}
-
-class $$CandlesTableTableManager extends RootTableManager<
-    _$Database,
-    $CandlesTable,
-    Candle,
-    $$CandlesTableFilterComposer,
-    $$CandlesTableOrderingComposer,
-    $$CandlesTableAnnotationComposer,
-    $$CandlesTableCreateCompanionBuilder,
-    $$CandlesTableUpdateCompanionBuilder,
-    (Candle, BaseReferences<_$Database, $CandlesTable, Candle>),
-    Candle,
-    PrefetchHooks Function()> {
-  $$CandlesTableTableManager(_$Database db, $CandlesTable table)
-      : super(TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $$CandlesTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $$CandlesTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $$CandlesTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback: ({
-            Value<int> id = const Value.absent(),
-            Value<String> symbol = const Value.absent(),
-            Value<DateTime> date = const Value.absent(),
-            Value<double> open = const Value.absent(),
-            Value<double> high = const Value.absent(),
-            Value<double> low = const Value.absent(),
-            Value<double> close = const Value.absent(),
-            Value<int> volume = const Value.absent(),
-            Value<double> adjClose = const Value.absent(),
-          }) =>
-              CandlesCompanion(
-            id: id,
-            symbol: symbol,
-            date: date,
-            open: open,
-            high: high,
-            low: low,
-            close: close,
-            volume: volume,
-            adjClose: adjClose,
-          ),
-          createCompanionCallback: ({
-            Value<int> id = const Value.absent(),
-            required String symbol,
-            required DateTime date,
-            Value<double> open = const Value.absent(),
-            Value<double> high = const Value.absent(),
-            Value<double> low = const Value.absent(),
-            Value<double> close = const Value.absent(),
-            Value<int> volume = const Value.absent(),
-            Value<double> adjClose = const Value.absent(),
-          }) =>
-              CandlesCompanion.insert(
-            id: id,
-            symbol: symbol,
-            date: date,
-            open: open,
-            high: high,
-            low: low,
-            close: close,
-            volume: volume,
-            adjClose: adjClose,
-          ),
-          withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
-              .toList(),
-          prefetchHooksCallback: null,
-        ));
-}
-
-typedef $$CandlesTableProcessedTableManager = ProcessedTableManager<
-    _$Database,
-    $CandlesTable,
-    Candle,
-    $$CandlesTableFilterComposer,
-    $$CandlesTableOrderingComposer,
-    $$CandlesTableAnnotationComposer,
-    $$CandlesTableCreateCompanionBuilder,
-    $$CandlesTableUpdateCompanionBuilder,
-    (Candle, BaseReferences<_$Database, $CandlesTable, Candle>),
-    Candle,
-    PrefetchHooks Function()>;
-typedef $$TradesTableCreateCompanionBuilder = TradesCompanion Function({
-  Value<int> id,
-  required String symbol,
-  required String name,
-  required double quantity,
-  required double price,
-  required String tradeType,
-  required DateTime tradeDate,
-  Value<double> realizedPL,
-  Value<double> commission,
-});
-typedef $$TradesTableUpdateCompanionBuilder = TradesCompanion Function({
-  Value<int> id,
-  Value<String> symbol,
-  Value<String> name,
-  Value<double> quantity,
-  Value<double> price,
-  Value<String> tradeType,
-  Value<DateTime> tradeDate,
-  Value<double> realizedPL,
-  Value<double> commission,
-});
-
-class $$TradesTableFilterComposer extends Composer<_$Database, $TradesTable> {
-  $$TradesTableFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<int> get id => $composableBuilder(
-      column: $table.id, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get symbol => $composableBuilder(
-      column: $table.symbol, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get name => $composableBuilder(
-      column: $table.name, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<double> get quantity => $composableBuilder(
-      column: $table.quantity, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<double> get price => $composableBuilder(
-      column: $table.price, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get tradeType => $composableBuilder(
-      column: $table.tradeType, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<DateTime> get tradeDate => $composableBuilder(
-      column: $table.tradeDate, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<double> get realizedPL => $composableBuilder(
-      column: $table.realizedPL, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<double> get commission => $composableBuilder(
-      column: $table.commission, builder: (column) => ColumnFilters(column));
-}
-
-class $$TradesTableOrderingComposer extends Composer<_$Database, $TradesTable> {
-  $$TradesTableOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<int> get id => $composableBuilder(
-      column: $table.id, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get symbol => $composableBuilder(
-      column: $table.symbol, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get name => $composableBuilder(
-      column: $table.name, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<double> get quantity => $composableBuilder(
-      column: $table.quantity, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<double> get price => $composableBuilder(
-      column: $table.price, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get tradeType => $composableBuilder(
-      column: $table.tradeType, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<DateTime> get tradeDate => $composableBuilder(
-      column: $table.tradeDate, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<double> get realizedPL => $composableBuilder(
-      column: $table.realizedPL, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<double> get commission => $composableBuilder(
-      column: $table.commission, builder: (column) => ColumnOrderings(column));
-}
-
-class $$TradesTableAnnotationComposer
-    extends Composer<_$Database, $TradesTable> {
-  $$TradesTableAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<int> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<String> get symbol =>
-      $composableBuilder(column: $table.symbol, builder: (column) => column);
-
-  GeneratedColumn<String> get name =>
-      $composableBuilder(column: $table.name, builder: (column) => column);
-
-  GeneratedColumn<double> get quantity =>
-      $composableBuilder(column: $table.quantity, builder: (column) => column);
-
-  GeneratedColumn<double> get price =>
-      $composableBuilder(column: $table.price, builder: (column) => column);
-
-  GeneratedColumn<String> get tradeType =>
-      $composableBuilder(column: $table.tradeType, builder: (column) => column);
-
-  GeneratedColumn<DateTime> get tradeDate =>
-      $composableBuilder(column: $table.tradeDate, builder: (column) => column);
-
-  GeneratedColumn<double> get realizedPL => $composableBuilder(
-      column: $table.realizedPL, builder: (column) => column);
-
-  GeneratedColumn<double> get commission => $composableBuilder(
-      column: $table.commission, builder: (column) => column);
-}
-
-class $$TradesTableTableManager extends RootTableManager<
-    _$Database,
-    $TradesTable,
-    Trade,
-    $$TradesTableFilterComposer,
-    $$TradesTableOrderingComposer,
-    $$TradesTableAnnotationComposer,
-    $$TradesTableCreateCompanionBuilder,
-    $$TradesTableUpdateCompanionBuilder,
-    (Trade, BaseReferences<_$Database, $TradesTable, Trade>),
-    Trade,
-    PrefetchHooks Function()> {
-  $$TradesTableTableManager(_$Database db, $TradesTable table)
-      : super(TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $$TradesTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $$TradesTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $$TradesTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback: ({
-            Value<int> id = const Value.absent(),
-            Value<String> symbol = const Value.absent(),
-            Value<String> name = const Value.absent(),
-            Value<double> quantity = const Value.absent(),
-            Value<double> price = const Value.absent(),
-            Value<String> tradeType = const Value.absent(),
-            Value<DateTime> tradeDate = const Value.absent(),
-            Value<double> realizedPL = const Value.absent(),
-            Value<double> commission = const Value.absent(),
-          }) =>
-              TradesCompanion(
-            id: id,
-            symbol: symbol,
-            name: name,
-            quantity: quantity,
-            price: price,
-            tradeType: tradeType,
-            tradeDate: tradeDate,
-            realizedPL: realizedPL,
-            commission: commission,
-          ),
-          createCompanionCallback: ({
-            Value<int> id = const Value.absent(),
-            required String symbol,
-            required String name,
-            required double quantity,
-            required double price,
-            required String tradeType,
-            required DateTime tradeDate,
-            Value<double> realizedPL = const Value.absent(),
-            Value<double> commission = const Value.absent(),
-          }) =>
-              TradesCompanion.insert(
-            id: id,
-            symbol: symbol,
-            name: name,
-            quantity: quantity,
-            price: price,
-            tradeType: tradeType,
-            tradeDate: tradeDate,
-            realizedPL: realizedPL,
-            commission: commission,
-          ),
-          withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
-              .toList(),
-          prefetchHooksCallback: null,
-        ));
-}
-
-typedef $$TradesTableProcessedTableManager = ProcessedTableManager<
-    _$Database,
-    $TradesTable,
-    Trade,
-    $$TradesTableFilterComposer,
-    $$TradesTableOrderingComposer,
-    $$TradesTableAnnotationComposer,
-    $$TradesTableCreateCompanionBuilder,
-    $$TradesTableUpdateCompanionBuilder,
-    (Trade, BaseReferences<_$Database, $TradesTable, Trade>),
-    Trade,
-    PrefetchHooks Function()>;
-
-class $DatabaseManager {
-  final _$Database _db;
-  $DatabaseManager(this._db);
-  $$CandlesTableTableManager get candles =>
-      $$CandlesTableTableManager(_db, _db.candles);
-  $$TradesTableTableManager get trades =>
-      $$TradesTableTableManager(_db, _db.trades);
+  @override
+  int get schemaVersion => 10;
 }

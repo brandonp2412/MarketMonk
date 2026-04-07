@@ -3,7 +3,9 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_page.dart';
+import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
+import 'package:provider/provider.dart';
 
 class PortfolioPage extends StatefulWidget {
   const PortfolioPage({super.key});
@@ -147,7 +149,7 @@ class PortfolioPageState extends State<PortfolioPage>
         slivers: [
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: _SummaryCard(
                 totalValue: totalValue,
                 totalGain: totalGain,
@@ -305,6 +307,7 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final gainColor = totalGain >= 0 ? Colors.green : Colors.redAccent;
+    final settings = context.watch<SettingsState>();
     return Card(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -325,6 +328,18 @@ class _SummaryCard extends StatelessWidget {
                   style: TextStyle(color: gainColor, fontSize: 13),
                 ),
               ],
+            ),
+            const Spacer(),
+            DropdownButton<String>(
+              value: settings.displayCurrency,
+              isDense: true,
+              underline: const SizedBox(),
+              items: supportedCurrencies
+                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) settings.setDisplayCurrency(value);
+              },
             ),
           ],
         ),

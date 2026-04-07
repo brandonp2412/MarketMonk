@@ -214,25 +214,6 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Tooltip(
-              message:
-                  'Display all monetary values in this currency (converted from USD)',
-              child: DropdownButtonFormField<String>(
-                value: settings.displayCurrency,
-                decoration: const InputDecoration(labelText: 'Display currency'),
-                items: supportedCurrencies
-                    .map(
-                      (c) => DropdownMenuItem(value: c, child: Text(c)),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  if (value != null) settings.setDisplayCurrency(value);
-                },
-              ),
-            ),
-          ),
-          Padding(
             padding: const EdgeInsets.only(top: 8.0),
             child: Tooltip(
               message: 'Use the primary color of your device for the app',

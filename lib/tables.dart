@@ -1,5 +1,7 @@
 import 'package:drift/drift.dart';
 
+@TableIndex(
+    name: 'idx_trades_symbol_trade_date', columns: {#symbol, #tradeDate})
 class Trades extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get symbol => text()();
@@ -14,6 +16,7 @@ class Trades extends Table {
   RealColumn get commission => real().withDefault(const Constant(0.0))();
 }
 
+@TableIndex(name: 'idx_candles_symbol_date', columns: {#symbol, #date})
 class Candles extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get symbol => text()();

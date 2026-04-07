@@ -12,7 +12,7 @@ part 'database.g.dart';
 @DriftDatabase(tables: [Candles, Trades])
 class Database extends _$Database {
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   Database() : super(_openConnection());
 
@@ -61,17 +61,6 @@ class Database extends _$Database {
         await customStatement('PRAGMA foreign_keys = ON');
       },
       beforeOpen: (details) async {
-        // Create performance indices if they don't exist yet.
-        // IF NOT EXISTS makes this idempotent across fresh installs and upgrades.
-        await customStatement(
-          'CREATE INDEX IF NOT EXISTS idx_candles_symbol_date '
-          'ON candles (symbol, date)',
-        );
-        await customStatement(
-          'CREATE INDEX IF NOT EXISTS idx_trades_symbol_trade_date '
-          'ON trades (symbol, trade_date)',
-        );
-
         if (kDebugMode) await validateDatabaseSchema();
       },
     );
@@ -169,7 +158,16 @@ class Database extends _$Database {
     from7To8: (Migrator m, Schema8 schema) async {
       await m.createTable(schema.trades);
     },
-    // No-op: version bump only. Real work done in _migrateTickersToTrades().
-    from8To9: (Migrator m, Schema9 schema) async {},
+    from8To9: (m, schema) async {},
+    from9To10: (Migrator m, Schema10 schema) async {
+      await m.database.customStatement(
+        'CREATE INDEX IF NOT EXISTS idx_candles_symbol_date '
+        'ON candles (symbol, date)',
+      );
+      await m.database.customStatement(
+        'CREATE INDEX IF NOT EXISTS idx_trades_symbol_trade_date '
+        'ON trades (symbol, trade_date)',
+      );
+    },
   );
 }
