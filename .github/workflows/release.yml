@@ -134,7 +134,7 @@ jobs:
 
       - name: Decode Android keystore
         run: |
-          echo -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/keystore.jks
+          echo -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -di > android/app/keystore.jks
           echo "storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}" > android/key.properties
           echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}" >> android/key.properties
           echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" >> android/key.properties
