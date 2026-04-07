@@ -5,6 +5,7 @@ import 'package:market_monk/chart_page.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/portfolio_page.dart';
+import 'package:market_monk/returns_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:provider/provider.dart';
 
@@ -71,7 +72,7 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
     );
     return const DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         body: SafeArea(
           child: TabBarView(
@@ -79,6 +80,7 @@ class _MyHomePageState extends State<MyHomePage> {
               ChartPage(),
               PortfolioPage(),
               HoldingsPage(),
+              ReturnsPage(),
             ],
           ),
         ),
@@ -98,6 +100,10 @@ class _MyHomePageState extends State<MyHomePage> {
               Tab(
                 icon: Icon(Icons.list_alt),
                 text: "Holdings",
+              ),
+              Tab(
+                icon: Icon(Icons.show_chart),
+                text: "Returns",
               ),
             ],
           ),
