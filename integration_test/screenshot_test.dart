@@ -6,6 +6,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:market_monk/chart_page.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
+import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/main.dart' as app;
 import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/settings_page.dart';
@@ -134,7 +135,7 @@ List<CandlesCompanion> mockCandles = [
   ),
 ];
 
-enum TabBarState { chart, portfolio }
+enum TabBarState { chart, portfolio, holdings }
 
 Future<void> appWrapper() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -161,6 +162,9 @@ BuildContext getBuildContext(WidgetTester tester, TabBarState? tabBarState) {
           .context;
     case null:
       break;
+    case TabBarState.holdings:
+      return (tester.state(find.byType(HoldingsPage)) as HoldingsPageState)
+          .context;
   }
 
   return tester.element(find.byType(TabBarView));
@@ -260,6 +264,20 @@ void main() {
           page: const EditTickerPage(symbol: 'GME'),
         ),
         tabBarState: TabBarState.portfolio,
+      ),
+    );
+
+    testWidgets(
+      "HoldingsPage",
+      (tester) async => await generateScreenshot(
+        binding: binding,
+        tester: tester,
+        screenshotName: '5_en-US',
+        navigateToPage: (context) async => navigateTo(
+          context: context,
+          page: const HoldingsPage(),
+        ),
+        tabBarState: TabBarState.holdings,
       ),
     );
   });

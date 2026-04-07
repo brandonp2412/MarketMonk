@@ -29,10 +29,10 @@ class HoldingsPage extends StatefulWidget {
   const HoldingsPage({super.key});
 
   @override
-  State<HoldingsPage> createState() => _HoldingsPageState();
+  State<HoldingsPage> createState() => HoldingsPageState();
 }
 
-class _HoldingsPageState extends State<HoldingsPage>
+class HoldingsPageState extends State<HoldingsPage>
     with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
