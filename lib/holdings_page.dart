@@ -163,7 +163,6 @@ class HoldingsPageState extends State<HoldingsPage>
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text(
               'Delete',
-              style: TextStyle(color: Colors.redAccent),
             ),
           ),
         ],
@@ -290,12 +289,10 @@ class HoldingsPageState extends State<HoldingsPage>
       floatingActionButton: _selecting
           ? FloatingActionButton.extended(
               onPressed: () => _deleteSelected(context),
-              backgroundColor: Colors.redAccent,
               label: Text(
                 'Delete (${_selectedSymbols.length})',
-                style: const TextStyle(color: Colors.white),
               ),
-              icon: const Icon(Icons.delete, color: Colors.white),
+              icon: const Icon(Icons.delete),
             )
           : FloatingActionButton.extended(
               onPressed: () => Navigator.push(
@@ -429,8 +426,8 @@ class _SymbolTile extends StatelessWidget {
       );
     } else {
       leadingWidget = SizedBox(
-        width: 30,
-        height: 30,
+        width: 40,
+        height: 40,
         child: position != null
             ? Icon(
                 changePct >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
