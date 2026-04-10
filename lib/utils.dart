@@ -297,8 +297,10 @@ class YahooFinanceApi {
       final Map<String, dynamic> data = json.decode(response.body);
       final List<dynamic> quotes = data['quotes'] ?? [];
 
+      // Include EQUITYs, ETFs, and ETNs — all have tradeable candle data.
+      const tradeable = {'EQUITY', 'ETF', 'ETN'};
       return quotes
-          .where((quote) => quote['quoteType'] == 'EQUITY')
+          .where((quote) => tradeable.contains(quote['quoteType']))
           .map((quote) => StockResult.fromJson(quote))
           .toList();
     });

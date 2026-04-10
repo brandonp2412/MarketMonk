@@ -209,9 +209,10 @@ class ChartPageState extends State<ChartPage>
     });
   }
 
-  void _selectStock(StockResult result) {
+  void _selectStock(StockResult result) => _selectSymbol(result.symbol);
+
+  void _selectSymbol(String symbol) {
     _searchFocus.unfocus();
-    final symbol = result.symbol;
     setState(() {
       _mode = _ChartMode.stock;
       _selectedSymbol = symbol;
@@ -360,15 +361,31 @@ class ChartPageState extends State<ChartPage>
   }
 
   Widget _buildSearchResults() {
+    final query = _searchController.text.trim().toUpperCase();
     if (_searchLoading) {
       return const Center(child: CircularProgressIndicator());
     }
+
+    // "Use anyway" tile — always shown at the bottom so the user can force a
+    // known symbol that the Yahoo Finance search API doesn't surface (e.g. GLD).
+    final useAnywayTile = ListTile(
+      leading: const Icon(Icons.open_in_new),
+      title: Text('Use "$query" anyway'),
+      subtitle: const Text('Load chart for this exact ticker'),
+      onTap: () => _selectSymbol(query),
+    );
+
     if (_searchResults.isEmpty) {
-      return const Center(child: Text('No results found'));
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [useAnywayTile],
+      );
     }
+
     return ListView.builder(
-      itemCount: _searchResults.length,
+      itemCount: _searchResults.length + 1,
       itemBuilder: (context, i) {
+        if (i == _searchResults.length) return useAnywayTile;
         final r = _searchResults[i];
         final name = r.longname.isNotEmpty ? r.longname : r.shortname;
         return ListTile(
