@@ -8,6 +8,7 @@ import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/main.dart' as app;
+import 'package:market_monk/main.dart';
 import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
@@ -147,9 +148,14 @@ Future<void> appWrapper() async {
     'curveLines': true,
   });
   final settings = SettingsState();
+  final accounts = AccountManager();
+  await accounts.init();
   runApp(
-    ChangeNotifierProvider.value(
-      value: settings,
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: settings),
+        ChangeNotifierProvider.value(value: accounts),
+      ],
       child: const app.MyApp(),
     ),
   );
