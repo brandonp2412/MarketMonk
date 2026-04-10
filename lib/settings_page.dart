@@ -165,7 +165,7 @@ class _SettingsPageState extends State<SettingsPage> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: DropdownButtonFormField<ThemeMode>(
-              value: settings.theme,
+              initialValue: settings.theme,
               decoration: const InputDecoration(
                 labelStyle: TextStyle(),
                 labelText: 'Theme',
@@ -198,7 +198,7 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Tooltip(
               message: 'How dates are displayed below graphs',
               child: DropdownButtonFormField<String>(
-                value: settings.dateFormat,
+                initialValue: settings.dateFormat,
                 items: const [
                   DropdownMenuItem(value: "d/M/yy", child: Text("d/M/yy")),
                   DropdownMenuItem(value: "M/d/yy", child: Text("M/d/yy")),
@@ -299,6 +299,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           ListTile(
+            enabled: false,
             leading: const Icon(Icons.candlestick_chart),
             title: const Text('Interactive Brokers'),
             subtitle: const Text('Connect IB Gateway to import portfolio'),
