@@ -310,6 +310,7 @@ class ChartPageState extends State<ChartPage>
             minHeight: 2,
             color: Theme.of(context).colorScheme.primary,
           ),
+        if (!_networkLoading) const SizedBox(height: 2),
         Expanded(
           child: _mode == _ChartMode.searching
               ? _buildSearchResults()
