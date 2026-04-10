@@ -4,8 +4,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:market_monk/accounts_page.dart';
 import 'package:market_monk/csv_import.dart';
 import 'package:market_monk/database.dart';
+import 'package:market_monk/ib_settings_page.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/ticker_line.dart';
@@ -284,6 +286,29 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           const SizedBox(height: 8),
+          ListTile(
+            leading: const Icon(Icons.manage_accounts),
+            title: const Text('Manage accounts'),
+            subtitle: Text(
+              context.watch<AccountManager>().activeAccount,
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AccountsPage()),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.candlestick_chart),
+            title: const Text('Interactive Brokers'),
+            subtitle: const Text('Connect IB Gateway to import portfolio'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const IbSettingsPage()),
+            ),
+          ),
+          const Divider(),
           Tooltip(
             message: 'Download the database file for the entire app',
             child: ListTile(

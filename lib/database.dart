@@ -14,13 +14,13 @@ class Database extends _$Database {
   @override
   int get schemaVersion => 10;
 
-  Database() : super(_openConnection());
+  Database([String name = 'market-monk']) : super(_openConnection(name));
 
   Database.connect(super.executor);
 
-  static QueryExecutor _openConnection() {
+  static QueryExecutor _openConnection([String name = 'market-monk']) {
     return driftDatabase(
-      name: 'market-monk',
+      name: name,
       native: const DriftNativeOptions(
         databaseDirectory: getApplicationSupportDirectory,
       ),

@@ -41,6 +41,9 @@ class HoldingsPageState extends State<HoldingsPage>
   List<SymbolSummary> _summaries = [];
   late Stream<List<SymbolSummary>> _stream;
 
+  bool _selecting = false;
+  final Set<String> _selectedSymbols = {};
+
   @override
   void initState() {
     super.initState();
@@ -60,7 +63,7 @@ class HoldingsPageState extends State<HoldingsPage>
   }
 
   /// Fires candle syncs for all held symbols in the background without
-  /// blocking the UI. Rebuilds the stream when finished so prices refresh.
+  /// blocking the UI.
   Future<void> _syncAllInBackground() async {
     try {
       final trades = await db.trades.select().get();
@@ -115,32 +118,121 @@ class HoldingsPageState extends State<HoldingsPage>
     return summaries;
   }
 
-  /// Builds a stream that reacts only to trade changes.
-  /// Prices are fetched via targeted per-symbol queries (not a full candles watch).
   Stream<List<SymbolSummary>> _buildStream() {
     return db.trades.select().watch().asyncMap(_computeSummaries);
+  }
+
+  void _exitSelecting() {
+    setState(() {
+      _selecting = false;
+      _selectedSymbols.clear();
+    });
+  }
+
+  void _toggleSelectAll() {
+    setState(() {
+      if (_selectedSymbols.length == _summaries.length) {
+        _selectedSymbols.clear();
+      } else {
+        _selectedSymbols
+          ..clear()
+          ..addAll(_summaries.map((s) => s.symbol));
+      }
+    });
+  }
+
+  Future<void> _deleteSelected(BuildContext context) async {
+    if (_selectedSymbols.isEmpty) return;
+
+    final count = _selectedSymbols.length;
+    final ctx = context;
+    final confirmed = await showDialog<bool>(
+      context: ctx,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete $count holding${count == 1 ? '' : 's'}?'),
+        content: Text(
+          'All trades for the selected symbol${count == 1 ? '' : 's'} will '
+          'be permanently deleted. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Colors.redAccent),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !ctx.mounted) return;
+
+    for (final symbol in _selectedSymbols) {
+      await (db.trades.delete()..where((t) => t.symbol.equals(symbol))).go();
+    }
+    _exitSelecting();
+    if (ctx.mounted)
+      toast(ctx, 'Deleted $count holding${count == 1 ? '' : 's'}');
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
+
+    final allSelected =
+        _summaries.isNotEmpty && _selectedSymbols.length == _summaries.length;
+
     final menuButton = PopupMenuButton(
       icon: const Icon(Icons.more_vert),
       tooltip: 'Show menu',
       itemBuilder: (context) => [
-        PopupMenuItem(
-          child: ListTile(
-            leading: const Icon(Icons.settings),
-            title: const Text('Settings'),
-            onTap: () async {
-              Navigator.pop(context);
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SettingsPage()),
-              );
-            },
+        if (_selecting) ...[
+          PopupMenuItem(
+            onTap: _toggleSelectAll,
+            child: ListTile(
+              leading: Icon(
+                allSelected ? Icons.deselect : Icons.select_all,
+              ),
+              title: Text(allSelected ? 'Deselect all' : 'Select all'),
+            ),
           ),
-        ),
+          PopupMenuItem(
+            onTap: () => _deleteSelected(context),
+            child: const ListTile(
+              leading: Icon(Icons.delete, color: Colors.redAccent),
+              title: Text(
+                'Delete selected',
+                style: TextStyle(color: Colors.redAccent),
+              ),
+            ),
+          ),
+          PopupMenuItem(
+            onTap: _exitSelecting,
+            child: const ListTile(
+              leading: Icon(Icons.close),
+              title: Text('Cancel selection'),
+            ),
+          ),
+        ] else ...[
+          PopupMenuItem(
+            child: ListTile(
+              leading: const Icon(Icons.settings),
+              title: const Text('Settings'),
+              onTap: () async {
+                Navigator.pop(context);
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsPage()),
+                );
+              },
+            ),
+          ),
+        ],
       ],
     );
 
@@ -169,7 +261,9 @@ class HoldingsPageState extends State<HoldingsPage>
               padding: const EdgeInsets.only(left: 16, right: 16, top: 16),
               child: SearchBar(
                 controller: _search,
-                hintText: 'Search...',
+                hintText: _selecting
+                    ? '${_selectedSymbols.length} selected'
+                    : 'Search...',
                 padding: WidgetStateProperty.all(
                   const EdgeInsets.only(right: 8),
                 ),
@@ -193,15 +287,25 @@ class HoldingsPageState extends State<HoldingsPage>
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const EditTickerPage()),
-        ),
-        label: const Text('Add'),
-        icon: const Icon(Icons.add),
-        tooltip: 'Add trade',
-      ),
+      floatingActionButton: _selecting
+          ? FloatingActionButton.extended(
+              onPressed: () => _deleteSelected(context),
+              backgroundColor: Colors.redAccent,
+              label: Text(
+                'Delete (${_selectedSymbols.length})',
+                style: const TextStyle(color: Colors.white),
+              ),
+              icon: const Icon(Icons.delete, color: Colors.white),
+            )
+          : FloatingActionButton.extended(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const EditTickerPage()),
+              ),
+              label: const Text('Add'),
+              icon: const Icon(Icons.add),
+              tooltip: 'Add trade',
+            ),
     );
   }
 
@@ -251,7 +355,28 @@ class HoldingsPageState extends State<HoldingsPage>
           final s = summaries[index - 1];
           return _SymbolTile(
             summary: s,
-            onTap: () => _openDetail(s),
+            selecting: _selecting,
+            isSelected: _selectedSymbols.contains(s.symbol),
+            onTap: () {
+              if (_selecting) {
+                setState(() {
+                  if (_selectedSymbols.contains(s.symbol)) {
+                    _selectedSymbols.remove(s.symbol);
+                    if (_selectedSymbols.isEmpty) _selecting = false;
+                  } else {
+                    _selectedSymbols.add(s.symbol);
+                  }
+                });
+              } else {
+                _openDetail(s);
+              }
+            },
+            onLongPress: () {
+              setState(() {
+                _selecting = true;
+                _selectedSymbols.add(s.symbol);
+              });
+            },
           );
         },
       ),
@@ -275,11 +400,17 @@ class HoldingsPageState extends State<HoldingsPage>
 
 class _SymbolTile extends StatelessWidget {
   final SymbolSummary summary;
+  final bool selecting;
+  final bool isSelected;
   final VoidCallback onTap;
+  final VoidCallback onLongPress;
 
   const _SymbolTile({
     required this.summary,
+    required this.selecting,
+    required this.isSelected,
     required this.onTap,
+    required this.onLongPress,
   });
 
   @override
@@ -289,8 +420,15 @@ class _SymbolTile extends StatelessWidget {
     final hasRealizedPL = summary.trades.any((t) => t.realizedPL != 0);
     final realizedPL = summary.totalRealizedPL;
 
-    return ListTile(
-      leading: SizedBox(
+    Widget leadingWidget;
+    if (selecting) {
+      leadingWidget = Checkbox(
+        value: isSelected,
+        onChanged: (_) => onTap(),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      );
+    } else {
+      leadingWidget = SizedBox(
         width: 30,
         height: 30,
         child: position != null
@@ -299,7 +437,14 @@ class _SymbolTile extends StatelessWidget {
                 color: changePct >= 0 ? Colors.green : Colors.redAccent,
               )
             : const Icon(Icons.history, color: Colors.grey),
-      ),
+      );
+    }
+
+    return ListTile(
+      selected: isSelected,
+      selectedTileColor:
+          Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+      leading: leadingWidget,
       title: Text(summary.symbol),
       subtitle: position != null
           ? Column(
@@ -334,6 +479,7 @@ class _SymbolTile extends StatelessWidget {
             )
           : null,
       onTap: onTap,
+      onLongPress: onLongPress,
     );
   }
 }
