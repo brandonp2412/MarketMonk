@@ -430,21 +430,23 @@ class ChartPageState extends State<ChartPage>
       ('10y', 10, 0, 0),
     ];
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Row(
-        children: [
-          for (final (label, y, m, d) in options)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 3),
-              child: _PeriodChip(
-                label: label,
-                selected: y == years && m == months && d == days,
-                onTap: () => _onPeriodSelected(y: y, m: m, d: d),
+    return Center(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          children: [
+            for (final (label, y, m, d) in options)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 3),
+                child: _PeriodChip(
+                  label: label,
+                  selected: y == years && m == months && d == days,
+                  onTap: () => _onPeriodSelected(y: y, m: m, d: d),
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
