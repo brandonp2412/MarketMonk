@@ -1,6 +1,0 @@
-# Documentation & Commenting Standards
-- **Minimalist Comments**: Avoid comments that describe what the code is doing. If the code is unclear, refactor the code to be self-documenting using descriptive variable and function names.
-- **The "External Knowledge" Exception**: Comments are REQUIRED when implementing logic derived from external formulas, non-obvious business rules, or academic papers (e.g., explaining the Brzycki formula in Flexify's 1RM calculations). 
-- **Docstrings**: Public API members (classes, mixins, extensions, and top-level functions) should have triple-slash `///` docstrings. These must provide value to the editor's hover-state/IntelliSense, not just repeat the function name.
-- **Reference Links**: If a piece of logic is a workaround for a known framework bug or follows a specific StackOverflow/GitHub Issue solution, include the URL in a comment.
-- **No Dead Code**: Never leave commented-out code blocks. If code is not used, delete it; Git history is the record, not the source file.
