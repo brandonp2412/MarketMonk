@@ -46,6 +46,17 @@ Holdings,,,,Symbol,Quantity,Multiplier,Cost Price,Close Price,Value,Unrealized P
 // Malformed / empty CSV — should produce empty results, not throw
 const _emptyCsv = 'Activity Statement,,,,2025-01-01 - 2025-12-31\n';
 
+// ---------------------------------------------------------------------------
+// Minimal Interactive Brokers CSV fixture (EXECUTION rows only).
+// Includes: 2 STK BUY rows, 1 STK SELL row, and 1 CASH row to be skipped.
+// ---------------------------------------------------------------------------
+const _ibkrCsvMinimal =
+    '"ClientAccountID","AccountAlias","Model","CurrencyPrimary","AssetClass","SubCategory","Symbol","Description","Conid","SecurityID","SecurityIDType","CUSIP","ISIN","FIGI","ListingExchange","UnderlyingConid","UnderlyingSymbol","UnderlyingSecurityID","UnderlyingListingExchange","Issuer","IssuerCountryCode","Multiplier","Strike","Expiry","Put/Call","PrincipalAdjustFactor","TransactionType","TradeID","OrderID","ExecID","BrokerageOrderID","OrderReference","VolatilityOrderLink","ClearingFirmID","OrigTradePrice","OrigTradeDate","OrigTradeID","ExtExecID","BlockID","OrderTime","Date/Time","ReportDate","SettleDate","TradeDate","Exchange","Buy/Sell","Quantity","Price","Amount","Proceeds","NetCash","NetCashWithBillable","Commission","BrokerExecutionCommission","BrokerClearingCommission","ThirdPartyExecutionCommission","ThirdPartyClearingCommission","ThirdPartyRegulatoryCommission","OtherCommission","CommissionCurrency","Tax","SalesTax","TradeCharge","OtherTax","Code","OrderType","LevelOfDetail","TraderID","IsAPIOrder","AllocatedTo","AccruedInterest","RFQID","PositionActionID","SerialNumber","DeliveryType","CommodityType","Fineness","Weight"\n'
+    '"U1234","","","USD","STK","COMMON","AAPL","APPLE INC","12345","US0378331005","ISIN","037833100","US0378331005","BBG000B9XRY4","NASDAQ","","AAPL","","","","US","1","","","","","ExchTrade","111","222","aaa","bbb","ccc","","","0","","","ext1","0","20260413;090000","20260413;090000","20260413","20260414","20260413","NASDAQ","BUY","10","150.00","-1500","1500","-1501","-1501","-1","-1","0","0","0","0","0","USD","0","0","0","0","O","MKT","EXECUTION","","N","","0","","","","","","0.0","0.0"\n'
+    '"U1234","","","USD","STK","COMMON","AAPL","APPLE INC","12345","US0378331005","ISIN","037833100","US0378331005","BBG000B9XRY4","NASDAQ","","AAPL","","","","US","1","","","","","ExchTrade","113","222","aac","bbc","ccc","","","0","","","ext3","0","20260413;090100","20260413;090100","20260413","20260414","20260413","NASDAQ","BUY","5","149.50","-747.5","747.5","-747.5","-747.5","0","0","0","0","0","0","0","USD","0","0","0","0","O","MKT","EXECUTION","","N","","0","","","","","","0.0","0.0"\n'
+    '"U1234","","","USD","STK","COMMON","AAPL","APPLE INC","12345","US0378331005","ISIN","037833100","US0378331005","BBG000B9XRY4","NASDAQ","","AAPL","","","","US","1","","","","","ExchTrade","114","333","aad","bbd","ddd","","","0","","","ext4","0","20260415;093000","20260415;093000","20260415","20260416","20260415","NASDAQ","SELL","8","175.00","1400","-1400","1400","1400","0","0","0","0","0","0","0","USD","0","0","0","0","C","MKT","EXECUTION","","N","","0","","","","","","0.0","0.0"\n'
+    '"U1234","","","USD","CASH","","NZD.USD","NZD.USD","99999","","","","","","","","","","","","","1","","","","","ExchTrade","999","888","xxx","yyy","","","","0","","","N/A","0","20260413;150000","20260413;150000","20260413","20260413","20260413","IDEALFX","BUY","100","0.58","58","-58","0","0","0","","","","","","","NZD","0","0","0","0","","","EXECUTION","","N","","0","","","","","","0.0","0.0"\n';
+
 void main() {
   setUpAll(_overrideSqlite3);
 
@@ -142,6 +153,72 @@ void main() {
     test('completely empty string returns empty ParseResult', () {
       final result = TigerBrokersParser().parse('');
       expect(result.trades, isEmpty);
+    });
+  });
+
+  // ─── InteractiveBrokersParser — trades ────────────────────────────────────
+  group('InteractiveBrokersParser — trades', () {
+    late ParseResult result;
+
+    setUpAll(() {
+      result = InteractiveBrokersParser().parse(_ibkrCsvMinimal);
+    });
+
+    test('parses only STK EXECUTION rows (skips CASH row)', () {
+      expect(result.trades, hasLength(3));
+    });
+
+    test('BUY rows produce positive quantity and tradeType open', () {
+      final buys = result.trades
+          .where((t) => t.symbol == 'AAPL' && t.tradeType == 'open')
+          .toList();
+      expect(buys, hasLength(2));
+      for (final t in buys) {
+        expect(t.quantity, greaterThan(0));
+      }
+    });
+
+    test('SELL row produces negative quantity and tradeType close', () {
+      final sell = result.trades.firstWhere((t) => t.tradeType == 'close');
+      expect(sell.quantity, closeTo(-8.0, 0.001));
+      expect(sell.price, closeTo(175.0, 0.001));
+    });
+
+    test('commission stored as positive absolute value', () {
+      final buy = result.trades.firstWhere(
+        (t) => t.symbol == 'AAPL' && t.tradeType == 'open' && t.quantity > 9,
+      );
+      expect(buy.commission, closeTo(1.0, 0.001));
+    });
+
+    test('TradeDate parsed correctly from YYYYMMDD format', () {
+      final buy = result.trades.first;
+      expect(buy.tradeDate.year, 2026);
+      expect(buy.tradeDate.month, 4);
+      expect(buy.tradeDate.day, 13);
+    });
+
+    test('symbol and name extracted from dedicated columns', () {
+      final trade = result.trades.first;
+      expect(trade.symbol, 'AAPL');
+      expect(trade.name, 'APPLE INC');
+    });
+
+    test('realizedPL is always 0.0 (not available per execution)', () {
+      for (final t in result.trades) {
+        expect(t.realizedPL, equals(0.0));
+      }
+    });
+  });
+
+  group('InteractiveBrokersParser — empty/malformed CSV', () {
+    test('empty string returns empty ParseResult without throwing', () {
+      expect(InteractiveBrokersParser().parse('').trades, isEmpty);
+    });
+
+    test('header-only CSV returns empty ParseResult', () {
+      final headerOnly = _ibkrCsvMinimal.split('\n').first;
+      expect(InteractiveBrokersParser().parse(headerOnly).trades, isEmpty);
     });
   });
 

@@ -90,8 +90,101 @@ class TigerBrokersParser extends BrokerCsvParser {
   }
 }
 
+/// Parses trade execution CSVs exported from Interactive Brokers (Flex Query
+/// or Activity Statement → Trades section, "EXECUTION" level of detail).
+///
+/// Each row in the IBKR file represents a single fill. The parser skips
+/// non-STK asset classes (e.g. forex CASH rows) and any rows that are not
+/// individual executions (e.g. summary ORDER rows).
+class InteractiveBrokersParser extends BrokerCsvParser {
+  @override
+  String get name => 'Interactive Brokers';
+
+  @override
+  ParseResult parse(String csvContent) {
+    final rows = _parseCsv(csvContent);
+    if (rows.isEmpty) return ParseResult(trades: []);
+
+    final header = rows.first;
+    final col = <String, int>{};
+    for (int i = 0; i < header.length; i++) {
+      col[header[i].trim()] = i;
+    }
+
+    final symbolIdx = col['Symbol'];
+    final descIdx = col['Description'];
+    final assetClassIdx = col['AssetClass'];
+    final buySellIdx = col['Buy/Sell'];
+    final quantityIdx = col['Quantity'];
+    final priceIdx = col['Price'];
+    final commissionIdx = col['Commission'];
+    final tradeDateIdx = col['TradeDate'];
+    final levelIdx = col['LevelOfDetail'];
+
+    if ([
+      symbolIdx,
+      descIdx,
+      assetClassIdx,
+      buySellIdx,
+      quantityIdx,
+      priceIdx,
+      commissionIdx,
+      tradeDateIdx,
+      levelIdx,
+    ].any((i) => i == null)) {
+      return ParseResult(trades: []);
+    }
+
+    final trades = <ImportedTrade>[];
+    for (final row in rows.skip(1)) {
+      if (row[assetClassIdx!].trim() != 'STK') continue;
+      if (row[levelIdx!].trim() != 'EXECUTION') continue;
+
+      final symbol = row[symbolIdx!].trim();
+      if (symbol.isEmpty) continue;
+
+      final buySell = row[buySellIdx!].trim();
+      if (buySell != 'BUY' && buySell != 'SELL') continue;
+
+      final rawQty = double.tryParse(row[quantityIdx!].replaceAll(',', ''));
+      final price = double.tryParse(row[priceIdx!].replaceAll(',', ''));
+      if (rawQty == null || price == null) continue;
+
+      final quantity = buySell == 'SELL' ? -rawQty.abs() : rawQty.abs();
+      final commission =
+          (double.tryParse(row[commissionIdx!].replaceAll(',', '')) ?? 0.0)
+              .abs();
+
+      // TradeDate column is "YYYYMMDD" (e.g. "20260413")
+      final raw = row[tradeDateIdx!].trim();
+      final tradeDate = raw.length == 8
+          ? DateTime.tryParse(
+                '${raw.substring(0, 4)}-${raw.substring(4, 6)}-${raw.substring(6, 8)}',
+              ) ??
+              DateTime.now()
+          : DateTime.tryParse(raw) ?? DateTime.now();
+
+      trades.add(
+        ImportedTrade(
+          symbol: symbol,
+          name: row[descIdx!].trim(),
+          quantity: quantity,
+          price: price,
+          tradeType: buySell == 'BUY' ? 'open' : 'close',
+          tradeDate: tradeDate,
+          realizedPL: 0.0,
+          commission: commission,
+        ),
+      );
+    }
+
+    return ParseResult(trades: trades);
+  }
+}
+
 final List<BrokerCsvParser> supportedBrokers = [
   TigerBrokersParser(),
+  InteractiveBrokersParser(),
 ];
 
 Future<int> importTrades(List<ImportedTrade> trades) async {
