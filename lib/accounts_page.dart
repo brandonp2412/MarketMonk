@@ -80,10 +80,10 @@ class AccountsPage extends StatelessWidget {
           FilledButton(
             onPressed: () {
               final name = controller.text.trim();
+              Navigator.pop(ctx);
               if (name.isNotEmpty && !accounts.accounts.contains(name)) {
                 accounts.addAccount(name);
               }
-              Navigator.pop(ctx);
             },
             child: const Text('Add'),
           ),
