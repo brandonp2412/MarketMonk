@@ -52,11 +52,23 @@ class ChartPageState extends State<ChartPage>
   bool _searchLoading = false;
   Timer? _debounce;
 
+  int _lastTradesVersion = 0;
+
   @override
   void initState() {
     super.initState();
     _loadFavorite();
     _loadPortfolio();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final version = context.watch<SettingsState>().tradesVersion;
+    if (version != _lastTradesVersion) {
+      _lastTradesVersion = version;
+      if (version > 0) _loadPortfolio();
+    }
   }
 
   @override

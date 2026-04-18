@@ -179,4 +179,12 @@ class SettingsState extends ChangeNotifier {
     if (cachedRate != null) _applyRate(code, cachedRate);
     await _fetchAndApplyRate(code);
   }
+
+  int tradesVersion = 0;
+
+  /// Increments [tradesVersion] to signal that the trades table has changed.
+  void notifyTradesImported() {
+    tradesVersion++;
+    notifyListeners();
+  }
 }

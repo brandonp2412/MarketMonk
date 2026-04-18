@@ -147,6 +147,7 @@ class _SettingsPageState extends State<SettingsPage> {
     // Step 5: insert into DB
     final tradesCount = await importTrades(parsed.trades);
     if (!context.mounted) return;
+    context.read<SettingsState>().notifyTradesImported();
     toast(context, 'Imported $tradesCount trades');
   }
 
