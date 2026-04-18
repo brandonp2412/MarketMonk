@@ -63,7 +63,11 @@ class AccountManager extends ChangeNotifier {
     accounts = [...accounts, name];
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('accounts', accounts);
-    notifyListeners();
+    // Defer notification to post-frame so it fires after the current build
+    // phase completes. Without this, notifyListeners() fires as a microtask
+    // during the dialog's exit-animation frame, marking AccountsPage dirty
+    // mid-build and triggering _dependents.isEmpty assertions on the Overlay.
+    WidgetsBinding.instance.addPostFrameCallback((_) => notifyListeners());
   }
 
   Future<void> deleteAccount(String name) async {
@@ -87,7 +91,9 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsState>();
-    final accounts = context.watch<AccountManager>();
+    final activeAccount = context.select<AccountManager, String>(
+      (am) => am.activeAccount,
+    );
 
     return DynamicColorBuilder(
       builder: (lightDynamic, darkDynamic) => MaterialApp(
@@ -110,7 +116,7 @@ class MyApp extends StatelessWidget {
         themeMode: settings.theme,
         // ValueKey forces a full rebuild when the active account changes,
         // ensuring all tabs reload their data from the new database.
-        home: MyHomePage(key: ValueKey(accounts.activeAccount)),
+        home: MyHomePage(key: ValueKey(activeAccount)),
       ),
     );
   }

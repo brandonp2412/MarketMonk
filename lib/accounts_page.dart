@@ -57,40 +57,13 @@ class AccountsPage extends StatelessWidget {
     BuildContext context,
     AccountManager accounts,
   ) async {
-    final controller = TextEditingController();
-    await showDialog<void>(
+    final name = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('New account'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'Account name',
-            hintText: 'e.g. Retirement, ISA, Trading',
-          ),
-          autofocus: true,
-          textCapitalization: TextCapitalization.words,
-          onSubmitted: (_) => Navigator.pop(ctx),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final name = controller.text.trim();
-              Navigator.pop(ctx);
-              if (name.isNotEmpty && !accounts.accounts.contains(name)) {
-                accounts.addAccount(name);
-              }
-            },
-            child: const Text('Add'),
-          ),
-        ],
-      ),
+      builder: (_) => const _AddAccountDialog(),
     );
-    controller.dispose();
+    if (name != null && name.isNotEmpty && !accounts.accounts.contains(name)) {
+      accounts.addAccount(name);
+    }
   }
 
   Future<void> _confirmDelete(
@@ -124,5 +97,49 @@ class AccountsPage extends StatelessWidget {
     if (confirmed == true && context.mounted) {
       await context.read<AccountManager>().deleteAccount(name);
     }
+  }
+}
+
+class _AddAccountDialog extends StatefulWidget {
+  const _AddAccountDialog();
+
+  @override
+  State<_AddAccountDialog> createState() => _AddAccountDialogState();
+}
+
+class _AddAccountDialogState extends State<_AddAccountDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('New account'),
+      content: TextField(
+        controller: _controller,
+        decoration: const InputDecoration(
+          labelText: 'Account name',
+          hintText: 'e.g. Retirement, ISA, Trading',
+        ),
+        autofocus: true,
+        textCapitalization: TextCapitalization.words,
+        onSubmitted: (value) => Navigator.pop(context, value.trim()),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _controller.text.trim()),
+          child: const Text('Add'),
+        ),
+      ],
+    );
   }
 }
