@@ -7,7 +7,6 @@ import 'package:intl/intl.dart';
 import 'package:market_monk/accounts_page.dart';
 import 'package:market_monk/csv_import.dart';
 import 'package:market_monk/database.dart';
-import 'package:market_monk/ib_settings_page.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/ticker_line.dart';
@@ -296,17 +295,6 @@ class _SettingsPageState extends State<SettingsPage> {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const AccountsPage()),
-            ),
-          ),
-          ListTile(
-            enabled: false,
-            leading: const Icon(Icons.candlestick_chart),
-            title: const Text('Interactive Brokers'),
-            subtitle: const Text('Connect IB Gateway to import portfolio'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const IbSettingsPage()),
             ),
           ),
           const Divider(),
