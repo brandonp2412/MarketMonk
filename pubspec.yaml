@@ -1,6 +1,6 @@
 name: market_monk
 description: Track stocks quickly and easily
-version: 1.0.39+40
+version: 1.0.40+41
 environment:
   sdk: ^3.5.4
 dependencies:
