@@ -671,10 +671,8 @@ class ChartPageState extends State<ChartPage>
     final last = _portfolioSeries!.last.value;
     final pct = safePercentChange(first, last);
     final color = pct >= 0 ? Colors.green : Colors.redAccent;
-    final totalValue = _positions.fold(0.0, (s, p) => s + p.currentValue);
-    final totalCost = _positions.fold(0.0, (s, p) => s + p.costBasis);
-    final unrealized = totalValue - totalCost;
-    final unrealizedPct = totalCost > 0 ? (unrealized / totalCost) * 100 : 0.0;
+    final unrealized = last - first;
+    final unrealizedPct = pct;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
