@@ -151,6 +151,61 @@ class _SettingsPageState extends State<SettingsPage> {
     toast(context, 'Imported $tradesCount trades');
   }
 
+  Future<void> _showCurrencyPicker(
+    BuildContext context,
+    SettingsState settings,
+  ) async {
+    var selected = Set<String>.from(settings.visibleCurrencies);
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Display currencies'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView(
+              shrinkWrap: true,
+              children: supportedCurrencies
+                  .map(
+                    (c) => CheckboxListTile(
+                      dense: true,
+                      title: Text(c),
+                      value: selected.contains(c),
+                      onChanged: (checked) {
+                        setState(() {
+                          if (checked == true) {
+                            selected.add(c);
+                          } else if (selected.length > 1) {
+                            selected.remove(c);
+                          }
+                        });
+                      },
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                settings.setVisibleCurrencies(
+                  supportedCurrencies.where(selected.contains).toList(),
+                );
+                Navigator.pop(context);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final packageInfo = PackageInfo.fromPlatform();
@@ -214,6 +269,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
             ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.currency_exchange),
+            title: const Text('Currencies'),
+            subtitle: Text(settings.visibleCurrencies.join(', ')),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _showCurrencyPicker(context, settings),
           ),
           Padding(
             padding: const EdgeInsets.only(top: 8.0),

@@ -334,7 +334,7 @@ class _SummaryCard extends StatelessWidget {
               value: settings.displayCurrency,
               isDense: true,
               underline: const SizedBox(),
-              items: supportedCurrencies
+              items: settings.visibleCurrencies
                   .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                   .toList(),
               onChanged: (value) {

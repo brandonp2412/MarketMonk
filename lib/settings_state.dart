@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -57,9 +58,28 @@ class SettingsState extends ChangeNotifier {
   String dateFormat = 'd/M/yy';
   Color seedColor = _defaultSeedColor;
   String displayCurrency = 'USD';
+  List<String> visibleCurrencies = ['USD'];
 
   SettingsState() {
     init();
+  }
+
+  /// Returns the ISO 4217 currency code for the device locale, falling back to USD.
+  static String _detectLocaleCurrency() {
+    try {
+      var locale = Platform.localeName;
+      final dotIdx = locale.indexOf('.');
+      if (dotIdx != -1) locale = locale.substring(0, dotIdx);
+      final code = NumberFormat.simpleCurrency(locale: locale).currencyName;
+      if (code != null && supportedCurrencies.contains(code)) return code;
+    } catch (_) {}
+    return 'USD';
+  }
+
+  static List<String> _defaultVisibleCurrencies() {
+    final home = _detectLocaleCurrency();
+    final defaults = {home, 'USD'};
+    return supportedCurrencies.where(defaults.contains).toList();
   }
 
   init() async {
@@ -88,7 +108,16 @@ class SettingsState extends ChangeNotifier {
     final colorVal = prefs.getInt('seedColor');
     seedColor = colorVal != null ? Color(colorVal) : _defaultSeedColor;
 
-    displayCurrency = prefs.getString('displayCurrency') ?? 'USD';
+    final savedCurrencies = prefs.getStringList('visibleCurrencies');
+    visibleCurrencies = (savedCurrencies != null && savedCurrencies.isNotEmpty)
+        ? savedCurrencies
+        : _defaultVisibleCurrencies();
+
+    displayCurrency =
+        prefs.getString('displayCurrency') ?? _detectLocaleCurrency();
+    if (!visibleCurrencies.contains(displayCurrency)) {
+      displayCurrency = visibleCurrencies.first;
+    }
     final cachedRate = prefs.getDouble('exchangeRate_$displayCurrency');
     _applyRate(displayCurrency, cachedRate ?? 1.0);
 
@@ -168,6 +197,18 @@ class SettingsState extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     prefs.setInt('seedColor', _colorToInt(value));
+  }
+
+  void setVisibleCurrencies(List<String> currencies) async {
+    assert(currencies.isNotEmpty);
+    visibleCurrencies = List.from(currencies);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('visibleCurrencies', currencies);
+    if (!visibleCurrencies.contains(displayCurrency)) {
+      displayCurrency = visibleCurrencies.first;
+      await prefs.setString('displayCurrency', displayCurrency);
+    }
+    notifyListeners();
   }
 
   void setDisplayCurrency(String code) async {
