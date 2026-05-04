@@ -95,6 +95,7 @@ jobs:
         run: |
           git add pubspec.yaml
           git commit -m "Bump version to ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }} [skip ci]"
+          git pull --rebase origin main
           git push origin main
 
       - name: Create and push tag
