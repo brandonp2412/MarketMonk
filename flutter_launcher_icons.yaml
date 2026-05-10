@@ -3,11 +3,12 @@ flutter_launcher_icons:
   image_path: fastlane/metadata/android/en-US/images/icon.png
 
   android: "launcher_icon"
-  # image_path_android: "assets/icon/icon.png"
   min_sdk_android: 21 # android min sdk min:16, default 21
-  # adaptive_icon_background: "assets/icon/background.png"
-  # adaptive_icon_foreground: "assets/icon/foreground.png"
-  # adaptive_icon_monochrome: "assets/icon/monochrome.png"
+  # Adaptive icon layers are managed manually in mipmap-anydpi-v26/ic_launcher.xml.
+  # The manifest uses @mipmap/ic_launcher (not launcher_icon) for adaptive + themed icon support.
+  # ic_launcher_background color: #1A1A2E (res/values/ic_launcher_background.xml)
+  # ic_launcher_foreground: mipmap-*/ic_launcher_foreground.webp
+  # monochrome: same foreground layer, tinted by system on Android 13+ (API 33)
 
   ios: true
   # image_path_ios: "assets/icon/icon.png"
