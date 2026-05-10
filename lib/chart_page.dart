@@ -73,10 +73,6 @@ class ChartPageState extends State<ChartPage>
     final account = context.watch<AccountManager>().activeAccount;
     if (account != _lastAccount) {
       _lastAccount = account;
-      setState(() {
-        _portfolioSeries = null;
-        _positions = [];
-      });
       _loadPortfolio();
       if (_selectedSymbol != null) _setStockStream(_selectedSymbol!);
     }

@@ -95,39 +95,9 @@ class PortfolioPageState extends State<PortfolioPage>
     super.build(context);
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-              child: TextField(
-                controller: _filterController,
-                onChanged: (v) => setState(() => _filterText = v.trim()),
-                decoration: InputDecoration(
-                  hintText: 'Filter holdings...',
-                  prefixIcon: const Icon(Icons.search),
-                  isDense: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  suffixIcon: _filterText.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () => setState(() {
-                            _filterText = '';
-                            _filterController.clear();
-                          }),
-                        )
-                      : null,
-                ),
-              ),
-            ),
-            Expanded(
-              child: StreamBuilder<List<Position>>(
-                stream: stream,
-                builder: _buildBody,
-              ),
-            ),
-          ],
+        child: StreamBuilder<List<Position>>(
+          stream: stream,
+          builder: _buildBody,
         ),
       ),
     );
@@ -218,6 +188,20 @@ class PortfolioPageState extends State<PortfolioPage>
                 totalValue: totalValue,
                 totalGain: totalGain,
                 totalGainPct: totalGainPct,
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: _FilterRow(
+                controller: _filterController,
+                filterText: _filterText,
+                onChanged: (v) => setState(() => _filterText = v.trim()),
+                onClear: () => setState(() {
+                  _filterText = '';
+                  _filterController.clear();
+                }),
               ),
             ),
           ),
@@ -374,7 +358,6 @@ class _SummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final gainColor = totalGain >= 0 ? Colors.green : Colors.redAccent;
     final settings = context.watch<SettingsState>();
-    final accounts = context.watch<AccountManager>();
     return Card(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -397,19 +380,6 @@ class _SummaryCard extends StatelessWidget {
               ],
             ),
             const Spacer(),
-            if (accounts.accounts.length > 1)
-              DropdownButton<String>(
-                value: accounts.activeAccount,
-                isDense: true,
-                underline: const SizedBox(),
-                items: accounts.accounts
-                    .map((a) => DropdownMenuItem(value: a, child: Text(a)))
-                    .toList(),
-                onChanged: (value) {
-                  if (value != null) accounts.switchAccount(value);
-                },
-              ),
-            if (accounts.accounts.length > 1) const SizedBox(width: 8),
             DropdownButton<String>(
               value: settings.displayCurrency,
               isDense: true,
@@ -424,6 +394,63 @@ class _SummaryCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _FilterRow extends StatelessWidget {
+  final TextEditingController controller;
+  final String filterText;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  const _FilterRow({
+    required this.controller,
+    required this.filterText,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accounts = context.watch<AccountManager>();
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: controller,
+            onChanged: onChanged,
+            decoration: InputDecoration(
+              hintText: 'Filter holdings...',
+              prefixIcon: const Icon(Icons.search),
+              isDense: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              suffixIcon: filterText.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: onClear,
+                    )
+                  : null,
+            ),
+          ),
+        ),
+        if (accounts.accounts.length > 1) ...[
+          const SizedBox(width: 8),
+          DropdownButton<String>(
+            value: accounts.activeAccount,
+            isDense: true,
+            underline: const SizedBox(),
+            items: accounts.accounts
+                .map((a) => DropdownMenuItem(value: a, child: Text(a)))
+                .toList(),
+            onChanged: (value) {
+              if (value != null) accounts.switchAccount(value);
+            },
+          ),
+        ],
+      ],
     );
   }
 }
