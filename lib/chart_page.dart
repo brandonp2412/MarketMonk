@@ -53,6 +53,7 @@ class ChartPageState extends State<ChartPage>
   Timer? _debounce;
 
   int _lastTradesVersion = 0;
+  String _lastAccount = '';
 
   @override
   void initState() {
@@ -68,6 +69,16 @@ class ChartPageState extends State<ChartPage>
     if (version != _lastTradesVersion) {
       _lastTradesVersion = version;
       if (version > 0) _loadPortfolio();
+    }
+    final account = context.watch<AccountManager>().activeAccount;
+    if (account != _lastAccount) {
+      _lastAccount = account;
+      setState(() {
+        _portfolioSeries = null;
+        _positions = [];
+      });
+      _loadPortfolio();
+      if (_selectedSymbol != null) _setStockStream(_selectedSymbol!);
     }
   }
 

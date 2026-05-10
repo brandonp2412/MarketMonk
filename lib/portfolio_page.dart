@@ -24,6 +24,7 @@ class PortfolioPageState extends State<PortfolioPage>
   int? touchedIndex;
   final _filterController = TextEditingController();
   String _filterText = '';
+  String _lastAccount = '';
 
   @override
   void initState() {
@@ -31,6 +32,20 @@ class PortfolioPageState extends State<PortfolioPage>
     stream = _buildStream();
     _preload();
     _syncAllInBackground();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final account = context.watch<AccountManager>().activeAccount;
+    if (account != _lastAccount) {
+      _lastAccount = account;
+      setState(() {
+        stream = _buildStream();
+        _positions = [];
+      });
+      _preload();
+    }
   }
 
   @override
@@ -359,6 +374,7 @@ class _SummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final gainColor = totalGain >= 0 ? Colors.green : Colors.redAccent;
     final settings = context.watch<SettingsState>();
+    final accounts = context.watch<AccountManager>();
     return Card(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -381,6 +397,19 @@ class _SummaryCard extends StatelessWidget {
               ],
             ),
             const Spacer(),
+            if (accounts.accounts.length > 1)
+              DropdownButton<String>(
+                value: accounts.activeAccount,
+                isDense: true,
+                underline: const SizedBox(),
+                items: accounts.accounts
+                    .map((a) => DropdownMenuItem(value: a, child: Text(a)))
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) accounts.switchAccount(value);
+                },
+              ),
+            if (accounts.accounts.length > 1) const SizedBox(width: 8),
             DropdownButton<String>(
               value: settings.displayCurrency,
               isDense: true,

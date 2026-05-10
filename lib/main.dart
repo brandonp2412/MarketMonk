@@ -91,9 +91,6 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsState>();
-    final activeAccount = context.select<AccountManager, String>(
-      (am) => am.activeAccount,
-    );
 
     return DynamicColorBuilder(
       builder: (lightDynamic, darkDynamic) => MaterialApp(
@@ -114,9 +111,7 @@ class MyApp extends StatelessWidget {
           useMaterial3: true,
         ),
         themeMode: settings.theme,
-        // ValueKey forces a full rebuild when the active account changes,
-        // ensuring all tabs reload their data from the new database.
-        home: MyHomePage(key: ValueKey(activeAccount)),
+        home: const MyHomePage(),
       ),
     );
   }
