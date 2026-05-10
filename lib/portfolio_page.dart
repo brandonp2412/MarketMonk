@@ -22,6 +22,8 @@ class PortfolioPageState extends State<PortfolioPage>
   late Stream<List<Position>> stream;
   List<Position> _positions = [];
   int? touchedIndex;
+  final _filterController = TextEditingController();
+  String _filterText = '';
 
   @override
   void initState() {
@@ -29,6 +31,12 @@ class PortfolioPageState extends State<PortfolioPage>
     stream = _buildStream();
     _preload();
     _syncAllInBackground();
+  }
+
+  @override
+  void dispose() {
+    _filterController.dispose();
+    super.dispose();
   }
 
   Future<void> _preload() async {
@@ -72,9 +80,39 @@ class PortfolioPageState extends State<PortfolioPage>
     super.build(context);
     return Scaffold(
       body: SafeArea(
-        child: StreamBuilder<List<Position>>(
-          stream: stream,
-          builder: _buildBody,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: TextField(
+                controller: _filterController,
+                onChanged: (v) => setState(() => _filterText = v.trim()),
+                decoration: InputDecoration(
+                  hintText: 'Filter holdings...',
+                  prefixIcon: const Icon(Icons.search),
+                  isDense: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  suffixIcon: _filterText.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () => setState(() {
+                            _filterText = '';
+                            _filterController.clear();
+                          }),
+                        )
+                      : null,
+                ),
+              ),
+            ),
+            Expanded(
+              child: StreamBuilder<List<Position>>(
+                stream: stream,
+                builder: _buildBody,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -122,6 +160,17 @@ class PortfolioPageState extends State<PortfolioPage>
     // Sort by value descending for consistent colours
     final sorted = [...positions]
       ..sort((a, b) => b.currentValue.compareTo(a.currentValue));
+
+    final query = _filterText.toLowerCase();
+    final filtered = query.isEmpty
+        ? sorted
+        : sorted
+            .where(
+              (p) =>
+                  p.symbol.toLowerCase().contains(query) ||
+                  p.name.toLowerCase().contains(query),
+            )
+            .toList();
 
     final colors = _buildColors(context, sorted.length);
 
@@ -220,21 +269,23 @@ class PortfolioPageState extends State<PortfolioPage>
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverList.builder(
-              itemCount: sorted.length,
+              itemCount: filtered.length,
               itemBuilder: (context, i) {
-                final p = sorted[i];
+                final p = filtered[i];
+                final sortedIndex = sorted.indexOf(p);
                 final val = p.currentValue;
                 final pct = totalValue > 0 ? val / totalValue * 100 : 0.0;
                 return _LegendTile(
-                  color: colors[i],
+                  color: colors[sortedIndex >= 0 ? sortedIndex : i],
                   symbol: p.symbol,
                   name: p.name,
                   value: val,
                   allocationPct: pct,
                   changePct: p.change,
-                  isHighlighted: i == touchedIndex,
+                  isHighlighted: sortedIndex == touchedIndex,
                   onTap: () => setState(
-                    () => touchedIndex = touchedIndex == i ? null : i,
+                    () => touchedIndex =
+                        touchedIndex == sortedIndex ? null : sortedIndex,
                   ),
                 );
               },

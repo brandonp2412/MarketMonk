@@ -206,6 +206,16 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  Widget _sectionHeader(String text) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+        child: Text(
+          text,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final packageInfo = PackageInfo.fromPlatform();
@@ -217,6 +227,8 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
       body: ListView(
         children: [
+          // ── Appearance ──────────────────────────────────────────────────
+          _sectionHeader('Appearance'),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: DropdownButtonFormField<ThemeMode>(
@@ -248,53 +260,24 @@ class _SettingsPageState extends State<SettingsPage> {
               },
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Tooltip(
-              message: 'How dates are displayed below graphs',
-              child: DropdownButtonFormField<String>(
-                initialValue: settings.dateFormat,
-                items: const [
-                  DropdownMenuItem(value: "d/M/yy", child: Text("d/M/yy")),
-                  DropdownMenuItem(value: "M/d/yy", child: Text("M/d/yy")),
-                  DropdownMenuItem(value: "d-M-yy", child: Text("d-M-yy")),
-                  DropdownMenuItem(value: "M-d-yy", child: Text("M-d-yy")),
-                  DropdownMenuItem(value: "d.M.yy", child: Text("d.M.yy")),
-                  DropdownMenuItem(value: "M.d.yy", child: Text("M.d.yy")),
-                ],
-                onChanged: (value) => settings.setDateFormat(value ?? 'd/M/yy'),
-                decoration: InputDecoration(
-                  labelText:
-                      'Date format (${DateFormat(settings.dateFormat).format(DateTime.now())})',
-                ),
-              ),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.currency_exchange),
-            title: const Text('Currencies'),
-            subtitle: Text(settings.visibleCurrencies.join(', ')),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showCurrencyPicker(context, settings),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: 8.0),
-            child: Tooltip(
-              message: 'Use the primary color of your device for the app',
-              child: ListTile(
-                title: const Text('System color scheme'),
-                leading: settings.systemColors
-                    ? const Icon(Icons.color_lens)
-                    : const Icon(Icons.color_lens_outlined),
-                onTap: () => settings.setSystemColors(!settings.systemColors),
-                trailing: Switch(
-                  value: settings.systemColors,
-                  onChanged: (value) => settings.setSystemColors(value),
-                ),
+          Tooltip(
+            message: 'Use the primary color of your device for the app',
+            child: ListTile(
+              title: const Text('System color scheme'),
+              leading: settings.systemColors
+                  ? const Icon(Icons.color_lens)
+                  : const Icon(Icons.color_lens_outlined),
+              onTap: () => settings.setSystemColors(!settings.systemColors),
+              trailing: Switch(
+                value: settings.systemColors,
+                onChanged: (value) => settings.setSystemColors(value),
               ),
             ),
           ),
           if (!settings.systemColors) _ColorPicker(settings: settings),
+
+          // ── Charts ──────────────────────────────────────────────────────
+          _sectionHeader('Charts'),
           Tooltip(
             message: 'Use wavy curves in the graphs page',
             child: ListTile(
@@ -347,7 +330,41 @@ class _SettingsPageState extends State<SettingsPage> {
               ],
             ),
           ),
-          const SizedBox(height: 8),
+
+          // ── Display ─────────────────────────────────────────────────────
+          _sectionHeader('Display'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Tooltip(
+              message: 'How dates are displayed below graphs',
+              child: DropdownButtonFormField<String>(
+                initialValue: settings.dateFormat,
+                items: const [
+                  DropdownMenuItem(value: "d/M/yy", child: Text("d/M/yy")),
+                  DropdownMenuItem(value: "M/d/yy", child: Text("M/d/yy")),
+                  DropdownMenuItem(value: "d-M-yy", child: Text("d-M-yy")),
+                  DropdownMenuItem(value: "M-d-yy", child: Text("M-d-yy")),
+                  DropdownMenuItem(value: "d.M.yy", child: Text("d.M.yy")),
+                  DropdownMenuItem(value: "M.d.yy", child: Text("M.d.yy")),
+                ],
+                onChanged: (value) => settings.setDateFormat(value ?? 'd/M/yy'),
+                decoration: InputDecoration(
+                  labelText:
+                      'Date format (${DateFormat(settings.dateFormat).format(DateTime.now())})',
+                ),
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.currency_exchange),
+            title: const Text('Currencies'),
+            subtitle: Text(settings.visibleCurrencies.join(', ')),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _showCurrencyPicker(context, settings),
+          ),
+
+          // ── Accounts ─────────────────────────────────────────────────────
+          _sectionHeader('Accounts'),
           ListTile(
             leading: const Icon(Icons.manage_accounts),
             title: const Text('Manage accounts'),
@@ -360,7 +377,10 @@ class _SettingsPageState extends State<SettingsPage> {
               MaterialPageRoute(builder: (_) => const AccountsPage()),
             ),
           ),
-          const Divider(),
+
+          // ── Data ─────────────────────────────────────────────────────────
+          _sectionHeader('Data'),
+          const Divider(height: 1),
           Tooltip(
             message: 'Download the database file for the entire app',
             child: ListTile(

@@ -334,6 +334,7 @@ class ChartPageState extends State<ChartPage>
 
   Widget _buildSearchBar() {
     final hasText = _searchController.text.isNotEmpty;
+    final accounts = context.watch<AccountManager>();
     final leading = hasText
         ? IconButton(
             icon: const Icon(Icons.arrow_back),
@@ -361,6 +362,23 @@ class ChartPageState extends State<ChartPage>
           if (text.isNotEmpty) _onSearchChanged(text);
         },
         trailing: [
+          if (accounts.accounts.length > 1)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: DropdownButton<String>(
+                value: accounts.activeAccount,
+                isDense: true,
+                underline: const SizedBox(),
+                items: accounts.accounts
+                    .map(
+                      (a) => DropdownMenuItem(value: a, child: Text(a)),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) accounts.switchAccount(value);
+                },
+              ),
+            ),
           IconButton(
             onPressed: () => Navigator.push(
               context,
@@ -524,6 +542,7 @@ class ChartPageState extends State<ChartPage>
     );
     final color = pct >= 0 ? Colors.green : Colors.redAccent;
     final symbol = _selectedSymbol ?? '';
+    final dollarChange = candles.last.close.value - candles.first.close.value;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -554,6 +573,11 @@ class ChartPageState extends State<ChartPage>
                 style: Theme.of(context).textTheme.titleLarge,
               ),
             ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${dollarChange >= 0 ? '+' : '-'}\$${dollarChange.abs().toStringAsFixed(2)} period change',
+            style: TextStyle(color: color, fontSize: 13),
           ),
           const SizedBox(height: 12),
           Wrap(
