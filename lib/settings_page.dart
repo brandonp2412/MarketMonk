@@ -230,29 +230,28 @@ class _SettingsPageState extends State<SettingsPage> {
           // ── Appearance ──────────────────────────────────────────────────
           _sectionHeader('Appearance'),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: DropdownButtonFormField<ThemeMode>(
-              initialValue: settings.theme,
-              decoration: const InputDecoration(
-                labelStyle: TextStyle(),
-                labelText: 'Theme',
-              ),
-              items: const [
-                DropdownMenuItem(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: SegmentedButton<ThemeMode>(
+              segments: const [
+                ButtonSegment(
                   value: ThemeMode.system,
-                  child: Text("System"),
+                  label: Text('System'),
+                  icon: Icon(Icons.brightness_auto),
                 ),
-                DropdownMenuItem(
+                ButtonSegment(
                   value: ThemeMode.dark,
-                  child: Text("Dark"),
+                  label: Text('Dark'),
+                  icon: Icon(Icons.dark_mode),
                 ),
-                DropdownMenuItem(
+                ButtonSegment(
                   value: ThemeMode.light,
-                  child: Text("Light"),
+                  label: Text('Light'),
+                  icon: Icon(Icons.light_mode),
                 ),
               ],
-              onChanged: (value) async {
-                if (value == null) return;
+              selected: {settings.theme},
+              onSelectionChanged: (selection) async {
+                final value = selection.first;
                 final settings = context.read<SettingsState>();
                 settings.setTheme(value);
                 final prefs = await SharedPreferences.getInstance();
@@ -275,6 +274,28 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           if (!settings.systemColors) _ColorPicker(settings: settings),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Tooltip(
+              message: 'How dates are displayed below graphs',
+              child: DropdownButtonFormField<String>(
+                initialValue: settings.dateFormat,
+                items: const [
+                  DropdownMenuItem(value: "d/M/yy", child: Text("d/M/yy")),
+                  DropdownMenuItem(value: "M/d/yy", child: Text("M/d/yy")),
+                  DropdownMenuItem(value: "d-M-yy", child: Text("d-M-yy")),
+                  DropdownMenuItem(value: "M-d-yy", child: Text("M-d-yy")),
+                  DropdownMenuItem(value: "d.M.yy", child: Text("d.M.yy")),
+                  DropdownMenuItem(value: "M.d.yy", child: Text("M.d.yy")),
+                ],
+                onChanged: (value) => settings.setDateFormat(value ?? 'd/M/yy'),
+                decoration: InputDecoration(
+                  labelText:
+                      'Date format (${DateFormat(settings.dateFormat).format(DateTime.now())})',
+                ),
+              ),
+            ),
+          ),
 
           // ── Charts ──────────────────────────────────────────────────────
           _sectionHeader('Charts'),
@@ -331,38 +352,6 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
 
-          // ── Display ─────────────────────────────────────────────────────
-          _sectionHeader('Display'),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Tooltip(
-              message: 'How dates are displayed below graphs',
-              child: DropdownButtonFormField<String>(
-                initialValue: settings.dateFormat,
-                items: const [
-                  DropdownMenuItem(value: "d/M/yy", child: Text("d/M/yy")),
-                  DropdownMenuItem(value: "M/d/yy", child: Text("M/d/yy")),
-                  DropdownMenuItem(value: "d-M-yy", child: Text("d-M-yy")),
-                  DropdownMenuItem(value: "M-d-yy", child: Text("M-d-yy")),
-                  DropdownMenuItem(value: "d.M.yy", child: Text("d.M.yy")),
-                  DropdownMenuItem(value: "M.d.yy", child: Text("M.d.yy")),
-                ],
-                onChanged: (value) => settings.setDateFormat(value ?? 'd/M/yy'),
-                decoration: InputDecoration(
-                  labelText:
-                      'Date format (${DateFormat(settings.dateFormat).format(DateTime.now())})',
-                ),
-              ),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.currency_exchange),
-            title: const Text('Currencies'),
-            subtitle: Text(settings.visibleCurrencies.join(', ')),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showCurrencyPicker(context, settings),
-          ),
-
           // ── Accounts ─────────────────────────────────────────────────────
           _sectionHeader('Accounts'),
           ListTile(
@@ -377,10 +366,16 @@ class _SettingsPageState extends State<SettingsPage> {
               MaterialPageRoute(builder: (_) => const AccountsPage()),
             ),
           ),
+          ListTile(
+            leading: const Icon(Icons.currency_exchange),
+            title: const Text('Currencies'),
+            subtitle: Text(settings.visibleCurrencies.join(', ')),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _showCurrencyPicker(context, settings),
+          ),
 
           // ── Data ─────────────────────────────────────────────────────────
           _sectionHeader('Data'),
-          const Divider(height: 1),
           Tooltip(
             message: 'Download the database file for the entire app',
             child: ListTile(
@@ -500,7 +495,7 @@ class _SettingsPageState extends State<SettingsPage> {
             const SizedBox(height: 16),
             const Divider(),
             Padding(
-              padding: const EdgeInsets.only(left: 16.0, bottom: 8),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Text(
                 "About",
                 style: Theme.of(context).textTheme.headlineLarge,

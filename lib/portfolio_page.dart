@@ -438,16 +438,19 @@ class _FilterRow extends StatelessWidget {
         ),
         if (accounts.accounts.length > 1) ...[
           const SizedBox(width: 8),
-          DropdownButton<String>(
-            value: accounts.activeAccount,
-            isDense: true,
-            underline: const SizedBox(),
-            items: accounts.accounts
-                .map((a) => DropdownMenuItem(value: a, child: Text(a)))
+          PopupMenuButton<String>(
+            initialValue: accounts.activeAccount,
+            onSelected: accounts.switchAccount,
+            itemBuilder: (context) => accounts.accounts
+                .map((a) => PopupMenuItem(value: a, child: Text(a)))
                 .toList(),
-            onChanged: (value) {
-              if (value != null) accounts.switchAccount(value);
-            },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(accounts.activeAccount),
+                const Icon(Icons.arrow_drop_down),
+              ],
+            ),
           ),
         ],
       ],

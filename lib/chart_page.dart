@@ -747,16 +747,19 @@ class ChartPageState extends State<ChartPage>
                 builder: (context) {
                   final accounts = context.watch<AccountManager>();
                   if (accounts.accounts.length <= 1) return const SizedBox();
-                  return DropdownButton<String>(
-                    value: accounts.activeAccount,
-                    isDense: true,
-                    underline: const SizedBox(),
-                    items: accounts.accounts
-                        .map((a) => DropdownMenuItem(value: a, child: Text(a)))
+                  return PopupMenuButton<String>(
+                    initialValue: accounts.activeAccount,
+                    onSelected: accounts.switchAccount,
+                    itemBuilder: (context) => accounts.accounts
+                        .map((a) => PopupMenuItem(value: a, child: Text(a)))
                         .toList(),
-                    onChanged: (value) {
-                      if (value != null) accounts.switchAccount(value);
-                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(accounts.activeAccount),
+                        const Icon(Icons.arrow_drop_down),
+                      ],
+                    ),
                   );
                 },
               ),
