@@ -441,6 +441,9 @@ class _FilterRow extends StatelessWidget {
           PopupMenuButton<String>(
             initialValue: accounts.activeAccount,
             onSelected: accounts.switchAccount,
+            popUpAnimationStyle: const AnimationStyle(
+              duration: Duration(milliseconds: 80),
+            ),
             itemBuilder: (context) => accounts.accounts
                 .map((a) => PopupMenuItem(value: a, child: Text(a)))
                 .toList(),
