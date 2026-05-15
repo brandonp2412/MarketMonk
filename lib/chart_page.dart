@@ -963,14 +963,11 @@ class ChartPageState extends State<ChartPage>
     final change = series.last.value - series.first.value;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Wrap(
-        alignment: WrapAlignment.center,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: 8,
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
               Container(
                 width: 10,
@@ -980,38 +977,47 @@ class ChartPageState extends State<ChartPage>
                   shape: BoxShape.circle,
                 ),
               ),
-              if (accounts.length > 1) ...[
-                const SizedBox(width: 6),
-                Text(
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
                   accountName,
                   style: Theme.of(context).textTheme.bodyMedium,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ],
-            ],
-          ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                pct >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
-                color: returnColor,
               ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    pct >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
+                    color: returnColor,
+                    size: 18,
+                  ),
+                  Text(
+                    '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium!
+                        .copyWith(color: returnColor),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 12),
               Text(
-                '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleLarge!
-                    .copyWith(color: returnColor),
+                fmtCurrency(series.last.value),
+                style: Theme.of(context).textTheme.titleMedium,
               ),
             ],
           ),
-          Text(
-            fmtCurrency(series.last.value),
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          Text(
-            '${change >= 0 ? '+' : ''}${fmtCurrency(change)} period change',
-            style: TextStyle(color: returnColor, fontSize: 13),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                '${change >= 0 ? '+' : ''}${fmtCurrency(change)} period change',
+                style: TextStyle(color: returnColor, fontSize: 13),
+              ),
+            ),
           ),
         ],
       ),
