@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:drift/drift.dart' hide Column;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:market_monk/candle_ticker.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
@@ -28,6 +29,17 @@ class ChartPageState extends State<ChartPage>
   final _searchController = TextEditingController();
   final _searchFocus = FocusNode();
 
+  static const _accountColors = [
+    Color(0xFF2196F3),
+    Color(0xFFFF9800),
+    Color(0xFF4CAF50),
+    Color(0xFF9C27B0),
+    Color(0xFFE91E63),
+    Color(0xFF00BCD4),
+    Color(0xFFFF5722),
+    Color(0xFF607D8B),
+  ];
+
   _ChartMode _mode = _ChartMode.portfolio;
   String? _selectedSymbol;
   String? _favoriteStock;
@@ -41,11 +53,11 @@ class ChartPageState extends State<ChartPage>
   // Stock chart
   Stream<List<CandleTicker>>? _stockStream;
 
-  // Portfolio chart
-  List<_DateValue>? _portfolioSeries;
-  List<Position> _positions = [];
+  // Portfolio chart — keyed by account name
+  Map<String, List<_DateValue>> _portfolioSeriesByAccount = {};
   String? _portfolioError;
   bool _portfolioLoading = false;
+  final Set<String> _hiddenAccounts = {};
 
   // Search
   List<StockResult> _searchResults = [];
@@ -53,13 +65,13 @@ class ChartPageState extends State<ChartPage>
   Timer? _debounce;
 
   int _lastTradesVersion = 0;
-  String _lastAccount = '';
+  String _lastAccountsKey = '';
 
   @override
   void initState() {
     super.initState();
     _loadFavorite();
-    _loadPortfolio();
+    _loadAllPortfolios();
   }
 
   @override
@@ -68,12 +80,13 @@ class ChartPageState extends State<ChartPage>
     final version = context.watch<SettingsState>().tradesVersion;
     if (version != _lastTradesVersion) {
       _lastTradesVersion = version;
-      if (version > 0) _loadPortfolio();
+      if (version > 0) _loadAllPortfolios();
     }
-    final account = context.watch<AccountManager>().activeAccount;
-    if (account != _lastAccount) {
-      _lastAccount = account;
-      _loadPortfolio();
+    final accountManager = context.watch<AccountManager>();
+    final accountsKey = accountManager.accounts.join(',');
+    if (accountsKey != _lastAccountsKey) {
+      _lastAccountsKey = accountsKey;
+      _loadAllPortfolios();
       if (_selectedSymbol != null) _setStockStream(_selectedSymbol!);
     }
   }
@@ -92,35 +105,54 @@ class ChartPageState extends State<ChartPage>
     if (mounted) setState(() => _favoriteStock = fav);
   }
 
-  Future<void> _loadPortfolio() async {
+  Future<void> _loadAllPortfolios() async {
     if (!mounted) return;
+    final accountManager = context.read<AccountManager>();
+    final accounts = accountManager.accounts;
+
     setState(() {
       _portfolioError = null;
-      _portfolioLoading = _portfolioSeries == null;
+      _portfolioLoading = _portfolioSeriesByAccount.isEmpty;
     });
-    try {
-      final trades = await db.trades.select().get();
-      final symbols = trades.map((t) => t.symbol).toSet().toList();
-      final prices = await fetchLatestPrices(symbols);
-      final positions = computePositions(trades, prices);
-      final series = await _buildPortfolioSeries(positions);
-      if (!mounted) return;
-      setState(() {
-        _positions = positions;
-        _portfolioSeries = series;
-        _portfolioLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _portfolioError = e.toString();
-        _portfolioLoading = false;
-      });
+
+    final newSeries = <String, List<_DateValue>>{};
+    String? firstError;
+
+    for (final accountName in accounts) {
+      final isActive = accountName == accountManager.activeAccount;
+      final accountDb = isActive
+          ? db
+          : (accountName == 'Default'
+              ? Database()
+              : Database('market-monk-$accountName'));
+      try {
+        final trades = await accountDb.trades.select().get();
+        final symbols = trades.map((t) => t.symbol).toSet().toList();
+        final prices = await fetchLatestPrices(symbols, database: accountDb);
+        final positions = computePositions(trades, prices);
+        newSeries[accountName] = await _buildPortfolioSeries(
+          positions,
+          accountDb,
+        );
+      } catch (e) {
+        newSeries[accountName] = [];
+        firstError ??= e.toString();
+      } finally {
+        if (!isActive) await accountDb.close();
+      }
     }
+
+    if (!mounted) return;
+    setState(() {
+      _portfolioSeriesByAccount = newSeries;
+      _portfolioError = firstError;
+      _portfolioLoading = false;
+    });
   }
 
   Future<List<_DateValue>> _buildPortfolioSeries(
     List<Position> positions,
+    Database accountDb,
   ) async {
     if (positions.isEmpty) return [];
 
@@ -133,7 +165,7 @@ class ChartPageState extends State<ChartPage>
     final Map<String, Map<DateTime, double>> pricesBySymbol = {};
 
     for (final symbol in sharesMap.keys) {
-      final rows = await (db.candles.select()
+      final rows = await (accountDb.candles.select()
             ..where(
               (c) => c.symbol.equals(symbol) & c.date.isBiggerThanValue(after),
             )
@@ -300,7 +332,7 @@ class ChartPageState extends State<ChartPage>
     if (_mode == _ChartMode.stock && _selectedSymbol != null) {
       _setStockStream(_selectedSymbol!);
     } else {
-      _loadPortfolio();
+      _loadAllPortfolios();
     }
   }
 
@@ -625,6 +657,7 @@ class ChartPageState extends State<ChartPage>
   List<Widget> _buildPortfolioContent(SettingsState settings) {
     return [
       _buildPortfolioChart(context, settings),
+      _buildPortfolioLegend(context),
       _buildPortfolioSummary(context, settings),
     ];
   }
@@ -632,26 +665,35 @@ class ChartPageState extends State<ChartPage>
   Widget _buildPortfolioChart(BuildContext context, SettingsState settings) {
     final height = MediaQuery.of(context).size.height * 0.38;
 
-    if (_portfolioError != null) {
-      return SizedBox(
-        height: height,
-        child: Center(child: Text(_portfolioError!)),
-      );
-    }
-    if (_portfolioLoading || _portfolioSeries == null) {
+    if (_portfolioLoading) {
       return SizedBox(
         height: height,
         child: const Center(child: CircularProgressIndicator()),
       );
     }
-    if (_portfolioSeries!.isEmpty) {
+    if (_portfolioError != null && _portfolioSeriesByAccount.isEmpty) {
+      return SizedBox(
+        height: height,
+        child: Center(child: Text(_portfolioError!)),
+      );
+    }
+
+    final accounts = context.read<AccountManager>().accounts;
+    final visibleSeries = {
+      for (final entry in _portfolioSeriesByAccount.entries)
+        if (!_hiddenAccounts.contains(entry.key) && entry.value.isNotEmpty)
+          entry.key: entry.value,
+    };
+
+    if (visibleSeries.isEmpty) {
+      final allEmpty = _portfolioSeriesByAccount.values.every((s) => s.isEmpty);
       return SizedBox(
         height: height,
         child: Center(
           child: Text(
-            _positions.isEmpty
+            allEmpty
                 ? 'No trades yet.\nSearch for a stock above to get started.'
-                : 'No candle data for current holdings.',
+                : 'All portfolios hidden — tap a legend item to show it.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge,
           ),
@@ -659,73 +701,202 @@ class ChartPageState extends State<ChartPage>
       );
     }
 
-    final spots = <FlSpot>[
-      for (var i = 0; i < _portfolioSeries!.length; i++)
-        FlSpot(i.toDouble(), _portfolioSeries![i].value),
-    ];
+    // Union of all visible dates → shared X index axis
+    final allDates = <DateTime>{};
+    for (final series in visibleSeries.values) {
+      for (final dv in series) allDates.add(dv.date);
+    }
+    final sortedDates = allDates.toList()..sort();
+    final dateIndex = <DateTime, int>{
+      for (var i = 0; i < sortedDates.length; i++) sortedDates[i]: i,
+    };
+
+    final singleLine = visibleSeries.length == 1;
+    final lineBarsData = <LineChartBarData>[];
+    for (final entry in visibleSeries.entries) {
+      final idx = accounts.indexOf(entry.key);
+      final color = _accountColors[idx.clamp(0, _accountColors.length - 1)];
+      final spots = entry.value
+          .map((dv) => FlSpot(dateIndex[dv.date]!.toDouble(), dv.value))
+          .toList();
+      lineBarsData.add(
+        LineChartBarData(
+          spots: spots,
+          color: color,
+          isCurved: settings.curveLines,
+          curveSmoothness: settings.curveSmoothness,
+          preventCurveOverShooting: true,
+          barWidth: 2.5,
+          dotData: const FlDotData(show: false),
+          belowBarData: BarAreaData(
+            show: singleLine,
+            gradient: LinearGradient(
+              colors: [
+                color.withValues(alpha: 0.3),
+                Theme.of(context).colorScheme.surface.withValues(alpha: 0.0),
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+        ),
+      );
+    }
+
+    final formatter = DateFormat(settings.dateFormat);
+    final visibleKeys = visibleSeries.keys.toList();
 
     return SizedBox(
       height: height,
-      child: TickerLine(
-        dates: _portfolioSeries!.map((d) => d.date),
-        spots: spots,
+      child: Padding(
+        padding: const EdgeInsets.only(right: 32, top: 16),
+        child: LineChart(
+          LineChartData(
+            titlesData: FlTitlesData(
+              topTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              rightTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              leftTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: true, reservedSize: 45),
+              ),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 27,
+                  interval: 1,
+                  getTitlesWidget: (value, meta) {
+                    final i = value.toInt();
+                    if (i < 0 || i >= sortedDates.length) {
+                      return const SizedBox();
+                    }
+                    final screenWidth = MediaQuery.of(context).size.width;
+                    final labelCount = (screenWidth / 120).floor();
+                    final indices = List.generate(labelCount, (n) {
+                      return ((sortedDates.length - 1) * n / (labelCount - 1))
+                          .round();
+                    });
+                    if (!indices.contains(i)) return const SizedBox();
+                    return SideTitleWidget(
+                      meta: meta,
+                      child: Text(
+                        formatter.format(sortedDates[i]),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            lineBarsData: lineBarsData,
+            gridData: const FlGridData(show: false),
+            lineTouchData: LineTouchData(
+              touchTooltipData: LineTouchTooltipData(
+                getTooltipColor: (_) => Theme.of(context).colorScheme.surface,
+                getTooltipItems: (touchedSpots) {
+                  return touchedSpots.map((spot) {
+                    final i = spot.x.toInt();
+                    final date = (i >= 0 && i < sortedDates.length)
+                        ? formatter.format(sortedDates[i])
+                        : '';
+                    final accountName = spot.barIndex < visibleKeys.length
+                        ? visibleKeys[spot.barIndex]
+                        : '';
+                    final accountIdx = accounts.indexOf(accountName);
+                    final spotColor = _accountColors[
+                        accountIdx.clamp(0, _accountColors.length - 1)];
+                    final label =
+                        visibleKeys.length > 1 ? '$accountName\n' : '';
+                    return LineTooltipItem(
+                      '$label${fmtCurrency(spot.y)}\n$date',
+                      Theme.of(context)
+                          .textTheme
+                          .bodySmall!
+                          .copyWith(color: spotColor),
+                    );
+                  }).toList();
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPortfolioLegend(BuildContext context) {
+    final accounts = context.watch<AccountManager>().accounts;
+    if (accounts.length <= 1) return const SizedBox();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 4,
+        alignment: WrapAlignment.center,
+        children: [
+          for (var i = 0; i < accounts.length; i++)
+            GestureDetector(
+              onTap: () => setState(() {
+                if (_hiddenAccounts.contains(accounts[i])) {
+                  _hiddenAccounts.remove(accounts[i]);
+                } else {
+                  _hiddenAccounts.add(accounts[i]);
+                }
+              }),
+              child: AnimatedOpacity(
+                opacity: _hiddenAccounts.contains(accounts[i]) ? 0.35 : 1.0,
+                duration: const Duration(milliseconds: 200),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: _accountColors[i % _accountColors.length],
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      accounts[i],
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
 
   Widget _buildPortfolioSummary(BuildContext context, SettingsState settings) {
-    if (_portfolioSeries == null ||
-        _portfolioSeries!.isEmpty ||
-        _positions.isEmpty) {
-      return const SizedBox();
-    }
-
-    final first = _portfolioSeries!.first.value;
-    final last = _portfolioSeries!.last.value;
-    final pct = safePercentChange(first, last);
-    final color = pct >= 0 ? Colors.green : Colors.redAccent;
-    final unrealized = last - first;
-    final unrealizedPct = pct;
+    final accounts = context.read<AccountManager>().accounts;
+    final visibleSeries = {
+      for (final entry in _portfolioSeriesByAccount.entries)
+        if (!_hiddenAccounts.contains(entry.key) && entry.value.isNotEmpty)
+          entry.key: entry.value,
+    };
+    if (visibleSeries.isEmpty) return const SizedBox();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Column(
         children: [
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 16,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    pct >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
-                    color: color,
-                  ),
-                  Text(
-                    '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge!
-                        .copyWith(color: color),
-                  ),
-                ],
-              ),
-              Text(
-                fmtCurrency(last),
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Unrealized P/L: '
-            '${unrealized >= 0 ? '+' : ''}${fmtCurrency(unrealized)}'
-            ' (${unrealizedPct.toStringAsFixed(2)}%)',
-            style: TextStyle(
-              color: unrealized >= 0 ? Colors.green : Colors.redAccent,
+          for (final entry in visibleSeries.entries)
+            _buildAccountSummaryRow(
+              context,
+              accounts,
+              entry.key,
+              entry.value,
             ),
-          ),
           const SizedBox(height: 8),
           Wrap(
             alignment: WrapAlignment.center,
@@ -743,45 +914,104 @@ class ChartPageState extends State<ChartPage>
                   if (value != null) settings.setDisplayCurrency(value);
                 },
               ),
-              Builder(
-                builder: (context) {
-                  final accounts = context.watch<AccountManager>();
-                  if (accounts.accounts.length <= 1) return const SizedBox();
-                  return PopupMenuButton<String>(
-                    initialValue: accounts.activeAccount,
-                    onSelected: accounts.switchAccount,
-                    popUpAnimationStyle: const AnimationStyle(
-                      duration: Duration(milliseconds: 80),
-                    ),
-                    itemBuilder: (context) => accounts.accounts
-                        .map((a) => PopupMenuItem(value: a, child: Text(a)))
-                        .toList(),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(accounts.activeAccount),
-                        const Icon(Icons.arrow_drop_down),
-                      ],
-                    ),
-                  );
-                },
-              ),
               _ActionChip(
                 icon: Icons.refresh,
                 label: 'Refresh',
                 onTap: () async {
                   setState(() => _networkLoading = true);
-                  clearAllSyncCache();
-                  final trades = await db.trades.select().get();
-                  final symbols = trades.map((t) => t.symbol).toSet();
-                  for (final s in symbols) {
-                    await syncCandles(s);
+                  final accountManager = context.read<AccountManager>();
+                  for (final accountName in accountManager.accounts) {
+                    final isActive =
+                        accountName == accountManager.activeAccount;
+                    final accountDb = isActive
+                        ? db
+                        : (accountName == 'Default'
+                            ? Database()
+                            : Database('market-monk-$accountName'));
+                    try {
+                      final trades = await accountDb.trades.select().get();
+                      final symbols =
+                          trades.map((t) => t.symbol).toSet().toList();
+                      for (final s in symbols) {
+                        await syncCandles(s, database: accountDb);
+                      }
+                    } finally {
+                      if (!isActive) await accountDb.close();
+                    }
                   }
-                  await _loadPortfolio();
+                  await _loadAllPortfolios();
                   if (mounted) setState(() => _networkLoading = false);
                 },
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccountSummaryRow(
+    BuildContext context,
+    List<String> accounts,
+    String accountName,
+    List<_DateValue> series,
+  ) {
+    final idx = accounts.indexOf(accountName);
+    final dotColor = _accountColors[idx.clamp(0, _accountColors.length - 1)];
+    final pct = safePercentChange(series.first.value, series.last.value);
+    final returnColor = pct >= 0 ? Colors.green : Colors.redAccent;
+    final change = series.last.value - series.first.value;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 8,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: dotColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              if (accounts.length > 1) ...[
+                const SizedBox(width: 6),
+                Text(
+                  accountName,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ],
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                pct >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
+                color: returnColor,
+              ),
+              Text(
+                '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge!
+                    .copyWith(color: returnColor),
+              ),
+            ],
+          ),
+          Text(
+            fmtCurrency(series.last.value),
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          Text(
+            '${change >= 0 ? '+' : ''}${fmtCurrency(change)} period change',
+            style: TextStyle(color: returnColor, fontSize: 13),
           ),
         ],
       ),
