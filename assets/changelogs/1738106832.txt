@@ -1,0 +1,3 @@
+• Add 5d button and group by day for smaller ranges
+• Add button to insert to portfolio
+• Add delete button to portfolio

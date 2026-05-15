@@ -1,0 +1,2 @@
+• Improve adding tickers experience
+• Fix app nav sometimes overlapping system nav

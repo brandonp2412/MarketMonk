@@ -1,0 +1,3 @@
+• Show total portfolio value
+• Fix importing database
+• Simplify portfolio sync operation

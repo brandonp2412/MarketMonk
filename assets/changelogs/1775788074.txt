@@ -1,0 +1,5 @@
+• Merge Returns into Charts page
+• Center date picker
+• Prevent layout jump when loading
+• Remove color from delete buttons
+• Fix include ETFs/ETNs in search results with force-ticker fallback

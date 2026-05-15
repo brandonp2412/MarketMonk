@@ -1,0 +1,5 @@
+• add monochrome layer for Android 13+ themed icon support
+• four UX improvements across charts, portfolio, and settings
+• Fix eliminate chart flicker on account switch; add account toggle to portfolio
+• Fix move account switcher to portfolio summary next to currency dropdown
+• Fix stop chart spinner on account switch; move filter into scroll; add account toggle to filter row

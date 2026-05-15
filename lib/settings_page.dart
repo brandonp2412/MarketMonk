@@ -5,6 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/accounts_page.dart';
+import 'package:market_monk/whats_new.dart';
 import 'package:market_monk/csv_import.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
@@ -499,6 +500,15 @@ class _SettingsPageState extends State<SettingsPage> {
               child: Text(
                 "About",
                 style: Theme.of(context).textTheme.headlineLarge,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.new_releases_outlined),
+              title: const Text("What's New"),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const WhatsNew()),
               ),
             ),
             ListTile(

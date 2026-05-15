@@ -1,0 +1,12 @@
+• Add BUY/SELL toggle with trade entry on every save
+• Add Select All to holdings menu with check circle visuals
+• Add color theme picker with 10 seed color swatches
+• Add delete all data button
+• Add Tiger Brokers CSV import
+• Allow multiple entries for the same ticker
+• Fix Realized P&L text being cut off
+• Rename Trades page to Holdings
+• Show friendly date format for Purchased At field
+• Show stock name on pie chart hover; pin pie chart while scrolling
+• Track ongoing trades and add Holdings tab
+• Increase portfolio trailing text size

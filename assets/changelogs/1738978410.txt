@@ -1,0 +1,5 @@
+• Add date format setting
+• Add system color scheme setting
+• Add curve line graphs setting with smoothness slider
+• Add export/import database
+• Remove accidental extra space on portfolio page

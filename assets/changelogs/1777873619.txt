@@ -1,0 +1,2 @@
+• Add per-user currency visibility with locale-based defaults
+• Fix portfolio unrealized P&L to be period-dependent

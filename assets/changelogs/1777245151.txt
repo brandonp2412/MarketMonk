@@ -1,0 +1,4 @@
+• add Interactive Brokers CSV import
+• Fix dismiss dialog before notifying listeners on account add
+• Fix prevent overlay assertion when adding account
+• Fix reload portfolio chart after CSV import

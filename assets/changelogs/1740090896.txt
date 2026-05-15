@@ -1,0 +1,11 @@
+• Add sharing of stocks with CSV
+• Animate selecting portfolio items
+• Prevent curve overshooting on curved graphs
+• Use 1 month as default period
+• Add missing padding in settings page
+• Fix clear button on portfolio page
+• Turn off line curves by default
+• Center charts page buttons and summary line
+• Say amounts and price in portfolio trailing list
+• Reduce loaders on chart page
+• Use pull-down to refresh on portfolio

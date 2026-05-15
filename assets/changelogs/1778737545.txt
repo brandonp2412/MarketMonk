@@ -1,0 +1,2 @@
+• polish settings UX and account switcher animation
+• Fix speed up account picker popup animation to 80ms

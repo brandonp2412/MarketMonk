@@ -91,9 +91,68 @@ jobs:
           sed -i "s/^version: .*/version: $NEW_VERSION+$NEW_BUILD_NUMBER/" pubspec.yaml
           echo "Updated pubspec.yaml with new version"
 
+      - name: Generate changelog
+        id: changelog
+        run: |
+          TIMESTAMP=$(date +%s)
+          ASSET_CHANGELOG="assets/changelogs/${TIMESTAMP}.txt"
+          mkdir -p assets/changelogs
+
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            RANGE="$LAST_TAG..HEAD"
+          else
+            RANGE="HEAD"
+          fi
+
+          git --no-pager log --pretty=format:'%s' $RANGE | \
+            sort -u | \
+            grep -v "^Merge " | \
+            grep -v "^Bump " | \
+            grep -v "\[skip ci\]" | \
+            grep -v "^ci:" | \
+            grep -v "^chore:" | \
+            grep -v "^test:" | \
+            grep -v "^refactor:" | \
+            grep -v "^style:" | \
+            grep -v "^docs:" | \
+            grep -v "^build:" | \
+            grep -v "^Generate " | \
+            grep -v "^Format " | \
+            grep -v "^Ran " | \
+            grep -v "^Run " | \
+            grep -v "^Fix dart format" | \
+            grep -v "^Fix tests" | \
+            grep -v "^Fix lint" | \
+            grep -v "^Fix formatting" | \
+            grep -v "^Update android" | \
+            grep -v "^Update flutter" | \
+            grep -v "^Update screenshots" | \
+            grep -v "^Add CLAUDE" | \
+            grep -v "^Revert " | \
+            head -10 | \
+            sed 's/^feat: //' | \
+            sed 's/^fix: /Fix /' | \
+            sed 's/^perf: //' | \
+            sed 's/^/• /' > "$ASSET_CHANGELOG"
+
+          if [ ! -s "$ASSET_CHANGELOG" ]; then
+            echo "• Bug fixes and improvements" > "$ASSET_CHANGELOG"
+          fi
+
+          # Deduplicate: skip if first line matches any existing changelog
+          FIRST_LINE=$(head -1 "$ASSET_CHANGELOG" | sed 's/[.[\*^$()+?{|]/\\&/g')
+          DUPLICATE=$(grep -rl "^${FIRST_LINE}$" assets/changelogs/ 2>/dev/null | grep -v "$ASSET_CHANGELOG" | head -1)
+          if [ -n "$DUPLICATE" ]; then
+            echo "Skipping duplicate changelog (matches $DUPLICATE)"
+            rm "$ASSET_CHANGELOG"
+          else
+            echo "asset_changelog=$ASSET_CHANGELOG" >> $GITHUB_OUTPUT
+          fi
+
       - name: Commit and push version bump
         run: |
-          git add pubspec.yaml
+          git add pubspec.yaml assets/changelogs/
           git commit -m "Bump version to ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }} [skip ci]"
           git pull --rebase origin main
           git push origin main

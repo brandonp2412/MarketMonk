@@ -1,0 +1,1 @@
+• Add encryption setting for iOS and macOS
