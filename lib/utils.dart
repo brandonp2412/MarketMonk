@@ -108,12 +108,16 @@ List<Position> computePositions(
 /// Returns the latest candle close price per symbol.
 /// Uses an INNER JOIN with a GROUP BY subquery so the DB returns exactly
 /// one row per symbol instead of all historical candles.
-Future<Map<String, double>> fetchLatestPrices(List<String> symbols) async {
+Future<Map<String, double>> fetchLatestPrices(
+  List<String> symbols, {
+  Database? database,
+}) async {
   if (symbols.isEmpty) return {};
+  final d = database ?? db;
 
   final ph = List.filled(symbols.length, '?').join(', ');
   try {
-    final rows = await db.customSelect(
+    final rows = await d.customSelect(
       'SELECT c.symbol, c.close '
       'FROM candles c '
       'INNER JOIN ('
@@ -122,7 +126,7 @@ Future<Map<String, double>> fetchLatestPrices(List<String> symbols) async {
       ') sub ON c.symbol = sub.symbol AND c.date = sub.md '
       'WHERE c.close > 0',
       variables: [for (final s in symbols) Variable(s)],
-      readsFrom: {db.candles},
+      readsFrom: {d.candles},
     ).get();
 
     return {
@@ -134,7 +138,7 @@ Future<Map<String, double>> fetchLatestPrices(List<String> symbols) async {
     // Fall back to N individual limit-1 queries if the JOIN fails
     final prices = <String, double>{};
     for (final s in symbols) {
-      final c = await (db.candles.select()
+      final c = await (d.candles.select()
             ..where((r) => r.symbol.equals(s))
             ..orderBy(
               [
@@ -152,9 +156,11 @@ Future<Map<String, double>> fetchLatestPrices(List<String> symbols) async {
 
 Future<void> insertCandles(
   List<YahooFinanceCandleData> dataList,
-  String symbol,
-) async {
+  String symbol, {
+  Database? database,
+}) async {
   const int batchSize = 1000;
+  final d = database ?? db;
 
   for (int i = 0; i < dataList.length; i += batchSize) {
     final batch = dataList.skip(i).take(batchSize).map((data) {
@@ -170,11 +176,8 @@ Future<void> insertCandles(
       );
     }).toList();
 
-    await db.batch((batchBuilder) {
-      batchBuilder.insertAllOnConflictUpdate(
-        db.candles,
-        batch,
-      );
+    await d.batch((batchBuilder) {
+      batchBuilder.insertAllOnConflictUpdate(d.candles, batch);
     });
 
     debugPrint('Inserted ${i + batch.length}');
@@ -225,9 +228,10 @@ double safePercentChange(double oldValue, double newValue) {
 DateTime? _syncGuardDate;
 final Set<String> _syncedSymbols = {};
 
-/// Removes [symbol] from the sync guard so the next [syncCandles] call will
-/// actually re-check (used by pull-to-refresh).
-void clearSyncCache(String symbol) => _syncedSymbols.remove(symbol);
+/// Removes [symbol] from the sync guard for all databases so the next
+/// [syncCandles] call will actually re-check (used by pull-to-refresh).
+void clearSyncCache(String symbol) =>
+    _syncedSymbols.removeWhere((k) => k.endsWith(':$symbol'));
 
 /// Removes all symbols from the sync guard (e.g. after a full manual refresh).
 void clearAllSyncCache() => _syncedSymbols.clear();
@@ -237,7 +241,12 @@ void clearAllSyncCache() => _syncedSymbols.clear();
 ///
 /// Skips the network call if the symbol has already been synced today in this
 /// session, or if the local DB already has today's data.
-Future<void> syncCandles(String symbol) async {
+///
+/// Pass [database] to write into a specific account's DB instead of the
+/// global active-account [db].
+Future<void> syncCandles(String symbol, {Database? database}) async {
+  final d = database ?? db;
+
   // Roll the guard over on a new calendar day
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
@@ -246,11 +255,13 @@ Future<void> syncCandles(String symbol) async {
     _syncGuardDate = today;
   }
 
-  if (_syncedSymbols.contains(symbol)) return;
-  _syncedSymbols.add(symbol); // mark before async gap to prevent races
+  // Guard key includes the DB identity so different accounts sync independently.
+  final guardKey = '${d.hashCode}:$symbol';
+  if (_syncedSymbols.contains(guardKey)) return;
+  _syncedSymbols.add(guardKey); // mark before async gap to prevent races
 
   try {
-    var latest = await (db.candles.select()
+    var latest = await (d.candles.select()
           ..where((tbl) => tbl.symbol.equals(symbol))
           ..orderBy(
             [(u) => OrderingTerm(expression: u.date, mode: OrderingMode.desc)],
@@ -262,7 +273,7 @@ Future<void> syncCandles(String symbol) async {
       final response = await const YahooFinanceDailyReader().getDailyDTOs(
         symbol,
       );
-      await insertCandles(response.candlesData, symbol);
+      await insertCandles(response.candlesData, symbol, database: d);
     } else if (today.isAfter(
       DateTime(latest.date.year, latest.date.month, latest.date.day),
     )) {
@@ -270,11 +281,11 @@ Future<void> syncCandles(String symbol) async {
         symbol,
         startDate: latest.date,
       );
-      await insertCandles(response.candlesData, symbol);
+      await insertCandles(response.candlesData, symbol, database: d);
     }
   } catch (_) {
     // Remove from guard on failure so next attempt can retry
-    _syncedSymbols.remove(symbol);
+    _syncedSymbols.remove(guardKey);
     rethrow;
   }
 }

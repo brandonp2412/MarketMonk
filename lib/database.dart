@@ -14,7 +14,11 @@ class Database extends _$Database {
   @override
   int get schemaVersion => 10;
 
-  Database([String name = 'market-monk']) : super(_openConnection(name));
+  // Multiple short-lived instances are opened intentionally for secondary
+  // accounts and are always closed after use.
+  Database([String name = 'market-monk']) : super(_openConnection(name)) {
+    driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
+  }
 
   Database.connect(super.executor);
 
