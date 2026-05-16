@@ -1,0 +1,5 @@
+• Fix multiple db warnings
+• add What's New log with historical changelogs
+• allow renaming any account, including Default
+• per-portfolio color-coded returns and tooltip on chart page
+• Fix replace Wrap layout in account summary rows with structured Rows
