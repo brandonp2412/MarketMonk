@@ -70,6 +70,30 @@ class AccountManager extends ChangeNotifier {
     WidgetsBinding.instance.addPostFrameCallback((_) => notifyListeners());
   }
 
+  Future<void> renameAccount(String oldName, String newName) async {
+    if (newName.isEmpty || accounts.contains(newName)) return;
+    final dir = await getApplicationSupportDirectory();
+    final oldFileName =
+        oldName == 'Default' ? 'market-monk' : 'market-monk-$oldName';
+    final isActive = activeAccount == oldName;
+    if (isActive) await db.close();
+    for (final suffix in ['', '-wal', '-shm']) {
+      final src = File(p.join(dir.path, '$oldFileName.sqlite$suffix'));
+      final dst = File(p.join(dir.path, 'market-monk-$newName.sqlite$suffix'));
+      if (await src.exists()) await src.rename(dst.path);
+    }
+    accounts = accounts.map((a) => a == oldName ? newName : a).toList();
+    if (isActive) {
+      activeAccount = newName;
+      db = Database('market-monk-$newName');
+      clearAllSyncCache();
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('accounts', accounts);
+    if (isActive) await prefs.setString('activeAccount', newName);
+    WidgetsBinding.instance.addPostFrameCallback((_) => notifyListeners());
+  }
+
   Future<void> deleteAccount(String name) async {
     if (name == 'Default') return;
     if (activeAccount == name) await switchAccount('Default');
