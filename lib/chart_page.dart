@@ -71,7 +71,54 @@ class ChartPageState extends State<ChartPage>
   void initState() {
     super.initState();
     _loadFavorite();
+    _loadPeriodThenPortfolios();
+    _syncCandlesInBackground();
+  }
+
+  Future<void> _loadPeriodThenPortfolios() async {
+    final prefs = await SharedPreferences.getInstance();
+    final y = prefs.getInt('chartPeriodYears') ?? 1;
+    final m = prefs.getInt('chartPeriodMonths') ?? 0;
+    final d = prefs.getInt('chartPeriodDays') ?? 0;
+    if (mounted)
+      setState(() {
+        years = y;
+        months = m;
+        days = d;
+      });
     _loadAllPortfolios();
+  }
+
+  Future<void> _savePeriod() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('chartPeriodYears', years);
+    await prefs.setInt('chartPeriodMonths', months);
+    await prefs.setInt('chartPeriodDays', days);
+  }
+
+  Future<void> _syncCandlesInBackground() async {
+    if (!mounted) return;
+    final accountManager = context.read<AccountManager>();
+    try {
+      for (final accountName in accountManager.accounts) {
+        final isActive = accountName == accountManager.activeAccount;
+        final accountDb = isActive
+            ? db
+            : (accountName == 'Default'
+                ? Database()
+                : Database('market-monk-$accountName'));
+        try {
+          final trades = await accountDb.trades.select().get();
+          final symbols = trades.map((t) => t.symbol).toSet().toList();
+          for (final s in symbols) {
+            await syncCandles(s, database: accountDb);
+          }
+        } finally {
+          if (!isActive) await accountDb.close();
+        }
+      }
+    } catch (_) {}
+    if (mounted) _loadAllPortfolios();
   }
 
   @override
@@ -329,6 +376,7 @@ class ChartPageState extends State<ChartPage>
       months = m;
       days = d;
     });
+    _savePeriod();
     if (_mode == _ChartMode.stock && _selectedSymbol != null) {
       _setStockStream(_selectedSymbol!);
     } else {

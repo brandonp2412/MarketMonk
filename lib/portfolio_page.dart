@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:drift/drift.dart' hide Column, Table;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -5,7 +7,9 @@ import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 class PortfolioPage extends StatefulWidget {
   const PortfolioPage({super.key});
@@ -88,6 +92,36 @@ class PortfolioPageState extends State<PortfolioPage>
   Future<void> _updateCandles() async {
     clearAllSyncCache();
     await _syncAllInBackground();
+  }
+
+  Future<void> _exportCsv(
+      BuildContext context, List<Position> positions) async {
+    final buf = StringBuffer();
+    buf.writeln(
+        'Symbol,Name,Shares,Avg Cost,Current Price,Current Value,Cost Basis,Unrealized P/L,% Change');
+    for (final p in positions) {
+      final cells = [
+        p.symbol,
+        '"${p.name.replaceAll('"', '""')}"',
+        p.netShares.toStringAsFixed(6),
+        p.avgCost.toStringAsFixed(4),
+        p.currentPrice.toStringAsFixed(4),
+        p.currentValue.toStringAsFixed(2),
+        p.costBasis.toStringAsFixed(2),
+        p.unrealizedPL.toStringAsFixed(2),
+        p.change.toStringAsFixed(2),
+      ];
+      buf.writeln(cells.join(','));
+    }
+
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/positions.csv');
+    await file.writeAsString(buf.toString());
+    if (!context.mounted) return;
+    await Share.shareXFiles(
+      [XFile(file.path, mimeType: 'text/csv')],
+      subject: 'Portfolio Positions',
+    );
   }
 
   @override
@@ -202,6 +236,7 @@ class PortfolioPageState extends State<PortfolioPage>
                   _filterText = '';
                   _filterController.clear();
                 }),
+                onExport: () => _exportCsv(context, positions),
               ),
             ),
           ),
@@ -403,12 +438,14 @@ class _FilterRow extends StatelessWidget {
   final String filterText;
   final ValueChanged<String> onChanged;
   final VoidCallback onClear;
+  final VoidCallback onExport;
 
   const _FilterRow({
     required this.controller,
     required this.filterText,
     required this.onChanged,
     required this.onClear,
+    required this.onExport,
   });
 
   @override
@@ -456,6 +493,12 @@ class _FilterRow extends StatelessWidget {
             ),
           ),
         ],
+        const SizedBox(width: 4),
+        IconButton(
+          icon: const Icon(Icons.download),
+          tooltip: 'Export positions as CSV',
+          onPressed: onExport,
+        ),
       ],
     );
   }
