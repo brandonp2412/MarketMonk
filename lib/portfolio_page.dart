@@ -99,13 +99,15 @@ class PortfolioPageState extends State<PortfolioPage>
     BuildContext context,
     List<Position> positions,
   ) async {
+    final accountName = context.read<AccountManager>().activeAccount;
     final buf = StringBuffer();
     buf.writeln(
-      'Symbol,Name,Shares,Avg Cost,Current Price,Current Value,Cost Basis,Unrealized P/L,% Change,Last Purchase Date',
+      'Account,Symbol,Name,Shares,Avg Cost,Current Price,Current Value,Cost Basis,Unrealized P/L,% Change,Last Purchase Date',
     );
     final dateFmt = DateFormat('yyyy-MM-dd');
     for (final p in positions) {
       final cells = [
+        '"${accountName.replaceAll('"', '""')}"',
         p.symbol,
         '"${p.name.replaceAll('"', '""')}"',
         p.netShares.toStringAsFixed(6),
