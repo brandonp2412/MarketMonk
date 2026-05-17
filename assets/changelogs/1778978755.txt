@@ -1,0 +1,4 @@
+• add last purchase date to CSV export
+• include account name in positions CSV export
+• persist chart period, refresh portfolio on load, export CSV
+• Fix put account name in CSV filename, not as a column
