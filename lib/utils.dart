@@ -41,6 +41,7 @@ class Position {
   final double avgCost; // weighted avg buy price
   final double currentPrice; // latest candle close (or avgCost if no candles)
   final DateTime firstBuyDate;
+  final DateTime lastBuyDate;
 
   Position({
     required this.symbol,
@@ -49,6 +50,7 @@ class Position {
     required this.avgCost,
     required this.currentPrice,
     required this.firstBuyDate,
+    required this.lastBuyDate,
   });
 
   double get change => safePercentChange(avgCost, currentPrice);
@@ -84,10 +86,12 @@ List<Position> computePositions(
     final currentPrice = latestPrices[symbol] ?? avgCost;
 
     final name = symbolTrades.first.name;
+    final dates = buyTrades.map((t) => t.tradeDate);
     final firstBuyDate = buyTrades.isNotEmpty
-        ? buyTrades
-            .map((t) => t.tradeDate)
-            .reduce((a, b) => a.isBefore(b) ? a : b)
+        ? dates.reduce((a, b) => a.isBefore(b) ? a : b)
+        : DateTime.now();
+    final lastBuyDate = buyTrades.isNotEmpty
+        ? dates.reduce((a, b) => a.isAfter(b) ? a : b)
         : DateTime.now();
 
     positions.add(
@@ -98,6 +102,7 @@ List<Position> computePositions(
         avgCost: avgCost,
         currentPrice: currentPrice,
         firstBuyDate: firstBuyDate,
+        lastBuyDate: lastBuyDate,
       ),
     );
   }

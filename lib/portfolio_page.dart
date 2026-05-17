@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:drift/drift.dart' hide Column, Table;
+import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:market_monk/main.dart';
@@ -95,10 +96,14 @@ class PortfolioPageState extends State<PortfolioPage>
   }
 
   Future<void> _exportCsv(
-      BuildContext context, List<Position> positions) async {
+    BuildContext context,
+    List<Position> positions,
+  ) async {
     final buf = StringBuffer();
     buf.writeln(
-        'Symbol,Name,Shares,Avg Cost,Current Price,Current Value,Cost Basis,Unrealized P/L,% Change');
+      'Symbol,Name,Shares,Avg Cost,Current Price,Current Value,Cost Basis,Unrealized P/L,% Change,Last Purchase Date',
+    );
+    final dateFmt = DateFormat('yyyy-MM-dd');
     for (final p in positions) {
       final cells = [
         p.symbol,
@@ -110,6 +115,7 @@ class PortfolioPageState extends State<PortfolioPage>
         p.costBasis.toStringAsFixed(2),
         p.unrealizedPL.toStringAsFixed(2),
         p.change.toStringAsFixed(2),
+        dateFmt.format(p.lastBuyDate),
       ];
       buf.writeln(cells.join(','));
     }
@@ -487,7 +493,7 @@ class _FilterRow extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(accounts.activeAccount),
+                Text(accounts.activeAccount[0].toUpperCase()),
                 const Icon(Icons.arrow_drop_down),
               ],
             ),
