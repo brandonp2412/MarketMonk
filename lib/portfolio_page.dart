@@ -102,12 +102,11 @@ class PortfolioPageState extends State<PortfolioPage>
     final accountName = context.read<AccountManager>().activeAccount;
     final buf = StringBuffer();
     buf.writeln(
-      'Account,Symbol,Name,Shares,Avg Cost,Current Price,Current Value,Cost Basis,Unrealized P/L,% Change,Last Purchase Date',
+      'Symbol,Name,Shares,Avg Cost,Current Price,Current Value,Cost Basis,Unrealized P/L,% Change,Last Purchase Date',
     );
     final dateFmt = DateFormat('yyyy-MM-dd');
     for (final p in positions) {
       final cells = [
-        '"${accountName.replaceAll('"', '""')}"',
         p.symbol,
         '"${p.name.replaceAll('"', '""')}"',
         p.netShares.toStringAsFixed(6),
@@ -122,8 +121,9 @@ class PortfolioPageState extends State<PortfolioPage>
       buf.writeln(cells.join(','));
     }
 
+    final safeName = accountName.replaceAll(RegExp(r'[^\w\-]'), '_');
     final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/positions.csv');
+    final file = File('${dir.path}/positions_$safeName.csv');
     await file.writeAsString(buf.toString());
     if (!context.mounted) return;
     await Share.shareXFiles(
