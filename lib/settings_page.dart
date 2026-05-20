@@ -400,11 +400,16 @@ class _SettingsPageState extends State<SettingsPage> {
               title: const Text('Export database'),
               onTap: () async {
                 Navigator.pop(context);
+                final activeAccount =
+                    context.read<AccountManager>().activeAccount;
+                final dbName = activeAccount == 'Default'
+                    ? 'market-monk'
+                    : 'market-monk-$activeAccount';
                 final dbFolder = await getApplicationSupportDirectory();
-                final file = File(p.join(dbFolder.path, 'market-monk.sqlite'));
+                final file = File(p.join(dbFolder.path, '$dbName.sqlite'));
                 final bytes = await file.readAsBytes();
                 final result = await FilePicker.platform.saveFile(
-                  fileName: 'market-monk.sqlite',
+                  fileName: '$dbName.sqlite',
                   bytes: bytes,
                 );
                 if (Platform.isMacOS || Platform.isWindows || Platform.isLinux)
@@ -460,6 +465,8 @@ class _SettingsPageState extends State<SettingsPage> {
               title: const Text('Import database'),
               onTap: () async {
                 Navigator.pop(context);
+                final activeAccount =
+                    context.read<AccountManager>().activeAccount;
                 FilePickerResult? result =
                     await FilePicker.platform.pickFiles();
                 if (result == null) return;
@@ -498,11 +505,13 @@ class _SettingsPageState extends State<SettingsPage> {
                   return;
                 }
 
+                final dbName = activeAccount == 'Default'
+                    ? 'market-monk'
+                    : 'market-monk-$activeAccount';
                 final dbFolder = await getApplicationSupportDirectory();
                 await db.close();
-                await sourceFile
-                    .copy(p.join(dbFolder.path, 'market-monk.sqlite'));
-                db = Database();
+                await sourceFile.copy(p.join(dbFolder.path, '$dbName.sqlite'));
+                db = Database(dbName);
                 if (!context.mounted) return;
                 Navigator.pushNamedAndRemoveUntil(context, '/', (_) => false);
               },
