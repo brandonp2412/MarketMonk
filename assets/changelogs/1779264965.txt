@@ -1,0 +1,2 @@
+• market closed indicator, determinate sync progress, fix stuck spinner
+• Fix export/import database uses active account's file
