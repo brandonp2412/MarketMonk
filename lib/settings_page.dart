@@ -301,6 +301,22 @@ class _SettingsPageState extends State<SettingsPage> {
           // ── Charts ──────────────────────────────────────────────────────
           _sectionHeader('Charts'),
           Tooltip(
+            message:
+                'Show a badge on the chart when the market is closed (weekends)',
+            child: ListTile(
+              title: const Text('Market closed indicator'),
+              leading: settings.showMarketClosed
+                  ? const Icon(Icons.schedule)
+                  : const Icon(Icons.schedule_outlined),
+              onTap: () =>
+                  settings.setShowMarketClosed(!settings.showMarketClosed),
+              trailing: Switch(
+                value: settings.showMarketClosed,
+                onChanged: (value) => settings.setShowMarketClosed(value),
+              ),
+            ),
+          ),
+          Tooltip(
             message: 'Use wavy curves in the graphs page',
             child: ListTile(
               title: const Text('Curve line graphs'),

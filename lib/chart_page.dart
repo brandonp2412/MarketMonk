@@ -44,6 +44,8 @@ class ChartPageState extends State<ChartPage>
   String? _selectedSymbol;
   String? _favoriteStock;
   bool _networkLoading = false;
+  double? _syncProgress; // null = indeterminate, 0.0–1.0 = determinate
+  String? _stockError;
 
   // Shared time period
   int years = 1;
@@ -144,6 +146,50 @@ class ChartPageState extends State<ChartPage>
     _searchFocus.dispose();
     _debounce?.cancel();
     super.dispose();
+  }
+
+  /// Syncs candles for all accounts and tracks determinate progress on
+  /// [_syncProgress]. Caller is responsible for setting [_networkLoading].
+  Future<void> _refreshAllPortfolioCandles() async {
+    final accountManager = context.read<AccountManager>();
+
+    // Pre-collect all (db, isActive, symbols) so we know the total up front.
+    final tasks = <({Database db, bool isActive, List<String> symbols})>[];
+    for (final accountName in accountManager.accounts) {
+      final isActive = accountName == accountManager.activeAccount;
+      final accountDb = isActive
+          ? db
+          : (accountName == 'Default'
+              ? Database()
+              : Database('market-monk-$accountName'));
+      try {
+        final trades = await accountDb.trades.select().get();
+        final symbols = trades.map((t) => t.symbol).toSet().toList();
+        tasks.add((db: accountDb, isActive: isActive, symbols: symbols));
+      } catch (_) {
+        if (!isActive) await accountDb.close();
+      }
+    }
+
+    final total = tasks.fold(0, (sum, t) => sum + t.symbols.length);
+    if (mounted) setState(() => _syncProgress = total > 0 ? 0.0 : null);
+
+    int done = 0;
+    for (final task in tasks) {
+      try {
+        for (final symbol in task.symbols) {
+          await syncCandles(symbol, database: task.db);
+          done++;
+          if (mounted) {
+            setState(() => _syncProgress = total > 0 ? done / total : null);
+          }
+        }
+      } catch (_) {
+        // Continue with remaining symbols on error
+      } finally {
+        if (!task.isActive) await task.db.close();
+      }
+    }
   }
 
   Future<void> _loadFavorite() async {
@@ -315,6 +361,8 @@ class ChartPageState extends State<ChartPage>
       _mode = _ChartMode.stock;
       _selectedSymbol = symbol;
       _networkLoading = true;
+      _syncProgress = null;
+      _stockError = null;
     });
     _setStockStream(symbol);
     syncCandles(symbol).then((_) {
@@ -322,8 +370,13 @@ class ChartPageState extends State<ChartPage>
         _setStockStream(symbol);
         setState(() => _networkLoading = false);
       }
-    }).catchError((_) {
-      if (mounted) setState(() => _networkLoading = false);
+    }).catchError((Object e) {
+      if (mounted) {
+        setState(() {
+          _networkLoading = false;
+          _stockError = e.toString();
+        });
+      }
     });
   }
 
@@ -393,6 +446,7 @@ class ChartPageState extends State<ChartPage>
       _searchResults = [];
       _selectedSymbol = null;
       _searchLoading = false;
+      _stockError = null;
     });
   }
 
@@ -407,6 +461,7 @@ class ChartPageState extends State<ChartPage>
         if (_networkLoading)
           LinearProgressIndicator(
             minHeight: 2,
+            value: _syncProgress,
             color: Theme.of(context).colorScheme.primary,
           ),
         if (!_networkLoading) const SizedBox(height: 2),
@@ -501,11 +556,51 @@ class ChartPageState extends State<ChartPage>
     );
   }
 
+  bool _isMarketClosed() {
+    final weekday = DateTime.now().weekday;
+    return weekday == DateTime.saturday || weekday == DateTime.sunday;
+  }
+
+  Widget _buildMarketClosedBanner() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.secondaryContainer,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.schedule,
+                size: 14,
+                color: Theme.of(context).colorScheme.onSecondaryContainer,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Market closed',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSecondaryContainer,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildChartContent(SettingsState settings) {
     return ListView(
       children: [
         const SizedBox(height: 8),
         _buildTimeChips(),
+        if (settings.showMarketClosed && _isMarketClosed())
+          _buildMarketClosedBanner(),
         const SizedBox(height: 4),
         if (_mode == _ChartMode.stock)
           ..._buildStockContent(settings)
@@ -577,6 +672,12 @@ class ChartPageState extends State<ChartPage>
       );
     }
     if (snapshot.data == null || snapshot.data!.isEmpty) {
+      if (_stockError != null) {
+        return SizedBox(
+          height: height,
+          child: Center(child: Text(_stockError!)),
+        );
+      }
       return SizedBox(
         height: height,
         child: const Center(child: CircularProgressIndicator()),
@@ -687,9 +788,17 @@ class ChartPageState extends State<ChartPage>
                 icon: Icons.refresh,
                 label: 'Refresh',
                 onTap: () async {
-                  setState(() => _networkLoading = true);
+                  setState(() {
+                    _networkLoading = true;
+                    _syncProgress = null;
+                    _stockError = null;
+                  });
                   clearSyncCache(symbol);
-                  await syncCandles(symbol);
+                  try {
+                    await syncCandles(symbol);
+                  } catch (e) {
+                    if (mounted) setState(() => _stockError = e.toString());
+                  }
                   if (_selectedSymbol != null)
                     _setStockStream(_selectedSymbol!);
                   if (mounted) setState(() => _networkLoading = false);
@@ -967,26 +1076,7 @@ class ChartPageState extends State<ChartPage>
                 label: 'Refresh',
                 onTap: () async {
                   setState(() => _networkLoading = true);
-                  final accountManager = context.read<AccountManager>();
-                  for (final accountName in accountManager.accounts) {
-                    final isActive =
-                        accountName == accountManager.activeAccount;
-                    final accountDb = isActive
-                        ? db
-                        : (accountName == 'Default'
-                            ? Database()
-                            : Database('market-monk-$accountName'));
-                    try {
-                      final trades = await accountDb.trades.select().get();
-                      final symbols =
-                          trades.map((t) => t.symbol).toSet().toList();
-                      for (final s in symbols) {
-                        await syncCandles(s, database: accountDb);
-                      }
-                    } finally {
-                      if (!isActive) await accountDb.close();
-                    }
-                  }
+                  await _refreshAllPortfolioCandles();
                   await _loadAllPortfolios();
                   if (mounted) setState(() => _networkLoading = false);
                 },
