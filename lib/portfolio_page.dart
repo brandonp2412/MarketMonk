@@ -20,7 +20,7 @@ class PortfolioPage extends StatefulWidget {
 }
 
 class PortfolioPageState extends State<PortfolioPage>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   @override
   bool get wantKeepAlive => true;
 
@@ -34,6 +34,7 @@ class PortfolioPageState extends State<PortfolioPage>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     stream = _buildStream();
     _preload();
     _syncAllInBackground();
@@ -50,11 +51,21 @@ class PortfolioPageState extends State<PortfolioPage>
         _positions = [];
       });
       _preload();
+      _syncAllInBackground();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _preload();
+      _syncAllInBackground();
     }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _filterController.dispose();
     super.dispose();
   }
