@@ -1,0 +1,1 @@
+• Fix sync portfolio on app resume and account switch
