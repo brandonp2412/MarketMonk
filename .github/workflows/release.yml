@@ -348,3 +348,42 @@ jobs:
             artifacts/android-aab/app-release.aab
             artifacts/linux-app/market_monk-linux-${{ needs.version-bump.outputs.version }}.zip
             artifacts/windows-app/market_monk-windows-${{ needs.version-bump.outputs.version }}.zip
+
+  virustotal:
+    needs: [create-release, version-bump]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Android artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: android-apk
+
+      - name: VirusTotal Scan
+        id: vt
+        uses: crazy-max/ghaction-virustotal@v4
+        with:
+          vt_api_key: ${{ secrets.VT_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          files: |
+            android-apk/app-arm64-v8a-release.apk
+            android-apk/app-armeabi-v7a-release.apk
+            android-apk/app-x86_64-release.apk
+
+      - name: Append VirusTotal links to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: v${{ needs.version-bump.outputs.version }}
+          ANALYSIS: ${{ steps.vt.outputs.analysis }}
+        run: |
+          VT_SECTION=$'\n\n---\n**VirusTotal Analysis**\n'
+          IFS=',' read -ra ENTRIES <<< "$ANALYSIS"
+          for entry in "${ENTRIES[@]}"; do
+            filename=$(basename "${entry%%=*}")
+            url="${entry##*=}"
+            VT_SECTION+="- [${filename}](${url})"$'\n'
+          done
+          CURRENT_BODY=$(gh release view "$VERSION" --json body -q .body)
+          gh release edit "$VERSION" --notes "${CURRENT_BODY}${VT_SECTION}"
