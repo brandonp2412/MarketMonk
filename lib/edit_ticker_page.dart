@@ -320,9 +320,9 @@ class _EditTickerPageState extends State<EditTickerPage> {
                   const SizedBox(height: 8),
                   TextField(
                     controller: price,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Price',
-                      prefix: Text("\$"),
+                      prefix: Text(currency.currencySymbol),
                     ),
                     onTap: () => selectAll(price),
                     keyboardType: TextInputType.number,
