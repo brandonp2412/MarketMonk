@@ -1,0 +1,1 @@
+• Fix show display currency symbol in price field instead of hardcoded $
