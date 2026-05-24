@@ -60,9 +60,10 @@ class TickerLine extends StatelessWidget {
     final formatter = DateFormat(settings.dateFormat);
 
     return Padding(
-      padding: const EdgeInsets.only(right: 32.0, top: 16.0),
+      padding: const EdgeInsets.only(right: 8.0, top: 24.0),
       child: LineChart(
         LineChartData(
+          clipData: const FlClipData.all(),
           titlesData: FlTitlesData(
             topTitles: const AxisTitles(
               sideTitles: SideTitles(showTitles: false),
@@ -71,7 +72,7 @@ class TickerLine extends StatelessWidget {
               sideTitles: SideTitles(showTitles: false),
             ),
             leftTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: true, reservedSize: 45),
+              sideTitles: SideTitles(showTitles: false),
             ),
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(

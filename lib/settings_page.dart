@@ -274,6 +274,16 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
           ),
+          ListTile(
+            title: const Text('Pure black (AMOLED)'),
+            leading: const Icon(Icons.contrast),
+            subtitle: const Text('Use pure black for AMOLED displays'),
+            trailing: Switch(
+              value: settings.pureBlack,
+              onChanged: (value) => settings.setPureBlack(value),
+            ),
+            onTap: () => settings.setPureBlack(!settings.pureBlack),
+          ),
           if (!settings.systemColors) _ColorPicker(settings: settings),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),

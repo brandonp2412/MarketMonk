@@ -60,6 +60,7 @@ class SettingsState extends ChangeNotifier {
   String displayCurrency = 'USD';
   List<String> visibleCurrencies = ['USD'];
   bool showMarketClosed = false;
+  bool pureBlack = false;
 
   SettingsState() {
     init();
@@ -115,6 +116,7 @@ class SettingsState extends ChangeNotifier {
         : _defaultVisibleCurrencies();
 
     showMarketClosed = prefs.getBool('showMarketClosed') ?? false;
+    pureBlack = prefs.getBool('pureBlack') ?? false;
 
     displayCurrency =
         prefs.getString('displayCurrency') ?? _detectLocaleCurrency();
@@ -174,6 +176,13 @@ class SettingsState extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     prefs.setBool('curveLines', value);
+  }
+
+  void setPureBlack(bool value) async {
+    pureBlack = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setBool('pureBlack', value);
   }
 
   void setShowMarketClosed(bool value) async {

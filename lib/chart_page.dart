@@ -561,33 +561,47 @@ class ChartPageState extends State<ChartPage>
     return weekday == DateTime.saturday || weekday == DateTime.sunday;
   }
 
-  Widget _buildMarketClosedBanner() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.secondaryContainer,
-            borderRadius: BorderRadius.circular(16),
+  Widget _buildMarketClosedBanner(SettingsState settings) {
+    return GestureDetector(
+      onLongPress: () {
+        settings.setShowMarketClosed(false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Market closed indicator hidden'),
+            action: SnackBarAction(
+              label: 'Undo',
+              onPressed: () => settings.setShowMarketClosed(true),
+            ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.schedule,
-                size: 14,
-                color: Theme.of(context).colorScheme.onSecondaryContainer,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                'Market closed',
-                style: TextStyle(
-                  fontSize: 12,
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.secondaryContainer,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.schedule,
+                  size: 14,
                   color: Theme.of(context).colorScheme.onSecondaryContainer,
                 ),
-              ),
-            ],
+                const SizedBox(width: 6),
+                Text(
+                  'Market closed',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSecondaryContainer,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -600,8 +614,8 @@ class ChartPageState extends State<ChartPage>
         const SizedBox(height: 8),
         _buildTimeChips(),
         if (settings.showMarketClosed && _isMarketClosed())
-          _buildMarketClosedBanner(),
-        const SizedBox(height: 4),
+          _buildMarketClosedBanner(settings),
+        const SizedBox(height: 8),
         if (_mode == _ChartMode.stock)
           ..._buildStockContent(settings)
         else
@@ -906,9 +920,10 @@ class ChartPageState extends State<ChartPage>
     return SizedBox(
       height: height,
       child: Padding(
-        padding: const EdgeInsets.only(right: 32, top: 16),
+        padding: const EdgeInsets.only(right: 8, top: 16),
         child: LineChart(
           LineChartData(
+            clipData: const FlClipData.all(),
             titlesData: FlTitlesData(
               topTitles: const AxisTitles(
                 sideTitles: SideTitles(showTitles: false),
@@ -917,7 +932,7 @@ class ChartPageState extends State<ChartPage>
                 sideTitles: SideTitles(showTitles: false),
               ),
               leftTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: true, reservedSize: 45),
+                sideTitles: SideTitles(showTitles: false),
               ),
               bottomTitles: AxisTitles(
                 sideTitles: SideTitles(
@@ -954,6 +969,8 @@ class ChartPageState extends State<ChartPage>
             gridData: const FlGridData(show: false),
             lineTouchData: LineTouchData(
               touchTooltipData: LineTouchTooltipData(
+                fitInsideHorizontally: true,
+                fitInsideVertically: true,
                 getTooltipColor: (_) => Theme.of(context).colorScheme.surface,
                 getTooltipItems: (touchedSpots) {
                   return touchedSpots.map((spot) {
