@@ -568,6 +568,7 @@ class ChartPageState extends State<ChartPage>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Market closed indicator hidden'),
+            duration: const Duration(seconds: 4),
             action: SnackBarAction(
               label: 'Undo',
               onPressed: () => settings.setShowMarketClosed(true),
@@ -613,9 +614,11 @@ class ChartPageState extends State<ChartPage>
       children: [
         const SizedBox(height: 8),
         _buildTimeChips(),
-        if (settings.showMarketClosed && _isMarketClosed())
+        if (settings.showMarketClosed && _isMarketClosed()) ...[
+          const SizedBox(height: 8),
           _buildMarketClosedBanner(settings),
-        const SizedBox(height: 8),
+        ],
+        const SizedBox(height: 4),
         if (_mode == _ChartMode.stock)
           ..._buildStockContent(settings)
         else
@@ -828,7 +831,6 @@ class ChartPageState extends State<ChartPage>
   List<Widget> _buildPortfolioContent(SettingsState settings) {
     return [
       _buildPortfolioChart(context, settings),
-      _buildPortfolioLegend(context),
       _buildPortfolioSummary(context, settings),
     ];
   }
@@ -864,7 +866,7 @@ class ChartPageState extends State<ChartPage>
           child: Text(
             allEmpty
                 ? 'No trades yet.\nSearch for a stock above to get started.'
-                : 'All portfolios hidden — tap a legend item to show it.',
+                : 'All portfolios hidden — tap a portfolio below to show it.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge,
           ),
@@ -970,8 +972,10 @@ class ChartPageState extends State<ChartPage>
             lineTouchData: LineTouchData(
               touchTooltipData: LineTouchTooltipData(
                 fitInsideHorizontally: true,
-                fitInsideVertically: true,
-                getTooltipColor: (_) => Theme.of(context).colorScheme.surface,
+                getTooltipColor: (_) => Theme.of(context)
+                    .colorScheme
+                    .surface
+                    .withValues(alpha: 0.9),
                 getTooltipItems: (touchedSpots) {
                   return touchedSpots.map((spot) {
                     final i = spot.x.toInt();
@@ -1003,68 +1007,19 @@ class ChartPageState extends State<ChartPage>
     );
   }
 
-  Widget _buildPortfolioLegend(BuildContext context) {
-    final accounts = context.watch<AccountManager>().accounts;
-    if (accounts.length <= 1) return const SizedBox();
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 4,
-        alignment: WrapAlignment.center,
-        children: [
-          for (var i = 0; i < accounts.length; i++)
-            GestureDetector(
-              onTap: () => setState(() {
-                if (_hiddenAccounts.contains(accounts[i])) {
-                  _hiddenAccounts.remove(accounts[i]);
-                } else {
-                  _hiddenAccounts.add(accounts[i]);
-                }
-              }),
-              child: AnimatedOpacity(
-                opacity: _hiddenAccounts.contains(accounts[i]) ? 0.35 : 1.0,
-                duration: const Duration(milliseconds: 200),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: _accountColors[i % _accountColors.length],
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      accounts[i],
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildPortfolioSummary(BuildContext context, SettingsState settings) {
     final accounts = context.read<AccountManager>().accounts;
-    final visibleSeries = {
+    final allSeries = {
       for (final entry in _portfolioSeriesByAccount.entries)
-        if (!_hiddenAccounts.contains(entry.key) && entry.value.isNotEmpty)
-          entry.key: entry.value,
+        if (entry.value.isNotEmpty) entry.key: entry.value,
     };
-    if (visibleSeries.isEmpty) return const SizedBox();
+    if (allSeries.isEmpty) return const SizedBox();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Column(
         children: [
-          for (final entry in visibleSeries.entries)
+          for (final entry in allSeries.entries)
             _buildAccountSummaryRow(
               context,
               accounts,
@@ -1116,65 +1071,79 @@ class ChartPageState extends State<ChartPage>
     final pct = safePercentChange(series.first.value, series.last.value);
     final returnColor = pct >= 0 ? Colors.green : Colors.redAccent;
     final change = series.last.value - series.first.value;
+    final isHidden = _hiddenAccounts.contains(accountName);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
+    return GestureDetector(
+      onTap: () => setState(() {
+        if (isHidden) {
+          _hiddenAccounts.remove(accountName);
+        } else {
+          _hiddenAccounts.add(accountName);
+        }
+      }),
+      child: AnimatedOpacity(
+        opacity: isHidden ? 0.35 : 1.0,
+        duration: const Duration(milliseconds: 200),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: dotColor,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  accountName,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
               Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    pct >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
-                    color: returnColor,
-                    size: 18,
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: dotColor,
+                      shape: BoxShape.circle,
+                    ),
                   ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      accountName,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        pct >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
+                        color: returnColor,
+                        size: 18,
+                      ),
+                      Text(
+                        '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium!
+                            .copyWith(color: returnColor),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 12),
                   Text(
-                    '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium!
-                        .copyWith(color: returnColor),
+                    fmtCurrency(series.last.value),
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ],
               ),
-              const SizedBox(width: 12),
-              Text(
-                fmtCurrency(series.last.value),
-                style: Theme.of(context).textTheme.titleMedium,
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    '${change >= 0 ? '+' : ''}${fmtCurrency(change)} period change',
+                    style: TextStyle(color: returnColor, fontSize: 13),
+                  ),
+                ),
               ),
             ],
           ),
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                '${change >= 0 ? '+' : ''}${fmtCurrency(change)} period change',
-                style: TextStyle(color: returnColor, fontSize: 13),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

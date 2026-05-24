@@ -108,8 +108,9 @@ class TickerLine extends StatelessWidget {
           gridData: const FlGridData(show: false),
           lineTouchData: LineTouchData(
             touchTooltipData: LineTouchTooltipData(
+              fitInsideHorizontally: true,
               getTooltipColor: (touchedSpot) =>
-                  Theme.of(context).colorScheme.surface,
+                  Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
               getTooltipItems: (touchedSpots) =>
                   getTooltip(touchedSpots, context, formatter),
             ),
