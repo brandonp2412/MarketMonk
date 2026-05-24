@@ -565,14 +565,12 @@ class ChartPageState extends State<ChartPage>
     return GestureDetector(
       onLongPress: () {
         settings.setShowMarketClosed(false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Market closed indicator hidden'),
-            duration: const Duration(seconds: 4),
-            action: SnackBarAction(
-              label: 'Undo',
-              onPressed: () => settings.setShowMarketClosed(true),
-            ),
+        toast(
+          context,
+          'Market closed indicator hidden',
+          SnackBarAction(
+            label: 'Undo',
+            onPressed: () => settings.setShowMarketClosed(true),
           ),
         );
       },
@@ -618,7 +616,6 @@ class ChartPageState extends State<ChartPage>
           const SizedBox(height: 8),
           _buildMarketClosedBanner(settings),
         ],
-        const SizedBox(height: 4),
         if (_mode == _ChartMode.stock)
           ..._buildStockContent(settings)
         else
@@ -922,7 +919,7 @@ class ChartPageState extends State<ChartPage>
     return SizedBox(
       height: height,
       child: Padding(
-        padding: const EdgeInsets.only(right: 8, top: 16),
+        padding: const EdgeInsets.only(right: 8, top: 8),
         child: LineChart(
           LineChartData(
             clipData: const FlClipData.all(),
