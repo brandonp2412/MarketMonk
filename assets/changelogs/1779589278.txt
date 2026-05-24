@@ -1,0 +1,3 @@
+• Improve end of day indicator
+• improve market closed indicator, pure black theme, chart layout
+• Fix market closed banner spacing, snackbar duration, legend, tooltip
