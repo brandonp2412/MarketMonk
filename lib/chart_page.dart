@@ -47,6 +47,12 @@ class ChartPageState extends State<ChartPage>
   double? _syncProgress; // null = indeterminate, 0.0–1.0 = determinate
   String? _stockError;
 
+  // Measured height of the floating search bar overlay so chart content can
+  // be padded beneath it, while the chart's canvas extends to the top and
+  // tooltips can render above the data without being clipped.
+  final _overlayKey = GlobalKey();
+  double _overlayHeight = 70.0;
+
   // Shared time period
   int years = 1;
   int months = 0;
@@ -75,6 +81,14 @@ class ChartPageState extends State<ChartPage>
     _loadFavorite();
     _loadPeriodThenPortfolios();
     _syncCandlesInBackground();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureOverlay());
+  }
+
+  void _measureOverlay() {
+    final box = _overlayKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !mounted) return;
+    final h = box.size.height;
+    if (h != _overlayHeight) setState(() => _overlayHeight = h);
   }
 
   Future<void> _loadPeriodThenPortfolios() async {
@@ -455,20 +469,36 @@ class ChartPageState extends State<ChartPage>
     super.build(context);
     final settings = context.watch<SettingsState>();
 
-    return Column(
+    // Stack layout: the chart fills the full height so fl_chart's tooltip
+    // canvas extends behind the search bar, letting tooltips render above
+    // their data points without being obscured. The search bar floats on top
+    // as the last-painted child (highest z-order).
+    return Stack(
       children: [
-        _buildSearchBar(),
-        if (_networkLoading)
-          LinearProgressIndicator(
-            minHeight: 2,
-            value: _syncProgress,
-            color: Theme.of(context).colorScheme.primary,
+        if (_mode == _ChartMode.searching)
+          Padding(
+            padding: EdgeInsets.only(top: _overlayHeight),
+            child: _buildSearchResults(),
+          )
+        else
+          _buildChartContent(settings),
+        Align(
+          alignment: Alignment.topCenter,
+          child: Column(
+            key: _overlayKey,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildSearchBar(),
+              if (_networkLoading)
+                LinearProgressIndicator(
+                  minHeight: 2,
+                  value: _syncProgress,
+                  color: Theme.of(context).colorScheme.primary,
+                )
+              else
+                const SizedBox(height: 2),
+            ],
           ),
-        if (!_networkLoading) const SizedBox(height: 2),
-        Expanded(
-          child: _mode == _ChartMode.searching
-              ? _buildSearchResults()
-              : _buildChartContent(settings),
         ),
       ],
     );
@@ -609,8 +639,8 @@ class ChartPageState extends State<ChartPage>
 
   Widget _buildChartContent(SettingsState settings) {
     return ListView(
+      padding: EdgeInsets.only(top: _overlayHeight + 8),
       children: [
-        const SizedBox(height: 8),
         _buildTimeChips(),
         if (settings.showMarketClosed && _isMarketClosed()) ...[
           const SizedBox(height: 8),
@@ -919,7 +949,7 @@ class ChartPageState extends State<ChartPage>
     return SizedBox(
       height: height,
       child: Padding(
-        padding: const EdgeInsets.only(right: 8, top: 8),
+        padding: const EdgeInsets.only(left: 8, right: 8, top: 8),
         child: LineChart(
           LineChartData(
             clipData: const FlClipData.all(),
@@ -952,6 +982,7 @@ class ChartPageState extends State<ChartPage>
                     if (!indices.contains(i)) return const SizedBox();
                     return SideTitleWidget(
                       meta: meta,
+                      fitInside: SideTitleFitInsideData.fromTitleMeta(meta),
                       child: Text(
                         formatter.format(sortedDates[i]),
                         style: const TextStyle(
