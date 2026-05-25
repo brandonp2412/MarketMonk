@@ -42,8 +42,13 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
       builder: (context, snap) {
         final trades = snap.data ?? widget.summary.trades;
         final totalRealized = trades.fold(0.0, (sum, t) => sum + t.realizedPL);
+        final nativeCurr = symbolCurrency(widget.summary.symbol);
+        final nativeRate = allRatesFromUsd[nativeCurr] ?? 1.0;
+        // Convert realized P/L from native currency to USD so it can be added
+        // to unrealizedPL (which Position already expresses in USD).
+        final totalRealizedUsd = totalRealized / nativeRate;
         final unrealizedPL = position?.unrealizedPL ?? 0.0;
-        final totalGain = totalRealized + unrealizedPL;
+        final totalGain = totalRealizedUsd + unrealizedPL;
 
         return Scaffold(
           appBar: AppBar(
@@ -88,10 +93,15 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                           ),
                           _SummaryRow(
                             label: 'Avg cost',
-                            value: fmtCurrency(position.avgCost),
+                            // avgCost is in native currency — show without conversion.
+                            value: fmtNativeCurrency(
+                              position.avgCost,
+                              position.nativeCurrency,
+                            ),
                           ),
                           _SummaryRow(
                             label: 'Current value',
+                            // currentValue is already in USD (Position converts).
                             value: fmtCurrency(position.currentValue),
                           ),
                           _SummaryRow(
@@ -108,7 +118,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                           _SummaryRow(
                             label: 'Realized P/L',
                             value:
-                                '${totalRealized >= 0 ? '+' : ''}${fmtCurrency(totalRealized)}',
+                                '${totalRealized >= 0 ? '+' : ''}${fmtNativeCurrency(totalRealized, nativeCurr)}',
                             color: totalRealized >= 0
                                 ? Colors.green
                                 : Colors.redAccent,
@@ -117,6 +127,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                         if (position != null || trades.isNotEmpty)
                           _SummaryRow(
                             label: 'Total gain',
+                            // totalGain is in USD (both components converted above).
                             value:
                                 '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}',
                             color: totalGain >= 0
@@ -281,16 +292,16 @@ class _TradeTile extends StatelessWidget {
           ),
         ),
         subtitle: Text(
-          '${qty.toStringAsFixed(4)} @ ${fmtCurrency(trade.price)}  ·  $dateStr',
+          '${qty.toStringAsFixed(4)} @ ${fmtNativeCurrency(trade.price, symbolCurrency(trade.symbol))}  ·  $dateStr',
         ),
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(fmtCurrency(total)),
+            Text(fmtNativeCurrency(total, symbolCurrency(trade.symbol))),
             if (!isBuy && trade.realizedPL != 0)
               Text(
-                '${trade.realizedPL >= 0 ? '+' : ''}${fmtCurrency(trade.realizedPL)}',
+                '${trade.realizedPL >= 0 ? '+' : ''}${fmtNativeCurrency(trade.realizedPL, symbolCurrency(trade.symbol))}',
                 style: TextStyle(
                   fontSize: 11,
                   color:
@@ -407,10 +418,12 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
               controller: _price,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Price',
-                border: OutlineInputBorder(),
-                prefixText: '\$',
+                border: const OutlineInputBorder(),
+                prefixText: nativeCurrencySymbol(
+                  symbolCurrency(widget.trade.symbol),
+                ),
               ),
             ),
             if (!_isBuy) ...[
@@ -421,10 +434,12 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
                   decimal: true,
                   signed: true,
                 ),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Realized P/L',
-                  border: OutlineInputBorder(),
-                  prefixText: '\$',
+                  border: const OutlineInputBorder(),
+                  prefixText: nativeCurrencySymbol(
+                    symbolCurrency(widget.trade.symbol),
+                  ),
                 ),
               ),
             ],

@@ -134,7 +134,7 @@ class SettingsState extends ChangeNotifier {
 
   void _applyRate(String currencyCode, double rate) {
     currency = NumberFormat.simpleCurrency(name: currencyCode);
-    exchangeRate = rate;
+    allRatesFromUsd[currencyCode] = rate;
   }
 
   Future<void> _fetchAndApplyRate(String currencyCode) async {

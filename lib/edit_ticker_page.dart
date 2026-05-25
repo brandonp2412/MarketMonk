@@ -30,6 +30,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
   bool autoSetPrice = false;
   bool loading = false;
   bool _isSell = false;
+  String _nativeCurrency = 'USD';
   int years = 0;
   int months = 0;
   int days = 5;
@@ -221,13 +222,15 @@ class _EditTickerPageState extends State<EditTickerPage> {
                         setState(() {
                           loading = true;
                         });
+                        final tickerSymbol = value.split(' ').first;
                         try {
-                          await syncCandles(value.split(' ').first);
+                          await syncCandles(tickerSymbol);
                         } catch (error) {
                           if (context.mounted) toast(context, error.toString());
                         } finally {
                           setState(() {
                             loading = false;
+                            _nativeCurrency = symbolCurrency(tickerSymbol);
                           });
                         }
 
@@ -274,8 +277,9 @@ class _EditTickerPageState extends State<EditTickerPage> {
                             setState(() {
                               loading = true;
                             });
+                            final tickerSymbol = text.split(' ').first;
                             try {
-                              await syncCandles(text.split(' ').first);
+                              await syncCandles(tickerSymbol);
                             } catch (error) {
                               if (context.mounted)
                                 toast(context, error.toString());
@@ -283,6 +287,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                             } finally {
                               setState(() {
                                 loading = false;
+                                _nativeCurrency = symbolCurrency(tickerSymbol);
                               });
                             }
                           },
@@ -322,7 +327,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                     controller: price,
                     decoration: InputDecoration(
                       labelText: 'Price',
-                      prefix: Text(currency.currencySymbol),
+                      prefix: Text(nativeCurrencySymbol(_nativeCurrency)),
                     ),
                     onTap: () => selectAll(price),
                     keyboardType: TextInputType.number,

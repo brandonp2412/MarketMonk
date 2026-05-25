@@ -296,10 +296,12 @@ void main() {
               position: Position(
                 symbol: 'GME',
                 name: 'GameStop',
+                nativeCurrency: 'USD',
                 netShares: 5,
                 avgCost: 30.23,
                 currentPrice: 30.23,
                 firstBuyDate: DateTime.now(),
+                lastBuyDate: DateTime.now(),
               ),
               trades: [
                 Trade(

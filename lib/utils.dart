@@ -10,10 +10,37 @@ import 'package:market_monk/main.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
 
 var currency = NumberFormat.simpleCurrency();
-double exchangeRate = 1.0;
 
-/// Formats [v] in the user's display currency, applying the current exchange rate.
+/// USD-based rates for every supported currency (key=ISO code, value=units per 1 USD).
+/// Populated by SettingsState on startup and currency change.
+Map<String, double> allRatesFromUsd = {'USD': 1.0};
+
+/// The current USD → displayCurrency conversion factor.
+double get exchangeRate =>
+    allRatesFromUsd[currency.currencyName ?? 'USD'] ?? 1.0;
+
+/// In-memory cache: symbol → native ISO currency code (e.g. "INR" for .NS stocks).
+final Map<String, String> _symbolCurrencies = {};
+
+/// Returns the cached native currency for [symbol], defaulting to 'USD'.
+String symbolCurrency(String symbol) => _symbolCurrencies[symbol] ?? 'USD';
+
+/// Formats [v] (assumed to be in USD) in the user's display currency.
 String fmtCurrency(double v) => currency.format(v * exchangeRate);
+
+/// Formats [v] which is denominated in [nativeCurrency], converting it to the
+/// user's chosen display currency via the cached cross-rates.
+///
+/// Example: fmtNativeCurrency(1370.0, 'INR') with display=USD and
+/// allRatesFromUsd['INR']=84 → formats 1370/84 ≈ $16.31.
+String fmtNativeCurrency(double v, String nativeCurrency) {
+  final nativeRate = allRatesFromUsd[nativeCurrency] ?? 1.0;
+  return fmtCurrency(v / nativeRate);
+}
+
+/// Returns the [NumberFormat.currencySymbol] for [nativeCurrency].
+String nativeCurrencySymbol(String nativeCurrency) =>
+    NumberFormat.simpleCurrency(name: nativeCurrency).currencySymbol;
 
 void selectAll(TextEditingController controller) => controller.selection =
     TextSelection(baseOffset: 0, extentOffset: controller.text.length);
@@ -37,15 +64,25 @@ void toast(BuildContext context, String message, [SnackBarAction? action]) {
 class Position {
   final String symbol;
   final String name;
+
+  /// ISO 4217 currency that [avgCost] and [currentPrice] are denominated in.
+  final String nativeCurrency;
+
   final double netShares; // SUM(quantity) across all trades
-  final double avgCost; // weighted avg buy price
-  final double currentPrice; // latest candle close (or avgCost if no candles)
+
+  /// Weighted average buy price in [nativeCurrency].
+  final double avgCost;
+
+  /// Latest candle close price in [nativeCurrency].
+  final double currentPrice;
+
   final DateTime firstBuyDate;
   final DateTime lastBuyDate;
 
   Position({
     required this.symbol,
     required this.name,
+    required this.nativeCurrency,
     required this.netShares,
     required this.avgCost,
     required this.currentPrice,
@@ -53,10 +90,23 @@ class Position {
     required this.lastBuyDate,
   });
 
+  /// Conversion factor from [nativeCurrency] to USD.
+  /// All monetary getters below return values in USD so that
+  /// [fmtCurrency] (which applies USD → displayCurrency) works correctly.
+  double get _nativeToUsd => 1.0 / (allRatesFromUsd[nativeCurrency] ?? 1.0);
+
+  /// Percentage gain/loss relative to average cost. Currency-agnostic.
   double get change => safePercentChange(avgCost, currentPrice);
-  double get currentValue => netShares * currentPrice;
-  double get costBasis => netShares * avgCost;
-  double get unrealizedPL => netShares * (currentPrice - avgCost);
+
+  /// Current market value in USD.
+  double get currentValue => netShares * currentPrice * _nativeToUsd;
+
+  /// Total cost basis in USD.
+  double get costBasis => netShares * avgCost * _nativeToUsd;
+
+  /// Unrealised profit/loss in USD.
+  double get unrealizedPL =>
+      netShares * (currentPrice - avgCost) * _nativeToUsd;
 }
 
 /// Computes open positions from a list of trades and a symbol→latestPrice map.
@@ -98,6 +148,7 @@ List<Position> computePositions(
       Position(
         symbol: symbol,
         name: name,
+        nativeCurrency: symbolCurrency(symbol),
         netShares: netShares,
         avgCost: avgCost,
         currentPrice: currentPrice,
@@ -265,6 +316,10 @@ Future<void> syncCandles(String symbol, {Database? database}) async {
   if (_syncedSymbols.contains(guardKey)) return;
   _syncedSymbols.add(guardKey); // mark before async gap to prevent races
 
+  // Lazily populate this symbol's native currency and its exchange rate.
+  // Fires in the background so it doesn't block candle loading.
+  unawaited(_fetchSymbolCurrencyAndRate(symbol));
+
   try {
     var latest = await (d.candles.select()
           ..where((tbl) => tbl.symbol.equals(symbol))
@@ -292,6 +347,60 @@ Future<void> syncCandles(String symbol, {Database? database}) async {
     // Remove from guard on failure so next attempt can retry
     _syncedSymbols.remove(guardKey);
     rethrow;
+  }
+}
+
+/// Fetches the native currency for [symbol] from the Yahoo Finance chart API,
+/// then — only if that currency differs from USD — lazily fetches its USD-based
+/// exchange rate from Frankfurter and stores it in [allRatesFromUsd].
+///
+/// Both results are cached in-memory so repeat calls are free.
+Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
+  if (_symbolCurrencies.containsKey(symbol)) return;
+
+  try {
+    final uri = Uri.parse(
+      'https://query1.finance.yahoo.com/v8/finance/chart/$symbol'
+      '?interval=1d&range=1d',
+    );
+    final response = await http.get(uri);
+    if (response.statusCode != 200) return;
+
+    final data = json.decode(response.body) as Map<String, dynamic>;
+    final result =
+        ((data['chart'] as Map<String, dynamic>?)?['result'] as List?)?.first
+            as Map<String, dynamic>?;
+    final curr =
+        (result?['meta'] as Map<String, dynamic>?)?['currency'] as String?;
+    if (curr == null || curr.isEmpty) return;
+
+    _symbolCurrencies[symbol] = curr;
+
+    // Only hit Frankfurter when the native currency is not already known.
+    if (!allRatesFromUsd.containsKey(curr) && curr != 'USD') {
+      await _fetchAndCacheRate(curr);
+    }
+  } catch (_) {
+    // Silently ignore — positions fall back to treating native as USD.
+  }
+}
+
+/// Fetches the USD → [currencyCode] rate from Frankfurter and stores it in
+/// [allRatesFromUsd]. Called lazily, only for currencies we haven't seen yet.
+Future<void> _fetchAndCacheRate(String currencyCode) async {
+  try {
+    final uri = Uri.parse(
+      'https://api.frankfurter.app/latest?from=USD&to=$currencyCode',
+    );
+    final response = await http.get(uri);
+    if (response.statusCode != 200) return;
+
+    final data = json.decode(response.body) as Map<String, dynamic>;
+    final rate = ((data['rates'] as Map<String, dynamic>)[currencyCode] as num?)
+        ?.toDouble();
+    if (rate != null) allRatesFromUsd[currencyCode] = rate;
+  } catch (_) {
+    // Silently ignore — the position falls back to treating native as USD.
   }
 }
 
