@@ -6,6 +6,7 @@ import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/trade_history_page.dart';
 import 'package:market_monk/utils.dart';
+import 'package:provider/provider.dart';
 
 /// A summary of a symbol: open position (if any) + full trade history.
 class SymbolSummary {
@@ -40,6 +41,7 @@ class HoldingsPageState extends State<HoldingsPage>
   final _search = TextEditingController();
   List<SymbolSummary> _summaries = [];
   late Stream<List<SymbolSummary>> _stream;
+  String _lastAccount = '';
 
   bool _selecting = false;
   final Set<String> _selectedSymbols = {};
@@ -50,6 +52,21 @@ class HoldingsPageState extends State<HoldingsPage>
     _stream = _buildStream();
     _preload();
     _syncAllInBackground();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final account = context.watch<AccountManager>().activeAccount;
+    if (account != _lastAccount) {
+      _lastAccount = account;
+      setState(() {
+        _stream = _buildStream();
+        _summaries = [];
+      });
+      _preload();
+      _syncAllInBackground();
+    }
   }
 
   /// Pre-loads data immediately via get() so the UI has something to show
