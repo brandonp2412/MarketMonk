@@ -106,6 +106,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
 
     final candles =
         snapshot.data!.map((tickerCandle) => tickerCandle.candle).toList();
+    if (candles.isEmpty) return const SizedBox();
     List<FlSpot> spots = [];
     for (var index = 0; index < candles.length; index++) {
       spots.add(FlSpot(index.toDouble(), candles[index].close.value));
