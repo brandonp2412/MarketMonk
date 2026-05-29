@@ -1,0 +1,5 @@
+• Fix tooltips being obscured
+• Fix correct VirusTotal URL extraction in release workflow
+• Fix correct currency conversion for non-USD stocks (#25)
+• Fix float search bar over chart so tooltips aren't obscured
+• Fix refresh HoldingsPage when active account changes
