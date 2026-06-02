@@ -54,8 +54,9 @@ class Database extends _$Database {
         }
 
         if (kDebugMode) {
-          final wrongForeignKeys =
-              await customSelect('PRAGMA foreign_key_check').get();
+          final wrongForeignKeys = await customSelect(
+            'PRAGMA foreign_key_check',
+          ).get();
           assert(
             wrongForeignKeys.isEmpty,
             '${wrongForeignKeys.map((e) => e.data)}',
@@ -137,7 +138,8 @@ class Database extends _$Database {
 
   static final _upgrade = migrationSteps(
     from1To2: (m, schema) async {
-      await m.alterTable(TableMigration(schema.tickers));
+      await m.alterTable(
+          TableMigration(schema.tickers)); // ignore: experimental_member_use
     },
     from2To3: (Migrator m, Schema3 schema) async {
       await schema.tickers.deleteAll();
@@ -157,7 +159,8 @@ class Database extends _$Database {
       await m.createTable(schema.candles);
     },
     from6To7: (Migrator m, Schema7 schema) async {
-      await m.alterTable(TableMigration(schema.tickers));
+      await m.alterTable(
+          TableMigration(schema.tickers)); // ignore: experimental_member_use
     },
     from7To8: (Migrator m, Schema8 schema) async {
       await m.createTable(schema.trades);

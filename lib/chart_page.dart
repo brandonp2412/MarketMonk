@@ -414,7 +414,10 @@ class ChartPageState extends State<ChartPage>
                 db.candles.date.isBiggerThanValue(after),
           )
           ..orderBy([
-            OrderingTerm(expression: db.candles.date, mode: OrderingMode.asc),
+            OrderingTerm(
+              expression: db.candles.date,
+              mode: OrderingMode.asc,
+            ),
           ])
           ..groupBy(groupBy))
         .watch()
@@ -561,10 +564,7 @@ class ChartPageState extends State<ChartPage>
     );
 
     if (_searchResults.isEmpty) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [useAnywayTile],
-      );
+      return Column(mainAxisSize: MainAxisSize.min, children: [useAnywayTile]);
     }
 
     return ListView.builder(
@@ -696,10 +696,7 @@ class ChartPageState extends State<ChartPage>
         builder: (context, snapshot) =>
             _buildStockChart(context, snapshot, settings),
       ),
-      StreamBuilder(
-        stream: _stockStream,
-        builder: _buildStockSummary,
-      ),
+      StreamBuilder(stream: _stockStream, builder: _buildStockSummary),
     ];
   }
 
@@ -736,10 +733,7 @@ class ChartPageState extends State<ChartPage>
 
     return SizedBox(
       height: height,
-      child: TickerLine(
-        dates: candles.map((c) => c.date.value),
-        spots: spots,
-      ),
+      child: TickerLine(dates: candles.map((c) => c.date.value), spots: spots),
     );
   }
 
@@ -775,10 +769,9 @@ class ChartPageState extends State<ChartPage>
                   ),
                   Text(
                     '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge!
-                        .copyWith(color: color),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleLarge!.copyWith(color: color),
                   ),
                 ],
               ),
@@ -1000,10 +993,10 @@ class ChartPageState extends State<ChartPage>
             lineTouchData: LineTouchData(
               touchTooltipData: LineTouchTooltipData(
                 fitInsideHorizontally: true,
-                getTooltipColor: (_) => Theme.of(context)
-                    .colorScheme
-                    .surface
-                    .withValues(alpha: 0.9),
+                fitInsideVertically: true,
+                getTooltipColor: (_) => Theme.of(
+                  context,
+                ).colorScheme.surface.withValues(alpha: 0.9),
                 getTooltipItems: (touchedSpots) {
                   return touchedSpots.map((spot) {
                     final i = spot.x.toInt();
@@ -1014,16 +1007,17 @@ class ChartPageState extends State<ChartPage>
                         ? visibleKeys[spot.barIndex]
                         : '';
                     final accountIdx = accounts.indexOf(accountName);
-                    final spotColor = _accountColors[
-                        accountIdx.clamp(0, _accountColors.length - 1)];
+                    final spotColor = _accountColors[accountIdx.clamp(
+                      0,
+                      _accountColors.length - 1,
+                    )];
                     final label =
                         visibleKeys.length > 1 ? '$accountName\n' : '';
                     return LineTooltipItem(
                       '$label${fmtCurrency(spot.y)}\n$date',
-                      Theme.of(context)
-                          .textTheme
-                          .bodySmall!
-                          .copyWith(color: spotColor),
+                      Theme.of(
+                        context,
+                      ).textTheme.bodySmall!.copyWith(color: spotColor),
                     );
                   }).toList();
                 },
@@ -1048,12 +1042,7 @@ class ChartPageState extends State<ChartPage>
       child: Column(
         children: [
           for (final entry in allSeries.entries)
-            _buildAccountSummaryRow(
-              context,
-              accounts,
-              entry.key,
-              entry.value,
-            ),
+            _buildAccountSummaryRow(context, accounts, entry.key, entry.value),
           const SizedBox(height: 8),
           Wrap(
             alignment: WrapAlignment.center,
@@ -1145,10 +1134,9 @@ class ChartPageState extends State<ChartPage>
                       ),
                       Text(
                         '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium!
-                            .copyWith(color: returnColor),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleMedium!.copyWith(color: returnColor),
                       ),
                     ],
                   ),

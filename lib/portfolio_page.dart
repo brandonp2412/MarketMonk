@@ -138,7 +138,9 @@ class PortfolioPageState extends State<PortfolioPage>
     await file.writeAsString(buf.toString());
     if (!context.mounted) return;
     await Share.shareXFiles(
-      [XFile(file.path, mimeType: 'text/csv')],
+      [
+        XFile(file.path, mimeType: 'text/csv'),
+      ],
       subject: 'Portfolio Positions',
     );
   }
@@ -556,11 +558,7 @@ class _LegendTile extends StatelessWidget {
         decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       ),
       title: Text(symbol),
-      subtitle: Text(
-        name,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
+      subtitle: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.end,

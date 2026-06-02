@@ -11,11 +11,7 @@ class TickerLine extends StatelessWidget {
   final List<FlSpot> spots;
   final Iterable<DateTime> dates;
 
-  const TickerLine({
-    super.key,
-    required this.spots,
-    required this.dates,
-  });
+  const TickerLine({super.key, required this.spots, required this.dates});
 
   Widget getBottomTitles(
     double value,
@@ -23,10 +19,7 @@ class TickerLine extends StatelessWidget {
     BuildContext context,
     DateFormat formatter,
   ) {
-    const style = TextStyle(
-      fontWeight: FontWeight.bold,
-      fontSize: 16,
-    );
+    const style = TextStyle(fontWeight: FontWeight.bold, fontSize: 16);
     Widget text;
 
     double screenWidth = MediaQuery.of(context).size.width;
@@ -93,9 +86,7 @@ class TickerLine extends StatelessWidget {
               curveSmoothness: settings.curveSmoothness,
               preventCurveOverShooting: true,
               barWidth: 3,
-              dotData: const FlDotData(
-                show: false,
-              ),
+              dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(
                 show: true,
                 gradient: LinearGradient(
@@ -110,6 +101,7 @@ class TickerLine extends StatelessWidget {
           lineTouchData: LineTouchData(
             touchTooltipData: LineTouchTooltipData(
               fitInsideHorizontally: true,
+              fitInsideVertically: true,
               getTooltipColor: (touchedSpot) =>
                   Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
               getTooltipItems: (touchedSpots) =>
@@ -132,10 +124,7 @@ class TickerLine extends StatelessWidget {
     final date = formatter.format(dateStr);
 
     return [
-      LineTooltipItem(
-        '$price\n$date',
-        Theme.of(context).textTheme.bodyLarge!,
-      ),
+      LineTooltipItem('$price\n$date', Theme.of(context).textTheme.bodyLarge!),
     ];
   }
 }
