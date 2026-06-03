@@ -42,10 +42,8 @@ class _SettingsPageState extends State<SettingsPage> {
             isExpanded: true,
             items: supportedBrokers
                 .map(
-                  (parser) => DropdownMenuItem(
-                    value: parser,
-                    child: Text(parser.name),
-                  ),
+                  (parser) =>
+                      DropdownMenuItem(value: parser, child: Text(parser.name)),
                 )
                 .toList(),
             onChanged: (value) {
@@ -109,8 +107,9 @@ class _SettingsPageState extends State<SettingsPage> {
                     (t) => ListTile(
                       dense: true,
                       title: Text('${t.symbol} — ${t.tradeType.toUpperCase()}'),
-                      subtitle:
-                          Text(t.tradeDate.toIso8601String().substring(0, 10)),
+                      subtitle: Text(
+                        t.tradeDate.toIso8601String().substring(0, 10),
+                      ),
                       trailing: Text(
                         '${t.quantity.abs().toStringAsFixed(2)} @ \$${t.price.toStringAsFixed(2)}',
                       ),
@@ -223,9 +222,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final settings = context.watch<SettingsState>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Settings"),
-      ),
+      appBar: AppBar(title: const Text("Settings")),
       body: ListView(
         children: [
           // ── Appearance ──────────────────────────────────────────────────
@@ -349,10 +346,9 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               Slider(
                 value: settings.curveSmoothness,
-                inactiveColor: Theme.of(context)
-                    .colorScheme
-                    .primary
-                    .withValues(alpha: 0.24),
+                inactiveColor: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.24),
                 onChanged: (value) {
                   settings.setCurveSmoothness(value);
                 },
@@ -384,9 +380,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ListTile(
             leading: const Icon(Icons.manage_accounts),
             title: const Text('Manage accounts'),
-            subtitle: Text(
-              context.watch<AccountManager>().activeAccount,
-            ),
+            subtitle: Text(context.watch<AccountManager>().activeAccount),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.push(
               context,
@@ -507,8 +501,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   0x00,
                 ];
                 final isValid = header.length == 16 &&
-                    List.generate(16, (i) => header[i] == sqliteMagic[i])
-                        .every((b) => b);
+                    List.generate(
+                      16,
+                      (i) => header[i] == sqliteMagic[i],
+                    ).every((b) => b);
                 if (!isValid) {
                   if (!context.mounted) return;
                   toast(context, 'Selected file is not a valid database');

@@ -23,19 +23,18 @@ Future<Trade> _insertTrade(
   DateTime? tradeDate,
   double realizedPL = 0.0,
   double commission = 2.0,
-}) =>
-    db.trades.insertReturning(
-      TradesCompanion.insert(
-        symbol: symbol,
-        name: name,
-        quantity: quantity,
-        price: price,
-        tradeType: tradeType,
-        tradeDate: tradeDate ?? DateTime(2025, 3, 1),
-        realizedPL: Value(realizedPL),
-        commission: Value(commission),
-      ),
-    );
+}) => db.trades.insertReturning(
+  TradesCompanion.insert(
+    symbol: symbol,
+    name: name,
+    quantity: quantity,
+    price: price,
+    tradeType: tradeType,
+    tradeDate: tradeDate ?? DateTime(2025, 3, 1),
+    realizedPL: Value(realizedPL),
+    commission: Value(commission),
+  ),
+);
 
 void main() {
   setUpAll(_overrideSqlite3);
@@ -56,22 +55,24 @@ void main() {
       expect(inserted.price, closeTo(150.0, 0.001));
     });
 
-    test('defaults: realizedPL and commission have sensible defaults',
-        () async {
-      final inserted = await db.trades.insertReturning(
-        TradesCompanion.insert(
-          symbol: 'GOOG',
-          name: 'Alphabet',
-          quantity: 1,
-          price: 200.0,
-          tradeType: 'open',
-          tradeDate: DateTime(2025, 1, 1),
-        ),
-      );
+    test(
+      'defaults: realizedPL and commission have sensible defaults',
+      () async {
+        final inserted = await db.trades.insertReturning(
+          TradesCompanion.insert(
+            symbol: 'GOOG',
+            name: 'Alphabet',
+            quantity: 1,
+            price: 200.0,
+            tradeType: 'open',
+            tradeDate: DateTime(2025, 1, 1),
+          ),
+        );
 
-      expect(inserted.realizedPL, equals(0.0));
-      expect(inserted.commission, equals(0.0));
-    });
+        expect(inserted.realizedPL, equals(0.0));
+        expect(inserted.commission, equals(0.0));
+      },
+    );
 
     test('multiple trades for the same symbol have distinct IDs', () async {
       final a = await _insertTrade(db, quantity: 10, tradeType: 'open');
@@ -99,12 +100,13 @@ void main() {
     test('update modifies only specified fields', () async {
       final t = await _insertTrade(db, price: 150.0);
 
-      await (db.trades.update()..where((r) => r.id.equals(t.id)))
-          .write(const TradesCompanion(price: Value(175.0)));
+      await (db.trades.update()..where((r) => r.id.equals(t.id))).write(
+        const TradesCompanion(price: Value(175.0)),
+      );
 
-      final updated = await (db.trades.select()
-            ..where((r) => r.id.equals(t.id)))
-          .getSingle();
+      final updated =
+          await (db.trades.select()..where((r) => r.id.equals(t.id)))
+              .getSingle();
 
       expect(updated.price, closeTo(175.0, 0.001));
       expect(
@@ -148,19 +150,20 @@ void main() {
     tearDown(() => db.close());
 
     test('filter by symbol returns only that symbol\'s trades', () async {
-      final aaplTrades = await (db.trades.select()
-            ..where((t) => t.symbol.equals('AAPL')))
-          .get();
+      final aaplTrades =
+          await (db.trades.select()..where((t) => t.symbol.equals('AAPL')))
+              .get();
 
       expect(aaplTrades, hasLength(2));
       expect(aaplTrades.every((t) => t.symbol == 'AAPL'), isTrue);
     });
 
     test('ordering by tradeDate descending returns newest first', () async {
-      final ordered = await (db.trades.select()
-            ..where((t) => t.symbol.equals('AAPL'))
-            ..orderBy([(t) => OrderingTerm.desc(t.tradeDate)]))
-          .get();
+      final ordered =
+          await (db.trades.select()
+                ..where((t) => t.symbol.equals('AAPL'))
+                ..orderBy([(t) => OrderingTerm.desc(t.tradeDate)]))
+              .get();
 
       expect(
         ordered.first.tradeDate.month,
@@ -171,9 +174,9 @@ void main() {
     });
 
     test('total realizedPL across symbol can be summed', () async {
-      final aaplTrades = await (db.trades.select()
-            ..where((t) => t.symbol.equals('AAPL')))
-          .get();
+      final aaplTrades =
+          await (db.trades.select()..where((t) => t.symbol.equals('AAPL')))
+              .get();
 
       final totalPL = aaplTrades.fold(0.0, (sum, t) => sum + t.realizedPL);
       expect(totalPL, closeTo(300.0, 0.01));
@@ -186,22 +189,24 @@ void main() {
     setUp(() => db = _openDb());
     tearDown(() => db.close());
 
-    test('can insert trade for any symbol without a prior dependency',
-        () async {
-      final inserted = await _insertTrade(db, symbol: 'CLOSED_POS');
-      expect(inserted.symbol, 'CLOSED_POS');
+    test(
+      'can insert trade for any symbol without a prior dependency',
+      () async {
+        final inserted = await _insertTrade(db, symbol: 'CLOSED_POS');
+        expect(inserted.symbol, 'CLOSED_POS');
 
-      final all = await db.trades.select().get();
-      expect(all, hasLength(1));
-    });
+        final all = await db.trades.select().get();
+        expect(all, hasLength(1));
+      },
+    );
 
     test('can insert multiple trades for the same symbol', () async {
       await _insertTrade(db, symbol: 'AAPL', quantity: 10);
       await _insertTrade(db, symbol: 'AAPL', quantity: -5, tradeType: 'close');
 
-      final trades = await (db.trades.select()
-            ..where((t) => t.symbol.equals('AAPL')))
-          .get();
+      final trades =
+          await (db.trades.select()..where((t) => t.symbol.equals('AAPL')))
+              .get();
       expect(trades, hasLength(2));
     });
   });
@@ -212,16 +217,18 @@ void main() {
     setUp(() => db = _openDb());
     tearDown(() => db.close());
 
-    test('negative realizedPL (losing trade) is stored and retrieved',
-        () async {
-      final t = await _insertTrade(
-        db,
-        quantity: -10,
-        tradeType: 'close',
-        realizedPL: -250.0,
-      );
-      expect(t.realizedPL, closeTo(-250.0, 0.001));
-    });
+    test(
+      'negative realizedPL (losing trade) is stored and retrieved',
+      () async {
+        final t = await _insertTrade(
+          db,
+          quantity: -10,
+          tradeType: 'close',
+          realizedPL: -250.0,
+        );
+        expect(t.realizedPL, closeTo(-250.0, 0.001));
+      },
+    );
 
     test('zero realizedPL on open trades stays zero', () async {
       final t = await _insertTrade(db, tradeType: 'open', realizedPL: 0.0);

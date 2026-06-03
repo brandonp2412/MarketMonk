@@ -12,9 +12,7 @@ Database openDb() => Database.connect(NativeDatabase.memory());
 /// On Linux the versioned library name is libsqlite3.so.0 — load it
 /// explicitly so tests run without the -dev symlink installed.
 void _overrideSqlite3() {
-  open.overrideForAll(
-    () => DynamicLibrary.open('libsqlite3.so.0'),
-  );
+  open.overrideForAll(() => DynamicLibrary.open('libsqlite3.so.0'));
 }
 
 Future<Trade> _insertTrade(
@@ -24,17 +22,16 @@ Future<Trade> _insertTrade(
   double quantity = 10,
   double price = 150.0,
   String tradeType = 'open',
-}) =>
-    db.trades.insertReturning(
-      TradesCompanion.insert(
-        symbol: symbol,
-        name: name,
-        quantity: quantity,
-        price: price,
-        tradeType: tradeType,
-        tradeDate: DateTime(2025, 3, 1),
-      ),
-    );
+}) => db.trades.insertReturning(
+  TradesCompanion.insert(
+    symbol: symbol,
+    name: name,
+    quantity: quantity,
+    price: price,
+    tradeType: tradeType,
+    tradeDate: DateTime(2025, 3, 1),
+  ),
+);
 
 void main() {
   setUpAll(_overrideSqlite3);
@@ -80,8 +77,9 @@ void main() {
       await _insertTrade(db, symbol: 'MSFT', quantity: 5);
 
       // Edit ONLY the first trade
-      await (db.trades.update()..where((t) => t.id.equals(first.id)))
-          .write(const TradesCompanion(quantity: Value(99)));
+      await (db.trades.update()..where((t) => t.id.equals(first.id))).write(
+        const TradesCompanion(quantity: Value(99)),
+      );
 
       final rows = await db.trades.select().get();
       expect(rows.length, equals(2));

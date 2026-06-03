@@ -9,41 +9,75 @@ class Tickers extends Table with TableInfo<Tickers, TickersData> {
   final String? _alias;
   Tickers(this.attachedDatabase, [this._alias]);
   late final GeneratedColumn<int> id = GeneratedColumn<int>(
-      'id', aliasedName, false,
-      hasAutoIncrement: true,
-      type: DriftSqlType.int,
-      requiredDuringInsert: false,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
   late final GeneratedColumn<String> symbol = GeneratedColumn<String>(
-      'symbol', aliasedName, false,
-      type: DriftSqlType.string,
-      requiredDuringInsert: true,
-      defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'));
+    'symbol',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
+  );
   late final GeneratedColumn<String> name = GeneratedColumn<String>(
-      'name', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
   late final GeneratedColumn<double> change = GeneratedColumn<double>(
-      'change', aliasedName, false,
-      type: DriftSqlType.double, requiredDuringInsert: true);
+    'change',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
   late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
-      'created_at', aliasedName, false,
-      type: DriftSqlType.dateTime,
-      requiredDuringInsert: false,
-      defaultValue: const CustomExpression(
-          'CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER)'));
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: const CustomExpression(
+      'CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER)',
+    ),
+  );
   late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
-      'updated_at', aliasedName, false,
-      type: DriftSqlType.dateTime,
-      requiredDuringInsert: false,
-      defaultValue: const CustomExpression(
-          'CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER)'));
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: const CustomExpression(
+      'CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER)',
+    ),
+  );
   late final GeneratedColumn<double> amount = GeneratedColumn<double>(
-      'amount', aliasedName, false,
-      type: DriftSqlType.double, requiredDuringInsert: true);
+    'amount',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
   @override
-  List<GeneratedColumn> get $columns =>
-      [id, symbol, name, change, createdAt, updatedAt, amount];
+  List<GeneratedColumn> get $columns => [
+    id,
+    symbol,
+    name,
+    change,
+    createdAt,
+    updatedAt,
+    amount,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -55,20 +89,34 @@ class Tickers extends Table with TableInfo<Tickers, TickersData> {
   TickersData map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return TickersData(
-      id: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
-      symbol: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}symbol'])!,
-      name: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
-      change: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}change'])!,
-      createdAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
-      updatedAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
-      amount: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}amount'])!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      symbol: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}symbol'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      change: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}change'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      amount: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}amount'],
+      )!,
     );
   }
 
@@ -86,14 +134,15 @@ class TickersData extends DataClass implements Insertable<TickersData> {
   final DateTime createdAt;
   final DateTime updatedAt;
   final double amount;
-  const TickersData(
-      {required this.id,
-      required this.symbol,
-      required this.name,
-      required this.change,
-      required this.createdAt,
-      required this.updatedAt,
-      required this.amount});
+  const TickersData({
+    required this.id,
+    required this.symbol,
+    required this.name,
+    required this.change,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.amount,
+  });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -119,8 +168,10 @@ class TickersData extends DataClass implements Insertable<TickersData> {
     );
   }
 
-  factory TickersData.fromJson(Map<String, dynamic> json,
-      {ValueSerializer? serializer}) {
+  factory TickersData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return TickersData(
       id: serializer.fromJson<int>(json['id']),
@@ -146,23 +197,23 @@ class TickersData extends DataClass implements Insertable<TickersData> {
     };
   }
 
-  TickersData copyWith(
-          {int? id,
-          String? symbol,
-          String? name,
-          double? change,
-          DateTime? createdAt,
-          DateTime? updatedAt,
-          double? amount}) =>
-      TickersData(
-        id: id ?? this.id,
-        symbol: symbol ?? this.symbol,
-        name: name ?? this.name,
-        change: change ?? this.change,
-        createdAt: createdAt ?? this.createdAt,
-        updatedAt: updatedAt ?? this.updatedAt,
-        amount: amount ?? this.amount,
-      );
+  TickersData copyWith({
+    int? id,
+    String? symbol,
+    String? name,
+    double? change,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    double? amount,
+  }) => TickersData(
+    id: id ?? this.id,
+    symbol: symbol ?? this.symbol,
+    name: name ?? this.name,
+    change: change ?? this.change,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    amount: amount ?? this.amount,
+  );
   TickersData copyWithCompanion(TickersCompanion data) {
     return TickersData(
       id: data.id.present ? data.id.value : this.id,
@@ -230,10 +281,10 @@ class TickersCompanion extends UpdateCompanion<TickersData> {
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     required double amount,
-  })  : symbol = Value(symbol),
-        name = Value(name),
-        change = Value(change),
-        amount = Value(amount);
+  }) : symbol = Value(symbol),
+       name = Value(name),
+       change = Value(change),
+       amount = Value(amount);
   static Insertable<TickersData> custom({
     Expression<int>? id,
     Expression<String>? symbol,
@@ -254,14 +305,15 @@ class TickersCompanion extends UpdateCompanion<TickersData> {
     });
   }
 
-  TickersCompanion copyWith(
-      {Value<int>? id,
-      Value<String>? symbol,
-      Value<String>? name,
-      Value<double>? change,
-      Value<DateTime>? createdAt,
-      Value<DateTime>? updatedAt,
-      Value<double>? amount}) {
+  TickersCompanion copyWith({
+    Value<int>? id,
+    Value<String>? symbol,
+    Value<String>? name,
+    Value<double>? change,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<double>? amount,
+  }) {
     return TickersCompanion(
       id: id ?? this.id,
       symbol: symbol ?? this.symbol,

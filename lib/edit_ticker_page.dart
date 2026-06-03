@@ -50,8 +50,11 @@ class _EditTickerPageState extends State<EditTickerPage> {
     if (symbol.text.isEmpty) return;
 
     final now = DateTime.now();
-    final after =
-        DateTime(now.year - years, now.month - months, now.day - days - 1);
+    final after = DateTime(
+      now.year - years,
+      now.month - months,
+      now.day - days - 1,
+    );
     const weekExpression = CustomExpression<String>(
       "STRFTIME('%Y-%m-%W', DATE(\"date\", 'unixepoch', 'localtime'))",
     );
@@ -59,22 +62,17 @@ class _EditTickerPageState extends State<EditTickerPage> {
     if (years > 0 || months > 5) groupBy = [weekExpression];
 
     stream = (db.selectOnly(db.candles)
-          ..addColumns([
-            db.candles.date,
-            db.candles.close,
-          ])
+          ..addColumns([db.candles.date, db.candles.close])
           ..where(
             db.candles.symbol.equals(symbol.text.split(' ').first) &
                 db.candles.date.isBiggerOrEqualValue(after),
           )
-          ..orderBy(
-            [
-              OrderingTerm(
-                expression: db.candles.date,
-                mode: OrderingMode.asc,
-              ),
-            ],
-          )
+          ..orderBy([
+            OrderingTerm(
+              expression: db.candles.date,
+              mode: OrderingMode.asc,
+            ),
+          ])
           ..groupBy(groupBy))
         .watch()
         .map(
@@ -195,9 +193,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Add trade"),
-      ),
+      appBar: AppBar(title: const Text("Add trade")),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: material.Column(
@@ -211,8 +207,9 @@ class _EditTickerPageState extends State<EditTickerPage> {
                       optionsBuilder:
                           (TextEditingValue textEditingValue) async {
                         final api = YahooFinanceApi();
-                        final results =
-                            await api.searchTickers(textEditingValue.text);
+                        final results = await api.searchTickers(
+                          textEditingValue.text,
+                        );
                         return results.map(
                           (result) => '${result.symbol} (${result.longname})',
                         );
@@ -254,7 +251,10 @@ class _EditTickerPageState extends State<EditTickerPage> {
                         );
                         if (loading)
                           leading = const Padding(
-                            padding: EdgeInsets.only(left: 16.0, right: 8.0),
+                            padding: EdgeInsets.only(
+                              left: 16.0,
+                              right: 8.0,
+                            ),
                             child: SizedBox(
                               height: 24,
                               width: 24,
@@ -288,7 +288,9 @@ class _EditTickerPageState extends State<EditTickerPage> {
                             } finally {
                               setState(() {
                                 loading = false;
-                                _nativeCurrency = symbolCurrency(tickerSymbol);
+                                _nativeCurrency = symbolCurrency(
+                                  tickerSymbol,
+                                );
                               });
                             }
                           },
@@ -469,18 +471,10 @@ class _EditTickerPageState extends State<EditTickerPage> {
             child: Row(
               children: [
                 percentChange >= 0
-                    ? const Icon(
-                        Icons.arrow_upward,
-                        color: Colors.green,
-                      )
-                    : const Icon(
-                        Icons.arrow_downward,
-                        color: Colors.red,
-                      ),
+                    ? const Icon(Icons.arrow_upward, color: Colors.green)
+                    : const Icon(Icons.arrow_downward, color: Colors.red),
                 const SizedBox(width: 4),
-                Text(
-                  "${percentChange.toStringAsFixed(2)}%",
-                ),
+                Text("${percentChange.toStringAsFixed(2)}%"),
               ],
             ),
           );

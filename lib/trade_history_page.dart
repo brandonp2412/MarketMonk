@@ -245,10 +245,7 @@ class _SummaryRow extends StatelessWidget {
           Text(label, style: Theme.of(context).textTheme.bodyMedium),
           Text(
             value,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
+            style: TextStyle(fontWeight: FontWeight.w600, color: color),
           ),
         ],
       ),
@@ -338,9 +335,7 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
     _qty = TextEditingController(
       text: widget.trade.quantity.abs().toStringAsFixed(4),
     );
-    _price = TextEditingController(
-      text: widget.trade.price.toStringAsFixed(2),
-    );
+    _price = TextEditingController(text: widget.trade.price.toStringAsFixed(2));
     _realizedPL = TextEditingController(
       text: widget.trade.realizedPL.toStringAsFixed(2),
     );
@@ -406,8 +401,9 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
             const SizedBox(height: 16),
             TextField(
               controller: _qty,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               decoration: const InputDecoration(
                 labelText: 'Quantity',
                 border: OutlineInputBorder(),
@@ -416,8 +412,9 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
             const SizedBox(height: 12),
             TextField(
               controller: _price,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               decoration: InputDecoration(
                 labelText: 'Price',
                 border: const OutlineInputBorder(),
@@ -459,10 +456,7 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancel'),
         ),
-        FilledButton(
-          onPressed: _save,
-          child: const Text('Save'),
-        ),
+        FilledButton(onPressed: _save, child: const Text('Save')),
       ],
     );
   }

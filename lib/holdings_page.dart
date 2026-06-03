@@ -178,9 +178,7 @@ class HoldingsPageState extends State<HoldingsPage>
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              'Delete',
-            ),
+            child: const Text('Delete'),
           ),
         ],
       ),
@@ -211,9 +209,7 @@ class HoldingsPageState extends State<HoldingsPage>
           PopupMenuItem(
             onTap: _toggleSelectAll,
             child: ListTile(
-              leading: Icon(
-                allSelected ? Icons.deselect : Icons.select_all,
-              ),
+              leading: Icon(allSelected ? Icons.deselect : Icons.select_all),
               title: Text(allSelected ? 'Deselect all' : 'Select all'),
             ),
           ),
@@ -306,9 +302,7 @@ class HoldingsPageState extends State<HoldingsPage>
       floatingActionButton: _selecting
           ? FloatingActionButton.extended(
               onPressed: () => _deleteSelected(context),
-              label: Text(
-                'Delete (${_selectedSymbols.length})',
-              ),
+              label: Text('Delete (${_selectedSymbols.length})'),
               icon: const Icon(Icons.delete),
             )
           : FloatingActionButton.extended(
@@ -456,8 +450,9 @@ class _SymbolTile extends StatelessWidget {
 
     return ListTile(
       selected: isSelected,
-      selectedTileColor:
-          Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+      selectedTileColor: Theme.of(
+        context,
+      ).colorScheme.primaryContainer.withValues(alpha: 0.3),
       leading: leadingWidget,
       title: Text(summary.symbol),
       subtitle: position != null

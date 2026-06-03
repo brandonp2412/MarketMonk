@@ -9,51 +9,90 @@ class Candles extends Table with TableInfo<Candles, CandlesData> {
   final String? _alias;
   Candles(this.attachedDatabase, [this._alias]);
   late final GeneratedColumn<int> id = GeneratedColumn<int>(
-      'id', aliasedName, false,
-      hasAutoIncrement: true,
-      type: DriftSqlType.int,
-      requiredDuringInsert: false,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
   late final GeneratedColumn<String> symbol = GeneratedColumn<String>(
-      'symbol', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
+    'symbol',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
   late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
-      'date', aliasedName, false,
-      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+    'date',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
   late final GeneratedColumn<double> open = GeneratedColumn<double>(
-      'open', aliasedName, false,
-      type: DriftSqlType.double,
-      requiredDuringInsert: false,
-      defaultValue: const CustomExpression('-1.0'));
+    'open',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const CustomExpression('-1.0'),
+  );
   late final GeneratedColumn<double> high = GeneratedColumn<double>(
-      'high', aliasedName, false,
-      type: DriftSqlType.double,
-      requiredDuringInsert: false,
-      defaultValue: const CustomExpression('-1.0'));
+    'high',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const CustomExpression('-1.0'),
+  );
   late final GeneratedColumn<double> low = GeneratedColumn<double>(
-      'low', aliasedName, false,
-      type: DriftSqlType.double,
-      requiredDuringInsert: false,
-      defaultValue: const CustomExpression('-1.0'));
+    'low',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const CustomExpression('-1.0'),
+  );
   late final GeneratedColumn<double> close = GeneratedColumn<double>(
-      'close', aliasedName, false,
-      type: DriftSqlType.double,
-      requiredDuringInsert: false,
-      defaultValue: const CustomExpression('-1.0'));
+    'close',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const CustomExpression('-1.0'),
+  );
   late final GeneratedColumn<int> volume = GeneratedColumn<int>(
-      'volume', aliasedName, false,
-      type: DriftSqlType.int,
-      requiredDuringInsert: false,
-      defaultValue: const CustomExpression('0'));
+    'volume',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const CustomExpression('0'),
+  );
   late final GeneratedColumn<double> adjClose = GeneratedColumn<double>(
-      'adj_close', aliasedName, false,
-      type: DriftSqlType.double,
-      requiredDuringInsert: false,
-      defaultValue: const CustomExpression('-1.0'));
+    'adj_close',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const CustomExpression('-1.0'),
+  );
   @override
-  List<GeneratedColumn> get $columns =>
-      [id, symbol, date, open, high, low, close, volume, adjClose];
+  List<GeneratedColumn> get $columns => [
+    id,
+    symbol,
+    date,
+    open,
+    high,
+    low,
+    close,
+    volume,
+    adjClose,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -65,24 +104,42 @@ class Candles extends Table with TableInfo<Candles, CandlesData> {
   CandlesData map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return CandlesData(
-      id: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
-      symbol: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}symbol'])!,
-      date: attachedDatabase.typeMapping
-          .read(DriftSqlType.dateTime, data['${effectivePrefix}date'])!,
-      open: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}open'])!,
-      high: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}high'])!,
-      low: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}low'])!,
-      close: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}close'])!,
-      volume: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}volume'])!,
-      adjClose: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}adj_close'])!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      symbol: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}symbol'],
+      )!,
+      date: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}date'],
+      )!,
+      open: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}open'],
+      )!,
+      high: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}high'],
+      )!,
+      low: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}low'],
+      )!,
+      close: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}close'],
+      )!,
+      volume: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}volume'],
+      )!,
+      adjClose: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}adj_close'],
+      )!,
     );
   }
 
@@ -102,16 +159,17 @@ class CandlesData extends DataClass implements Insertable<CandlesData> {
   final double close;
   final int volume;
   final double adjClose;
-  const CandlesData(
-      {required this.id,
-      required this.symbol,
-      required this.date,
-      required this.open,
-      required this.high,
-      required this.low,
-      required this.close,
-      required this.volume,
-      required this.adjClose});
+  const CandlesData({
+    required this.id,
+    required this.symbol,
+    required this.date,
+    required this.open,
+    required this.high,
+    required this.low,
+    required this.close,
+    required this.volume,
+    required this.adjClose,
+  });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -141,8 +199,10 @@ class CandlesData extends DataClass implements Insertable<CandlesData> {
     );
   }
 
-  factory CandlesData.fromJson(Map<String, dynamic> json,
-      {ValueSerializer? serializer}) {
+  factory CandlesData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return CandlesData(
       id: serializer.fromJson<int>(json['id']),
@@ -172,27 +232,27 @@ class CandlesData extends DataClass implements Insertable<CandlesData> {
     };
   }
 
-  CandlesData copyWith(
-          {int? id,
-          String? symbol,
-          DateTime? date,
-          double? open,
-          double? high,
-          double? low,
-          double? close,
-          int? volume,
-          double? adjClose}) =>
-      CandlesData(
-        id: id ?? this.id,
-        symbol: symbol ?? this.symbol,
-        date: date ?? this.date,
-        open: open ?? this.open,
-        high: high ?? this.high,
-        low: low ?? this.low,
-        close: close ?? this.close,
-        volume: volume ?? this.volume,
-        adjClose: adjClose ?? this.adjClose,
-      );
+  CandlesData copyWith({
+    int? id,
+    String? symbol,
+    DateTime? date,
+    double? open,
+    double? high,
+    double? low,
+    double? close,
+    int? volume,
+    double? adjClose,
+  }) => CandlesData(
+    id: id ?? this.id,
+    symbol: symbol ?? this.symbol,
+    date: date ?? this.date,
+    open: open ?? this.open,
+    high: high ?? this.high,
+    low: low ?? this.low,
+    close: close ?? this.close,
+    volume: volume ?? this.volume,
+    adjClose: adjClose ?? this.adjClose,
+  );
   CandlesData copyWithCompanion(CandlesCompanion data) {
     return CandlesData(
       id: data.id.present ? data.id.value : this.id,
@@ -272,8 +332,8 @@ class CandlesCompanion extends UpdateCompanion<CandlesData> {
     this.close = const Value.absent(),
     this.volume = const Value.absent(),
     this.adjClose = const Value.absent(),
-  })  : symbol = Value(symbol),
-        date = Value(date);
+  }) : symbol = Value(symbol),
+       date = Value(date);
   static Insertable<CandlesData> custom({
     Expression<int>? id,
     Expression<String>? symbol,
@@ -298,16 +358,17 @@ class CandlesCompanion extends UpdateCompanion<CandlesData> {
     });
   }
 
-  CandlesCompanion copyWith(
-      {Value<int>? id,
-      Value<String>? symbol,
-      Value<DateTime>? date,
-      Value<double>? open,
-      Value<double>? high,
-      Value<double>? low,
-      Value<double>? close,
-      Value<int>? volume,
-      Value<double>? adjClose}) {
+  CandlesCompanion copyWith({
+    Value<int>? id,
+    Value<String>? symbol,
+    Value<DateTime>? date,
+    Value<double>? open,
+    Value<double>? high,
+    Value<double>? low,
+    Value<double>? close,
+    Value<int>? volume,
+    Value<double>? adjClose,
+  }) {
     return CandlesCompanion(
       id: id ?? this.id,
       symbol: symbol ?? this.symbol,
@@ -377,52 +438,86 @@ class Trades extends Table with TableInfo<Trades, TradesData> {
   final String? _alias;
   Trades(this.attachedDatabase, [this._alias]);
   late final GeneratedColumn<int> id = GeneratedColumn<int>(
-      'id', aliasedName, false,
-      hasAutoIncrement: true,
-      type: DriftSqlType.int,
-      requiredDuringInsert: false,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
   late final GeneratedColumn<String> symbol = GeneratedColumn<String>(
-      'symbol', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
+    'symbol',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
   late final GeneratedColumn<String> name = GeneratedColumn<String>(
-      'name', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
   late final GeneratedColumn<double> quantity = GeneratedColumn<double>(
-      'quantity', aliasedName, false,
-      type: DriftSqlType.double, requiredDuringInsert: true);
+    'quantity',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
   late final GeneratedColumn<double> price = GeneratedColumn<double>(
-      'price', aliasedName, false,
-      type: DriftSqlType.double, requiredDuringInsert: true);
+    'price',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
   late final GeneratedColumn<String> tradeType = GeneratedColumn<String>(
-      'trade_type', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
+    'trade_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
   late final GeneratedColumn<DateTime> tradeDate = GeneratedColumn<DateTime>(
-      'trade_date', aliasedName, false,
-      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+    'trade_date',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
   late final GeneratedColumn<double> realizedPL = GeneratedColumn<double>(
-      'realized_p_l', aliasedName, false,
-      type: DriftSqlType.double,
-      requiredDuringInsert: false,
-      defaultValue: const CustomExpression('0.0'));
+    'realized_p_l',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const CustomExpression('0.0'),
+  );
   late final GeneratedColumn<double> commission = GeneratedColumn<double>(
-      'commission', aliasedName, false,
-      type: DriftSqlType.double,
-      requiredDuringInsert: false,
-      defaultValue: const CustomExpression('0.0'));
+    'commission',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const CustomExpression('0.0'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
-        id,
-        symbol,
-        name,
-        quantity,
-        price,
-        tradeType,
-        tradeDate,
-        realizedPL,
-        commission
-      ];
+    id,
+    symbol,
+    name,
+    quantity,
+    price,
+    tradeType,
+    tradeDate,
+    realizedPL,
+    commission,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -434,24 +529,42 @@ class Trades extends Table with TableInfo<Trades, TradesData> {
   TradesData map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return TradesData(
-      id: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
-      symbol: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}symbol'])!,
-      name: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
-      quantity: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}quantity'])!,
-      price: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}price'])!,
-      tradeType: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}trade_type'])!,
-      tradeDate: attachedDatabase.typeMapping
-          .read(DriftSqlType.dateTime, data['${effectivePrefix}trade_date'])!,
-      realizedPL: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}realized_p_l'])!,
-      commission: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}commission'])!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      symbol: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}symbol'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      quantity: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}quantity'],
+      )!,
+      price: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}price'],
+      )!,
+      tradeType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}trade_type'],
+      )!,
+      tradeDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}trade_date'],
+      )!,
+      realizedPL: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}realized_p_l'],
+      )!,
+      commission: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}commission'],
+      )!,
     );
   }
 
@@ -471,16 +584,17 @@ class TradesData extends DataClass implements Insertable<TradesData> {
   final DateTime tradeDate;
   final double realizedPL;
   final double commission;
-  const TradesData(
-      {required this.id,
-      required this.symbol,
-      required this.name,
-      required this.quantity,
-      required this.price,
-      required this.tradeType,
-      required this.tradeDate,
-      required this.realizedPL,
-      required this.commission});
+  const TradesData({
+    required this.id,
+    required this.symbol,
+    required this.name,
+    required this.quantity,
+    required this.price,
+    required this.tradeType,
+    required this.tradeDate,
+    required this.realizedPL,
+    required this.commission,
+  });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -510,8 +624,10 @@ class TradesData extends DataClass implements Insertable<TradesData> {
     );
   }
 
-  factory TradesData.fromJson(Map<String, dynamic> json,
-      {ValueSerializer? serializer}) {
+  factory TradesData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return TradesData(
       id: serializer.fromJson<int>(json['id']),
@@ -541,27 +657,27 @@ class TradesData extends DataClass implements Insertable<TradesData> {
     };
   }
 
-  TradesData copyWith(
-          {int? id,
-          String? symbol,
-          String? name,
-          double? quantity,
-          double? price,
-          String? tradeType,
-          DateTime? tradeDate,
-          double? realizedPL,
-          double? commission}) =>
-      TradesData(
-        id: id ?? this.id,
-        symbol: symbol ?? this.symbol,
-        name: name ?? this.name,
-        quantity: quantity ?? this.quantity,
-        price: price ?? this.price,
-        tradeType: tradeType ?? this.tradeType,
-        tradeDate: tradeDate ?? this.tradeDate,
-        realizedPL: realizedPL ?? this.realizedPL,
-        commission: commission ?? this.commission,
-      );
+  TradesData copyWith({
+    int? id,
+    String? symbol,
+    String? name,
+    double? quantity,
+    double? price,
+    String? tradeType,
+    DateTime? tradeDate,
+    double? realizedPL,
+    double? commission,
+  }) => TradesData(
+    id: id ?? this.id,
+    symbol: symbol ?? this.symbol,
+    name: name ?? this.name,
+    quantity: quantity ?? this.quantity,
+    price: price ?? this.price,
+    tradeType: tradeType ?? this.tradeType,
+    tradeDate: tradeDate ?? this.tradeDate,
+    realizedPL: realizedPL ?? this.realizedPL,
+    commission: commission ?? this.commission,
+  );
   TradesData copyWithCompanion(TradesCompanion data) {
     return TradesData(
       id: data.id.present ? data.id.value : this.id,
@@ -571,10 +687,12 @@ class TradesData extends DataClass implements Insertable<TradesData> {
       price: data.price.present ? data.price.value : this.price,
       tradeType: data.tradeType.present ? data.tradeType.value : this.tradeType,
       tradeDate: data.tradeDate.present ? data.tradeDate.value : this.tradeDate,
-      realizedPL:
-          data.realizedPL.present ? data.realizedPL.value : this.realizedPL,
-      commission:
-          data.commission.present ? data.commission.value : this.commission,
+      realizedPL: data.realizedPL.present
+          ? data.realizedPL.value
+          : this.realizedPL,
+      commission: data.commission.present
+          ? data.commission.value
+          : this.commission,
     );
   }
 
@@ -595,8 +713,17 @@ class TradesData extends DataClass implements Insertable<TradesData> {
   }
 
   @override
-  int get hashCode => Object.hash(id, symbol, name, quantity, price, tradeType,
-      tradeDate, realizedPL, commission);
+  int get hashCode => Object.hash(
+    id,
+    symbol,
+    name,
+    quantity,
+    price,
+    tradeType,
+    tradeDate,
+    realizedPL,
+    commission,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -643,12 +770,12 @@ class TradesCompanion extends UpdateCompanion<TradesData> {
     required DateTime tradeDate,
     this.realizedPL = const Value.absent(),
     this.commission = const Value.absent(),
-  })  : symbol = Value(symbol),
-        name = Value(name),
-        quantity = Value(quantity),
-        price = Value(price),
-        tradeType = Value(tradeType),
-        tradeDate = Value(tradeDate);
+  }) : symbol = Value(symbol),
+       name = Value(name),
+       quantity = Value(quantity),
+       price = Value(price),
+       tradeType = Value(tradeType),
+       tradeDate = Value(tradeDate);
   static Insertable<TradesData> custom({
     Expression<int>? id,
     Expression<String>? symbol,
@@ -673,16 +800,17 @@ class TradesCompanion extends UpdateCompanion<TradesData> {
     });
   }
 
-  TradesCompanion copyWith(
-      {Value<int>? id,
-      Value<String>? symbol,
-      Value<String>? name,
-      Value<double>? quantity,
-      Value<double>? price,
-      Value<String>? tradeType,
-      Value<DateTime>? tradeDate,
-      Value<double>? realizedPL,
-      Value<double>? commission}) {
+  TradesCompanion copyWith({
+    Value<int>? id,
+    Value<String>? symbol,
+    Value<String>? name,
+    Value<double>? quantity,
+    Value<double>? price,
+    Value<String>? tradeType,
+    Value<DateTime>? tradeDate,
+    Value<double>? realizedPL,
+    Value<double>? commission,
+  }) {
     return TradesCompanion(
       id: id ?? this.id,
       symbol: symbol ?? this.symbol,
@@ -750,17 +878,24 @@ class DatabaseAtV10 extends GeneratedDatabase {
   DatabaseAtV10(QueryExecutor e) : super(e);
   late final Candles candles = Candles(this);
   late final Trades trades = Trades(this);
-  late final Index idxCandlesSymbolDate = Index('idx_candles_symbol_date',
-      'CREATE INDEX idx_candles_symbol_date ON candles (symbol, date)');
+  late final Index idxCandlesSymbolDate = Index(
+    'idx_candles_symbol_date',
+    'CREATE INDEX idx_candles_symbol_date ON candles (symbol, date)',
+  );
   late final Index idxTradesSymbolTradeDate = Index(
-      'idx_trades_symbol_trade_date',
-      'CREATE INDEX idx_trades_symbol_trade_date ON trades (symbol, trade_date)');
+    'idx_trades_symbol_trade_date',
+    'CREATE INDEX idx_trades_symbol_trade_date ON trades (symbol, trade_date)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities =>
-      [candles, trades, idxCandlesSymbolDate, idxTradesSymbolTradeDate];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+    candles,
+    trades,
+    idxCandlesSymbolDate,
+    idxTradesSymbolTradeDate,
+  ];
   @override
   int get schemaVersion => 10;
 }

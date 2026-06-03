@@ -136,9 +136,7 @@ class MyApp extends StatelessWidget {
                       seedColor: settings.seedColor,
                       brightness: Brightness.dark,
                     ))
-              .copyWith(
-            surface: settings.pureBlack ? Colors.black : null,
-          ),
+              .copyWith(surface: settings.pureBlack ? Colors.black : null),
           useMaterial3: true,
         ),
         themeMode: settings.theme,
@@ -170,11 +168,7 @@ class _MyHomePageState extends State<MyHomePage> {
       child: Scaffold(
         body: SafeArea(
           child: TabBarView(
-            children: [
-              ChartPage(),
-              PortfolioPage(),
-              HoldingsPage(),
-            ],
+            children: [ChartPage(), PortfolioPage(), HoldingsPage()],
           ),
         ),
         bottomNavigationBar: SafeArea(

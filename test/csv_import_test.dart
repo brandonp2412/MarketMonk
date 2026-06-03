@@ -81,16 +81,18 @@ void main() {
       expect(buy.price, closeTo(150.0, 0.001));
     });
 
-    test('SELL trade has negative quantity, tradeType close, and realizedPL',
-        () {
-      final sell = result.trades.firstWhere(
-        (t) => t.symbol == 'AAPL' && t.tradeType == 'close',
-      );
-      expect(sell.quantity, lessThan(0));
-      expect(sell.quantity, closeTo(-5.0, 0.001));
-      expect(sell.price, closeTo(180.0, 0.001));
-      expect(sell.realizedPL, closeTo(150.0, 0.01));
-    });
+    test(
+      'SELL trade has negative quantity, tradeType close, and realizedPL',
+      () {
+        final sell = result.trades.firstWhere(
+          (t) => t.symbol == 'AAPL' && t.tradeType == 'close',
+        );
+        expect(sell.quantity, lessThan(0));
+        expect(sell.quantity, closeTo(-5.0, 0.001));
+        expect(sell.price, closeTo(180.0, 0.001));
+        expect(sell.realizedPL, closeTo(150.0, 0.01));
+      },
+    );
 
     test('commission is stored as positive absolute value', () {
       final buy = result.trades.firstWhere(
@@ -260,12 +262,14 @@ void main() {
       expect(sell.commission, closeTo(2.0, 0.001));
     });
 
-    test('closed-position trades stored even with no matching holding',
-        () async {
-      final result = TigerBrokersParser().parse(_closedPositionCsv);
-      final tCount = await importTrades(result.trades);
+    test(
+      'closed-position trades stored even with no matching holding',
+      () async {
+        final result = TigerBrokersParser().parse(_closedPositionCsv);
+        final tCount = await importTrades(result.trades);
 
-      expect(tCount, equals(2));
-    });
+        expect(tCount, equals(2));
+      },
+    );
   });
 }

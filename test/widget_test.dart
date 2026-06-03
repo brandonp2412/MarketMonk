@@ -49,9 +49,9 @@ void main() {
       // real scenario: AccountsPage is a child route inside the same Overlay
       // that MyApp's MaterialApp owns.
       final navContext = tester.element(find.byType(MyHomePage));
-      Navigator.of(navContext).push(
-        MaterialPageRoute(builder: (_) => const AccountsPage()),
-      );
+      Navigator.of(
+        navContext,
+      ).push(MaterialPageRoute(builder: (_) => const AccountsPage()));
       await tester.pumpAndSettle();
 
       await tester.tap(find.byType(FloatingActionButton));

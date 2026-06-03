@@ -52,9 +52,7 @@ void toast(BuildContext context, String message, [SnackBarAction? action]) {
     SnackBar(
       content: Text(message),
       behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       action: action ?? defaultAction,
     ),
   );
@@ -130,8 +128,10 @@ List<Position> computePositions(
 
     final buyTrades = symbolTrades.where((t) => t.quantity > 0).toList();
     final totalBuyQty = buyTrades.fold(0.0, (sum, t) => sum + t.quantity);
-    final weightedCost =
-        buyTrades.fold(0.0, (sum, t) => sum + t.quantity * t.price);
+    final weightedCost = buyTrades.fold(
+      0.0,
+      (sum, t) => sum + t.quantity * t.price,
+    );
     final avgCost = totalBuyQty > 0 ? weightedCost / totalBuyQty : 0.0;
     final currentPrice = latestPrices[symbol] ?? avgCost;
 
@@ -196,12 +196,9 @@ Future<Map<String, double>> fetchLatestPrices(
     for (final s in symbols) {
       final c = await (d.candles.select()
             ..where((r) => r.symbol.equals(s))
-            ..orderBy(
-              [
-                (r) =>
-                    OrderingTerm(expression: r.date, mode: OrderingMode.desc),
-              ],
-            )
+            ..orderBy([
+              (r) => OrderingTerm(expression: r.date, mode: OrderingMode.desc),
+            ])
             ..limit(1))
           .getSingleOrNull();
       if (c != null && c.close > 0) prices[s] = c.close;
@@ -247,11 +244,8 @@ Future<Candle?> findClosestDate(DateTime date, String symbol) {
   return (db.candles.select()
         ..where((u) => u.symbol.equals(symbol))
         ..orderBy([
-          (t) => OrderingTerm.asc(
-                CustomExpression(
-                  "ABS(\"date\" - $timestamp)",
-                ),
-              ),
+          (t) =>
+              OrderingTerm.asc(CustomExpression("ABS(\"date\" - $timestamp)")),
         ])
         ..limit(1))
       .getSingleOrNull();
@@ -261,11 +255,7 @@ Future<Candle?> findClosestPrice(double price, String symbol) {
   return (db.candles.select()
         ..where((u) => u.symbol.equals(symbol))
         ..orderBy([
-          (t) => OrderingTerm.asc(
-                CustomExpression(
-                  "ABS(close - $price)",
-                ),
-              ),
+          (t) => OrderingTerm.asc(CustomExpression("ABS(close - $price)")),
         ])
         ..limit(1))
       .getSingleOrNull();
@@ -323,9 +313,9 @@ Future<void> syncCandles(String symbol, {Database? database}) async {
   try {
     var latest = await (d.candles.select()
           ..where((tbl) => tbl.symbol.equals(symbol))
-          ..orderBy(
-            [(u) => OrderingTerm(expression: u.date, mode: OrderingMode.desc)],
-          )
+          ..orderBy([
+            (u) => OrderingTerm(expression: u.date, mode: OrderingMode.desc),
+          ])
           ..limit(1))
         .getSingleOrNull();
 

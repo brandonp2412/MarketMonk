@@ -7,26 +7,25 @@ import 'package:drift/drift.dart'; // ignore_for_file: type=lint,unused_import
 final class Schema2 extends i0.VersionedSchema {
   Schema2({required super.database}) : super(version: 2);
   @override
-  late final List<i1.DatabaseSchemaEntity> entities = [
-    tickers,
-  ];
+  late final List<i1.DatabaseSchemaEntity> entities = [tickers];
   late final Shape0 tickers = Shape0(
-      source: i0.VersionedTable(
-        entityName: 'tickers',
-        withoutRowId: false,
-        isStrict: false,
-        tableConstraints: [],
-        columns: [
-          _column_0,
-          _column_1,
-          _column_2,
-          _column_3,
-          _column_4,
-          _column_5,
-        ],
-        attachedDatabase: database,
-      ),
-      alias: null);
+    source: i0.VersionedTable(
+      entityName: 'tickers',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_1,
+        _column_2,
+        _column_3,
+        _column_4,
+        _column_5,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
 }
 
 class Shape0 extends i0.VersionedTable {
@@ -46,56 +45,82 @@ class Shape0 extends i0.VersionedTable {
 }
 
 i1.GeneratedColumn<int> _column_0(String aliasedName) =>
-    i1.GeneratedColumn<int>('id', aliasedName, false,
-        hasAutoIncrement: true,
-        type: i1.DriftSqlType.int,
-        defaultConstraints:
-            i1.GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+    i1.GeneratedColumn<int>(
+      'id',
+      aliasedName,
+      false,
+      hasAutoIncrement: true,
+      type: i1.DriftSqlType.int,
+      defaultConstraints: i1.GeneratedColumn.constraintIsAlways(
+        'PRIMARY KEY AUTOINCREMENT',
+      ),
+    );
 i1.GeneratedColumn<String> _column_1(String aliasedName) =>
-    i1.GeneratedColumn<String>('symbol', aliasedName, false,
-        type: i1.DriftSqlType.string,
-        defaultConstraints: i1.GeneratedColumn.constraintIsAlways('UNIQUE'));
+    i1.GeneratedColumn<String>(
+      'symbol',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.string,
+      defaultConstraints: i1.GeneratedColumn.constraintIsAlways('UNIQUE'),
+    );
 i1.GeneratedColumn<double> _column_2(String aliasedName) =>
-    i1.GeneratedColumn<double>('change', aliasedName, false,
-        type: i1.DriftSqlType.double);
+    i1.GeneratedColumn<double>(
+      'change',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.double,
+    );
 i1.GeneratedColumn<DateTime> _column_3(String aliasedName) =>
-    i1.GeneratedColumn<DateTime>('created_at', aliasedName, false,
-        type: i1.DriftSqlType.dateTime,
-        defaultValue: const CustomExpression(
-            'CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER)'));
+    i1.GeneratedColumn<DateTime>(
+      'created_at',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.dateTime,
+      defaultValue: const CustomExpression(
+        'CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER)',
+      ),
+    );
 i1.GeneratedColumn<DateTime> _column_4(String aliasedName) =>
-    i1.GeneratedColumn<DateTime>('updated_at', aliasedName, false,
-        type: i1.DriftSqlType.dateTime,
-        defaultValue: const CustomExpression(
-            'CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER)'));
+    i1.GeneratedColumn<DateTime>(
+      'updated_at',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.dateTime,
+      defaultValue: const CustomExpression(
+        'CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER)',
+      ),
+    );
 i1.GeneratedColumn<double> _column_5(String aliasedName) =>
-    i1.GeneratedColumn<double>('amount', aliasedName, false,
-        type: i1.DriftSqlType.double);
+    i1.GeneratedColumn<double>(
+      'amount',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.double,
+    );
 
 final class Schema3 extends i0.VersionedSchema {
   Schema3({required super.database}) : super(version: 3);
   @override
-  late final List<i1.DatabaseSchemaEntity> entities = [
-    tickers,
-  ];
+  late final List<i1.DatabaseSchemaEntity> entities = [tickers];
   late final Shape1 tickers = Shape1(
-      source: i0.VersionedTable(
-        entityName: 'tickers',
-        withoutRowId: false,
-        isStrict: false,
-        tableConstraints: [],
-        columns: [
-          _column_0,
-          _column_1,
-          _column_6,
-          _column_2,
-          _column_3,
-          _column_4,
-          _column_5,
-        ],
-        attachedDatabase: database,
-      ),
-      alias: null);
+    source: i0.VersionedTable(
+      entityName: 'tickers',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_1,
+        _column_6,
+        _column_2,
+        _column_3,
+        _column_4,
+        _column_5,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
 }
 
 class Shape1 extends i0.VersionedTable {
@@ -117,54 +142,57 @@ class Shape1 extends i0.VersionedTable {
 }
 
 i1.GeneratedColumn<String> _column_6(String aliasedName) =>
-    i1.GeneratedColumn<String>('name', aliasedName, false,
-        type: i1.DriftSqlType.string);
+    i1.GeneratedColumn<String>(
+      'name',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.string,
+    );
 
 final class Schema4 extends i0.VersionedSchema {
   Schema4({required super.database}) : super(version: 4);
   @override
-  late final List<i1.DatabaseSchemaEntity> entities = [
-    tickers,
-    candles,
-  ];
+  late final List<i1.DatabaseSchemaEntity> entities = [tickers, candles];
   late final Shape1 tickers = Shape1(
-      source: i0.VersionedTable(
-        entityName: 'tickers',
-        withoutRowId: false,
-        isStrict: false,
-        tableConstraints: [],
-        columns: [
-          _column_0,
-          _column_1,
-          _column_6,
-          _column_2,
-          _column_3,
-          _column_4,
-          _column_5,
-        ],
-        attachedDatabase: database,
-      ),
-      alias: null);
+    source: i0.VersionedTable(
+      entityName: 'tickers',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_1,
+        _column_6,
+        _column_2,
+        _column_3,
+        _column_4,
+        _column_5,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
   late final Shape2 candles = Shape2(
-      source: i0.VersionedTable(
-        entityName: 'candles',
-        withoutRowId: false,
-        isStrict: false,
-        tableConstraints: [],
-        columns: [
-          _column_0,
-          _column_7,
-          _column_8,
-          _column_9,
-          _column_10,
-          _column_11,
-          _column_12,
-          _column_13,
-          _column_14,
-        ],
-        attachedDatabase: database,
-      ),
-      alias: null);
+    source: i0.VersionedTable(
+      entityName: 'candles',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_7,
+        _column_8,
+        _column_9,
+        _column_10,
+        _column_11,
+        _column_12,
+        _column_13,
+        _column_14,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
 }
 
 class Shape2 extends i0.VersionedTable {
@@ -190,83 +218,116 @@ class Shape2 extends i0.VersionedTable {
 }
 
 i1.GeneratedColumn<String> _column_7(String aliasedName) =>
-    i1.GeneratedColumn<String>('symbol', aliasedName, false,
-        type: i1.DriftSqlType.string,
-        defaultConstraints: i1.GeneratedColumn.constraintIsAlways(
-            'REFERENCES tickers (symbol)'));
+    i1.GeneratedColumn<String>(
+      'symbol',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.string,
+      defaultConstraints: i1.GeneratedColumn.constraintIsAlways(
+        'REFERENCES tickers (symbol)',
+      ),
+    );
 i1.GeneratedColumn<DateTime> _column_8(String aliasedName) =>
-    i1.GeneratedColumn<DateTime>('date', aliasedName, false,
-        type: i1.DriftSqlType.dateTime);
+    i1.GeneratedColumn<DateTime>(
+      'date',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.dateTime,
+    );
 i1.GeneratedColumn<double> _column_9(String aliasedName) =>
-    i1.GeneratedColumn<double>('open', aliasedName, false,
-        type: i1.DriftSqlType.double,
-        defaultValue: const CustomExpression('-1.0'));
+    i1.GeneratedColumn<double>(
+      'open',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.double,
+      defaultValue: const CustomExpression('-1.0'),
+    );
 i1.GeneratedColumn<double> _column_10(String aliasedName) =>
-    i1.GeneratedColumn<double>('high', aliasedName, false,
-        type: i1.DriftSqlType.double,
-        defaultValue: const CustomExpression('-1.0'));
+    i1.GeneratedColumn<double>(
+      'high',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.double,
+      defaultValue: const CustomExpression('-1.0'),
+    );
 i1.GeneratedColumn<double> _column_11(String aliasedName) =>
-    i1.GeneratedColumn<double>('low', aliasedName, false,
-        type: i1.DriftSqlType.double,
-        defaultValue: const CustomExpression('-1.0'));
+    i1.GeneratedColumn<double>(
+      'low',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.double,
+      defaultValue: const CustomExpression('-1.0'),
+    );
 i1.GeneratedColumn<double> _column_12(String aliasedName) =>
-    i1.GeneratedColumn<double>('close', aliasedName, false,
-        type: i1.DriftSqlType.double,
-        defaultValue: const CustomExpression('-1.0'));
+    i1.GeneratedColumn<double>(
+      'close',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.double,
+      defaultValue: const CustomExpression('-1.0'),
+    );
 i1.GeneratedColumn<int> _column_13(String aliasedName) =>
-    i1.GeneratedColumn<int>('volume', aliasedName, false,
-        type: i1.DriftSqlType.int, defaultValue: const CustomExpression('0'));
+    i1.GeneratedColumn<int>(
+      'volume',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.int,
+      defaultValue: const CustomExpression('0'),
+    );
 i1.GeneratedColumn<double> _column_14(String aliasedName) =>
-    i1.GeneratedColumn<double>('adj_close', aliasedName, false,
-        type: i1.DriftSqlType.double,
-        defaultValue: const CustomExpression('-1.0'));
+    i1.GeneratedColumn<double>(
+      'adj_close',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.double,
+      defaultValue: const CustomExpression('-1.0'),
+    );
 
 final class Schema5 extends i0.VersionedSchema {
   Schema5({required super.database}) : super(version: 5);
   @override
-  late final List<i1.DatabaseSchemaEntity> entities = [
-    tickers,
-    candles,
-  ];
+  late final List<i1.DatabaseSchemaEntity> entities = [tickers, candles];
   late final Shape3 tickers = Shape3(
-      source: i0.VersionedTable(
-        entityName: 'tickers',
-        withoutRowId: false,
-        isStrict: false,
-        tableConstraints: [],
-        columns: [
-          _column_0,
-          _column_1,
-          _column_6,
-          _column_2,
-          _column_3,
-          _column_4,
-          _column_5,
-          _column_15,
-        ],
-        attachedDatabase: database,
-      ),
-      alias: null);
+    source: i0.VersionedTable(
+      entityName: 'tickers',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_1,
+        _column_6,
+        _column_2,
+        _column_3,
+        _column_4,
+        _column_5,
+        _column_15,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
   late final Shape2 candles = Shape2(
-      source: i0.VersionedTable(
-        entityName: 'candles',
-        withoutRowId: false,
-        isStrict: false,
-        tableConstraints: [],
-        columns: [
-          _column_0,
-          _column_7,
-          _column_8,
-          _column_9,
-          _column_10,
-          _column_11,
-          _column_12,
-          _column_13,
-          _column_14,
-        ],
-        attachedDatabase: database,
-      ),
-      alias: null);
+    source: i0.VersionedTable(
+      entityName: 'candles',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_7,
+        _column_8,
+        _column_9,
+        _column_10,
+        _column_11,
+        _column_12,
+        _column_13,
+        _column_14,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
 }
 
 class Shape3 extends i0.VersionedTable {
@@ -290,56 +351,59 @@ class Shape3 extends i0.VersionedTable {
 }
 
 i1.GeneratedColumn<double> _column_15(String aliasedName) =>
-    i1.GeneratedColumn<double>('price', aliasedName, false,
-        type: i1.DriftSqlType.double);
+    i1.GeneratedColumn<double>(
+      'price',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.double,
+    );
 
 final class Schema6 extends i0.VersionedSchema {
   Schema6({required super.database}) : super(version: 6);
   @override
-  late final List<i1.DatabaseSchemaEntity> entities = [
-    tickers,
-    candles,
-  ];
+  late final List<i1.DatabaseSchemaEntity> entities = [tickers, candles];
   late final Shape4 tickers = Shape4(
-      source: i0.VersionedTable(
-        entityName: 'tickers',
-        withoutRowId: false,
-        isStrict: false,
-        tableConstraints: [],
-        columns: [
-          _column_0,
-          _column_1,
-          _column_6,
-          _column_2,
-          _column_3,
-          _column_16,
-          _column_4,
-          _column_5,
-          _column_15,
-        ],
-        attachedDatabase: database,
-      ),
-      alias: null);
+    source: i0.VersionedTable(
+      entityName: 'tickers',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_1,
+        _column_6,
+        _column_2,
+        _column_3,
+        _column_16,
+        _column_4,
+        _column_5,
+        _column_15,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
   late final Shape2 candles = Shape2(
-      source: i0.VersionedTable(
-        entityName: 'candles',
-        withoutRowId: false,
-        isStrict: false,
-        tableConstraints: [],
-        columns: [
-          _column_0,
-          _column_7,
-          _column_8,
-          _column_9,
-          _column_10,
-          _column_11,
-          _column_12,
-          _column_13,
-          _column_14,
-        ],
-        attachedDatabase: database,
-      ),
-      alias: null);
+    source: i0.VersionedTable(
+      entityName: 'candles',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_7,
+        _column_8,
+        _column_9,
+        _column_10,
+        _column_11,
+        _column_12,
+        _column_13,
+        _column_14,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
 }
 
 class Shape4 extends i0.VersionedTable {
@@ -365,63 +429,71 @@ class Shape4 extends i0.VersionedTable {
 }
 
 i1.GeneratedColumn<DateTime> _column_16(String aliasedName) =>
-    i1.GeneratedColumn<DateTime>('purchased_at', aliasedName, false,
-        type: i1.DriftSqlType.dateTime,
-        defaultValue: const CustomExpression(
-            'CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER)'));
+    i1.GeneratedColumn<DateTime>(
+      'purchased_at',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.dateTime,
+      defaultValue: const CustomExpression(
+        'CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER)',
+      ),
+    );
 
 final class Schema7 extends i0.VersionedSchema {
   Schema7({required super.database}) : super(version: 7);
   @override
-  late final List<i1.DatabaseSchemaEntity> entities = [
-    tickers,
-    candles,
-  ];
+  late final List<i1.DatabaseSchemaEntity> entities = [tickers, candles];
   late final Shape4 tickers = Shape4(
-      source: i0.VersionedTable(
-        entityName: 'tickers',
-        withoutRowId: false,
-        isStrict: false,
-        tableConstraints: [],
-        columns: [
-          _column_0,
-          _column_17,
-          _column_6,
-          _column_2,
-          _column_3,
-          _column_16,
-          _column_4,
-          _column_5,
-          _column_15,
-        ],
-        attachedDatabase: database,
-      ),
-      alias: null);
+    source: i0.VersionedTable(
+      entityName: 'tickers',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_17,
+        _column_6,
+        _column_2,
+        _column_3,
+        _column_16,
+        _column_4,
+        _column_5,
+        _column_15,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
   late final Shape2 candles = Shape2(
-      source: i0.VersionedTable(
-        entityName: 'candles',
-        withoutRowId: false,
-        isStrict: false,
-        tableConstraints: [],
-        columns: [
-          _column_0,
-          _column_7,
-          _column_8,
-          _column_9,
-          _column_10,
-          _column_11,
-          _column_12,
-          _column_13,
-          _column_14,
-        ],
-        attachedDatabase: database,
-      ),
-      alias: null);
+    source: i0.VersionedTable(
+      entityName: 'candles',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_7,
+        _column_8,
+        _column_9,
+        _column_10,
+        _column_11,
+        _column_12,
+        _column_13,
+        _column_14,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
 }
 
 i1.GeneratedColumn<String> _column_17(String aliasedName) =>
-    i1.GeneratedColumn<String>('symbol', aliasedName, false,
-        type: i1.DriftSqlType.string);
+    i1.GeneratedColumn<String>(
+      'symbol',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.string,
+    );
 
 final class Schema8 extends i0.VersionedSchema {
   Schema8({required super.database}) : super(version: 8);
@@ -432,65 +504,68 @@ final class Schema8 extends i0.VersionedSchema {
     trades,
   ];
   late final Shape4 tickers = Shape4(
-      source: i0.VersionedTable(
-        entityName: 'tickers',
-        withoutRowId: false,
-        isStrict: false,
-        tableConstraints: [],
-        columns: [
-          _column_0,
-          _column_17,
-          _column_6,
-          _column_2,
-          _column_3,
-          _column_16,
-          _column_4,
-          _column_5,
-          _column_15,
-        ],
-        attachedDatabase: database,
-      ),
-      alias: null);
+    source: i0.VersionedTable(
+      entityName: 'tickers',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_17,
+        _column_6,
+        _column_2,
+        _column_3,
+        _column_16,
+        _column_4,
+        _column_5,
+        _column_15,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
   late final Shape2 candles = Shape2(
-      source: i0.VersionedTable(
-        entityName: 'candles',
-        withoutRowId: false,
-        isStrict: false,
-        tableConstraints: [],
-        columns: [
-          _column_0,
-          _column_7,
-          _column_8,
-          _column_9,
-          _column_10,
-          _column_11,
-          _column_12,
-          _column_13,
-          _column_14,
-        ],
-        attachedDatabase: database,
-      ),
-      alias: null);
+    source: i0.VersionedTable(
+      entityName: 'candles',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_7,
+        _column_8,
+        _column_9,
+        _column_10,
+        _column_11,
+        _column_12,
+        _column_13,
+        _column_14,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
   late final Shape5 trades = Shape5(
-      source: i0.VersionedTable(
-        entityName: 'trades',
-        withoutRowId: false,
-        isStrict: false,
-        tableConstraints: [],
-        columns: [
-          _column_0,
-          _column_17,
-          _column_6,
-          _column_18,
-          _column_15,
-          _column_19,
-          _column_20,
-          _column_21,
-          _column_22,
-        ],
-        attachedDatabase: database,
-      ),
-      alias: null);
+    source: i0.VersionedTable(
+      entityName: 'trades',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_17,
+        _column_6,
+        _column_18,
+        _column_15,
+        _column_19,
+        _column_20,
+        _column_21,
+        _column_22,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
 }
 
 class Shape5 extends i0.VersionedTable {
@@ -516,22 +591,42 @@ class Shape5 extends i0.VersionedTable {
 }
 
 i1.GeneratedColumn<double> _column_18(String aliasedName) =>
-    i1.GeneratedColumn<double>('quantity', aliasedName, false,
-        type: i1.DriftSqlType.double);
+    i1.GeneratedColumn<double>(
+      'quantity',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.double,
+    );
 i1.GeneratedColumn<String> _column_19(String aliasedName) =>
-    i1.GeneratedColumn<String>('trade_type', aliasedName, false,
-        type: i1.DriftSqlType.string);
+    i1.GeneratedColumn<String>(
+      'trade_type',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.string,
+    );
 i1.GeneratedColumn<DateTime> _column_20(String aliasedName) =>
-    i1.GeneratedColumn<DateTime>('trade_date', aliasedName, false,
-        type: i1.DriftSqlType.dateTime);
+    i1.GeneratedColumn<DateTime>(
+      'trade_date',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.dateTime,
+    );
 i1.GeneratedColumn<double> _column_21(String aliasedName) =>
-    i1.GeneratedColumn<double>('realized_p_l', aliasedName, false,
-        type: i1.DriftSqlType.double,
-        defaultValue: const CustomExpression('0.0'));
+    i1.GeneratedColumn<double>(
+      'realized_p_l',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.double,
+      defaultValue: const CustomExpression('0.0'),
+    );
 i1.GeneratedColumn<double> _column_22(String aliasedName) =>
-    i1.GeneratedColumn<double>('commission', aliasedName, false,
-        type: i1.DriftSqlType.double,
-        defaultValue: const CustomExpression('0.0'));
+    i1.GeneratedColumn<double>(
+      'commission',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.double,
+      defaultValue: const CustomExpression('0.0'),
+    );
 
 final class Schema9 extends i0.VersionedSchema {
   Schema9({required super.database}) : super(version: 9);
@@ -542,65 +637,68 @@ final class Schema9 extends i0.VersionedSchema {
     trades,
   ];
   late final Shape4 tickers = Shape4(
-      source: i0.VersionedTable(
-        entityName: 'tickers',
-        withoutRowId: false,
-        isStrict: false,
-        tableConstraints: [],
-        columns: [
-          _column_0,
-          _column_17,
-          _column_6,
-          _column_2,
-          _column_3,
-          _column_16,
-          _column_4,
-          _column_5,
-          _column_15,
-        ],
-        attachedDatabase: database,
-      ),
-      alias: null);
+    source: i0.VersionedTable(
+      entityName: 'tickers',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_17,
+        _column_6,
+        _column_2,
+        _column_3,
+        _column_16,
+        _column_4,
+        _column_5,
+        _column_15,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
   late final Shape2 candles = Shape2(
-      source: i0.VersionedTable(
-        entityName: 'candles',
-        withoutRowId: false,
-        isStrict: false,
-        tableConstraints: [],
-        columns: [
-          _column_0,
-          _column_7,
-          _column_8,
-          _column_9,
-          _column_10,
-          _column_11,
-          _column_12,
-          _column_13,
-          _column_14,
-        ],
-        attachedDatabase: database,
-      ),
-      alias: null);
+    source: i0.VersionedTable(
+      entityName: 'candles',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_7,
+        _column_8,
+        _column_9,
+        _column_10,
+        _column_11,
+        _column_12,
+        _column_13,
+        _column_14,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
   late final Shape5 trades = Shape5(
-      source: i0.VersionedTable(
-        entityName: 'trades',
-        withoutRowId: false,
-        isStrict: false,
-        tableConstraints: [],
-        columns: [
-          _column_0,
-          _column_17,
-          _column_6,
-          _column_18,
-          _column_15,
-          _column_19,
-          _column_20,
-          _column_21,
-          _column_22,
-        ],
-        attachedDatabase: database,
-      ),
-      alias: null);
+    source: i0.VersionedTable(
+      entityName: 'trades',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_17,
+        _column_6,
+        _column_18,
+        _column_15,
+        _column_19,
+        _column_20,
+        _column_21,
+        _column_22,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
 }
 
 final class Schema10 extends i0.VersionedSchema {
@@ -613,50 +711,55 @@ final class Schema10 extends i0.VersionedSchema {
     idxTradesSymbolTradeDate,
   ];
   late final Shape2 candles = Shape2(
-      source: i0.VersionedTable(
-        entityName: 'candles',
-        withoutRowId: false,
-        isStrict: false,
-        tableConstraints: [],
-        columns: [
-          _column_0,
-          _column_17,
-          _column_8,
-          _column_9,
-          _column_10,
-          _column_11,
-          _column_12,
-          _column_13,
-          _column_14,
-        ],
-        attachedDatabase: database,
-      ),
-      alias: null);
+    source: i0.VersionedTable(
+      entityName: 'candles',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_17,
+        _column_8,
+        _column_9,
+        _column_10,
+        _column_11,
+        _column_12,
+        _column_13,
+        _column_14,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
   late final Shape5 trades = Shape5(
-      source: i0.VersionedTable(
-        entityName: 'trades',
-        withoutRowId: false,
-        isStrict: false,
-        tableConstraints: [],
-        columns: [
-          _column_0,
-          _column_17,
-          _column_6,
-          _column_18,
-          _column_15,
-          _column_19,
-          _column_20,
-          _column_21,
-          _column_22,
-        ],
-        attachedDatabase: database,
-      ),
-      alias: null);
-  final i1.Index idxCandlesSymbolDate = i1.Index('idx_candles_symbol_date',
-      'CREATE INDEX idx_candles_symbol_date ON candles (symbol, date)');
+    source: i0.VersionedTable(
+      entityName: 'trades',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_17,
+        _column_6,
+        _column_18,
+        _column_15,
+        _column_19,
+        _column_20,
+        _column_21,
+        _column_22,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  final i1.Index idxCandlesSymbolDate = i1.Index(
+    'idx_candles_symbol_date',
+    'CREATE INDEX idx_candles_symbol_date ON candles (symbol, date)',
+  );
   final i1.Index idxTradesSymbolTradeDate = i1.Index(
-      'idx_trades_symbol_trade_date',
-      'CREATE INDEX idx_trades_symbol_trade_date ON trades (symbol, trade_date)');
+    'idx_trades_symbol_trade_date',
+    'CREATE INDEX idx_trades_symbol_trade_date ON trades (symbol, trade_date)',
+  );
 }
 
 i0.MigrationStepWithVersion migrationSteps({
@@ -735,14 +838,15 @@ i1.OnUpgrade stepByStep({
   required Future<void> Function(i1.Migrator m, Schema10 schema) from9To10,
 }) =>
     i0.VersionedSchema.stepByStepHelper(
-        step: migrationSteps(
-      from1To2: from1To2,
-      from2To3: from2To3,
-      from3To4: from3To4,
-      from4To5: from4To5,
-      from5To6: from5To6,
-      from6To7: from6To7,
-      from7To8: from7To8,
-      from8To9: from8To9,
-      from9To10: from9To10,
-    ));
+      step: migrationSteps(
+        from1To2: from1To2,
+        from2To3: from2To3,
+        from3To4: from3To4,
+        from4To5: from4To5,
+        from5To6: from5To6,
+        from6To7: from6To7,
+        from7To8: from7To8,
+        from8To9: from8To9,
+        from9To10: from9To10,
+      ),
+    );
