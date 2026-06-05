@@ -77,15 +77,15 @@ class Tickers extends Table with TableInfo<Tickers, TickersData> {
   );
   @override
   List<GeneratedColumn> get $columns => [
-    id,
-    symbol,
-    name,
-    change,
-    createdAt,
-    updatedAt,
-    amount,
-    price,
-  ];
+        id,
+        symbol,
+        name,
+        change,
+        createdAt,
+        updatedAt,
+        amount,
+        price,
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -224,16 +224,17 @@ class TickersData extends DataClass implements Insertable<TickersData> {
     DateTime? updatedAt,
     double? amount,
     double? price,
-  }) => TickersData(
-    id: id ?? this.id,
-    symbol: symbol ?? this.symbol,
-    name: name ?? this.name,
-    change: change ?? this.change,
-    createdAt: createdAt ?? this.createdAt,
-    updatedAt: updatedAt ?? this.updatedAt,
-    amount: amount ?? this.amount,
-    price: price ?? this.price,
-  );
+  }) =>
+      TickersData(
+        id: id ?? this.id,
+        symbol: symbol ?? this.symbol,
+        name: name ?? this.name,
+        change: change ?? this.change,
+        createdAt: createdAt ?? this.createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+        amount: amount ?? this.amount,
+        price: price ?? this.price,
+      );
   TickersData copyWithCompanion(TickersCompanion data) {
     return TickersData(
       id: data.id.present ? data.id.value : this.id,
@@ -264,15 +265,15 @@ class TickersData extends DataClass implements Insertable<TickersData> {
 
   @override
   int get hashCode => Object.hash(
-    id,
-    symbol,
-    name,
-    change,
-    createdAt,
-    updatedAt,
-    amount,
-    price,
-  );
+        id,
+        symbol,
+        name,
+        change,
+        createdAt,
+        updatedAt,
+        amount,
+        price,
+      );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -315,11 +316,11 @@ class TickersCompanion extends UpdateCompanion<TickersData> {
     this.updatedAt = const Value.absent(),
     required double amount,
     required double price,
-  }) : symbol = Value(symbol),
-       name = Value(name),
-       change = Value(change),
-       amount = Value(amount),
-       price = Value(price);
+  })  : symbol = Value(symbol),
+        name = Value(name),
+        change = Value(change),
+        amount = Value(amount),
+        price = Value(price);
   static Insertable<TickersData> custom({
     Expression<int>? id,
     Expression<String>? symbol,
@@ -493,16 +494,16 @@ class Candles extends Table with TableInfo<Candles, CandlesData> {
   );
   @override
   List<GeneratedColumn> get $columns => [
-    id,
-    symbol,
-    date,
-    open,
-    high,
-    low,
-    close,
-    volume,
-    adjClose,
-  ];
+        id,
+        symbol,
+        date,
+        open,
+        high,
+        low,
+        close,
+        volume,
+        adjClose,
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -652,17 +653,18 @@ class CandlesData extends DataClass implements Insertable<CandlesData> {
     double? close,
     int? volume,
     double? adjClose,
-  }) => CandlesData(
-    id: id ?? this.id,
-    symbol: symbol ?? this.symbol,
-    date: date ?? this.date,
-    open: open ?? this.open,
-    high: high ?? this.high,
-    low: low ?? this.low,
-    close: close ?? this.close,
-    volume: volume ?? this.volume,
-    adjClose: adjClose ?? this.adjClose,
-  );
+  }) =>
+      CandlesData(
+        id: id ?? this.id,
+        symbol: symbol ?? this.symbol,
+        date: date ?? this.date,
+        open: open ?? this.open,
+        high: high ?? this.high,
+        low: low ?? this.low,
+        close: close ?? this.close,
+        volume: volume ?? this.volume,
+        adjClose: adjClose ?? this.adjClose,
+      );
   CandlesData copyWithCompanion(CandlesCompanion data) {
     return CandlesData(
       id: data.id.present ? data.id.value : this.id,
@@ -742,8 +744,8 @@ class CandlesCompanion extends UpdateCompanion<CandlesData> {
     this.close = const Value.absent(),
     this.volume = const Value.absent(),
     this.adjClose = const Value.absent(),
-  }) : symbol = Value(symbol),
-       date = Value(date);
+  })  : symbol = Value(symbol),
+        date = Value(date);
   static Insertable<CandlesData> custom({
     Expression<int>? id,
     Expression<String>? symbol,

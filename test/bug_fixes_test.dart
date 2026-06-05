@@ -22,16 +22,17 @@ Future<Trade> _insertTrade(
   double quantity = 10,
   double price = 150.0,
   String tradeType = 'open',
-}) => db.trades.insertReturning(
-  TradesCompanion.insert(
-    symbol: symbol,
-    name: name,
-    quantity: quantity,
-    price: price,
-    tradeType: tradeType,
-    tradeDate: DateTime(2025, 3, 1),
-  ),
-);
+}) =>
+    db.trades.insertReturning(
+      TradesCompanion.insert(
+        symbol: symbol,
+        name: name,
+        quantity: quantity,
+        price: price,
+        tradeType: tradeType,
+        tradeDate: DateTime(2025, 3, 1),
+      ),
+    );
 
 void main() {
   setUpAll(_overrideSqlite3);

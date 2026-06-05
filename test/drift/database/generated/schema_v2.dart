@@ -63,13 +63,13 @@ class Tickers extends Table with TableInfo<Tickers, TickersData> {
   );
   @override
   List<GeneratedColumn> get $columns => [
-    id,
-    symbol,
-    change,
-    createdAt,
-    updatedAt,
-    amount,
-  ];
+        id,
+        symbol,
+        change,
+        createdAt,
+        updatedAt,
+        amount,
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -186,14 +186,15 @@ class TickersData extends DataClass implements Insertable<TickersData> {
     DateTime? createdAt,
     DateTime? updatedAt,
     double? amount,
-  }) => TickersData(
-    id: id ?? this.id,
-    symbol: symbol ?? this.symbol,
-    change: change ?? this.change,
-    createdAt: createdAt ?? this.createdAt,
-    updatedAt: updatedAt ?? this.updatedAt,
-    amount: amount ?? this.amount,
-  );
+  }) =>
+      TickersData(
+        id: id ?? this.id,
+        symbol: symbol ?? this.symbol,
+        change: change ?? this.change,
+        createdAt: createdAt ?? this.createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+        amount: amount ?? this.amount,
+      );
   TickersData copyWithCompanion(TickersCompanion data) {
     return TickersData(
       id: data.id.present ? data.id.value : this.id,
@@ -255,9 +256,9 @@ class TickersCompanion extends UpdateCompanion<TickersData> {
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     required double amount,
-  }) : symbol = Value(symbol),
-       change = Value(change),
-       amount = Value(amount);
+  })  : symbol = Value(symbol),
+        change = Value(change),
+        amount = Value(amount);
   static Insertable<TickersData> custom({
     Expression<int>? id,
     Expression<String>? symbol,

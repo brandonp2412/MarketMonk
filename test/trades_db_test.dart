@@ -23,18 +23,19 @@ Future<Trade> _insertTrade(
   DateTime? tradeDate,
   double realizedPL = 0.0,
   double commission = 2.0,
-}) => db.trades.insertReturning(
-  TradesCompanion.insert(
-    symbol: symbol,
-    name: name,
-    quantity: quantity,
-    price: price,
-    tradeType: tradeType,
-    tradeDate: tradeDate ?? DateTime(2025, 3, 1),
-    realizedPL: Value(realizedPL),
-    commission: Value(commission),
-  ),
-);
+}) =>
+    db.trades.insertReturning(
+      TradesCompanion.insert(
+        symbol: symbol,
+        name: name,
+        quantity: quantity,
+        price: price,
+        tradeType: tradeType,
+        tradeDate: tradeDate ?? DateTime(2025, 3, 1),
+        realizedPL: Value(realizedPL),
+        commission: Value(commission),
+      ),
+    );
 
 void main() {
   setUpAll(_overrideSqlite3);
@@ -104,9 +105,9 @@ void main() {
         const TradesCompanion(price: Value(175.0)),
       );
 
-      final updated =
-          await (db.trades.select()..where((r) => r.id.equals(t.id)))
-              .getSingle();
+      final updated = await (db.trades.select()
+            ..where((r) => r.id.equals(t.id)))
+          .getSingle();
 
       expect(updated.price, closeTo(175.0, 0.001));
       expect(
@@ -150,20 +151,19 @@ void main() {
     tearDown(() => db.close());
 
     test('filter by symbol returns only that symbol\'s trades', () async {
-      final aaplTrades =
-          await (db.trades.select()..where((t) => t.symbol.equals('AAPL')))
-              .get();
+      final aaplTrades = await (db.trades.select()
+            ..where((t) => t.symbol.equals('AAPL')))
+          .get();
 
       expect(aaplTrades, hasLength(2));
       expect(aaplTrades.every((t) => t.symbol == 'AAPL'), isTrue);
     });
 
     test('ordering by tradeDate descending returns newest first', () async {
-      final ordered =
-          await (db.trades.select()
-                ..where((t) => t.symbol.equals('AAPL'))
-                ..orderBy([(t) => OrderingTerm.desc(t.tradeDate)]))
-              .get();
+      final ordered = await (db.trades.select()
+            ..where((t) => t.symbol.equals('AAPL'))
+            ..orderBy([(t) => OrderingTerm.desc(t.tradeDate)]))
+          .get();
 
       expect(
         ordered.first.tradeDate.month,
@@ -174,9 +174,9 @@ void main() {
     });
 
     test('total realizedPL across symbol can be summed', () async {
-      final aaplTrades =
-          await (db.trades.select()..where((t) => t.symbol.equals('AAPL')))
-              .get();
+      final aaplTrades = await (db.trades.select()
+            ..where((t) => t.symbol.equals('AAPL')))
+          .get();
 
       final totalPL = aaplTrades.fold(0.0, (sum, t) => sum + t.realizedPL);
       expect(totalPL, closeTo(300.0, 0.01));
@@ -204,9 +204,9 @@ void main() {
       await _insertTrade(db, symbol: 'AAPL', quantity: 10);
       await _insertTrade(db, symbol: 'AAPL', quantity: -5, tradeType: 'close');
 
-      final trades =
-          await (db.trades.select()..where((t) => t.symbol.equals('AAPL')))
-              .get();
+      final trades = await (db.trades.select()
+            ..where((t) => t.symbol.equals('AAPL')))
+          .get();
       expect(trades, hasLength(2));
     });
   });

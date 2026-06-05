@@ -70,14 +70,14 @@ class Tickers extends Table with TableInfo<Tickers, TickersData> {
   );
   @override
   List<GeneratedColumn> get $columns => [
-    id,
-    symbol,
-    name,
-    change,
-    createdAt,
-    updatedAt,
-    amount,
-  ];
+        id,
+        symbol,
+        name,
+        change,
+        createdAt,
+        updatedAt,
+        amount,
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -205,15 +205,16 @@ class TickersData extends DataClass implements Insertable<TickersData> {
     DateTime? createdAt,
     DateTime? updatedAt,
     double? amount,
-  }) => TickersData(
-    id: id ?? this.id,
-    symbol: symbol ?? this.symbol,
-    name: name ?? this.name,
-    change: change ?? this.change,
-    createdAt: createdAt ?? this.createdAt,
-    updatedAt: updatedAt ?? this.updatedAt,
-    amount: amount ?? this.amount,
-  );
+  }) =>
+      TickersData(
+        id: id ?? this.id,
+        symbol: symbol ?? this.symbol,
+        name: name ?? this.name,
+        change: change ?? this.change,
+        createdAt: createdAt ?? this.createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+        amount: amount ?? this.amount,
+      );
   TickersData copyWithCompanion(TickersCompanion data) {
     return TickersData(
       id: data.id.present ? data.id.value : this.id,
@@ -281,10 +282,10 @@ class TickersCompanion extends UpdateCompanion<TickersData> {
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     required double amount,
-  }) : symbol = Value(symbol),
-       name = Value(name),
-       change = Value(change),
-       amount = Value(amount);
+  })  : symbol = Value(symbol),
+        name = Value(name),
+        change = Value(change),
+        amount = Value(amount);
   static Insertable<TickersData> custom({
     Expression<int>? id,
     Expression<String>? symbol,
@@ -450,16 +451,16 @@ class Candles extends Table with TableInfo<Candles, CandlesData> {
   );
   @override
   List<GeneratedColumn> get $columns => [
-    id,
-    symbol,
-    date,
-    open,
-    high,
-    low,
-    close,
-    volume,
-    adjClose,
-  ];
+        id,
+        symbol,
+        date,
+        open,
+        high,
+        low,
+        close,
+        volume,
+        adjClose,
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -609,17 +610,18 @@ class CandlesData extends DataClass implements Insertable<CandlesData> {
     double? close,
     int? volume,
     double? adjClose,
-  }) => CandlesData(
-    id: id ?? this.id,
-    symbol: symbol ?? this.symbol,
-    date: date ?? this.date,
-    open: open ?? this.open,
-    high: high ?? this.high,
-    low: low ?? this.low,
-    close: close ?? this.close,
-    volume: volume ?? this.volume,
-    adjClose: adjClose ?? this.adjClose,
-  );
+  }) =>
+      CandlesData(
+        id: id ?? this.id,
+        symbol: symbol ?? this.symbol,
+        date: date ?? this.date,
+        open: open ?? this.open,
+        high: high ?? this.high,
+        low: low ?? this.low,
+        close: close ?? this.close,
+        volume: volume ?? this.volume,
+        adjClose: adjClose ?? this.adjClose,
+      );
   CandlesData copyWithCompanion(CandlesCompanion data) {
     return CandlesData(
       id: data.id.present ? data.id.value : this.id,
@@ -699,8 +701,8 @@ class CandlesCompanion extends UpdateCompanion<CandlesData> {
     this.close = const Value.absent(),
     this.volume = const Value.absent(),
     this.adjClose = const Value.absent(),
-  }) : symbol = Value(symbol),
-       date = Value(date);
+  })  : symbol = Value(symbol),
+        date = Value(date);
   static Insertable<CandlesData> custom({
     Expression<int>? id,
     Expression<String>? symbol,

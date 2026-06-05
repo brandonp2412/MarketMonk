@@ -83,16 +83,16 @@ class Candles extends Table with TableInfo<Candles, CandlesData> {
   );
   @override
   List<GeneratedColumn> get $columns => [
-    id,
-    symbol,
-    date,
-    open,
-    high,
-    low,
-    close,
-    volume,
-    adjClose,
-  ];
+        id,
+        symbol,
+        date,
+        open,
+        high,
+        low,
+        close,
+        volume,
+        adjClose,
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -242,17 +242,18 @@ class CandlesData extends DataClass implements Insertable<CandlesData> {
     double? close,
     int? volume,
     double? adjClose,
-  }) => CandlesData(
-    id: id ?? this.id,
-    symbol: symbol ?? this.symbol,
-    date: date ?? this.date,
-    open: open ?? this.open,
-    high: high ?? this.high,
-    low: low ?? this.low,
-    close: close ?? this.close,
-    volume: volume ?? this.volume,
-    adjClose: adjClose ?? this.adjClose,
-  );
+  }) =>
+      CandlesData(
+        id: id ?? this.id,
+        symbol: symbol ?? this.symbol,
+        date: date ?? this.date,
+        open: open ?? this.open,
+        high: high ?? this.high,
+        low: low ?? this.low,
+        close: close ?? this.close,
+        volume: volume ?? this.volume,
+        adjClose: adjClose ?? this.adjClose,
+      );
   CandlesData copyWithCompanion(CandlesCompanion data) {
     return CandlesData(
       id: data.id.present ? data.id.value : this.id,
@@ -332,8 +333,8 @@ class CandlesCompanion extends UpdateCompanion<CandlesData> {
     this.close = const Value.absent(),
     this.volume = const Value.absent(),
     this.adjClose = const Value.absent(),
-  }) : symbol = Value(symbol),
-       date = Value(date);
+  })  : symbol = Value(symbol),
+        date = Value(date);
   static Insertable<CandlesData> custom({
     Expression<int>? id,
     Expression<String>? symbol,
@@ -508,16 +509,16 @@ class Trades extends Table with TableInfo<Trades, TradesData> {
   );
   @override
   List<GeneratedColumn> get $columns => [
-    id,
-    symbol,
-    name,
-    quantity,
-    price,
-    tradeType,
-    tradeDate,
-    realizedPL,
-    commission,
-  ];
+        id,
+        symbol,
+        name,
+        quantity,
+        price,
+        tradeType,
+        tradeDate,
+        realizedPL,
+        commission,
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -667,17 +668,18 @@ class TradesData extends DataClass implements Insertable<TradesData> {
     DateTime? tradeDate,
     double? realizedPL,
     double? commission,
-  }) => TradesData(
-    id: id ?? this.id,
-    symbol: symbol ?? this.symbol,
-    name: name ?? this.name,
-    quantity: quantity ?? this.quantity,
-    price: price ?? this.price,
-    tradeType: tradeType ?? this.tradeType,
-    tradeDate: tradeDate ?? this.tradeDate,
-    realizedPL: realizedPL ?? this.realizedPL,
-    commission: commission ?? this.commission,
-  );
+  }) =>
+      TradesData(
+        id: id ?? this.id,
+        symbol: symbol ?? this.symbol,
+        name: name ?? this.name,
+        quantity: quantity ?? this.quantity,
+        price: price ?? this.price,
+        tradeType: tradeType ?? this.tradeType,
+        tradeDate: tradeDate ?? this.tradeDate,
+        realizedPL: realizedPL ?? this.realizedPL,
+        commission: commission ?? this.commission,
+      );
   TradesData copyWithCompanion(TradesCompanion data) {
     return TradesData(
       id: data.id.present ? data.id.value : this.id,
@@ -687,12 +689,10 @@ class TradesData extends DataClass implements Insertable<TradesData> {
       price: data.price.present ? data.price.value : this.price,
       tradeType: data.tradeType.present ? data.tradeType.value : this.tradeType,
       tradeDate: data.tradeDate.present ? data.tradeDate.value : this.tradeDate,
-      realizedPL: data.realizedPL.present
-          ? data.realizedPL.value
-          : this.realizedPL,
-      commission: data.commission.present
-          ? data.commission.value
-          : this.commission,
+      realizedPL:
+          data.realizedPL.present ? data.realizedPL.value : this.realizedPL,
+      commission:
+          data.commission.present ? data.commission.value : this.commission,
     );
   }
 
@@ -714,16 +714,16 @@ class TradesData extends DataClass implements Insertable<TradesData> {
 
   @override
   int get hashCode => Object.hash(
-    id,
-    symbol,
-    name,
-    quantity,
-    price,
-    tradeType,
-    tradeDate,
-    realizedPL,
-    commission,
-  );
+        id,
+        symbol,
+        name,
+        quantity,
+        price,
+        tradeType,
+        tradeDate,
+        realizedPL,
+        commission,
+      );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -770,12 +770,12 @@ class TradesCompanion extends UpdateCompanion<TradesData> {
     required DateTime tradeDate,
     this.realizedPL = const Value.absent(),
     this.commission = const Value.absent(),
-  }) : symbol = Value(symbol),
-       name = Value(name),
-       quantity = Value(quantity),
-       price = Value(price),
-       tradeType = Value(tradeType),
-       tradeDate = Value(tradeDate);
+  })  : symbol = Value(symbol),
+        name = Value(name),
+        quantity = Value(quantity),
+        price = Value(price),
+        tradeType = Value(tradeType),
+        tradeDate = Value(tradeDate);
   static Insertable<TradesData> custom({
     Expression<int>? id,
     Expression<String>? symbol,
@@ -891,11 +891,11 @@ class DatabaseAtV10 extends GeneratedDatabase {
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
-    candles,
-    trades,
-    idxCandlesSymbolDate,
-    idxTradesSymbolTradeDate,
-  ];
+        candles,
+        trades,
+        idxCandlesSymbolDate,
+        idxTradesSymbolTradeDate,
+      ];
   @override
   int get schemaVersion => 10;
 }
