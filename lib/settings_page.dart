@@ -111,7 +111,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         t.tradeDate.toIso8601String().substring(0, 10),
                       ),
                       trailing: Text(
-                        '${t.quantity.abs().toStringAsFixed(2)} @ \$${t.price.toStringAsFixed(2)}',
+                        '${t.quantity.abs().toStringAsFixed(2)} @ ${nativeCurrencySymbol(symbolCurrency(t.symbol))}${t.price.toStringAsFixed(2)}',
                       ),
                     ),
                   ),

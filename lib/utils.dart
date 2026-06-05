@@ -25,6 +25,11 @@ final Map<String, String> _symbolCurrencies = {};
 /// Returns the cached native currency for [symbol], defaulting to 'USD'.
 String symbolCurrency(String symbol) => _symbolCurrencies[symbol] ?? 'USD';
 
+/// Ensures the native currency and its exchange rate are cached for [symbol].
+/// Returns immediately if already cached. Safe to call concurrently.
+Future<void> fetchSymbolCurrencyAndRate(String symbol) =>
+    _fetchSymbolCurrencyAndRate(symbol);
+
 /// Formats [v] (assumed to be in USD) in the user's display currency.
 String fmtCurrency(double v) => currency.format(v * exchangeRate);
 

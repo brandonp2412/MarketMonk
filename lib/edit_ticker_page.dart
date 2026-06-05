@@ -223,6 +223,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                         final tickerSymbol = value.split(' ').first;
                         try {
                           await syncCandles(tickerSymbol);
+                          await fetchSymbolCurrencyAndRate(tickerSymbol);
                         } catch (error) {
                           if (context.mounted) toast(context, error.toString());
                         } finally {
@@ -281,6 +282,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                             final tickerSymbol = text.split(' ').first;
                             try {
                               await syncCandles(tickerSymbol);
+                              await fetchSymbolCurrencyAndRate(tickerSymbol);
                             } catch (error) {
                               if (context.mounted)
                                 toast(context, error.toString());

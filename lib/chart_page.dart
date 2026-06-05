@@ -46,6 +46,7 @@ class ChartPageState extends State<ChartPage>
   bool _networkLoading = false;
   double? _syncProgress; // null = indeterminate, 0.0–1.0 = determinate
   String? _stockError;
+  String _nativeCurrency = 'USD';
 
   // Measured height of the floating search bar overlay so chart content can
   // be padded beneath it, while the chart's canvas extends to the top and
@@ -379,10 +380,14 @@ class ChartPageState extends State<ChartPage>
       _stockError = null;
     });
     _setStockStream(symbol);
-    syncCandles(symbol).then((_) {
+    syncCandles(symbol).then((_) async {
+      await fetchSymbolCurrencyAndRate(symbol);
       if (mounted) {
         _setStockStream(symbol);
-        setState(() => _networkLoading = false);
+        setState(() {
+          _networkLoading = false;
+          _nativeCurrency = symbolCurrency(symbol);
+        });
       }
     }).catchError((Object e) {
       if (mounted) {
@@ -776,14 +781,14 @@ class ChartPageState extends State<ChartPage>
                 ],
               ),
               Text(
-                '\$${candles.last.close.value.toStringAsFixed(2)}',
+                fmtNativeCurrency(candles.last.close.value, _nativeCurrency),
                 style: Theme.of(context).textTheme.titleLarge,
               ),
             ],
           ),
           const SizedBox(height: 4),
           Text(
-            '${dollarChange >= 0 ? '+' : '-'}\$${dollarChange.abs().toStringAsFixed(2)} period change',
+            '${dollarChange >= 0 ? '+' : ''}${fmtNativeCurrency(dollarChange, _nativeCurrency)} period change',
             style: TextStyle(color: color, fontSize: 13),
           ),
           const SizedBox(height: 12),
