@@ -1,0 +1,3 @@
+• Formatting
+• Fix add fitInsideVertically to prevent tooltips being obscured by search bar
+• Fix use native/display currency instead of hardcoded USD
