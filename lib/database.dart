@@ -139,7 +139,9 @@ class Database extends _$Database {
   static final _upgrade = migrationSteps(
     from1To2: (m, schema) async {
       await m.alterTable(
-          TableMigration(schema.tickers)); // ignore: experimental_member_use
+        // ignore: experimental_member_use
+        TableMigration(schema.tickers),
+      );
     },
     from2To3: (Migrator m, Schema3 schema) async {
       await schema.tickers.deleteAll();
@@ -160,7 +162,9 @@ class Database extends _$Database {
     },
     from6To7: (Migrator m, Schema7 schema) async {
       await m.alterTable(
-          TableMigration(schema.tickers)); // ignore: experimental_member_use
+        // ignore: experimental_member_use
+        TableMigration(schema.tickers),
+      );
     },
     from7To8: (Migrator m, Schema8 schema) async {
       await m.createTable(schema.trades);

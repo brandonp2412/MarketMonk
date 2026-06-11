@@ -197,11 +197,13 @@ Future<void> generateScreenshot({
   await tester.pumpAndSettle();
 
   final controllerState = getBuildContext(tester, null);
+  if (!controllerState.mounted) return;
   DefaultTabController.of(controllerState).index = tabBarState.index;
   await tester.pumpAndSettle();
 
   if (navigateToPage != null) {
     final navState = getBuildContext(tester, tabBarState);
+    if (!navState.mounted) return;
     await navigateToPage(navState);
   }
 
