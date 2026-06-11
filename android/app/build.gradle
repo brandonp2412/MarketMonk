@@ -54,7 +54,9 @@ android {
            }
        }
        release {
-           signingConfig signingConfigs.release
+           if (keystorePropertiesFile.exists()) {
+               signingConfig signingConfigs.release
+           }
        }
    }
    
