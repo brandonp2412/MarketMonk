@@ -1,0 +1,2 @@
+• Fix apply kotlin-android plugin explicitly in app module
+• Fix skip release signing when keystore is absent
