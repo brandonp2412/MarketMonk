@@ -1,0 +1,1 @@
+• Fix remove hardcoded org.gradle.java.home from gradle.properties
