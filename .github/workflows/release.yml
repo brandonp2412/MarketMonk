@@ -179,10 +179,11 @@ jobs:
 
       # Build from /home/brandon/market_monk to match fdroiddata reproducible build path,
       # so the dart_plugin_registrant.dart file URI embedded in libapp.so is identical.
-      - name: Move workspace to fdroiddata build path
+      # Use cp -al (hardlink copy) so $GITHUB_WORKSPACE still exists for Actions internals.
+      - name: Create fdroiddata build path
         run: |
           sudo mkdir -p /home/brandon
-          sudo mv "$GITHUB_WORKSPACE" /home/brandon/market_monk
+          sudo cp -al "$GITHUB_WORKSPACE" /home/brandon/market_monk
           sudo chown -R runner:runner /home/brandon/market_monk
 
       - name: Setup Java
