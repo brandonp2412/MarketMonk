@@ -1,0 +1,1 @@
+• Fix build android release from /home/brandon/market_monk for reproducibility
