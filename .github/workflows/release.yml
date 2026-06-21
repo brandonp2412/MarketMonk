@@ -165,6 +165,11 @@ jobs:
   build-android:
     needs: version-bump
     runs-on: ubuntu-latest
+    # PUB_CACHE must match fdroiddata's `export PUB_CACHE=$(pwd)/.pub-cache` so that
+    # the native jni library's build ID (which is SHA1 of debug info including pub cache
+    # source paths) is identical between CI and the fdroiddata reproducible build.
+    env:
+      PUB_CACHE: /home/brandon/market_monk/.pub-cache
     steps:
       - uses: actions/checkout@v4
         with:
