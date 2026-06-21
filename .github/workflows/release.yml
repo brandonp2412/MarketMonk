@@ -172,6 +172,14 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
+      # Build from /home/brandon/market_monk to match fdroiddata reproducible build path,
+      # so the dart_plugin_registrant.dart file URI embedded in libapp.so is identical.
+      - name: Move workspace to fdroiddata build path
+        run: |
+          sudo mkdir -p /home/brandon
+          sudo mv "$GITHUB_WORKSPACE" /home/brandon/market_monk
+          sudo chown -R runner:runner /home/brandon/market_monk
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -179,20 +187,24 @@ jobs:
           java-version: "17"
 
       - name: Setup Flutter from submodule
+        working-directory: /home/brandon/market_monk
         run: |
-          export PATH="$PATH:$PWD/flutter/bin"
-          echo "$PWD/flutter/bin" >> $GITHUB_PATH
+          export PATH="$PATH:/home/brandon/market_monk/flutter/bin"
+          echo "/home/brandon/market_monk/flutter/bin" >> $GITHUB_PATH
           flutter --version
           flutter config --no-analytics
           flutter precache
 
       - name: Get dependencies
+        working-directory: /home/brandon/market_monk
         run: flutter pub get
 
       - name: Run build_runner
+        working-directory: /home/brandon/market_monk
         run: dart run build_runner build -d
 
       - name: Decode Android keystore
+        working-directory: /home/brandon/market_monk
         run: |
           echo -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -di > android/app/keystore.jks
           echo "storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}" > android/key.properties
@@ -201,20 +213,25 @@ jobs:
           echo "storeFile=keystore.jks" >> android/key.properties
 
       - name: Build APK for x86_64
+        working-directory: /home/brandon/market_monk
         run: flutter build apk --release --build-name=${{ needs.version-bump.outputs.version }} --build-number=${{ needs.version-bump.outputs.build_number }} --target-platform android-x64 --split-per-abi
 
       - name: Build APK for armeabi-v7a
+        working-directory: /home/brandon/market_monk
         run: flutter build apk --release --build-name=${{ needs.version-bump.outputs.version }} --build-number=${{ needs.version-bump.outputs.build_number }} --target-platform android-arm --split-per-abi
 
       - name: Build APK for arm64-v8a
+        working-directory: /home/brandon/market_monk
         run: flutter build apk --release --build-name=${{ needs.version-bump.outputs.version }} --build-number=${{ needs.version-bump.outputs.build_number }} --target-platform android-arm64 --split-per-abi
 
       - name: Build universal APK
+        working-directory: /home/brandon/market_monk
         run: |
           flutter build apk --release --build-name=${{ needs.version-bump.outputs.version }} --build-number=${{ needs.version-bump.outputs.build_number }}
           mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/market_monk.apk
 
       - name: Build App Bundle
+        working-directory: /home/brandon/market_monk
         run: flutter build appbundle --release --build-name=${{ needs.version-bump.outputs.version }} --build-number=${{ needs.version-bump.outputs.build_number }}
 
       - name: Upload APK artifact
@@ -223,15 +240,15 @@ jobs:
         with:
           name: android-apk
           path: |
-            build/app/outputs/flutter-apk/app-*-release.apk
-            build/app/outputs/flutter-apk/market_monk.apk
+            /home/brandon/market_monk/build/app/outputs/flutter-apk/app-*-release.apk
+            /home/brandon/market_monk/build/app/outputs/flutter-apk/market_monk.apk
 
       - name: Upload AAB artifact
         if: github.actor != 'nektos/act'
         uses: actions/upload-artifact@v4
         with:
           name: android-aab
-          path: build/app/outputs/bundle/release/app-release.aab
+          path: /home/brandon/market_monk/build/app/outputs/bundle/release/app-release.aab
 
   build-linux:
     needs: version-bump
