@@ -1,0 +1,1 @@
+• Fix set PUB_CACHE to match fdroiddata path for reproducible libdartjni.so
