@@ -137,11 +137,11 @@ class PortfolioPageState extends State<PortfolioPage>
     final file = File('${dir.path}/positions_$safeName.csv');
     await file.writeAsString(buf.toString());
     if (!context.mounted) return;
-    await Share.shareXFiles(
-      [
-        XFile(file.path, mimeType: 'text/csv'),
-      ],
-      subject: 'Portfolio Positions',
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(file.path, mimeType: 'text/csv')],
+        subject: 'Portfolio Positions',
+      ),
     );
   }
 

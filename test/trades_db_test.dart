@@ -1,14 +1,7 @@
-import 'dart:ffi';
-
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:market_monk/database.dart';
-import 'package:sqlite3/open.dart';
 import 'package:test/test.dart';
-
-void _overrideSqlite3() {
-  open.overrideForAll(() => DynamicLibrary.open('libsqlite3.so.0'));
-}
 
 Database _openDb() => Database.connect(NativeDatabase.memory());
 
@@ -38,8 +31,6 @@ Future<Trade> _insertTrade(
     );
 
 void main() {
-  setUpAll(_overrideSqlite3);
-
   // ─── Basic CRUD ────────────────────────────────────────────────────────────
   group('Trades table — basic CRUD', () {
     late Database db;

@@ -1,16 +1,9 @@
-import 'dart:ffi';
-
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:market_monk/csv_import.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart' as app;
-import 'package:sqlite3/open.dart';
 import 'package:test/test.dart';
-
-void _overrideSqlite3() {
-  open.overrideForAll(() => DynamicLibrary.open('libsqlite3.so.0'));
-}
 
 Database _openDb() => Database.connect(NativeDatabase.memory());
 
@@ -58,8 +51,6 @@ const _ibkrCsvMinimal =
     '"U1234","","","USD","CASH","","NZD.USD","NZD.USD","99999","","","","","","","","","","","","","1","","","","","ExchTrade","999","888","xxx","yyy","","","","0","","","N/A","0","20260413;150000","20260413;150000","20260413","20260413","20260413","IDEALFX","BUY","100","0.58","58","-58","0","0","0","","","","","","","NZD","0","0","0","0","","","EXECUTION","","N","","0","","","","","","0.0","0.0"\n';
 
 void main() {
-  setUpAll(_overrideSqlite3);
-
   // ─── TigerBrokersParser — Trades section ───────────────────────────────────
   group('TigerBrokersParser — trades', () {
     late ParseResult result;

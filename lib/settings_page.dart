@@ -70,7 +70,7 @@ class _SettingsPageState extends State<SettingsPage> {
     if (selectedParser == null || !context.mounted) return;
 
     // Step 2: pick the CSV file
-    final result = await FilePicker.platform.pickFiles();
+    final result = await FilePicker.pickFiles();
     if (result == null || !context.mounted) return;
 
     // Step 3: parse
@@ -412,7 +412,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 final dbFolder = await getApplicationSupportDirectory();
                 final file = File(p.join(dbFolder.path, '$dbName.sqlite'));
                 final bytes = await file.readAsBytes();
-                final result = await FilePicker.platform.saveFile(
+                final result = await FilePicker.saveFile(
                   fileName: '$dbName.sqlite',
                   bytes: bytes,
                 );
@@ -472,7 +472,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 final activeAccount =
                     context.read<AccountManager>().activeAccount;
                 FilePickerResult? result =
-                    await FilePicker.platform.pickFiles();
+                    await FilePicker.pickFiles();
                 if (result == null) return;
 
                 File sourceFile = File(result.files.single.path!);

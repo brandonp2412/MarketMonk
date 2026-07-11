@@ -19,11 +19,24 @@ Map<String, double> allRatesFromUsd = {'USD': 1.0};
 double get exchangeRate =>
     allRatesFromUsd[currency.currencyName ?? 'USD'] ?? 1.0;
 
+/// Yahoo Finance uses cent-based currency codes for some exchanges.
+/// Maps cent code → (parent ISO code, divisor from cents to base units).
+const _yahooCentCurrencies = <String, (String, double)>{
+  'ZAc': ('ZAR', 100.0),
+  'GBp': ('GBP', 100.0),
+};
+
 /// In-memory cache: symbol → native ISO currency code (e.g. "INR" for .NS stocks).
 final Map<String, String> _symbolCurrencies = {};
 
+/// In-memory cache: symbol → cent divisor (100.0 for ZAc/GBp, else 1.0).
+final Map<String, double> _symbolCentDivisors = {};
+
 /// Returns the cached native currency for [symbol], defaulting to 'USD'.
 String symbolCurrency(String symbol) => _symbolCurrencies[symbol] ?? 'USD';
+
+/// Returns the cent divisor for [symbol] (100.0 for ZAc/GBp stocks, else 1.0).
+double symbolCentDivisor(String symbol) => _symbolCentDivisors[symbol] ?? 1.0;
 
 /// Ensures the native currency and its exchange rate are cached for [symbol].
 /// Returns immediately if already cached. Safe to call concurrently.
@@ -149,14 +162,16 @@ List<Position> computePositions(
         ? dates.reduce((a, b) => a.isAfter(b) ? a : b)
         : DateTime.now();
 
+    final centDiv = symbolCentDivisor(symbol);
+
     positions.add(
       Position(
         symbol: symbol,
         name: name,
         nativeCurrency: symbolCurrency(symbol),
         netShares: netShares,
-        avgCost: avgCost,
-        currentPrice: currentPrice,
+        avgCost: avgCost / centDiv,
+        currentPrice: currentPrice / centDiv,
         firstBuyDate: firstBuyDate,
         lastBuyDate: lastBuyDate,
       ),
@@ -365,15 +380,27 @@ Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
     final result =
         ((data['chart'] as Map<String, dynamic>?)?['result'] as List?)?.first
             as Map<String, dynamic>?;
-    final curr =
+    final rawCurr =
         (result?['meta'] as Map<String, dynamic>?)?['currency'] as String?;
-    if (curr == null || curr.isEmpty) return;
+    if (rawCurr == null || rawCurr.isEmpty) return;
 
-    _symbolCurrencies[symbol] = curr;
+    final centInfo = _yahooCentCurrencies[rawCurr];
+    final String normalizedCurr;
+    final double centDivisor;
+    if (centInfo != null) {
+      normalizedCurr = centInfo.$1;
+      centDivisor = centInfo.$2;
+    } else {
+      normalizedCurr = rawCurr;
+      centDivisor = 1.0;
+    }
 
-    // Only hit Frankfurter when the native currency is not already known.
-    if (!allRatesFromUsd.containsKey(curr) && curr != 'USD') {
-      await _fetchAndCacheRate(curr);
+    _symbolCurrencies[symbol] = normalizedCurr;
+    _symbolCentDivisors[symbol] = centDivisor;
+
+    if (!allRatesFromUsd.containsKey(normalizedCurr) &&
+        normalizedCurr != 'USD') {
+      await _fetchAndCacheRate(normalizedCurr);
     }
   } catch (_) {
     // Silently ignore — positions fall back to treating native as USD.

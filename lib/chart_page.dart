@@ -47,12 +47,13 @@ class ChartPageState extends State<ChartPage>
   double? _syncProgress; // null = indeterminate, 0.0–1.0 = determinate
   String? _stockError;
   String _nativeCurrency = 'USD';
+  double _centDivisor = 1.0;
 
   // Measured height of the floating search bar overlay so chart content can
   // be padded beneath it, while the chart's canvas extends to the top and
   // tooltips can render above the data without being clipped.
   final _overlayKey = GlobalKey();
-  double _overlayHeight = 70.0;
+  double _overlayHeight = 80.0;
 
   // Shared time period
   int years = 1;
@@ -351,6 +352,7 @@ class ChartPageState extends State<ChartPage>
       _mode = _ChartMode.searching;
       _searchLoading = true;
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureOverlay());
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 300), () async {
       final api = YahooFinanceApi();
@@ -387,6 +389,7 @@ class ChartPageState extends State<ChartPage>
         setState(() {
           _networkLoading = false;
           _nativeCurrency = symbolCurrency(symbol);
+          _centDivisor = symbolCentDivisor(symbol);
         });
       }
     }).catchError((Object e) {
@@ -470,6 +473,7 @@ class ChartPageState extends State<ChartPage>
       _searchLoading = false;
       _stockError = null;
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureOverlay());
   }
 
   @override
@@ -485,7 +489,7 @@ class ChartPageState extends State<ChartPage>
       children: [
         if (_mode == _ChartMode.searching)
           Padding(
-            padding: EdgeInsets.only(top: _overlayHeight),
+            padding: EdgeInsets.only(top: _overlayHeight + 8),
             child: _buildSearchResults(),
           )
         else
@@ -755,7 +759,8 @@ class ChartPageState extends State<ChartPage>
     );
     final color = pct >= 0 ? Colors.green : Colors.redAccent;
     final symbol = _selectedSymbol ?? '';
-    final dollarChange = candles.last.close.value - candles.first.close.value;
+    final dollarChange =
+        (candles.last.close.value - candles.first.close.value) / _centDivisor;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -781,7 +786,10 @@ class ChartPageState extends State<ChartPage>
                 ],
               ),
               Text(
-                fmtNativeCurrency(candles.last.close.value, _nativeCurrency),
+                fmtNativeCurrency(
+                  candles.last.close.value / _centDivisor,
+                  _nativeCurrency,
+                ),
                 style: Theme.of(context).textTheme.titleLarge,
               ),
             ],

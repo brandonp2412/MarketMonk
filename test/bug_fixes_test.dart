@@ -1,19 +1,10 @@
-import 'dart:ffi';
-
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:market_monk/database.dart';
-import 'package:sqlite3/open.dart';
 import 'package:test/test.dart';
 
 /// Opens a fresh in-memory database at the current schema version.
 Database openDb() => Database.connect(NativeDatabase.memory());
-
-/// On Linux the versioned library name is libsqlite3.so.0 — load it
-/// explicitly so tests run without the -dev symlink installed.
-void _overrideSqlite3() {
-  open.overrideForAll(() => DynamicLibrary.open('libsqlite3.so.0'));
-}
 
 Future<Trade> _insertTrade(
   Database db, {
@@ -35,8 +26,6 @@ Future<Trade> _insertTrade(
     );
 
 void main() {
-  setUpAll(_overrideSqlite3);
-
   // ─── Issue #16 ────────────────────────────────────────────────────────────
   //
   // Multiple trades for the same symbol must all be stored independently.
