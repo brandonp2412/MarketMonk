@@ -471,8 +471,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 Navigator.pop(context);
                 final activeAccount =
                     context.read<AccountManager>().activeAccount;
-                FilePickerResult? result =
-                    await FilePicker.pickFiles();
+                FilePickerResult? result = await FilePicker.pickFiles();
                 if (result == null) return;
 
                 File sourceFile = File(result.files.single.path!);

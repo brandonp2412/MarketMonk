@@ -84,7 +84,7 @@ class SettingsState extends ChangeNotifier {
     return supportedCurrencies.where(defaults.contains).toList();
   }
 
-  init() async {
+  Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     final themeStr = prefs.getString('theme');
 
