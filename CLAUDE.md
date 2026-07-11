@@ -12,6 +12,13 @@
 - Before implementing features for a package, use the browser tool to read the latest README and API docs on `https://pub.dev/packages/[PACKAGE_NAME]`.
 - Note: Your Flutter MCP is for the SDK; use the browser for community packages like Drift, Riverpod, etc.
 
+# Flutter SDK & Lockfile Rules
+
+- The `flutter` git submodule is the single source of truth for the SDK version. CI, releases, and F-Droid all build with the pinned submodule and run `flutter pub get --enforce-lockfile`.
+- ALWAYS regenerate `pubspec.lock` using the submodule's Flutter (`flutter/bin/flutter pub get`), never a globally installed Flutter. The lockfile pins SDK-vendored packages (`meta`, `test`, `test_api`, `test_core`, `vector_math`, etc.) whose versions are dictated by the SDK, not pub.dev.
+- **Lockfile Protocol**: Any change that touches `pubspec.lock` (dependency add/upgrade/remove, or a regenerated lockfile) MUST be committed together with a matching `flutter` submodule bump if the SDK version changed. A lockfile generated with a newer Flutter than the pinned submodule breaks the F-Droid build (`Unable to satisfy pubspec.yaml using pubspec.lock`).
+- To bump the SDK: update the submodule (`git -C flutter checkout <tag>`), run `flutter/bin/flutter pub get`, regenerate plugin registrants, then commit the submodule pointer and `pubspec.lock` in the same commit.
+
 # Quality Standards (Definition of Done)
 
 - Before completing any task, you MUST ensure these commands pass:
