@@ -42,11 +42,11 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
       builder: (context, snap) {
         final trades = snap.data ?? widget.summary.trades;
         final totalRealized = trades.fold(0.0, (sum, t) => sum + t.realizedPL);
-        final nativeCurr = symbolCurrency(widget.summary.symbol);
+        final symbol = widget.summary.symbol;
+        final nativeCurr = symbolCurrency(symbol);
+        final centDiv = symbolCentDivisor(symbol);
         final nativeRate = allRatesFromUsd[nativeCurr] ?? 1.0;
-        // Convert realized P/L from native currency to USD so it can be added
-        // to unrealizedPL (which Position already expresses in USD).
-        final totalRealizedUsd = totalRealized / nativeRate;
+        final totalRealizedUsd = totalRealized / centDiv / nativeRate;
         final unrealizedPL = position?.unrealizedPL ?? 0.0;
         final totalGain = totalRealizedUsd + unrealizedPL;
 
@@ -118,7 +118,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                           _SummaryRow(
                             label: 'Realized P/L',
                             value:
-                                '${totalRealized >= 0 ? '+' : ''}${fmtNativeCurrency(totalRealized, nativeCurr)}',
+                                '${totalRealized >= 0 ? '+' : ''}${fmtNativeCurrency(totalRealized / centDiv, nativeCurr)}',
                             color: totalRealized >= 0
                                 ? Colors.green
                                 : Colors.redAccent,
@@ -148,6 +148,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                   ...trades.map(
                     (t) => _TradeTile(
                       trade: t,
+                      centDiv: centDiv,
                       onLongPress: () => _showTradeActions(t),
                     ),
                   ),
@@ -255,16 +256,21 @@ class _SummaryRow extends StatelessWidget {
 
 class _TradeTile extends StatelessWidget {
   final Trade trade;
+  final double centDiv;
   final VoidCallback? onLongPress;
 
-  const _TradeTile({required this.trade, this.onLongPress});
+  const _TradeTile({
+    required this.trade,
+    required this.centDiv,
+    this.onLongPress,
+  });
 
   @override
   Widget build(BuildContext context) {
     final isBuy = trade.tradeType == 'open';
     final dateStr = DateFormat('dd MMM yyyy').format(trade.tradeDate);
     final qty = trade.quantity.abs();
-    final total = (qty * trade.price).abs();
+    final total = (qty * trade.price / centDiv).abs();
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -289,7 +295,7 @@ class _TradeTile extends StatelessWidget {
           ),
         ),
         subtitle: Text(
-          '${qty.toStringAsFixed(4)} @ ${fmtNativeCurrency(trade.price, symbolCurrency(trade.symbol))}  ·  $dateStr',
+          '${qty.toStringAsFixed(4)} @ ${fmtNativeCurrency(trade.price / centDiv, symbolCurrency(trade.symbol))}  ·  $dateStr',
         ),
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -298,7 +304,7 @@ class _TradeTile extends StatelessWidget {
             Text(fmtNativeCurrency(total, symbolCurrency(trade.symbol))),
             if (!isBuy && trade.realizedPL != 0)
               Text(
-                '${trade.realizedPL >= 0 ? '+' : ''}${fmtNativeCurrency(trade.realizedPL, symbolCurrency(trade.symbol))}',
+                '${trade.realizedPL >= 0 ? '+' : ''}${fmtNativeCurrency(trade.realizedPL / centDiv, symbolCurrency(trade.symbol))}',
                 style: TextStyle(
                   fontSize: 11,
                   color:
