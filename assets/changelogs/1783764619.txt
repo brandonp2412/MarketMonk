@@ -1,0 +1,2 @@
+• Fix bump flutter submodule to 3.44.6 to match pubspec.lock
+• Fix currency conversion for ZAc/GBp cent-denominated stocks and search bar layout
