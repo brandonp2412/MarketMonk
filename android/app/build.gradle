@@ -32,7 +32,6 @@ android {
             def sdkDir = android.sdkDirectory.absolutePath
             if (sdkDir != "/opt/android-sdk") {
                 cFlags "-fdebug-prefix-map=${sdkDir}=/opt/android-sdk"
-                cppFlags "-fdebug-prefix-map=${sdkDir}=/opt/android-sdk"
             }
         }
     }
