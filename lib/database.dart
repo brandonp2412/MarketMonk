@@ -66,6 +66,14 @@ class Database extends _$Database {
         await customStatement('PRAGMA foreign_keys = ON');
       },
       beforeOpen: (details) async {
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_candles_symbol_date '
+          'ON candles (symbol, date)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_trades_symbol_trade_date '
+          'ON trades (symbol, trade_date)',
+        );
         if (kDebugMode) await validateDatabaseSchema();
       },
     );
@@ -134,6 +142,15 @@ class Database extends _$Database {
     }
 
     await customStatement('DROP TABLE tickers');
+
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_candles_symbol_date '
+      'ON candles (symbol, date)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_trades_symbol_trade_date '
+      'ON trades (symbol, trade_date)',
+    );
   }
 
   static final _upgrade = migrationSteps(
