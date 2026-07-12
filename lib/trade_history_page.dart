@@ -31,6 +31,9 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                 ),
           ]))
         .watch();
+    fetchSymbolCurrencyAndRate(widget.summary.symbol).then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override

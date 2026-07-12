@@ -27,6 +27,23 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  static const _brokerCsvInstructions = {
+    'Tiger Brokers': [
+      'Log into Tiger Trade (app or web).',
+      'Go to Account (Me) → Statements.',
+      'Pick a date range covering the trades to import.',
+      'Enable "Display Detailed Trading Records" so individual fills are included, not just summary totals.',
+      'Set the export format to CSV and download the statement.',
+    ],
+    'Interactive Brokers': [
+      'Log into IBKR Client Portal.',
+      'Go to Reports → Flex Queries, then click "+" next to Activity Flex Query.',
+      'Under Sections, add Trades, set Options to Execution (one row per fill), and click Select All for the fields.',
+      'Save the query, then set Period to a custom date range covering your trades (IBKR limits each run to 1 year).',
+      'Set Format to CSV, then Run the query and download the file.',
+    ],
+  };
+
   Future<void> _importCsv(BuildContext context) async {
     // Step 1: broker selection dialog
     BrokerCsvParser? selectedParser;
@@ -37,18 +54,44 @@ class _SettingsPageState extends State<SettingsPage> {
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
           title: const Text('Select broker'),
-          content: DropdownButton<BrokerCsvParser>(
-            value: currentSelection,
-            isExpanded: true,
-            items: supportedBrokers
-                .map(
-                  (parser) =>
-                      DropdownMenuItem(value: parser, child: Text(parser.name)),
-                )
-                .toList(),
-            onChanged: (value) {
-              if (value != null) setState(() => currentSelection = value);
-            },
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DropdownButton<BrokerCsvParser>(
+                  value: currentSelection,
+                  isExpanded: true,
+                  items: supportedBrokers
+                      .map(
+                        (parser) => DropdownMenuItem(
+                          value: parser,
+                          child: Text(parser.name),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) setState(() => currentSelection = value);
+                  },
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'How to get this CSV from ${currentSelection.name}:',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 4),
+                ...(_brokerCsvInstructions[currentSelection.name] ?? [])
+                    .asMap()
+                    .entries
+                    .map(
+                      (entry) => Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text('${entry.key + 1}. ${entry.value}'),
+                      ),
+                    ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
