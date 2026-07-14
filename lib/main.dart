@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/chart_page.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/holdings_page.dart';
@@ -154,6 +155,17 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  final _pageController = PageController();
+  var _currentIndex = 0;
+
+  static const _tabs = ['ChartPage', 'PortfolioPage', 'HoldingsPage'];
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -163,25 +175,26 @@ class _MyHomePageState extends State<MyHomePage> {
         statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
       ),
     );
-    return const DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        body: SafeArea(
-          child: TabBarView(
-            children: [ChartPage(), PortfolioPage(), HoldingsPage()],
-          ),
+    return Scaffold(
+      extendBody: true,
+      body: SafeArea(
+        child: PageView(
+          controller: _pageController,
+          onPageChanged: (i) => setState(() => _currentIndex = i),
+          children: const [ChartPage(), PortfolioPage(), HoldingsPage()],
         ),
-        bottomNavigationBar: SafeArea(
-          top: false,
-          child: TabBar(
-            dividerColor: Colors.transparent,
-            tabs: [
-              Tab(icon: Icon(Icons.insights), text: "Charts"),
-              Tab(icon: Icon(Icons.pie_chart), text: "Portfolio"),
-              Tab(icon: Icon(Icons.list_alt), text: "Holdings"),
-            ],
-          ),
-        ),
+      ),
+      bottomNavigationBar: BottomNav(
+        tabs: _tabs,
+        currentIndex: _currentIndex,
+        onTap: (i) {
+          _pageController.animateToPage(
+            i,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeOutCubic,
+          );
+          setState(() => _currentIndex = i);
+        },
       ),
     );
   }

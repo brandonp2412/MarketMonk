@@ -24,8 +24,8 @@ void main() {
     await tester.pump();
 
     expect(find.text('Charts'), findsOneWidget);
-    expect(find.text('Portfolio'), findsOneWidget);
-    expect(find.text('Holdings'), findsOneWidget);
+    expect(find.bySemanticsLabel('Portfolio'), findsOneWidget);
+    expect(find.bySemanticsLabel('Holdings'), findsOneWidget);
   });
 
   testWidgets(
