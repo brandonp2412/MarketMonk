@@ -178,23 +178,32 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       extendBody: true,
       body: SafeArea(
-        child: PageView(
-          controller: _pageController,
-          onPageChanged: (i) => setState(() => _currentIndex = i),
-          children: const [ChartPage(), PortfolioPage(), HoldingsPage()],
+        child: Stack(
+          children: [
+            PageView(
+              controller: _pageController,
+              onPageChanged: (i) => setState(() => _currentIndex = i),
+              children: const [ChartPage(), PortfolioPage(), HoldingsPage()],
+            ),
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: BottomNav(
+                tabs: _tabs,
+                currentIndex: _currentIndex,
+                onTap: (i) {
+                  _pageController.animateToPage(
+                    i,
+                    duration: const Duration(milliseconds: 350),
+                    curve: Curves.easeOutCubic,
+                  );
+                  setState(() => _currentIndex = i);
+                },
+              ),
+            ),
+          ],
         ),
-      ),
-      bottomNavigationBar: BottomNav(
-        tabs: _tabs,
-        currentIndex: _currentIndex,
-        onTap: (i) {
-          _pageController.animateToPage(
-            i,
-            duration: const Duration(milliseconds: 350),
-            curve: Curves.easeOutCubic,
-          );
-          setState(() => _currentIndex = i);
-        },
       ),
     );
   }
