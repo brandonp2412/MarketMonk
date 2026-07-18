@@ -1,0 +1,10 @@
+• Add rule for editing pubspec.lock to CLAUDE.md
+• Explain the imports from other platforms
+• Fix holdings add button being obscured by bottom nav
+• Fix running on linux
+• Fix toasts not auto dismissing
+• Reduce odd coloring of holdings deletions
+• Simplify menu of portfolio page
+• Update serena config
+• add Y axis currency labels to stock and portfolio charts
+• Fix apply GBX/GBP cent scaling consistently across charts (#30)
