@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart' hide Column, Table;
 import 'package:flutter/material.dart';
+import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/main.dart';
@@ -302,14 +303,17 @@ class HoldingsPageState extends State<HoldingsPage>
               label: Text('Delete (${_selectedSymbols.length})'),
               icon: const Icon(Icons.delete),
             )
-          : FloatingActionButton.extended(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const EditTickerPage()),
+          : Padding(
+              padding: const EdgeInsets.only(bottom: bottomNavHeight),
+              child: FloatingActionButton.extended(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const EditTickerPage()),
+                ),
+                label: const Text('Add'),
+                icon: const Icon(Icons.add),
+                tooltip: 'Add trade',
               ),
-              label: const Text('Add'),
-              icon: const Icon(Icons.add),
-              tooltip: 'Add trade',
             ),
     );
   }
