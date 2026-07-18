@@ -282,9 +282,12 @@ class ChartPageState extends State<ChartPage>
               (c) => OrderingTerm(expression: c.date, mode: OrderingMode.asc),
             ]))
           .get();
+      final centDiv = symbolCentDivisor(symbol);
+      final nativeRate = allRatesFromUsd[symbolCurrency(symbol)] ?? 1.0;
       pricesBySymbol[symbol] = {
         for (final c in rows)
-          DateTime(c.date.year, c.date.month, c.date.day): c.close,
+          DateTime(c.date.year, c.date.month, c.date.day):
+              c.close / centDiv / nativeRate,
       };
     }
 
@@ -382,24 +385,23 @@ class ChartPageState extends State<ChartPage>
       _stockError = null;
     });
     _setStockStream(symbol);
-    syncCandles(symbol).then((_) async {
+    () async {
+      String? err;
+      try {
+        await syncCandles(symbol);
+      } catch (e) {
+        err = e.toString();
+      }
       await fetchSymbolCurrencyAndRate(symbol);
-      if (mounted) {
-        _setStockStream(symbol);
-        setState(() {
-          _networkLoading = false;
-          _nativeCurrency = symbolCurrency(symbol);
-          _centDivisor = symbolCentDivisor(symbol);
-        });
-      }
-    }).catchError((Object e) {
-      if (mounted) {
-        setState(() {
-          _networkLoading = false;
-          _stockError = e.toString();
-        });
-      }
-    });
+      if (!mounted) return;
+      _setStockStream(symbol);
+      setState(() {
+        _networkLoading = false;
+        _stockError = err;
+        _nativeCurrency = symbolCurrency(symbol);
+        _centDivisor = symbolCentDivisor(symbol);
+      });
+    }();
   }
 
   void _setStockStream(String symbol) {
@@ -737,12 +739,16 @@ class ChartPageState extends State<ChartPage>
     final candles = snapshot.data!.map((tc) => tc.candle).toList();
     final spots = <FlSpot>[
       for (var i = 0; i < candles.length; i++)
-        FlSpot(i.toDouble(), candles[i].close.value),
+        FlSpot(i.toDouble(), candles[i].close.value / _centDivisor),
     ];
 
     return SizedBox(
       height: height,
-      child: TickerLine(dates: candles.map((c) => c.date.value), spots: spots),
+      child: TickerLine(
+        dates: candles.map((c) => c.date.value),
+        spots: spots,
+        nativeCurrency: _nativeCurrency,
+      ),
     );
   }
 

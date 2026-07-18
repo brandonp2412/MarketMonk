@@ -427,9 +427,7 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
               decoration: InputDecoration(
                 labelText: 'Price',
                 border: const OutlineInputBorder(),
-                prefixText: nativeCurrencySymbol(
-                  symbolCurrency(widget.trade.symbol),
-                ),
+                prefixText: symbolPriceUnit(widget.trade.symbol),
               ),
             ),
             if (!_isBuy) ...[
@@ -443,9 +441,7 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
                 decoration: InputDecoration(
                   labelText: 'Realized P/L',
                   border: const OutlineInputBorder(),
-                  prefixText: nativeCurrencySymbol(
-                    symbolCurrency(widget.trade.symbol),
-                  ),
+                  prefixText: symbolPriceUnit(widget.trade.symbol),
                 ),
               ),
             ],

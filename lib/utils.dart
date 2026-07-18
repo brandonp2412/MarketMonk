@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
 
 var currency = NumberFormat.simpleCurrency();
@@ -37,6 +38,24 @@ String symbolCurrency(String symbol) => _symbolCurrencies[symbol] ?? 'USD';
 
 /// Returns the cent divisor for [symbol] (100.0 for ZAc/GBp stocks, else 1.0).
 double symbolCentDivisor(String symbol) => _symbolCentDivisors[symbol] ?? 1.0;
+
+/// Caches [rawCurrency] (as reported by Yahoo, e.g. 'GBp') for [symbol],
+/// normalizing cent codes to their parent ISO currency (GBp → GBP ÷ 100).
+/// Returns the normalized ISO code.
+String cacheSymbolMeta(String symbol, String rawCurrency) {
+  final centInfo = _yahooCentCurrencies[rawCurrency];
+  _symbolCurrencies[symbol] = centInfo?.$1 ?? rawCurrency;
+  _symbolCentDivisors[symbol] = centInfo?.$2 ?? 1.0;
+  return centInfo?.$1 ?? rawCurrency;
+}
+
+/// Label for the raw unit that [symbol]'s prices are quoted in — the cent
+/// code (e.g. "GBp") for cent-quoted stocks, else the currency symbol.
+String symbolPriceUnit(String symbol) {
+  final curr = symbolCurrency(symbol);
+  if (symbolCentDivisor(symbol) == 1.0) return nativeCurrencySymbol(curr);
+  return '${_yahooCentCurrencies.entries.firstWhere((e) => e.value.$1 == curr).key} ';
+}
 
 /// Ensures the native currency and its exchange rate are cached for [symbol].
 /// Returns immediately if already cached. Safe to call concurrently.
@@ -190,6 +209,11 @@ Future<Map<String, double>> fetchLatestPrices(
 }) async {
   if (symbols.isEmpty) return {};
   final d = database ?? db;
+
+  // Every computePositions caller fetches prices first, so this is the choke
+  // point that guarantees currency + cent-divisor metadata is loaded before
+  // positions are computed (GBp candles would otherwise be read as GBP, #30).
+  await Future.wait(symbols.map(_fetchSymbolCurrencyAndRate));
 
   final ph = List.filled(symbols.length, '?').join(', ');
   try {
@@ -364,9 +388,22 @@ Future<void> syncCandles(String symbol, {Database? database}) async {
 /// then — only if that currency differs from USD — lazily fetches its USD-based
 /// exchange rate from Frankfurter and stores it in [allRatesFromUsd].
 ///
-/// Both results are cached in-memory so repeat calls are free.
+/// Results are cached in-memory and in SharedPreferences, so repeat calls are
+/// free and cent-quoted stocks (GBp/ZAc) keep the right scale offline.
 Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
   if (_symbolCurrencies.containsKey(symbol)) return;
+
+  final prefs = await SharedPreferences.getInstance();
+  final savedRaw = prefs.getString('symbolRawCurrency_$symbol');
+  if (savedRaw != null) {
+    final normalized = cacheSymbolMeta(symbol, savedRaw);
+    if (normalized != 'USD' && !allRatesFromUsd.containsKey(normalized)) {
+      final savedRate = prefs.getDouble('exchangeRate_$normalized');
+      if (savedRate != null) allRatesFromUsd[normalized] = savedRate;
+      unawaited(_fetchAndCacheRate(normalized));
+    }
+    return;
+  }
 
   try {
     final uri = Uri.parse(
@@ -384,19 +421,8 @@ Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
         (result?['meta'] as Map<String, dynamic>?)?['currency'] as String?;
     if (rawCurr == null || rawCurr.isEmpty) return;
 
-    final centInfo = _yahooCentCurrencies[rawCurr];
-    final String normalizedCurr;
-    final double centDivisor;
-    if (centInfo != null) {
-      normalizedCurr = centInfo.$1;
-      centDivisor = centInfo.$2;
-    } else {
-      normalizedCurr = rawCurr;
-      centDivisor = 1.0;
-    }
-
-    _symbolCurrencies[symbol] = normalizedCurr;
-    _symbolCentDivisors[symbol] = centDivisor;
+    final normalizedCurr = cacheSymbolMeta(symbol, rawCurr);
+    await prefs.setString('symbolRawCurrency_$symbol', rawCurr);
 
     if (!allRatesFromUsd.containsKey(normalizedCurr) &&
         normalizedCurr != 'USD') {
@@ -420,7 +446,11 @@ Future<void> _fetchAndCacheRate(String currencyCode) async {
     final data = json.decode(response.body) as Map<String, dynamic>;
     final rate = ((data['rates'] as Map<String, dynamic>)[currencyCode] as num?)
         ?.toDouble();
-    if (rate != null) allRatesFromUsd[currencyCode] = rate;
+    if (rate != null) {
+      allRatesFromUsd[currencyCode] = rate;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('exchangeRate_$currencyCode', rate);
+    }
   } catch (_) {
     // Silently ignore — the position falls back to treating native as USD.
   }

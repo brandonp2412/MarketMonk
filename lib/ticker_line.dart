@@ -11,7 +11,15 @@ class TickerLine extends StatelessWidget {
   final List<FlSpot> spots;
   final Iterable<DateTime> dates;
 
-  const TickerLine({super.key, required this.spots, required this.dates});
+  /// ISO 4217 currency the [spots] values are denominated in.
+  final String nativeCurrency;
+
+  const TickerLine({
+    super.key,
+    required this.spots,
+    required this.dates,
+    this.nativeCurrency = 'USD',
+  });
 
   Widget getBottomTitles(
     double value,
@@ -118,7 +126,7 @@ class TickerLine extends StatelessWidget {
     BuildContext context,
     DateFormat formatter,
   ) {
-    final price = fmtCurrency(touchedSpots.first.y);
+    final price = fmtNativeCurrency(touchedSpots.first.y, nativeCurrency);
     final dateStr = dates.elementAtOrNull(touchedSpots.first.x.toInt());
     if (dateStr == null) return [];
     final date = formatter.format(dateStr);

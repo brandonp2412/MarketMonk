@@ -105,9 +105,10 @@ class _EditTickerPageState extends State<EditTickerPage> {
     final candles =
         snapshot.data!.map((tickerCandle) => tickerCandle.candle).toList();
     if (candles.isEmpty) return const SizedBox();
+    final centDiv = symbolCentDivisor(symbol.text.split(' ').first);
     List<FlSpot> spots = [];
     for (var index = 0; index < candles.length; index++) {
-      spots.add(FlSpot(index.toDouble(), candles[index].close.value));
+      spots.add(FlSpot(index.toDouble(), candles[index].close.value / centDiv));
     }
 
     var percentChange = safePercentChange(
@@ -122,6 +123,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
           child: TickerLine(
             dates: candles.map((candle) => candle.date.value),
             spots: spots,
+            nativeCurrency: _nativeCurrency,
           ),
         ),
         ListTile(
@@ -332,7 +334,9 @@ class _EditTickerPageState extends State<EditTickerPage> {
                     controller: price,
                     decoration: InputDecoration(
                       labelText: 'Price',
-                      prefix: Text(nativeCurrencySymbol(_nativeCurrency)),
+                      prefix: Text(
+                        symbolPriceUnit(symbol.text.split(' ').first),
+                      ),
                     ),
                     onTap: () => selectAll(price),
                     keyboardType: TextInputType.number,
