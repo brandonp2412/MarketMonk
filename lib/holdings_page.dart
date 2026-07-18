@@ -216,11 +216,8 @@ class HoldingsPageState extends State<HoldingsPage>
           PopupMenuItem(
             onTap: () => _deleteSelected(context),
             child: const ListTile(
-              leading: Icon(Icons.delete, color: Colors.redAccent),
-              title: Text(
-                'Delete selected',
-                style: TextStyle(color: Colors.redAccent),
-              ),
+              leading: Icon(Icons.delete),
+              title: Text('Delete selected'),
             ),
           ),
           PopupMenuItem(

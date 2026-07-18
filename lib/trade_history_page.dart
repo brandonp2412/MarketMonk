@@ -186,11 +186,8 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete, color: Colors.redAccent),
-              title: const Text(
-                'Delete trade',
-                style: TextStyle(color: Colors.redAccent),
-              ),
+              leading: const Icon(Icons.delete),
+              title: const Text('Delete trade'),
               onTap: () {
                 Navigator.pop(ctx);
                 _confirmDeleteTrade(trade);
