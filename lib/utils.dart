@@ -89,8 +89,10 @@ void toast(BuildContext context, String message, [SnackBarAction? action]) {
     SnackBar(
       content: Text(message),
       behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 4),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       action: action ?? defaultAction,
+      persist: false,
     ),
   );
 }
