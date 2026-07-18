@@ -27,7 +27,7 @@ class TickerLine extends StatelessWidget {
     BuildContext context,
     DateFormat formatter,
   ) {
-    const style = TextStyle(fontWeight: FontWeight.bold, fontSize: 16);
+    const style = TextStyle(fontSize: 12);
     Widget text;
 
     double screenWidth = MediaQuery.of(context).size.width;

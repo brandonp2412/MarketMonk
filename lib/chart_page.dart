@@ -1010,10 +1010,7 @@ class ChartPageState extends State<ChartPage>
                       fitInside: SideTitleFitInsideData.fromTitleMeta(meta),
                       child: Text(
                         formatter.format(sortedDates[i]),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
+                        style: const TextStyle(fontSize: 12),
                       ),
                     );
                   },
