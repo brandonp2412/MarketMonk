@@ -965,6 +965,7 @@ class ChartPageState extends State<ChartPage>
         child: LineChart(
           LineChartData(
             clipData: const FlClipData.all(),
+            borderData: FlBorderData(show: false),
             titlesData: FlTitlesData(
               topTitles: const AxisTitles(
                 sideTitles: SideTitles(showTitles: false),
@@ -972,8 +973,20 @@ class ChartPageState extends State<ChartPage>
               rightTitles: const AxisTitles(
                 sideTitles: SideTitles(showTitles: false),
               ),
-              leftTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: false),
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 46,
+                  minIncluded: false,
+                  maxIncluded: false,
+                  getTitlesWidget: (value, meta) => SideTitleWidget(
+                    meta: meta,
+                    child: Text(
+                      fmtCompactCurrency(value),
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ),
               ),
               bottomTitles: AxisTitles(
                 sideTitles: SideTitles(

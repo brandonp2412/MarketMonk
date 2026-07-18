@@ -65,6 +65,7 @@ class TickerLine extends StatelessWidget {
       padding: const EdgeInsets.only(left: 8.0, right: 8.0, top: 24.0),
       child: LineChart(
         LineChartData(
+          borderData: FlBorderData(show: false),
           clipData: const FlClipData.all(),
           titlesData: FlTitlesData(
             topTitles: const AxisTitles(
@@ -73,8 +74,20 @@ class TickerLine extends StatelessWidget {
             rightTitles: const AxisTitles(
               sideTitles: SideTitles(showTitles: false),
             ),
-            leftTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 46,
+                minIncluded: false,
+                maxIncluded: false,
+                getTitlesWidget: (value, meta) => SideTitleWidget(
+                  meta: meta,
+                  child: Text(
+                    fmtCompactNativeCurrency(value, nativeCurrency),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ),
             ),
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(

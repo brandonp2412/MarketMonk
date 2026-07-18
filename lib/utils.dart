@@ -75,6 +75,17 @@ String fmtNativeCurrency(double v, String nativeCurrency) {
   return fmtCurrency(v / nativeRate);
 }
 
+/// Compact display-currency label for chart axes (e.g. $1.2K).
+String fmtCompactCurrency(double v) =>
+    NumberFormat.compactCurrency(symbol: currency.currencySymbol)
+        .format(v * exchangeRate);
+
+/// Compact axis label for [v] denominated in [nativeCurrency].
+String fmtCompactNativeCurrency(double v, String nativeCurrency) {
+  final nativeRate = allRatesFromUsd[nativeCurrency] ?? 1.0;
+  return fmtCompactCurrency(v / nativeRate);
+}
+
 /// Returns the [NumberFormat.currencySymbol] for [nativeCurrency].
 String nativeCurrencySymbol(String nativeCurrency) =>
     NumberFormat.simpleCurrency(name: nativeCurrency).currencySymbol;
