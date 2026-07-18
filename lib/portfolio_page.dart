@@ -243,6 +243,7 @@ class PortfolioPageState extends State<PortfolioPage>
                 totalValue: totalValue,
                 totalGain: totalGain,
                 totalGainPct: totalGainPct,
+                onExport: () => _exportCsv(context, positions),
               ),
             ),
           ),
@@ -257,7 +258,6 @@ class PortfolioPageState extends State<PortfolioPage>
                   _filterText = '';
                   _filterController.clear();
                 }),
-                onExport: () => _exportCsv(context, positions),
               ),
             ),
           ),
@@ -403,17 +403,20 @@ class _SummaryCard extends StatelessWidget {
   final double totalValue;
   final double totalGain;
   final double totalGainPct;
+  final VoidCallback onExport;
 
   const _SummaryCard({
     required this.totalValue,
     required this.totalGain,
     required this.totalGainPct,
+    required this.onExport,
   });
 
   @override
   Widget build(BuildContext context) {
     final gainColor = totalGain >= 0 ? Colors.green : Colors.redAccent;
     final settings = context.watch<SettingsState>();
+    final accounts = context.watch<AccountManager>();
     return Card(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -436,16 +439,53 @@ class _SummaryCard extends StatelessWidget {
               ],
             ),
             const Spacer(),
-            DropdownButton<String>(
-              value: settings.displayCurrency,
-              isDense: true,
-              underline: const SizedBox(),
-              items: settings.visibleCurrencies
-                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                  .toList(),
-              onChanged: (value) {
-                if (value != null) settings.setDisplayCurrency(value);
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == '__export__') {
+                  onExport();
+                } else if (value.startsWith('cur:')) {
+                  settings.setDisplayCurrency(value.substring(4));
+                } else if (value.startsWith('acc:')) {
+                  accounts.switchAccount(value.substring(4));
+                }
               },
+              itemBuilder: (ctx) => [
+                ...settings.visibleCurrencies.map(
+                  (c) => CheckedPopupMenuItem(
+                    value: 'cur:$c',
+                    checked: c == settings.displayCurrency,
+                    child: Text(c),
+                  ),
+                ),
+                if (accounts.accounts.length > 1) ...[
+                  const PopupMenuDivider(),
+                  ...accounts.accounts.map(
+                    (a) => CheckedPopupMenuItem(
+                      value: 'acc:$a',
+                      checked: a == accounts.activeAccount,
+                      child: Text(a),
+                    ),
+                  ),
+                ],
+                const PopupMenuDivider(),
+                const PopupMenuItem(
+                  value: '__export__',
+                  child: Row(
+                    children: [
+                      Icon(Icons.download, size: 20),
+                      SizedBox(width: 8),
+                      Text('Export CSV'),
+                    ],
+                  ),
+                ),
+              ],
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(settings.displayCurrency),
+                  const Icon(Icons.arrow_drop_down),
+                ],
+              ),
             ),
           ],
         ),
@@ -459,19 +499,16 @@ class _FilterRow extends StatelessWidget {
   final String filterText;
   final ValueChanged<String> onChanged;
   final VoidCallback onClear;
-  final VoidCallback onExport;
 
   const _FilterRow({
     required this.controller,
     required this.filterText,
     required this.onChanged,
     required this.onClear,
-    required this.onExport,
   });
 
   @override
   Widget build(BuildContext context) {
-    final accounts = context.watch<AccountManager>();
     return Row(
       children: [
         Expanded(
@@ -493,32 +530,6 @@ class _FilterRow extends StatelessWidget {
                   : null,
             ),
           ),
-        ),
-        if (accounts.accounts.length > 1) ...[
-          const SizedBox(width: 8),
-          PopupMenuButton<String>(
-            initialValue: accounts.activeAccount,
-            onSelected: accounts.switchAccount,
-            popUpAnimationStyle: const AnimationStyle(
-              duration: Duration(milliseconds: 80),
-            ),
-            itemBuilder: (context) => accounts.accounts
-                .map((a) => PopupMenuItem(value: a, child: Text(a)))
-                .toList(),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(accounts.activeAccount[0].toUpperCase()),
-                const Icon(Icons.arrow_drop_down),
-              ],
-            ),
-          ),
-        ],
-        const SizedBox(width: 4),
-        IconButton(
-          icon: const Icon(Icons.download),
-          tooltip: 'Export positions as CSV',
-          onPressed: onExport,
         ),
       ],
     );
