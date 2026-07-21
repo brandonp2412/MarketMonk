@@ -10,12 +10,11 @@ dependencies:
   yahoo_finance_data_reader: ^1.0.11
   fl_chart: ^1.2.0
   intl: ^0.20.1
-  drift: 2.34.0
+  drift: 2.34.2
   drift_flutter: ^0.3.0
   path_provider: ^2.1.5
   drift_dev: ^2.23.1
   test: ^1.25.8
-  sqlite3_flutter_libs: ^0.6.0+eol
   flutter_launcher_icons: ^0.14.2
   shared_preferences: ^2.3.5
   provider: ^6.1.2
