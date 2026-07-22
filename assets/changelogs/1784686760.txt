@@ -1,0 +1,1 @@
+• Fix revert AGP/Kotlin/Gradle bump, dynamic_color not AGP 9-ready
