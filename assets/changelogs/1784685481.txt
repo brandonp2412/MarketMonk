@@ -1,0 +1,1 @@
+• Fix opt out of android.newDsl, incompatible with AGP 9 in Flutter 3.44.7
