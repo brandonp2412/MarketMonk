@@ -1,0 +1,1 @@
+• Fix use Flutter's AGP 9 escape hatch instead of reverting to AGP 8
