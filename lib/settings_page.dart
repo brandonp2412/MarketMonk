@@ -332,6 +332,10 @@ class _SettingsPageState extends State<SettingsPage> {
               child: DropdownButtonFormField<String>(
                 initialValue: settings.dateFormat,
                 items: const [
+                  DropdownMenuItem(
+                    value: "yyyy-MM-dd",
+                    child: Text("yyyy-MM-dd"),
+                  ),
                   DropdownMenuItem(value: "d/M/yy", child: Text("d/M/yy")),
                   DropdownMenuItem(value: "M/d/yy", child: Text("M/d/yy")),
                   DropdownMenuItem(value: "d-M-yy", child: Text("d-M-yy")),
