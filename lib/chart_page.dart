@@ -51,7 +51,9 @@ class ChartPageState extends State<ChartPage>
 
   // Measured height of the floating search bar overlay so chart content can
   // be padded beneath it, while the chart's canvas extends to the top and
-  // tooltips can render above the data without being clipped.
+  // tooltips can render above the data without being clipped. Re-measured
+  // whenever the overlay's laid-out size changes (the first frame can be
+  // laid out at a degenerate size, e.g. before the Linux window is realized).
   final _overlayKey = GlobalKey();
   double _overlayHeight = 80.0;
 
@@ -355,7 +357,6 @@ class ChartPageState extends State<ChartPage>
       _mode = _ChartMode.searching;
       _searchLoading = true;
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _measureOverlay());
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 300), () async {
       final api = YahooFinanceApi();
@@ -475,7 +476,6 @@ class ChartPageState extends State<ChartPage>
       _searchLoading = false;
       _stockError = null;
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _measureOverlay());
   }
 
   @override
@@ -498,20 +498,30 @@ class ChartPageState extends State<ChartPage>
           _buildChartContent(settings),
         Align(
           alignment: Alignment.topCenter,
-          child: Column(
-            key: _overlayKey,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildSearchBar(),
-              if (_networkLoading)
-                LinearProgressIndicator(
-                  minHeight: 2,
-                  value: _syncProgress,
-                  color: Theme.of(context).colorScheme.primary,
-                )
-              else
-                const SizedBox(height: 2),
-            ],
+          child: NotificationListener<SizeChangedLayoutNotification>(
+            onNotification: (_) {
+              WidgetsBinding.instance.addPostFrameCallback(
+                (_) => _measureOverlay(),
+              );
+              return true;
+            },
+            child: SizeChangedLayoutNotifier(
+              child: Column(
+                key: _overlayKey,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildSearchBar(),
+                  if (_networkLoading)
+                    LinearProgressIndicator(
+                      minHeight: 2,
+                      value: _syncProgress,
+                      color: Theme.of(context).colorScheme.primary,
+                    )
+                  else
+                    const SizedBox(height: 2),
+                ],
+              ),
+            ),
           ),
         ),
       ],
