@@ -255,6 +255,7 @@ jobs:
         if: github.actor != 'nektos/act'
         uses: actions/upload-artifact@v4
         with:
+          retention-days: 7
           name: android-apk
           path: |
             /home/brandon/market_monk/build/app/outputs/flutter-apk/app-*-release.apk
@@ -264,6 +265,7 @@ jobs:
         if: github.actor != 'nektos/act'
         uses: actions/upload-artifact@v4
         with:
+          retention-days: 7
           name: android-aab
           path: /home/brandon/market_monk/build/app/outputs/bundle/release/app-release.aab
 
@@ -308,6 +310,7 @@ jobs:
         if: github.actor != 'nektos/act'
         uses: actions/upload-artifact@v4
         with:
+          retention-days: 7
           name: linux-app
           path: market_monk-linux-${{ needs.version-bump.outputs.version }}.zip
 
@@ -347,6 +350,7 @@ jobs:
         if: github.actor != 'nektos/act'
         uses: actions/upload-artifact@v4
         with:
+          retention-days: 7
           name: windows-app
           path: market_monk-windows-${{ needs.version-bump.outputs.version }}.zip
 
