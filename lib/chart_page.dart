@@ -42,7 +42,7 @@ class ChartPageState extends State<ChartPage>
 
   _ChartMode _mode = _ChartMode.portfolio;
   String? _selectedSymbol;
-  String? _favoriteStock;
+  List<String> _favoriteStocks = [];
   bool _networkLoading = false;
   double? _syncProgress; // null = indeterminate, 0.0–1.0 = determinate
   String? _stockError;
@@ -82,7 +82,7 @@ class ChartPageState extends State<ChartPage>
   @override
   void initState() {
     super.initState();
-    _loadFavorite();
+    _loadFavorites();
     _loadPeriodThenPortfolios();
     _syncCandlesInBackground();
     WidgetsBinding.instance.addPostFrameCallback((_) => _measureOverlay());
@@ -210,10 +210,49 @@ class ChartPageState extends State<ChartPage>
     }
   }
 
-  Future<void> _loadFavorite() async {
+  Future<void> _loadFavorites() async {
     final prefs = await SharedPreferences.getInstance();
-    final fav = prefs.getString('favoriteStock');
-    if (mounted) setState(() => _favoriteStock = fav);
+    var favorites = prefs.getStringList('favoriteStocks');
+    if (favorites == null) {
+      final legacy = prefs.getString('favoriteStock');
+      favorites = legacy != null ? [legacy] : [];
+      await prefs.setStringList('favoriteStocks', favorites);
+      if (legacy != null) await prefs.remove('favoriteStock');
+    }
+    if (mounted) setState(() => _favoriteStocks = favorites!);
+    unawaited(_syncFavoriteCandles());
+  }
+
+  Future<void> _syncFavoriteCandles() async {
+    for (final symbol in _favoriteStocks) {
+      try {
+        await syncCandles(symbol);
+      } catch (_) {
+        // Continue with remaining symbols on error
+      }
+    }
+  }
+
+  Future<void> _toggleFavorite(String symbol) async {
+    final ctx = context;
+    final prefs = await SharedPreferences.getInstance();
+    if (!ctx.mounted) return;
+    final isFavorite = _favoriteStocks.contains(symbol);
+    setState(() {
+      if (isFavorite) {
+        _favoriteStocks.remove(symbol);
+      } else {
+        _favoriteStocks.add(symbol);
+      }
+    });
+    await prefs.setStringList('favoriteStocks', _favoriteStocks);
+    if (!ctx.mounted) return;
+    if (isFavorite) {
+      toast(ctx, 'Removed as favorite');
+    } else {
+      unawaited(syncCandles(symbol));
+      toast(ctx, 'Set as favorite');
+    }
   }
 
   Future<void> _loadAllPortfolios() async {
@@ -831,24 +870,11 @@ class ChartPageState extends State<ChartPage>
                 ),
               ),
               _ActionChip(
-                icon: _favoriteStock == symbol
+                icon: _favoriteStocks.contains(symbol)
                     ? Icons.favorite
                     : Icons.favorite_border,
                 label: 'Favorite',
-                onTap: () async {
-                  final ctx = context;
-                  final prefs = await SharedPreferences.getInstance();
-                  if (!ctx.mounted) return;
-                  if (_favoriteStock == symbol) {
-                    prefs.remove('favoriteStock');
-                    setState(() => _favoriteStock = null);
-                    toast(ctx, 'Removed as favorite');
-                  } else {
-                    prefs.setString('favoriteStock', symbol);
-                    setState(() => _favoriteStock = symbol);
-                    toast(ctx, 'Set as favorite');
-                  }
-                },
+                onTap: () => _toggleFavorite(symbol),
               ),
               _ActionChip(
                 icon: Icons.refresh,
@@ -879,9 +905,36 @@ class ChartPageState extends State<ChartPage>
 
   List<Widget> _buildPortfolioContent(SettingsState settings) {
     return [
+      _buildFavoritesRow(),
       _buildPortfolioChart(context, settings),
       _buildPortfolioSummary(context, settings),
     ];
+  }
+
+  Widget _buildFavoritesRow() {
+    if (_favoriteStocks.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: SizedBox(
+        height: 100,
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: _favoriteStocks.length,
+          itemBuilder: (context, index) {
+            final symbol = _favoriteStocks[index];
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: _FavoriteCard(
+                db: db,
+                symbol: symbol,
+                onTap: () => _selectSymbol(symbol),
+              ),
+            );
+          },
+        ),
+      ),
+    );
   }
 
   Widget _buildPortfolioChart(BuildContext context, SettingsState settings) {
@@ -1312,6 +1365,101 @@ class _ActionChip extends StatelessWidget {
                     fontWeight: FontWeight.w500,
                     color: colorScheme.onSurface,
                   ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A small card showing a favorited symbol's latest price and day change,
+/// used in the favorites row on the portfolio landing view.
+class _FavoriteCard extends StatelessWidget {
+  final Database db;
+  final String symbol;
+  final VoidCallback onTap;
+
+  const _FavoriteCard({
+    required this.db,
+    required this.symbol,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final stream = (db.candles.select()
+          ..where((c) => c.symbol.equals(symbol))
+          ..orderBy([
+            (c) => OrderingTerm(expression: c.date, mode: OrderingMode.desc),
+          ])
+          ..limit(2))
+        .watch();
+
+    return Container(
+      width: 108,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: colorScheme.outline.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  symbol,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 4),
+                StreamBuilder<List<Candle>>(
+                  stream: stream,
+                  builder: (context, snapshot) {
+                    final candles = snapshot.data;
+                    if (candles == null || candles.isEmpty) {
+                      return const SizedBox(
+                        height: 14,
+                        width: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      );
+                    }
+                    final centDivisor = symbolCentDivisor(symbol);
+                    final price = candles.first.close / centDivisor;
+                    final pct = candles.length > 1
+                        ? safePercentChange(
+                            candles[1].close,
+                            candles.first.close,
+                          )
+                        : null;
+                    final changeColor =
+                        (pct ?? 0) >= 0 ? Colors.green : Colors.redAccent;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          fmtNativeCurrency(price, symbolCurrency(symbol)),
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                        if (pct != null)
+                          Text(
+                            '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%',
+                            style: TextStyle(fontSize: 12, color: changeColor),
+                          ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
