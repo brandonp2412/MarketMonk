@@ -10,7 +10,12 @@ import 'package:provider/provider.dart';
 
 void main() {
   testWidgets('App renders tab navigation', (WidgetTester tester) async {
-    db = Database.connect(DatabaseConnection(NativeDatabase.memory()));
+    db = Database.connect(
+      DatabaseConnection(
+        NativeDatabase.memory(),
+        closeStreamsSynchronously: true,
+      ),
+    );
     final accounts = AccountManager();
     await tester.pumpWidget(
       MultiProvider(
@@ -31,7 +36,12 @@ void main() {
   testWidgets(
     'adding account does not cause overlay assertion while MyApp rebuilds',
     (WidgetTester tester) async {
-      db = Database.connect(DatabaseConnection(NativeDatabase.memory()));
+      db = Database.connect(
+        DatabaseConnection(
+          NativeDatabase.memory(),
+          closeStreamsSynchronously: true,
+        ),
+      );
       final accounts = AccountManager();
 
       await tester.pumpWidget(

@@ -15,7 +15,12 @@ void main() {
   testWidgets(
     'time chips stay below the search bar after a degenerate first frame',
     (WidgetTester tester) async {
-      db = Database.connect(DatabaseConnection(NativeDatabase.memory()));
+      db = Database.connect(
+        DatabaseConnection(
+          NativeDatabase.memory(),
+          closeStreamsSynchronously: true,
+        ),
+      );
       final accounts = AccountManager();
 
       tester.view.devicePixelRatio = 1.0;
