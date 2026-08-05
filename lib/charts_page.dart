@@ -17,14 +17,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 enum _ChartMode { portfolio, searching, stock }
 
-class ChartPage extends StatefulWidget {
-  const ChartPage({super.key});
+class ChartsPage extends StatefulWidget {
+  const ChartsPage({super.key});
 
   @override
-  State<ChartPage> createState() => ChartPageState();
+  State<ChartsPage> createState() => ChartsPageState();
 }
 
-class ChartPageState extends State<ChartPage>
+class ChartsPageState extends State<ChartsPage>
     with AutomaticKeepAliveClientMixin {
   final _searchController = TextEditingController();
   final _searchFocus = FocusNode();
