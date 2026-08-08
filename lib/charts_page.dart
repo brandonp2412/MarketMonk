@@ -931,9 +931,9 @@ class ChartsPageState extends State<ChartsPage>
   Widget _buildFavoritesRow() {
     if (_favoriteStocks.isEmpty) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: SizedBox(
-        height: 100,
+        height: 80,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16),
