@@ -327,7 +327,7 @@ class HoldingsPageState extends State<HoldingsPage>
     final summaries = snap.data ?? _summaries;
 
     if (summaries.isEmpty && !snap.hasData) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center();
     }
 
     if (snap.hasData && snap.data != _summaries) {

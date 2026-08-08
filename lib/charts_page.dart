@@ -622,7 +622,7 @@ class ChartsPageState extends State<ChartsPage>
   Widget _buildSearchResults() {
     final query = _searchController.text.trim().toUpperCase();
     if (_searchLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center();
     }
 
     // "Use anyway" tile — always shown at the bottom so the user can force a
@@ -795,7 +795,7 @@ class ChartsPageState extends State<ChartsPage>
       }
       return SizedBox(
         height: height,
-        child: const Center(child: CircularProgressIndicator()),
+        child: const Center(),
       );
     }
 
@@ -964,7 +964,7 @@ class ChartsPageState extends State<ChartsPage>
     if (_portfolioLoading) {
       return SizedBox(
         height: height,
-        child: const Center(child: CircularProgressIndicator()),
+        child: const Center(),
       );
     }
     if (_portfolioError != null && _portfolioSeriesByAccount.isEmpty) {
@@ -1464,7 +1464,6 @@ class _FavoriteCard extends StatelessWidget {
                       return const SizedBox(
                         height: 14,
                         width: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
                       );
                     }
                     final centDivisor = symbolCentDivisor(symbol);

@@ -67,7 +67,7 @@ class _WhatsNewState extends State<WhatsNew> {
     return Scaffold(
       appBar: AppBar(title: const Text("What's New")),
       body: _changelogs.isEmpty
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center()
           : ListView.separated(
               padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: _changelogs.length,

@@ -261,7 +261,6 @@ class _EditTickerPageState extends State<EditTickerPage> {
                             child: SizedBox(
                               height: 24,
                               width: 24,
-                              child: CircularProgressIndicator(),
                             ),
                           );
 

@@ -1,9 +1,9 @@
 import 'dart:io';
 
 import 'package:drift/drift.dart' hide Column, Table;
-import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
@@ -164,7 +164,7 @@ class PortfolioPageState extends State<PortfolioPage>
     final positions = snap.data ?? _positions;
 
     if (positions.isEmpty && !snap.hasData) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center();
     }
 
     if (snap.hasData && snap.data != _positions) {
