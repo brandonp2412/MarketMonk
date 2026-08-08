@@ -4,7 +4,7 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:market_monk/bottom_nav.dart';
-import 'package:market_monk/chart_page.dart';
+import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/portfolio_page.dart';
@@ -183,7 +183,7 @@ class _MyHomePageState extends State<MyHomePage> {
             PageView(
               controller: _pageController,
               onPageChanged: (i) => setState(() => _currentIndex = i),
-              children: const [ChartPage(), PortfolioPage(), HoldingsPage()],
+              children: const [ChartsPage(), PortfolioPage(), HoldingsPage()],
             ),
             Positioned(
               bottom: 0,

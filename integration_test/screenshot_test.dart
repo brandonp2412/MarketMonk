@@ -3,7 +3,7 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:market_monk/chart_page.dart';
+import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/holdings_page.dart';
@@ -164,7 +164,7 @@ Future<void> appWrapper() async {
 BuildContext getBuildContext(WidgetTester tester, TabBarState? tabBarState) {
   switch (tabBarState) {
     case TabBarState.chart:
-      return (tester.state(find.byType(ChartPage)) as ChartPageState).context;
+      return (tester.state(find.byType(ChartsPage)) as ChartsPageState).context;
     case TabBarState.portfolio:
       return (tester.state(find.byType(PortfolioPage)) as PortfolioPageState)
           .context;

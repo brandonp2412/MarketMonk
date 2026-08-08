@@ -415,6 +415,14 @@ class ChartsPageState extends State<ChartsPage>
 
   void _selectStock(StockResult result) => _selectSymbol(result.symbol);
 
+  void _selectFavorite(String symbol) {
+    _searchController.value = TextEditingValue(
+      text: symbol,
+      selection: TextSelection.collapsed(offset: symbol.length),
+    );
+    _selectSymbol(symbol);
+  }
+
   void _selectSymbol(String symbol) {
     _searchFocus.unfocus();
     setState(() {
@@ -928,7 +936,7 @@ class ChartsPageState extends State<ChartsPage>
               child: _FavoriteCard(
                 db: db,
                 symbol: symbol,
-                onTap: () => _selectSymbol(symbol),
+                onTap: () => _selectFavorite(symbol),
               ),
             );
           },
