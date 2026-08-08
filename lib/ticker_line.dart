@@ -77,7 +77,7 @@ class TickerLine extends StatelessWidget {
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 46,
+                reservedSize: 50,
                 minIncluded: false,
                 maxIncluded: false,
                 getTitlesWidget: (value, meta) => SideTitleWidget(
