@@ -29,17 +29,6 @@ class ChartsPageState extends State<ChartsPage>
   final _searchController = TextEditingController();
   final _searchFocus = FocusNode();
 
-  static const _accountColors = [
-    Color(0xFF2196F3),
-    Color(0xFFFF9800),
-    Color(0xFF4CAF50),
-    Color(0xFF9C27B0),
-    Color(0xFFE91E63),
-    Color(0xFF00BCD4),
-    Color(0xFFFF5722),
-    Color(0xFF607D8B),
-  ];
-
   _ChartMode _mode = _ChartMode.portfolio;
   String? _selectedSymbol;
   List<String> _favoriteStocks = [];
@@ -85,8 +74,11 @@ class ChartsPageState extends State<ChartsPage>
     _loadFavorites();
     _loadPeriodThenPortfolios();
     _syncCandlesInBackground();
+    _setColors();
     WidgetsBinding.instance.addPostFrameCallback((_) => _measureOverlay());
   }
+
+  void _setColors() {}
 
   void _measureOverlay() {
     final box = _overlayKey.currentContext?.findRenderObject() as RenderBox?;
@@ -530,6 +522,17 @@ class ChartsPageState extends State<ChartsPage>
     super.build(context);
     final settings = context.watch<SettingsState>();
 
+    final accountColors = [
+      Theme.of(context).colorScheme.primary,
+      Theme.of(context).colorScheme.secondary,
+      Theme.of(context).colorScheme.tertiary,
+      Theme.of(context).colorScheme.onSurface,
+      Color(0xFFE91E63),
+      Color(0xFF00BCD4),
+      Color(0xFFFF5722),
+      Color(0xFF607D8B),
+    ];
+
     // Stack layout: the chart fills the full height so fl_chart's tooltip
     // canvas extends behind the search bar, letting tooltips render above
     // their data points without being obscured. The search bar floats on top
@@ -542,7 +545,7 @@ class ChartsPageState extends State<ChartsPage>
             child: _buildSearchResults(),
           )
         else
-          _buildChartContent(settings),
+          _buildChartContent(settings, accountColors),
         Align(
           alignment: Alignment.topCenter,
           child: NotificationListener<SizeChangedLayoutNotification>(
@@ -705,7 +708,10 @@ class ChartsPageState extends State<ChartsPage>
     );
   }
 
-  Widget _buildChartContent(SettingsState settings) {
+  Widget _buildChartContent(
+    SettingsState settings,
+    List<Color> accountColors,
+  ) {
     return ListView(
       padding: EdgeInsets.only(top: _overlayHeight + 8),
       children: [
@@ -717,7 +723,7 @@ class ChartsPageState extends State<ChartsPage>
         if (_mode == _ChartMode.stock)
           ..._buildStockContent(settings)
         else
-          ..._buildPortfolioContent(settings),
+          ..._buildPortfolioContent(settings, accountColors),
       ],
     );
   }
@@ -911,11 +917,14 @@ class ChartsPageState extends State<ChartsPage>
     );
   }
 
-  List<Widget> _buildPortfolioContent(SettingsState settings) {
+  List<Widget> _buildPortfolioContent(
+    SettingsState settings,
+    List<Color> accountColors,
+  ) {
     return [
       _buildFavoritesRow(),
-      _buildPortfolioChart(context, settings),
-      _buildPortfolioSummary(context, settings),
+      _buildPortfolioChart(context, settings, accountColors),
+      _buildPortfolioSummary(context, settings, accountColors),
     ];
   }
 
@@ -945,7 +954,11 @@ class ChartsPageState extends State<ChartsPage>
     );
   }
 
-  Widget _buildPortfolioChart(BuildContext context, SettingsState settings) {
+  Widget _buildPortfolioChart(
+    BuildContext context,
+    SettingsState settings,
+    List<Color> accountColors,
+  ) {
     final height = MediaQuery.of(context).size.height * 0.38;
 
     if (_portfolioLoading) {
@@ -998,7 +1011,7 @@ class ChartsPageState extends State<ChartsPage>
     final lineBarsData = <LineChartBarData>[];
     for (final entry in visibleSeries.entries) {
       final idx = accounts.indexOf(entry.key);
-      final color = _accountColors[idx.clamp(0, _accountColors.length - 1)];
+      final color = accountColors[idx.clamp(0, accountColors.length - 1)];
       final spots = entry.value
           .map((dv) => FlSpot(dateIndex[dv.date]!.toDouble(), dv.value))
           .toList();
@@ -1107,9 +1120,9 @@ class ChartsPageState extends State<ChartsPage>
                         ? visibleKeys[spot.barIndex]
                         : '';
                     final accountIdx = accounts.indexOf(accountName);
-                    final spotColor = _accountColors[accountIdx.clamp(
+                    final spotColor = accountColors[accountIdx.clamp(
                       0,
-                      _accountColors.length - 1,
+                      accountColors.length - 1,
                     )];
                     final label =
                         visibleKeys.length > 1 ? '$accountName\n' : '';
@@ -1129,7 +1142,11 @@ class ChartsPageState extends State<ChartsPage>
     );
   }
 
-  Widget _buildPortfolioSummary(BuildContext context, SettingsState settings) {
+  Widget _buildPortfolioSummary(
+    BuildContext context,
+    SettingsState settings,
+    List<Color> accountColors,
+  ) {
     final accounts = context.read<AccountManager>().accounts;
     final allSeries = {
       for (final entry in _portfolioSeriesByAccount.entries)
@@ -1142,7 +1159,13 @@ class ChartsPageState extends State<ChartsPage>
       child: Column(
         children: [
           for (final entry in allSeries.entries)
-            _buildAccountSummaryRow(context, accounts, entry.key, entry.value),
+            _buildAccountSummaryRow(
+              context,
+              accounts,
+              entry.key,
+              entry.value,
+              accountColors,
+            ),
           const SizedBox(height: 8),
           Wrap(
             alignment: WrapAlignment.center,
@@ -1182,9 +1205,10 @@ class ChartsPageState extends State<ChartsPage>
     List<String> accounts,
     String accountName,
     List<_DateValue> series,
+    List<Color> accountColors,
   ) {
     final idx = accounts.indexOf(accountName);
-    final dotColor = _accountColors[idx.clamp(0, _accountColors.length - 1)];
+    final dotColor = accountColors[idx.clamp(0, accountColors.length - 1)];
     final pct = safePercentChange(series.first.value, series.last.value);
     final returnColor = pct >= 0 ? Colors.green : Colors.redAccent;
     final change = series.last.value - series.first.value;
