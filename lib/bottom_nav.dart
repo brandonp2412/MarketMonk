@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
-/// Total height this floating dock occupies, including outer padding.
-const double bottomNavHeight = 76;
+/// Total height this floating dock occupies, including its outer padding.
+///
+/// The dock is 60px high with 16px above and below it. Content that scrolls
+/// behind it needs this clearance plus a small visual gap.
+const double bottomNavHeight = 92;
 
 /// Variant 1: "Pill dock" — a compact centered pill where the selected tab
 /// expands horizontally to reveal its label while unselected tabs collapse

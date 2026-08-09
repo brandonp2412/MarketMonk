@@ -49,6 +49,7 @@ class PortfolioPageState extends State<PortfolioPage>
       setState(() {
         stream = _buildStream();
         _positions = [];
+        touchedIndex = null;
       });
       _preload();
       _syncAllInBackground();
@@ -213,12 +214,19 @@ class PortfolioPageState extends State<PortfolioPage>
             .toList();
 
     final colors = _buildColors(context, sorted.length);
+    // Holdings can change while this page is kept alive (for example, after
+    // switching accounts). Do not use a selection from the previous list.
+    final selectedIndex = touchedIndex != null &&
+            touchedIndex! >= 0 &&
+            touchedIndex! < sorted.length
+        ? touchedIndex
+        : null;
 
     final sections = List.generate(sorted.length, (i) {
       final p = sorted[i];
       final val = p.currentValue;
       final pct = totalValue > 0 ? val / totalValue * 100 : 0.0;
-      final isTouched = i == touchedIndex;
+      final isTouched = i == selectedIndex;
       return PieChartSectionData(
         value: val,
         color: colors[i],
@@ -291,7 +299,7 @@ class PortfolioPageState extends State<PortfolioPage>
                       ),
                     ),
                   ),
-                  if (touchedIndex != null)
+                  if (selectedIndex != null)
                     IgnorePointer(
                       child: SizedBox(
                         width: 100,
@@ -299,7 +307,7 @@ class PortfolioPageState extends State<PortfolioPage>
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              sorted[touchedIndex!].symbol,
+                              sorted[selectedIndex].symbol,
                               textAlign: TextAlign.center,
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
@@ -307,7 +315,7 @@ class PortfolioPageState extends State<PortfolioPage>
                               ),
                             ),
                             Text(
-                              sorted[touchedIndex!].name,
+                              sorted[selectedIndex].name,
                               textAlign: TextAlign.center,
                               style: const TextStyle(fontSize: 10),
                               maxLines: 2,
@@ -337,7 +345,7 @@ class PortfolioPageState extends State<PortfolioPage>
                   value: val,
                   allocationPct: pct,
                   changePct: p.change,
-                  isHighlighted: sortedIndex == touchedIndex,
+                  isHighlighted: sortedIndex == selectedIndex,
                   onTap: () => setState(
                     () => touchedIndex =
                         touchedIndex == sortedIndex ? null : sortedIndex,

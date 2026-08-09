@@ -41,8 +41,9 @@ void main() {
       );
       await tester.pump();
 
-      // Swallow the RenderFlex overflows caused by the degenerate frame.
-      while (tester.takeException() != null) {}
+      // The temporarily tiny layout must not build the search overlay and
+      // therefore must not report a RenderFlex overflow.
+      expect(tester.takeException(), null);
 
       tester.view.physicalSize = const Size(800, 600);
       await tester.pump();
@@ -51,6 +52,14 @@ void main() {
       final searchBottom = tester.getBottomLeft(find.byType(SearchBar)).dy;
       final chipTop = tester.getTopLeft(find.text('5d')).dy;
       expect(chipTop, greaterThanOrEqualTo(searchBottom));
+
+      // Charts refresh through a pull gesture, and the scrollable leaves room
+      // for the floating navigation dock rather than hiding its final rows.
+      expect(find.byType(RefreshIndicator), findsOneWidget);
+      final listView = tester.widget<ListView>(find.byType(ListView).first);
+      final padding = listView.padding! as EdgeInsets;
+      expect(padding.bottom, greaterThan(92));
+      expect(find.text('Refresh'), findsNothing);
     },
   );
 }

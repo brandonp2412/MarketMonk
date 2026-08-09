@@ -5,6 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/candle_ticker.dart';
+import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/main.dart';
@@ -199,6 +200,36 @@ class ChartsPageState extends State<ChartsPage>
       } finally {
         if (!task.isActive) await task.db.close();
       }
+    }
+  }
+
+  /// Refreshes whichever chart the user is currently viewing. This is used by
+  /// the page's pull-to-refresh gesture, keeping the chart controls focused on
+  /// navigation and actions other than loading data.
+  Future<void> _refreshCurrentChart() async {
+    if (_networkLoading) return;
+
+    setState(() {
+      _networkLoading = true;
+      _syncProgress = null;
+      _stockError = null;
+    });
+
+    try {
+      if (_mode == _ChartMode.stock && _selectedSymbol != null) {
+        clearSyncCache(_selectedSymbol!);
+        await syncCandles(_selectedSymbol!);
+        if (mounted) _setStockStream(_selectedSymbol!);
+      } else {
+        await _refreshAllPortfolioCandles();
+        await _loadAllPortfolios();
+      }
+    } catch (e) {
+      if (mounted && _mode == _ChartMode.stock) {
+        setState(() => _stockError = e.toString());
+      }
+    } finally {
+      if (mounted) setState(() => _networkLoading = false);
     }
   }
 
@@ -548,30 +579,43 @@ class ChartsPageState extends State<ChartsPage>
           _buildChartContent(settings, accountColors),
         Align(
           alignment: Alignment.topCenter,
-          child: NotificationListener<SizeChangedLayoutNotification>(
-            onNotification: (_) {
-              WidgetsBinding.instance.addPostFrameCallback(
-                (_) => _measureOverlay(),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // The page can briefly receive tiny constraints while a desktop
+              // window is being created or resized. SearchBar has a minimum
+              // interactive height, so laying it out in that space produces a
+              // RenderFlex overflow. It is safe to defer this visual overlay:
+              // the next real layout re-measures and displays it normally.
+              if (constraints.maxHeight < 72 || constraints.maxWidth < 120) {
+                return const SizedBox.shrink();
+              }
+
+              return NotificationListener<SizeChangedLayoutNotification>(
+                onNotification: (_) {
+                  WidgetsBinding.instance.addPostFrameCallback(
+                    (_) => _measureOverlay(),
+                  );
+                  return true;
+                },
+                child: SizeChangedLayoutNotifier(
+                  child: Column(
+                    key: _overlayKey,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildSearchBar(),
+                      if (_networkLoading)
+                        LinearProgressIndicator(
+                          minHeight: 2,
+                          value: _syncProgress,
+                          color: Theme.of(context).colorScheme.primary,
+                        )
+                      else
+                        const SizedBox(height: 2),
+                    ],
+                  ),
+                ),
               );
-              return true;
             },
-            child: SizeChangedLayoutNotifier(
-              child: Column(
-                key: _overlayKey,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildSearchBar(),
-                  if (_networkLoading)
-                    LinearProgressIndicator(
-                      minHeight: 2,
-                      value: _syncProgress,
-                      color: Theme.of(context).colorScheme.primary,
-                    )
-                  else
-                    const SizedBox(height: 2),
-                ],
-              ),
-            ),
           ),
         ),
       ],
@@ -712,19 +756,28 @@ class ChartsPageState extends State<ChartsPage>
     SettingsState settings,
     List<Color> accountColors,
   ) {
-    return ListView(
-      padding: EdgeInsets.only(top: _overlayHeight + 8),
-      children: [
-        _buildTimeChips(),
-        if (settings.showMarketClosed && _isMarketClosed()) ...[
-          const SizedBox(height: 8),
-          _buildMarketClosedBanner(settings),
+    return RefreshIndicator(
+      onRefresh: _refreshCurrentChart,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.only(
+          top: _overlayHeight + 8,
+          // Keep the summary and controls clear of the floating navigation
+          // dock, including when Android's system navigation is visible.
+          bottom: bottomNavHeight + 24,
+        ),
+        children: [
+          _buildTimeChips(),
+          if (settings.showMarketClosed && _isMarketClosed()) ...[
+            const SizedBox(height: 8),
+            _buildMarketClosedBanner(settings),
+          ],
+          if (_mode == _ChartMode.stock)
+            ..._buildStockContent(settings)
+          else
+            ..._buildPortfolioContent(settings, accountColors),
         ],
-        if (_mode == _ChartMode.stock)
-          ..._buildStockContent(settings)
-        else
-          ..._buildPortfolioContent(settings, accountColors),
-      ],
+      ),
     );
   }
 
@@ -890,26 +943,6 @@ class ChartsPageState extends State<ChartsPage>
                 label: 'Favorite',
                 onTap: () => _toggleFavorite(symbol),
               ),
-              _ActionChip(
-                icon: Icons.refresh,
-                label: 'Refresh',
-                onTap: () async {
-                  setState(() {
-                    _networkLoading = true;
-                    _syncProgress = null;
-                    _stockError = null;
-                  });
-                  clearSyncCache(symbol);
-                  try {
-                    await syncCandles(symbol);
-                  } catch (e) {
-                    if (mounted) setState(() => _stockError = e.toString());
-                  }
-                  if (_selectedSymbol != null)
-                    _setStockStream(_selectedSymbol!);
-                  if (mounted) setState(() => _networkLoading = false);
-                },
-              ),
             ],
           ),
         ],
@@ -931,9 +964,11 @@ class ChartsPageState extends State<ChartsPage>
   Widget _buildFavoritesRow() {
     if (_favoriteStocks.isEmpty) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      // The period selector sits immediately above this row. Give the cards a
+      // clear separation without making the landing page feel oversized.
+      padding: const EdgeInsets.only(top: 16, bottom: 8),
       child: SizedBox(
-        height: 80,
+        height: 64,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1183,16 +1218,6 @@ class ChartsPageState extends State<ChartsPage>
                   if (value != null) settings.setDisplayCurrency(value);
                 },
               ),
-              _ActionChip(
-                icon: Icons.refresh,
-                label: 'Refresh',
-                onTap: () async {
-                  setState(() => _networkLoading = true);
-                  await _refreshAllPortfolioCandles();
-                  await _loadAllPortfolios();
-                  if (mounted) setState(() => _networkLoading = false);
-                },
-              ),
             ],
           ),
         ],
@@ -1432,7 +1457,7 @@ class _FavoriteCard extends StatelessWidget {
         .watch();
 
     return Container(
-      width: 108,
+      width: 92,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
@@ -1445,7 +1470,7 @@ class _FavoriteCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1453,9 +1478,13 @@ class _FavoriteCard extends StatelessWidget {
                 Text(
                   symbol,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    height: 1,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 StreamBuilder<List<Candle>>(
                   stream: stream,
                   builder: (context, snapshot) {
@@ -1481,12 +1510,16 @@ class _FavoriteCard extends StatelessWidget {
                       children: [
                         Text(
                           fmtNativeCurrency(price, symbolCurrency(symbol)),
-                          style: const TextStyle(fontSize: 13),
+                          style: const TextStyle(fontSize: 11, height: 1),
                         ),
                         if (pct != null)
                           Text(
                             '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%',
-                            style: TextStyle(fontSize: 12, color: changeColor),
+                            style: TextStyle(
+                              fontSize: 10,
+                              height: 1,
+                              color: changeColor,
+                            ),
                           ),
                       ],
                     );
