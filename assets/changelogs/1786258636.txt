@@ -1,0 +1,9 @@
+• Fill search bar when tapping a favorite
+• Fix all db streams in unit tests
+• Fix bugs
+• Fix padding & height of favorites row
+• Increase y axis label width
+• Remove all these progress indicators
+• Rename chart_page -> charts_page
+• Use theme colors for chart
+• surface favorited stocks as an inline row on the Chart tab
