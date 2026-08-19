@@ -30,6 +30,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  patrol: ^4.8.0
   flutter_lints: ^6.0.0
   sqlite3: ^3.3.4
   msix:
@@ -37,6 +38,13 @@ dev_dependencies:
       url: https://github.com/insertjokehere/msix.git
       ref: msvc_redist
   build_runner: ^2.4.14
+
+patrol:
+  app_name: MarketMonk
+  test_directory: patrol_test
+  android:
+    package_name: com.codesail.market_monk
+
 flutter:
   uses-material-design: true
   assets:

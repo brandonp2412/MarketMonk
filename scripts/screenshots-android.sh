@@ -15,7 +15,7 @@ echo "Running screenshot tests on Android device $device..."
 # "cannot find symbol" errors for plugin classes in GeneratedPluginRegistrant.java
 (cd android && ./gradlew clean)
 
-export FLEXIFY_DEVICE_TYPE="$device_type"
+export MARKET_MONK_DEVICE_TYPE="$device_type"
 
 dart_define=()
 if [ -n "$only" ]; then
