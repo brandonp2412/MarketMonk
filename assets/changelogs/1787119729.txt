@@ -1,0 +1,1 @@
+• Setup automated e2e and screenshotting
