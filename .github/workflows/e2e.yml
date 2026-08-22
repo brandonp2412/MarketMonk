@@ -38,6 +38,7 @@ jobs:
       - name: Setup Flutter
         run: |
           chmod +x flutter/bin/*
+          export PATH="$GITHUB_WORKSPACE/flutter/bin:$PATH"
           echo "$GITHUB_WORKSPACE/flutter/bin" >> "$GITHUB_PATH"
           flutter --version
           flutter config --no-analytics
@@ -88,6 +89,7 @@ jobs:
       - name: Setup Flutter
         run: |
           chmod +x flutter/bin/*
+          export PATH="$GITHUB_WORKSPACE/flutter/bin:$PATH"
           echo "$GITHUB_WORKSPACE/flutter/bin" >> "$GITHUB_PATH"
           flutter --version
           flutter config --no-analytics
