@@ -11,7 +11,7 @@ jobs:
   quality-checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -49,7 +49,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       build_number: ${{ steps.version.outputs.build_number }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           submodules: recursive
@@ -63,6 +63,9 @@ jobs:
       - name: Get current version from pubspec.yaml
         id: current_version
         run: |
+          # A previous queued run may have bumped main after this run started.
+          # Version from the latest main so releases never reuse an existing tag.
+          git pull --ff-only origin main
           CURRENT_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
           CURRENT_BUILD_NUMBER=$(grep '^version:' pubspec.yaml | sed 's/.*+//')
           echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
@@ -172,7 +175,7 @@ jobs:
     env:
       PUB_CACHE: /home/brandon/market_monk/.pub-cache
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: main
           submodules: recursive
@@ -198,7 +201,7 @@ jobs:
           echo "ANDROID_SDK_ROOT=/opt/android-sdk" >> $GITHUB_ENV
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: "zulu"
           java-version: "17"
@@ -273,7 +276,7 @@ jobs:
     needs: version-bump
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: main
           submodules: recursive
@@ -318,7 +321,7 @@ jobs:
     needs: version-bump
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: main
           submodules: recursive
@@ -361,7 +364,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive
           fetch-depth: 0
