@@ -175,7 +175,7 @@ BuildContext getBuildContext(WidgetTester tester, TabBarState? tabBarState) {
           .context;
   }
 
-  return tester.element(find.byType(TabBarView));
+  return tester.element(find.byType(PageView));
 }
 
 void navigateTo({required BuildContext context, required Widget page}) {
@@ -196,9 +196,12 @@ Future<void> generateScreenshot({
   await appWrapper();
   await tester.pumpAndSettle();
 
-  final controllerState = getBuildContext(tester, null);
-  if (!controllerState.mounted) return;
-  DefaultTabController.of(controllerState).index = tabBarState.index;
+  final tab = switch (tabBarState) {
+    TabBarState.chart => 'ChartPage',
+    TabBarState.portfolio => 'PortfolioPage',
+    TabBarState.holdings => 'HoldingsPage',
+  };
+  await tester.tap(find.byKey(Key(tab)));
   await tester.pumpAndSettle();
 
   if (navigateToPage != null) {
