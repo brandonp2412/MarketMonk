@@ -7,6 +7,10 @@ on:
       - "pubspec.yaml"
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality-checks:
     runs-on: ubuntu-latest
