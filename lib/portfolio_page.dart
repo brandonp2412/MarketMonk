@@ -5,6 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/logging.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
@@ -78,7 +79,9 @@ class PortfolioPageState extends State<PortfolioPage>
       final prices = await fetchLatestPrices(symbols);
       final positions = computePositions(trades, prices);
       if (mounted) setState(() => _positions = positions);
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      talker.handle(error, stackTrace, 'Failed to preload portfolio positions');
+    }
   }
 
   Future<void> _syncAllInBackground() async {
@@ -88,8 +91,8 @@ class PortfolioPageState extends State<PortfolioPage>
       for (final symbol in symbols) {
         await syncCandles(symbol);
       }
-    } catch (_) {
-      // Silently ignore network errors
+    } catch (error, stackTrace) {
+      talker.handle(error, stackTrace, 'Background portfolio sync failed');
     }
     if (mounted) setState(() => stream = _buildStream());
   }
@@ -137,6 +140,7 @@ class PortfolioPageState extends State<PortfolioPage>
     final dir = await getTemporaryDirectory();
     final file = File('${dir.path}/positions_$safeName.csv');
     await file.writeAsString(buf.toString());
+    talker.info('Exported portfolio CSV with ${positions.length} positions');
     if (!context.mounted) return;
     await SharePlus.instance.share(
       ShareParams(

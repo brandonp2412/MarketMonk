@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/logging.dart';
 
 class ImportedTrade {
   final String symbol;
@@ -204,6 +205,7 @@ Future<int> importTrades(List<ImportedTrade> trades) async {
     );
     count++;
   }
+  talker.info('Imported $count trades');
   return count;
 }
 

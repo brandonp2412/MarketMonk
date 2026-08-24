@@ -9,6 +9,7 @@ import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/crash_logger.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/holdings_page.dart';
+import 'package:market_monk/logging.dart';
 import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
@@ -22,11 +23,14 @@ Future<void> main() async {
     () async {
       WidgetsFlutterBinding.ensureInitialized();
       await CrashLogger.install(fileName: 'marketmonk-crash.log');
+      installTalkerErrorHandlers();
+      talker.info('Starting Market Monk');
 
       final settings = SettingsState(autoInit: false);
       await settings.init();
       final accounts = AccountManager();
       await accounts.init();
+      talker.info('Account manager initialized');
 
       runApp(
         MultiProvider(
@@ -38,8 +42,10 @@ Future<void> main() async {
         ),
       );
     },
-    (error, stack) =>
-        CrashLogger.instance?.record(error, stack, context: 'zone'),
+    (error, stack) {
+      CrashLogger.instance?.record(error, stack, context: 'zone');
+      talker.handle(error, stack, 'Uncaught zone error');
+    },
   );
 }
 
@@ -58,6 +64,7 @@ class AccountManager extends ChangeNotifier {
     if (activeAccount != 'Default') {
       db = Database('market-monk-$activeAccount');
     }
+    talker.info('Loaded ${accounts.length} portfolio accounts');
   }
 
   Future<void> switchAccount(String name) async {
@@ -69,6 +76,7 @@ class AccountManager extends ChangeNotifier {
     db = name == 'Default' ? Database() : Database('market-monk-$name');
     clearAllSyncCache();
     notifyListeners();
+    talker.info('Switched active portfolio account');
   }
 
   Future<void> addAccount(String name) async {
@@ -77,6 +85,7 @@ class AccountManager extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('accounts', accounts);
     WidgetsBinding.instance.addPostFrameCallback((_) => notifyListeners());
+    talker.info('Added portfolio account');
   }
 
   Future<void> renameAccount(String oldName, String newName) async {
@@ -101,6 +110,7 @@ class AccountManager extends ChangeNotifier {
     await prefs.setStringList('accounts', accounts);
     if (isActive) await prefs.setString('activeAccount', newName);
     WidgetsBinding.instance.addPostFrameCallback((_) => notifyListeners());
+    talker.info('Renamed portfolio account');
   }
 
   Future<void> deleteAccount(String name) async {
@@ -113,8 +123,11 @@ class AccountManager extends ChangeNotifier {
       final dir = await getApplicationSupportDirectory();
       final file = File(p.join(dir.path, 'market-monk-$name.sqlite'));
       if (await file.exists()) await file.delete();
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      talker.handle(error, stackTrace, 'Failed to remove portfolio database');
+    }
     notifyListeners();
+    talker.info('Deleted portfolio account');
   }
 }
 

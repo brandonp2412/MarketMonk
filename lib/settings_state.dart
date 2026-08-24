@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:market_monk/utils.dart';
+import 'package:market_monk/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _defaultSeedColor = Color(0xFF2B7A78);
@@ -127,6 +128,7 @@ class SettingsState extends ChangeNotifier {
     _applyRate(displayCurrency, cachedRate ?? 1.0);
 
     notifyListeners();
+    talker.debug('Loaded application settings');
 
     // Refresh exchange rate in background
     _fetchAndApplyRate(displayCurrency);
@@ -158,9 +160,11 @@ class SettingsState extends ChangeNotifier {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setDouble('exchangeRate_$currencyCode', rate);
         notifyListeners();
+        talker.info('Refreshed display exchange rate');
       }
-    } catch (_) {
+    } catch (error, stackTrace) {
       // Keep using cached rate on network failure
+      talker.handle(error, stackTrace, 'Failed to refresh display exchange rate');
     }
   }
 
@@ -246,5 +250,6 @@ class SettingsState extends ChangeNotifier {
   void notifyTradesImported() {
     tradesVersion++;
     notifyListeners();
+    talker.debug('Notified listeners of a trade-data change');
   }
 }

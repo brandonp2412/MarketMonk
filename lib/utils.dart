@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
 
@@ -247,8 +248,9 @@ Future<Map<String, double>> fetchLatestPrices(
         row.readNullable<String>('symbol') ?? '':
             row.readNullable<double>('close') ?? 0.0,
     }..removeWhere((k, v) => k.isEmpty || v <= 0);
-  } catch (_) {
+  } catch (error, stackTrace) {
     // Fall back to N individual limit-1 queries if the JOIN fails
+    talker.handle(error, stackTrace, 'Latest-price query failed; using fallback');
     final prices = <String, double>{};
     for (final s in symbols) {
       final c = await (d.candles.select()
@@ -290,7 +292,7 @@ Future<void> insertCandles(
       batchBuilder.insertAllOnConflictUpdate(d.candles, batch);
     });
 
-    debugPrint('Inserted ${i + batch.length}');
+    talker.debug('Stored ${i + batch.length} candle records');
   }
 }
 
@@ -381,6 +383,7 @@ Future<void> syncCandles(String symbol, {Database? database}) async {
         symbol,
       );
       await insertCandles(response.candlesData, symbol, database: d);
+      talker.info('Completed initial candle sync');
     } else if (today.isAfter(
       DateTime(latest.date.year, latest.date.month, latest.date.day),
     )) {
@@ -389,10 +392,12 @@ Future<void> syncCandles(String symbol, {Database? database}) async {
         startDate: latest.date,
       );
       await insertCandles(response.candlesData, symbol, database: d);
+      talker.info('Completed incremental candle sync');
     }
-  } catch (_) {
+  } catch (error, stackTrace) {
     // Remove from guard on failure so next attempt can retry
     _syncedSymbols.remove(guardKey);
+    talker.handle(error, stackTrace, 'Candle sync failed');
     rethrow;
   }
 }
@@ -441,8 +446,9 @@ Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
         normalizedCurr != 'USD') {
       await _fetchAndCacheRate(normalizedCurr);
     }
-  } catch (_) {
-    // Silently ignore — positions fall back to treating native as USD.
+  } catch (error, stackTrace) {
+    // Positions fall back to treating native as USD.
+    talker.handle(error, stackTrace, 'Failed to fetch symbol currency metadata');
   }
 }
 
@@ -464,8 +470,9 @@ Future<void> _fetchAndCacheRate(String currencyCode) async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setDouble('exchangeRate_$currencyCode', rate);
     }
-  } catch (_) {
-    // Silently ignore — the position falls back to treating native as USD.
+  } catch (error, stackTrace) {
+    // The position falls back to treating native as USD.
+    talker.handle(error, stackTrace, 'Failed to fetch exchange rate');
   }
 }
 
@@ -482,7 +489,10 @@ class YahooFinanceApi {
         Uri.parse('$_baseUrl?q=${Uri.encodeComponent(query)}'),
       );
 
-      if (response.statusCode != 200) return [];
+      if (response.statusCode != 200) {
+        talker.warning('Ticker search returned HTTP ${response.statusCode}');
+        return [];
+      }
 
       final Map<String, dynamic> data = json.decode(response.body);
       final List<dynamic> quotes = data['quotes'] ?? [];
@@ -507,8 +517,9 @@ class YahooFinanceApi {
       try {
         final result = await action();
         completer.complete(result);
-      } catch (e) {
-        completer.completeError(e);
+      } catch (error, stackTrace) {
+        talker.handle(error, stackTrace, 'Ticker search request failed');
+        completer.completeError(error, stackTrace);
       }
     });
 

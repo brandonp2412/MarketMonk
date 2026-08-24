@@ -6,6 +6,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  talker_flutter: 5.1.20
   cupertino_icons: ^1.0.8
   yahoo_finance_data_reader: ^1.0.11
   fl_chart: ^1.2.0

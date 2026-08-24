@@ -9,6 +9,7 @@ import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/logging.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/ticker_line.dart';
@@ -224,9 +225,10 @@ class ChartsPageState extends State<ChartsPage>
         await _refreshAllPortfolioCandles();
         await _loadAllPortfolios();
       }
-    } catch (e) {
+    } catch (error, stackTrace) {
+      talker.handle(error, stackTrace, 'Chart refresh failed');
       if (mounted && _mode == _ChartMode.stock) {
-        setState(() => _stockError = e.toString());
+        setState(() => _stockError = error.toString());
       }
     } finally {
       if (mounted) setState(() => _networkLoading = false);
@@ -429,7 +431,8 @@ class ChartsPageState extends State<ChartsPage>
           _searchResults = results;
           _searchLoading = false;
         });
-      } catch (_) {
+      } catch (error, stackTrace) {
+        talker.handle(error, stackTrace, 'Ticker search failed');
         if (!mounted) return;
         setState(() => _searchLoading = false);
       }
@@ -460,8 +463,9 @@ class ChartsPageState extends State<ChartsPage>
       String? err;
       try {
         await syncCandles(symbol);
-      } catch (e) {
-        err = e.toString();
+      } catch (error, stackTrace) {
+        talker.handle(error, stackTrace, 'Selected ticker sync failed');
+        err = error.toString();
       }
       await fetchSymbolCurrencyAndRate(symbol);
       if (!mounted) return;

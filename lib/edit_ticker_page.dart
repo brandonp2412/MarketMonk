@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:market_monk/candle_ticker.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/logging.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
 
@@ -226,7 +227,12 @@ class _EditTickerPageState extends State<EditTickerPage> {
                         try {
                           await syncCandles(tickerSymbol);
                           await fetchSymbolCurrencyAndRate(tickerSymbol);
-                        } catch (error) {
+                        } catch (error, stackTrace) {
+                          talker.handle(
+                            error,
+                            stackTrace,
+                            'Failed to sync selected ticker',
+                          );
                           if (context.mounted) toast(context, error.toString());
                         } finally {
                           setState(() {
@@ -284,10 +290,14 @@ class _EditTickerPageState extends State<EditTickerPage> {
                             try {
                               await syncCandles(tickerSymbol);
                               await fetchSymbolCurrencyAndRate(tickerSymbol);
-                            } catch (error) {
+                            } catch (error, stackTrace) {
                               if (context.mounted)
                                 toast(context, error.toString());
-                              debugPrint(error.toString());
+                              talker.handle(
+                                error,
+                                stackTrace,
+                                'Failed to sync entered ticker',
+                              );
                             } finally {
                               setState(() {
                                 loading = false;
