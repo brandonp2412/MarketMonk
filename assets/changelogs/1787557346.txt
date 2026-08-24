@@ -1,0 +1,1 @@
+• Sync Google Play store metadata automatically (#40)
