@@ -1,7 +1,15 @@
-Easily monitor your investments with MarketMonk.
+Follow stocks and understand your portfolio at a glance.
 
-- Graph stock gains
-- Manage your portfolio
-- Configure to your hearts desires in the Settings menu
+MarketMonk is a stock tracker and portfolio monitor for investors who want a clear view of market prices, holdings, and performance. Add the shares you follow, build your portfolio, and explore price charts from one straightforward dashboard.
 
-All with simple charts and an intuitive UI.
+FEATURES
+
+• Track stock prices and market performance
+• Build and monitor a personal investment portfolio
+• View line charts to explore price movements and gains
+• Organise the information that matters to you
+• Adjust settings to suit your preferred investing view
+
+MarketMonk is designed to make portfolio tracking easier to read, whether you are checking a watchlist or reviewing your investments.
+
+Market data is provided for information only and is not financial advice. Always do your own research before making investment decisions.
