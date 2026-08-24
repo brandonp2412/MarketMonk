@@ -1,0 +1,16 @@
+default_platform(:android)
+
+platform :android do
+  desc "Upload the complete Google Play store listing without a binary release"
+  lane :metadata do |options|
+    upload_to_play_store(
+      track: options[:track] || "production",
+      skip_upload_apk: true,
+      skip_upload_aab: true,
+      skip_upload_changelogs: true,
+      skip_upload_metadata: false,
+      skip_upload_images: false,
+      skip_upload_screenshots: false
+    )
+  end
+end
