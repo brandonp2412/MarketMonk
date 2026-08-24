@@ -1,1 +1,1 @@
-MarketMonk
+MarketMonk: Stock Tracker
