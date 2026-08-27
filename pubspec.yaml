@@ -6,6 +6,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  frisbee_flutter_foundation:
+    git:
+      url: https://github.com/brandonp2412/Flexify.git
+      ref: 2e2711a67022d0f69b63512a2320fc69a4ab4b1e
+      path: packages/flutter_foundation
   cupertino_icons: ^1.0.8
   yahoo_finance_data_reader: ^1.0.11
   fl_chart: ^1.2.0

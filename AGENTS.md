@@ -19,6 +19,14 @@
 - **Lockfile Protocol**: Any change that touches `pubspec.lock` (dependency add/upgrade/remove, or a regenerated lockfile) MUST be committed together with a matching `flutter` submodule bump if the SDK version changed. A lockfile generated with a newer Flutter than the pinned submodule breaks the F-Droid build (`Unable to satisfy pubspec.yaml using pubspec.lock`).
 - To bump the SDK: update the submodule (`git -C flutter checkout <tag>`), run `flutter/bin/flutter pub get`, regenerate plugin registrants, then commit the submodule pointer and `pubspec.lock` in the same commit.
 
+# Cross-Project Flutter Reuse
+
+- Before implementing or fixing generic Flutter, Android, CI, Drift, navigation, theming, lifecycle, import/export, or performance behavior, search the sibling Flutter repositories (`Flexify`, `FitBook`, `MarketMonk`, `Quitter`, and `BlockDrop`) for an existing solution or regression test.
+- Reusable app-agnostic Flutter infrastructure should come from the `frisbee_flutter_foundation` package hosted under `packages/flutter_foundation` in Flexify rather than being copied between apps.
+- Shared CI behavior should use the reusable workflows hosted by Flexify; keep only app-specific orchestration and parameters locally.
+- When a generic fix is made here, check whether the same failure pattern exists in sibling apps before considering the task complete.
+- Keep shared-package and shared-workflow Git references pinned to a concrete commit. Update the pin deliberately when adopting a newer shared fix.
+
 # Git & Version Control
 - **Completion Protocol**: When a task is successful, you MUST commit the work.
 - **Commit Format**: Use the [Conventional Commits](https://www.conventionalcommits.org/) standard (e.g., `feat:`, `fix:`, `chore:`).
