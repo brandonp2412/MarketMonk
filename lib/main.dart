@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dynamic_color/dynamic_color.dart';
@@ -5,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/charts_page.dart';
+import 'package:market_monk/crash_logger.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/portfolio_page.dart';
@@ -15,19 +17,29 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  final settings = SettingsState();
-  final accounts = AccountManager();
-  await accounts.init();
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider.value(value: settings),
-        ChangeNotifierProvider.value(value: accounts),
-      ],
-      child: const MyApp(),
-    ),
+Future<void> main() async {
+  runZonedGuarded(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+      await CrashLogger.install(fileName: 'marketmonk-crash.log');
+
+      final settings = SettingsState();
+      await settings.init();
+      final accounts = AccountManager();
+      await accounts.init();
+
+      runApp(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: settings),
+            ChangeNotifierProvider.value(value: accounts),
+          ],
+          child: const MyApp(),
+        ),
+      );
+    },
+    (error, stack) =>
+        CrashLogger.instance?.record(error, stack, context: 'zone'),
   );
 }
 
@@ -64,10 +76,6 @@ class AccountManager extends ChangeNotifier {
     accounts = [...accounts, name];
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('accounts', accounts);
-    // Defer notification to post-frame so it fires after the current build
-    // phase completes. Without this, notifyListeners() fires as a microtask
-    // during the dialog's exit-animation frame, marking AccountsPage dirty
-    // mid-build and triggering _dependents.isEmpty assertions on the Overlay.
     WidgetsBinding.instance.addPostFrameCallback((_) => notifyListeners());
   }
 
