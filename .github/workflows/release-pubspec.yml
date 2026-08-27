@@ -1,0 +1,32 @@
+name: Dispatch release for pubspec-only changes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "pubspec.yaml"
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Dispatch Build and Release for pubspec-only pushes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          CHANGED=$(git diff --name-only "$BEFORE" "$AFTER")
+          if [ "$CHANGED" = "pubspec.yaml" ]; then
+            gh workflow run release.yml --ref main
+          else
+            echo "Build and Release already handles this push; no dispatch needed."
+          fi
