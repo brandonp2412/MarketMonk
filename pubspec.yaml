@@ -49,6 +49,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/
+    - assets/changelogs/
 msix_config:
   msstore_appId: 9PP4HKV1CMWC
   display_name: MarketMonk
