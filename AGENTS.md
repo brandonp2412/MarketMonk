@@ -12,6 +12,13 @@
 - Before implementing features for a package, use the browser tool to read the latest README and API docs on `https://pub.dev/packages/[PACKAGE_NAME]`.
 - Note: Your Flutter MCP is for the SDK; use the browser for community packages like Drift, Riverpod, etc.
 
+# Cross-Project Learning
+
+- Before implementing or fixing generic Flutter, Android, CI, Drift, navigation, theming, lifecycle, import/export, or performance behavior, search the sibling Flutter repositories (`Flexify`, `FitBook`, `MarketMonk`, `Quitter`, and `BlockDrop`) for an existing solution or regression test.
+- Reproduce or adapt useful patterns inside this repository rather than adding runtime dependencies on sibling repositories.
+- Keep CI workflows owned by this repository; do not call workflows hosted in sibling repositories solely to deduplicate YAML.
+- When a generic fix is made here, check whether the same failure pattern exists in sibling apps and apply the lesson independently where appropriate.
+
 # Flutter SDK & Lockfile Rules
 
 - The `flutter` git submodule is the single source of truth for the SDK version. CI, releases, and F-Droid all build with the pinned submodule and run `flutter pub get --enforce-lockfile`.
