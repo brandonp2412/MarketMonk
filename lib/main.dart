@@ -23,7 +23,7 @@ Future<void> main() async {
       WidgetsFlutterBinding.ensureInitialized();
       await CrashLogger.install(fileName: 'marketmonk-crash.log');
 
-      final settings = SettingsState();
+      final settings = SettingsState(autoInit: false);
       await settings.init();
       final accounts = AccountManager();
       await accounts.init();
