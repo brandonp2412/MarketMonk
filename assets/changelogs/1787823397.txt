@@ -1,0 +1,2 @@
+• Fix bundle What's New changelogs
+• Fix load What's New release notes reliably
