@@ -62,8 +62,8 @@ class SettingsState extends ChangeNotifier {
   bool showMarketClosed = false;
   bool pureBlack = false;
 
-  SettingsState() {
-    init();
+  SettingsState({bool autoInit = true}) {
+    if (autoInit) init();
   }
 
   /// Returns the ISO 4217 currency code for the device locale, falling back to USD.
