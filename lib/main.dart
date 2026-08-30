@@ -26,10 +26,9 @@ Future<void> main() async {
       installTalkerErrorHandlers();
       talker.info('Starting Market Monk');
 
-      final settings = SettingsState(autoInit: false);
-      await settings.init();
+      final settings = SettingsState();
       final accounts = AccountManager();
-      await accounts.init();
+      await Future.wait([settings.initialized, accounts.init()]);
       talker.info('Account manager initialized');
 
       runApp(

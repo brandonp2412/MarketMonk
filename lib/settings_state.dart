@@ -1,5 +1,5 @@
+import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -52,6 +52,9 @@ const supportedCurrencies = [
 ];
 
 class SettingsState extends ChangeNotifier {
+  final Future<http.Response> Function(Uri) _rateFetcher;
+  late final Future<void> initialized;
+
   ThemeMode theme = ThemeMode.system;
   bool systemColors = false;
   bool curveLines = false;
@@ -63,21 +66,24 @@ class SettingsState extends ChangeNotifier {
   bool showMarketClosed = false;
   bool pureBlack = false;
 
-  SettingsState({bool autoInit = true}) {
-    if (autoInit) init();
+  SettingsState({Future<http.Response> Function(Uri)? rateFetcher})
+      : _rateFetcher = rateFetcher ?? http.get {
+    initialized = init();
   }
 
-  /// Returns the ISO 4217 currency code for the device locale, falling back to USD.
-  static String _detectLocaleCurrency() {
+  /// Returns the supported ISO 4217 currency for [locale], falling back to USD.
+  static String currencyForLocale(Locale locale) {
     try {
-      var locale = Platform.localeName;
-      final dotIdx = locale.indexOf('.');
-      if (dotIdx != -1) locale = locale.substring(0, dotIdx);
-      final code = NumberFormat.simpleCurrency(locale: locale).currencyName;
+      final code = NumberFormat.simpleCurrency(
+        locale: locale.toString(),
+      ).currencyName;
       if (code != null && supportedCurrencies.contains(code)) return code;
     } catch (_) {}
     return 'USD';
   }
+
+  static String _detectLocaleCurrency() =>
+      currencyForLocale(WidgetsBinding.instance.platformDispatcher.locale);
 
   static List<String> _defaultVisibleCurrencies() {
     final home = _detectLocaleCurrency();
@@ -141,30 +147,40 @@ class SettingsState extends ChangeNotifier {
 
   Future<void> _fetchAndApplyRate(String currencyCode) async {
     if (currencyCode == 'USD') {
-      _applyRate('USD', 1.0);
+      allRatesFromUsd['USD'] = 1.0;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setDouble('exchangeRate_USD', 1.0);
-      notifyListeners();
+      if (displayCurrency == currencyCode) {
+        _applyRate('USD', 1.0);
+        notifyListeners();
+      }
       return;
     }
     try {
       final uri = Uri.parse(
         'https://api.frankfurter.app/latest?from=USD&to=$currencyCode',
       );
-      final response = await http.get(uri);
+      final response = await _rateFetcher(uri);
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
         final rates = data['rates'] as Map<String, dynamic>;
         final rate = (rates[currencyCode] as num).toDouble();
-        _applyRate(currencyCode, rate);
+        allRatesFromUsd[currencyCode] = rate;
         final prefs = await SharedPreferences.getInstance();
         await prefs.setDouble('exchangeRate_$currencyCode', rate);
-        notifyListeners();
+        if (displayCurrency == currencyCode) {
+          _applyRate(currencyCode, rate);
+          notifyListeners();
+        }
         talker.info('Refreshed display exchange rate');
       }
     } catch (error, stackTrace) {
       // Keep using cached rate on network failure
-      talker.handle(error, stackTrace, 'Failed to refresh display exchange rate');
+      talker.handle(
+        error,
+        stackTrace,
+        'Failed to refresh display exchange rate',
+      );
     }
   }
 
@@ -222,26 +238,33 @@ class SettingsState extends ChangeNotifier {
     prefs.setInt('seedColor', _colorToInt(value));
   }
 
-  void setVisibleCurrencies(List<String> currencies) async {
+  Future<void> setVisibleCurrencies(List<String> currencies) async {
     assert(currencies.isNotEmpty);
     visibleCurrencies = List.from(currencies);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('visibleCurrencies', currencies);
     if (!visibleCurrencies.contains(displayCurrency)) {
-      displayCurrency = visibleCurrencies.first;
-      await prefs.setString('displayCurrency', displayCurrency);
+      await _setDisplayCurrency(visibleCurrencies.first, prefs);
+      return;
     }
     notifyListeners();
   }
 
-  void setDisplayCurrency(String code) async {
-    displayCurrency = code;
-    notifyListeners();
+  Future<void> setDisplayCurrency(String code) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('displayCurrency', code);
+    await _setDisplayCurrency(code, prefs);
+  }
+
+  Future<void> _setDisplayCurrency(
+    String code,
+    SharedPreferences prefs,
+  ) async {
+    displayCurrency = code;
     final cachedRate = prefs.getDouble('exchangeRate_$code');
-    if (cachedRate != null) _applyRate(code, cachedRate);
-    await _fetchAndApplyRate(code);
+    _applyRate(code, cachedRate ?? allRatesFromUsd[code] ?? 1.0);
+    notifyListeners();
+    await prefs.setString('displayCurrency', code);
+    unawaited(_fetchAndApplyRate(code));
   }
 
   int tradesVersion = 0;
