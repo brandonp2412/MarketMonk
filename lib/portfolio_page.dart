@@ -4,6 +4,8 @@ import 'package:drift/drift.dart' hide Column, Table;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:market_monk/database.dart';
+import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/settings_page.dart';
@@ -31,6 +33,8 @@ class PortfolioPageState extends State<PortfolioPage>
   final _filterController = TextEditingController();
   String _filterText = '';
   String _lastAccount = '';
+  int _lastIbkrRefreshVersion = -1;
+  IbkrAccountConfig _lastIbkrConfig = const IbkrAccountConfig();
 
   @override
   void initState() {
@@ -44,9 +48,16 @@ class PortfolioPageState extends State<PortfolioPage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final account = context.watch<AccountManager>().activeAccount;
-    if (account != _lastAccount) {
+    final accounts = context.watch<AccountManager>();
+    final account = accounts.activeAccount;
+    final ibkrConfig = accounts.ibkrConfigFor(account);
+    final refreshVersion = accounts.ibkrRefreshVersion;
+    if (account != _lastAccount ||
+        ibkrConfig != _lastIbkrConfig ||
+        refreshVersion != _lastIbkrRefreshVersion) {
       _lastAccount = account;
+      _lastIbkrConfig = ibkrConfig;
+      _lastIbkrRefreshVersion = refreshVersion;
       setState(() {
         stream = _buildStream();
         _positions = [];
@@ -72,12 +83,24 @@ class PortfolioPageState extends State<PortfolioPage>
     super.dispose();
   }
 
+  Future<List<Position>> _loadPositions(List<Trade> trades) async {
+    final config = context.read<AccountManager>().ibkrConfigFor();
+    if (config.enabled) {
+      if (!config.isConfigured) {
+        throw StateError('IBKR portfolio source is not fully configured');
+      }
+      final snapshot = await IbkrApiClient(config).fetchPortfolio();
+      return computeIbkrPositions(snapshot.positions, trades);
+    }
+    final symbols = trades.map((t) => t.symbol).toSet().toList();
+    final prices = await fetchLatestPrices(symbols);
+    return computePositions(trades, prices);
+  }
+
   Future<void> _preload() async {
     try {
       final trades = await db.trades.select().get();
-      final symbols = trades.map((t) => t.symbol).toSet().toList();
-      final prices = await fetchLatestPrices(symbols);
-      final positions = computePositions(trades, prices);
+      final positions = await _loadPositions(trades);
       if (mounted) setState(() => _positions = positions);
     } catch (error, stackTrace) {
       talker.handle(error, stackTrace, 'Failed to preload portfolio positions');
@@ -86,27 +109,28 @@ class PortfolioPageState extends State<PortfolioPage>
 
   Future<void> _syncAllInBackground() async {
     try {
+      final useIbkr = _lastIbkrConfig.enabled;
       final trades = await db.trades.select().get();
-      final symbols = trades.map((t) => t.symbol).toSet();
+      final positions = await _loadPositions(trades);
+      final symbols = useIbkr
+          ? positions.map((position) => position.symbol).toSet()
+          : trades.map((trade) => trade.symbol).toSet();
       for (final symbol in symbols) {
         await syncCandles(symbol);
       }
+      if (mounted) setState(() => _positions = positions);
     } catch (error, stackTrace) {
       talker.handle(error, stackTrace, 'Background portfolio sync failed');
     }
     if (mounted) setState(() => stream = _buildStream());
   }
 
-  Stream<List<Position>> _buildStream() {
-    return db.trades.select().watch().asyncMap((trades) async {
-      final symbols = trades.map((t) => t.symbol).toSet().toList();
-      final prices = await fetchLatestPrices(symbols);
-      return computePositions(trades, prices);
-    });
-  }
+  Stream<List<Position>> _buildStream() =>
+      db.trades.select().watch().asyncMap(_loadPositions);
 
   Future<void> _updateCandles() async {
     clearAllSyncCache();
+    await _preload();
     await _syncAllInBackground();
   }
 
@@ -178,19 +202,21 @@ class PortfolioPageState extends State<PortfolioPage>
       });
     }
     if (positions.isEmpty) {
+      final ibkrEnabled =
+          context.watch<AccountManager>().ibkrConfigFor().enabled;
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('No holdings yet'),
+            Text(ibkrEnabled ? 'No IBKR stock positions' : 'No holdings yet'),
             const SizedBox(height: 12),
             FilledButton.icon(
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const SettingsPage()),
               ),
-              icon: const Icon(Icons.upload_file),
-              label: const Text('Import CSV'),
+              icon: Icon(ibkrEnabled ? Icons.settings : Icons.upload_file),
+              label: Text(ibkrEnabled ? 'IBKR settings' : 'Import CSV'),
             ),
           ],
         ),

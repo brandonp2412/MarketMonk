@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:market_monk/database.dart';
+import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -127,6 +128,9 @@ class Position {
 
   final DateTime firstBuyDate;
   final DateTime lastBuyDate;
+  final double? brokerMarketValue;
+  final double? brokerUnrealizedPL;
+  final double? brokerRealizedPL;
 
   Position({
     required this.symbol,
@@ -137,6 +141,9 @@ class Position {
     required this.currentPrice,
     required this.firstBuyDate,
     required this.lastBuyDate,
+    this.brokerMarketValue,
+    this.brokerUnrealizedPL,
+    this.brokerRealizedPL,
   });
 
   /// Conversion factor from [nativeCurrency] to USD.
@@ -148,14 +155,73 @@ class Position {
   double get change => safePercentChange(avgCost, currentPrice);
 
   /// Current market value in USD.
-  double get currentValue => netShares * currentPrice * _nativeToUsd;
+  double get currentValue =>
+      (brokerMarketValue ?? netShares * currentPrice) * _nativeToUsd;
 
   /// Total cost basis in USD.
   double get costBasis => netShares * avgCost * _nativeToUsd;
 
   /// Unrealised profit/loss in USD.
   double get unrealizedPL =>
-      netShares * (currentPrice - avgCost) * _nativeToUsd;
+      (brokerUnrealizedPL ?? netShares * (currentPrice - avgCost)) *
+      _nativeToUsd;
+
+  /// IBKR realized P/L for the current day, converted to USD when available.
+  double? get realizedToday =>
+      brokerRealizedPL == null ? null : brokerRealizedPL! * _nativeToUsd;
+}
+
+/// Converts current IBKR stock positions into MarketMonk positions while using
+/// local trades only for display names and purchase dates.
+Future<List<Position>> computeIbkrPositions(
+  List<IbkrPosition> brokerPositions,
+  List<Trade> localTrades,
+) async {
+  final stockPositions = brokerPositions
+      .where(
+        (position) => position.securityType == 'STK' && position.quantity > 0,
+      )
+      .toList();
+
+  for (final position in stockPositions) {
+    cacheSymbolMeta(position.symbol, position.currency);
+    if (position.currency != 'USD' &&
+        !allRatesFromUsd.containsKey(position.currency)) {
+      await _fetchAndCacheRate(position.currency);
+    }
+  }
+
+  return stockPositions.map((broker) {
+    final trades =
+        localTrades.where((trade) => trade.symbol == broker.symbol).toList();
+    final buys = trades.where((trade) => trade.quantity > 0).toList();
+    final now = DateTime.now();
+    final firstBuyDate = buys.isEmpty
+        ? now
+        : buys.map((trade) => trade.tradeDate).reduce(
+              (a, b) => a.isBefore(b) ? a : b,
+            );
+    final lastBuyDate = buys.isEmpty
+        ? now
+        : buys.map((trade) => trade.tradeDate).reduce(
+              (a, b) => a.isAfter(b) ? a : b,
+            );
+    final currentPrice = broker.marketPrice ?? broker.averageCost ?? 0.0;
+    final avgCost = broker.averageCost ?? currentPrice;
+    return Position(
+      symbol: broker.symbol,
+      name: trades.isEmpty ? broker.symbol : trades.first.name,
+      nativeCurrency: broker.currency,
+      netShares: broker.quantity,
+      avgCost: avgCost,
+      currentPrice: currentPrice,
+      firstBuyDate: firstBuyDate,
+      lastBuyDate: lastBuyDate,
+      brokerMarketValue: broker.marketValue,
+      brokerUnrealizedPL: broker.unrealizedPnl,
+      brokerRealizedPL: broker.realizedPnl,
+    );
+  }).toList();
 }
 
 /// Computes open positions from a list of trades and a symbol→latestPrice map.
@@ -250,7 +316,11 @@ Future<Map<String, double>> fetchLatestPrices(
     }..removeWhere((k, v) => k.isEmpty || v <= 0);
   } catch (error, stackTrace) {
     // Fall back to N individual limit-1 queries if the JOIN fails
-    talker.handle(error, stackTrace, 'Latest-price query failed; using fallback');
+    talker.handle(
+      error,
+      stackTrace,
+      'Latest-price query failed; using fallback',
+    );
     final prices = <String, double>{};
     for (final s in symbols) {
       final c = await (d.candles.select()
@@ -448,7 +518,11 @@ Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
     }
   } catch (error, stackTrace) {
     // Positions fall back to treating native as USD.
-    talker.handle(error, stackTrace, 'Failed to fetch symbol currency metadata');
+    talker.handle(
+      error,
+      stackTrace,
+      'Failed to fetch symbol currency metadata',
+    );
   }
 }
 

@@ -6,6 +6,7 @@ import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/utils.dart';
+import 'package:provider/provider.dart';
 
 class TradeHistoryPage extends StatefulWidget {
   final SymbolSummary summary;
@@ -39,6 +40,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
   @override
   Widget build(BuildContext context) {
     final position = widget.summary.position;
+    final ibkrManaged = context.watch<AccountManager>().ibkrConfigFor().enabled;
 
     return StreamBuilder<List<Trade>>(
       stream: _tradesStream,
@@ -51,23 +53,25 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
         final nativeRate = allRatesFromUsd[nativeCurr] ?? 1.0;
         final totalRealizedUsd = totalRealized / centDiv / nativeRate;
         final unrealizedPL = position?.unrealizedPL ?? 0.0;
+        final realizedToday = position?.realizedToday;
         final totalGain = totalRealizedUsd + unrealizedPL;
 
         return Scaffold(
           appBar: AppBar(
             title: Text('${widget.summary.symbol} — History'),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.add),
-                tooltip: 'Add trade',
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        EditTickerPage(symbol: widget.summary.symbol),
+              if (!ibkrManaged)
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  tooltip: 'Add trade',
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          EditTickerPage(symbol: widget.summary.symbol),
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           body: SafeArea(
@@ -117,9 +121,18 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                                 : Colors.redAccent,
                           ),
                         ],
+                        if (realizedToday != null)
+                          _SummaryRow(
+                            label: 'Realized P/L today',
+                            value:
+                                '${realizedToday >= 0 ? '+' : ''}${fmtCurrency(realizedToday)}',
+                            color: realizedToday >= 0
+                                ? Colors.green
+                                : Colors.redAccent,
+                          ),
                         if (trades.any((t) => t.realizedPL != 0)) ...[
                           _SummaryRow(
-                            label: 'Realized P/L',
+                            label: 'Imported realized P/L',
                             value:
                                 '${totalRealized >= 0 ? '+' : ''}${fmtNativeCurrency(totalRealized / centDiv, nativeCurr)}',
                             color: totalRealized >= 0
@@ -152,7 +165,8 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                     (t) => _TradeTile(
                       trade: t,
                       centDiv: centDiv,
-                      onLongPress: () => _showTradeActions(t),
+                      onLongPress:
+                          ibkrManaged ? null : () => _showTradeActions(t),
                     ),
                   ),
                 ] else

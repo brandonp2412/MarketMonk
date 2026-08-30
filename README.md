@@ -11,6 +11,7 @@ Track stocks on any platform 📈
 
 - 💹 Line graph stocks (with Yahoo Finance Data)
 - 🥧 Build and monitor your portfolio
+- 🏦 Optional read-only Interactive Brokers live portfolio source
 - ⚙️ Customize to your hearts desires
 
 <p float="left">
@@ -44,6 +45,10 @@ All issues and pull requests are welcome! Bugs will be fixed faster if you inclu
 # Developers
 
 Install [flutter](https://docs.flutter.dev/get-started/install) to run this app.
+
+## Interactive Brokers
+
+MarketMonk can use the standalone read-only proxy in [`server/`](server/) as the current portfolio source. The proxy talks directly to the official IBKR Client Portal Web API and is independent of any personal trading bot. Historical chart candles continue to use Yahoo so MarketMonk does not need to take over an IBKR brokerage session just to draw charts.
 
 ## Migrations
 

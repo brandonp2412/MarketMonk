@@ -9,6 +9,7 @@ import 'package:market_monk/accounts_page.dart';
 import 'package:market_monk/whats_new.dart';
 import 'package:market_monk/csv_import.dart';
 import 'package:market_monk/database.dart';
+import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/ticker_line.dart';
@@ -279,16 +280,165 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  Future<void> _showIbkrSettings(BuildContext context) async {
+    final accounts = context.read<AccountManager>();
+    final account = accounts.activeAccount;
+    final current = accounts.ibkrConfigFor(account);
+    final urlController = TextEditingController(text: current.baseUrl);
+    final tokenController = TextEditingController(text: current.token);
+    var enabled = current.enabled;
+    var checking = false;
+    String? status;
+    var statusOk = false;
+
+    Future<bool> checkConnection(StateSetter setDialogState) async {
+      final config = IbkrAccountConfig(
+        enabled: true,
+        baseUrl: urlController.text.trim(),
+        token: tokenController.text.trim(),
+      );
+      setDialogState(() {
+        checking = true;
+        status = null;
+      });
+      try {
+        await IbkrApiClient(config).testConnection();
+        setDialogState(() {
+          checking = false;
+          statusOk = true;
+          status = 'Connected to IBKR';
+        });
+        return true;
+      } catch (error) {
+        setDialogState(() {
+          checking = false;
+          statusOk = false;
+          status = error.toString().replaceFirst('Bad state: ', '');
+        });
+        return false;
+      }
+    }
+
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setDialogState) => AlertDialog(
+            title: Text('Interactive Brokers — $account'),
+            content: SizedBox(
+              width: 440,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Use IBKR portfolio data'),
+                    subtitle: const Text(
+                      'Positions and current valuations come from your self-hosted API. Historical charts continue to use Yahoo.',
+                    ),
+                    value: enabled,
+                    onChanged: checking
+                        ? null
+                        : (value) => setDialogState(() => enabled = value),
+                  ),
+                  TextField(
+                    controller: urlController,
+                    enabled: !checking,
+                    keyboardType: TextInputType.url,
+                    decoration: const InputDecoration(
+                      labelText: 'API URL',
+                      hintText: 'https://ibkr.example.com',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: tokenController,
+                    enabled: !checking,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Bearer token',
+                    ),
+                  ),
+                  if (status != null) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(
+                          statusOk ? Icons.check_circle : Icons.error_outline,
+                          color: statusOk
+                              ? Colors.green
+                              : Theme.of(dialogContext).colorScheme.error,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(status!)),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: checking ? null : () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed:
+                    checking ? null : () => checkConnection(setDialogState),
+                child: const Text('Test'),
+              ),
+              FilledButton(
+                onPressed: checking
+                    ? null
+                    : () async {
+                        final config = IbkrAccountConfig(
+                          enabled: enabled,
+                          baseUrl: urlController.text.trim(),
+                          token: tokenController.text.trim(),
+                        );
+                        if (enabled && !await checkConnection(setDialogState)) {
+                          return;
+                        }
+                        await accounts.setIbkrConfig(account, config);
+                        if (dialogContext.mounted) Navigator.pop(dialogContext);
+                      },
+                child: checking
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Save'),
+              ),
+            ],
+          ),
+        ),
+      );
+    } finally {
+      urlController.dispose();
+      tokenController.dispose();
+    }
+  }
+
   Future<void> _syncAllTickers(BuildContext context) async {
     final settings = context.read<SettingsState>();
     if (settings.syncInProgress) return;
 
+    final accounts = context.read<AccountManager>();
+    final config = accounts.ibkrConfigFor();
     final trades = await db.select(db.trades).get();
-    final symbols = trades.map((trade) => trade.symbol).toSet();
+    final symbols = config.enabled
+        ? (await IbkrApiClient(config).fetchPortfolio())
+            .positions
+            .where((position) => position.securityType == 'STK')
+            .map((position) => position.symbol)
+            .toSet()
+        : trades.map((trade) => trade.symbol).toSet();
     for (final symbol in symbols) {
       clearSyncCache(symbol);
     }
     await settings.syncTickers(symbols, syncCandles);
+    if (config.enabled) accounts.requestIbkrRefresh();
   }
 
   Widget _sectionHeader(String text) => Padding(
@@ -482,6 +632,23 @@ class _SettingsPageState extends State<SettingsPage> {
             subtitle: Text(settings.visibleCurrencies.join(', ')),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showCurrencyPicker(context, settings),
+          ),
+          Builder(
+            builder: (context) {
+              final accounts = context.watch<AccountManager>();
+              final config = accounts.ibkrConfigFor();
+              return ListTile(
+                leading: const Icon(Icons.account_balance),
+                title: const Text('Interactive Brokers'),
+                subtitle: Text(
+                  config.enabled
+                      ? 'IBKR portfolio source • ${config.baseUrl}'
+                      : 'Use a self-hosted IBKR portfolio API',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _showIbkrSettings(context),
+              );
+            },
           ),
 
           // ── Data ─────────────────────────────────────────────────────────

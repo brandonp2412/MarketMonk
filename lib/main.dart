@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dynamic_color/dynamic_color.dart';
@@ -9,6 +10,7 @@ import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/crash_logger.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/holdings_page.dart';
+import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/settings_state.dart';
@@ -55,16 +57,63 @@ Database db = Database();
 class AccountManager extends ChangeNotifier {
   List<String> accounts = ['Default'];
   String activeAccount = 'Default';
+  int ibkrRefreshVersion = 0;
+  final Map<String, IbkrAccountConfig> _ibkrConfigs = {};
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     activeAccount = prefs.getString('activeAccount') ?? 'Default';
     accounts = prefs.getStringList('accounts') ?? ['Default'];
+    final savedIbkrConfigs = prefs.getString('ibkrAccountConfigs');
+    if (savedIbkrConfigs != null) {
+      try {
+        final decoded = json.decode(savedIbkrConfigs) as Map<String, dynamic>;
+        for (final entry in decoded.entries) {
+          final value = entry.value;
+          if (value is Map<String, dynamic>) {
+            _ibkrConfigs[entry.key] = IbkrAccountConfig.fromJson(value);
+          }
+        }
+      } catch (error, stackTrace) {
+        talker.handle(
+          error,
+          stackTrace,
+          'Failed to load IBKR account settings',
+        );
+      }
+    }
     if (activeAccount != 'Default') {
       db = Database('market-monk-$activeAccount');
     }
     talker.info('Loaded ${accounts.length} portfolio accounts');
   }
+
+  /// Returns the IBKR connection associated with [name], or the active account.
+  IbkrAccountConfig ibkrConfigFor([String? name]) =>
+      _ibkrConfigs[name ?? activeAccount] ?? const IbkrAccountConfig();
+
+  /// Saves the read-only IBKR connection for one MarketMonk account.
+  Future<void> setIbkrConfig(String name, IbkrAccountConfig config) async {
+    _ibkrConfigs[name] = config;
+    final prefs = await SharedPreferences.getInstance();
+    await _saveIbkrConfigs(prefs);
+    ibkrRefreshVersion++;
+    notifyListeners();
+  }
+
+  /// Signals kept-alive portfolio pages to fetch a fresh IBKR snapshot.
+  void requestIbkrRefresh() {
+    ibkrRefreshVersion++;
+    notifyListeners();
+  }
+
+  Future<void> _saveIbkrConfigs(SharedPreferences prefs) => prefs.setString(
+        'ibkrAccountConfigs',
+        json.encode({
+          for (final entry in _ibkrConfigs.entries)
+            entry.key: entry.value.toJson(),
+        }),
+      );
 
   Future<void> switchAccount(String name) async {
     if (name == activeAccount) return;
@@ -83,6 +132,10 @@ class AccountManager extends ChangeNotifier {
     accounts = [...accounts, name];
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('accounts', accounts);
+    // Defer notification to post-frame so it fires after the current build
+    // phase completes. Without this, notifyListeners() fires as a microtask
+    // during the dialog's exit-animation frame, marking AccountsPage dirty
+    // mid-build and triggering _dependents.isEmpty assertions on the Overlay.
     WidgetsBinding.instance.addPostFrameCallback((_) => notifyListeners());
     talker.info('Added portfolio account');
   }
@@ -100,6 +153,8 @@ class AccountManager extends ChangeNotifier {
       if (await src.exists()) await src.rename(dst.path);
     }
     accounts = accounts.map((a) => a == oldName ? newName : a).toList();
+    final ibkrConfig = _ibkrConfigs.remove(oldName);
+    if (ibkrConfig != null) _ibkrConfigs[newName] = ibkrConfig;
     if (isActive) {
       activeAccount = newName;
       db = Database('market-monk-$newName');
@@ -107,6 +162,7 @@ class AccountManager extends ChangeNotifier {
     }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('accounts', accounts);
+    await _saveIbkrConfigs(prefs);
     if (isActive) await prefs.setString('activeAccount', newName);
     WidgetsBinding.instance.addPostFrameCallback((_) => notifyListeners());
     talker.info('Renamed portfolio account');
@@ -116,8 +172,10 @@ class AccountManager extends ChangeNotifier {
     if (name == 'Default') return;
     if (activeAccount == name) await switchAccount('Default');
     accounts = accounts.where((a) => a != name).toList();
+    _ibkrConfigs.remove(name);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('accounts', accounts);
+    await _saveIbkrConfigs(prefs);
     try {
       final dir = await getApplicationSupportDirectory();
       final file = File(p.join(dir.path, 'market-monk-$name.sqlite'));

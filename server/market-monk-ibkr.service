@@ -1,0 +1,28 @@
+[Unit]
+Description=MarketMonk read-only IBKR portfolio proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=market-monk-ibkr
+Group=market-monk-ibkr
+EnvironmentFile=/etc/market-monk-ibkr.env
+ExecStart=/usr/bin/python3 /opt/market-monk-ibkr/ibkr_proxy.py
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+[Install]
+WantedBy=multi-user.target
