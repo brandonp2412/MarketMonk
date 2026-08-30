@@ -242,6 +242,39 @@ void main() {
     });
   });
 
+  group('multi-file broker import', () {
+    test('combines trades from multiple Tiger Brokers CSVs', () {
+      final result = parseBrokerCsvBatch(
+        TigerBrokersParser(),
+        [_tigerCsvMinimal, _closedPositionCsv],
+      );
+
+      expect(result.trades, hasLength(5));
+      expect(
+        result.trades.map((trade) => trade.symbol).toSet(),
+        containsAll(['AAPL', 'META', 'NVDA']),
+      );
+    });
+
+    test('combines trades from multiple IBKR CSVs', () {
+      final result = parseBrokerCsvBatch(
+        InteractiveBrokersParser(),
+        [_ibkrCsvMinimal, _ibkrCsvMinimal],
+      );
+
+      expect(result.trades, hasLength(6));
+    });
+
+    test('empty files do not prevent valid files from importing', () {
+      final result = parseBrokerCsvBatch(
+        TigerBrokersParser(),
+        [_emptyCsv, _tigerCsvMinimal, ''],
+      );
+
+      expect(result.trades, hasLength(3));
+    });
+  });
+
   // ─── importTrades — database round-trip ───────────────────────────────────
   group('importTrades — database round-trip', () {
     late Database testDb;

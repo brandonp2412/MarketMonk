@@ -112,17 +112,25 @@ class _SettingsPageState extends State<SettingsPage> {
 
     if (selectedParser == null || !context.mounted) return;
 
-    // Step 2: pick the CSV file
-    final result = await FilePicker.pickFiles();
+    // Step 2: pick one or more CSV files
+    final result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['csv'],
+    );
     if (result == null || !context.mounted) return;
 
-    // Step 3: parse
+    // Step 3: parse all selected files as one import batch
     ParseResult parsed;
-    late String content;
+    final contents = <String>[];
     try {
-      final file = File(result.files.single.path!);
-      content = await file.readAsString();
-      parsed = selectedParser!.parse(content);
+      for (final pickedFile in result.files) {
+        final path = pickedFile.path;
+        if (path == null) {
+          throw StateError('Could not access ${pickedFile.name}');
+        }
+        contents.add(await File(path).readAsString());
+      }
+      parsed = parseBrokerCsvBatch(selectedParser!, contents);
     } catch (e) {
       if (!context.mounted) return;
       toast(context, 'Failed to parse CSV: $e');
@@ -131,14 +139,18 @@ class _SettingsPageState extends State<SettingsPage> {
 
     if (parsed.trades.isEmpty) {
       if (!context.mounted) return;
-      final detectedBroker = detectBrokerCsv(content, exclude: selectedParser);
+      BrokerCsvParser? detectedBroker;
+      for (final content in contents) {
+        detectedBroker = detectBrokerCsv(content, exclude: selectedParser);
+        if (detectedBroker != null) break;
+      }
       if (detectedBroker != null) {
         toast(
           context,
-          'This looks like a ${detectedBroker.name} CSV. Select ${detectedBroker.name} and try again.',
+          'These files look like ${detectedBroker.name} CSVs. Select ${detectedBroker.name} and try again.',
         );
       } else {
-        toast(context, 'No trades found in the selected file');
+        toast(context, 'No trades found in the selected files');
       }
       return;
     }

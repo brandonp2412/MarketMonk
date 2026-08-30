@@ -31,6 +31,18 @@ class ParseResult {
   ParseResult({required this.trades});
 }
 
+/// Parses multiple CSV exports from the same broker as one import batch.
+ParseResult parseBrokerCsvBatch(
+  BrokerCsvParser parser,
+  Iterable<String> csvContents,
+) {
+  final trades = <ImportedTrade>[];
+  for (final content in csvContents) {
+    trades.addAll(parser.parse(content).trades);
+  }
+  return ParseResult(trades: trades);
+}
+
 abstract class BrokerCsvParser {
   String get name;
   ParseResult parse(String csvContent);
@@ -190,8 +202,10 @@ final List<BrokerCsvParser> supportedBrokers = [
 ];
 
 /// Detects a supported broker whose parser recognizes trades in [csvContent].
-BrokerCsvParser? detectBrokerCsv(String csvContent,
-    {BrokerCsvParser? exclude}) {
+BrokerCsvParser? detectBrokerCsv(
+  String csvContent, {
+  BrokerCsvParser? exclude,
+}) {
   for (final parser in supportedBrokers) {
     if (parser.runtimeType == exclude?.runtimeType) continue;
     if (parser.parse(csvContent).trades.isNotEmpty) return parser;
