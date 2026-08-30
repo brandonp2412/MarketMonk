@@ -118,9 +118,10 @@ class _SettingsPageState extends State<SettingsPage> {
 
     // Step 3: parse
     ParseResult parsed;
+    late String content;
     try {
       final file = File(result.files.single.path!);
-      final content = await file.readAsString();
+      content = await file.readAsString();
       parsed = selectedParser!.parse(content);
     } catch (e) {
       if (!context.mounted) return;
@@ -130,7 +131,15 @@ class _SettingsPageState extends State<SettingsPage> {
 
     if (parsed.trades.isEmpty) {
       if (!context.mounted) return;
-      toast(context, 'No trades found in the selected file');
+      final detectedBroker = detectBrokerCsv(content, exclude: selectedParser);
+      if (detectedBroker != null) {
+        toast(
+          context,
+          'This looks like a ${detectedBroker.name} CSV. Select ${detectedBroker.name} and try again.',
+        );
+      } else {
+        toast(context, 'No trades found in the selected file');
+      }
       return;
     }
 

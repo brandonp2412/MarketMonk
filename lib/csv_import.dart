@@ -55,10 +55,11 @@ class TigerBrokersParser extends BrokerCsvParser {
       final activityType = row[7].trim();
       if (activityType != 'Open' && activityType != 'Close') continue;
 
-      final match = _symbolRegex.firstMatch(row[4].trim());
-      if (match == null) continue;
-      final name = match.group(1)!.trim();
-      final symbol = match.group(2)!.trim();
+      final symbolField = row[4].trim();
+      if (symbolField.isEmpty) continue;
+      final match = _symbolRegex.firstMatch(symbolField);
+      final name = match?.group(1)?.trim() ?? symbolField;
+      final symbol = match?.group(2)?.trim() ?? symbolField;
 
       final quantity = double.tryParse(row[8].replaceAll(',', ''));
       final tradePrice = double.tryParse(row[9].replaceAll(',', ''));
@@ -187,6 +188,16 @@ final List<BrokerCsvParser> supportedBrokers = [
   TigerBrokersParser(),
   InteractiveBrokersParser(),
 ];
+
+/// Detects a supported broker whose parser recognizes trades in [csvContent].
+BrokerCsvParser? detectBrokerCsv(String csvContent,
+    {BrokerCsvParser? exclude}) {
+  for (final parser in supportedBrokers) {
+    if (parser.runtimeType == exclude?.runtimeType) continue;
+    if (parser.parse(csvContent).trades.isNotEmpty) return parser;
+  }
+  return null;
+}
 
 Future<int> importTrades(List<ImportedTrade> trades) async {
   int count = 0;

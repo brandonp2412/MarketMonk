@@ -111,6 +111,17 @@ void main() {
       expect(meta.name, contains('Meta Platforms'));
     });
 
+    test('supports legacy Tiger rows containing only a ticker symbol', () {
+      final legacyCsv = _tigerCsvMinimal.replaceAll('Apple (AAPL)', 'AAPL');
+      final legacyResult = TigerBrokersParser().parse(legacyCsv);
+      final appleTrades =
+          legacyResult.trades.where((trade) => trade.symbol == 'AAPL').toList();
+
+      expect(legacyResult.trades, hasLength(3));
+      expect(appleTrades, hasLength(2));
+      expect(appleTrades.every((trade) => trade.name == 'AAPL'), isTrue);
+    });
+
     test('open trades have realizedPL == 0', () {
       for (final t in result.trades.where((t) => t.tradeType == 'open')) {
         expect(t.realizedPL, equals(0.0));
@@ -212,6 +223,22 @@ void main() {
     test('header-only CSV returns empty ParseResult', () {
       final headerOnly = _ibkrCsvMinimal.split('\n').first;
       expect(InteractiveBrokersParser().parse(headerOnly).trades, isEmpty);
+    });
+  });
+
+  group('broker detection', () {
+    test('recognizes Tiger statement when Interactive Brokers was selected',
+        () {
+      final detected = detectBrokerCsv(
+        _tigerCsvMinimal,
+        exclude: InteractiveBrokersParser(),
+      );
+      expect(detected, isA<TigerBrokersParser>());
+    });
+
+    test('recognizes an Interactive Brokers Flex Query export', () {
+      final detected = detectBrokerCsv(_ibkrCsvMinimal);
+      expect(detected, isA<InteractiveBrokersParser>());
     });
   });
 
