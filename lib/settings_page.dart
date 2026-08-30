@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -211,7 +212,15 @@ class _SettingsPageState extends State<SettingsPage> {
     // Step 5: insert into DB
     final tradesCount = await importTrades(parsed.trades);
     if (!context.mounted) return;
-    context.read<SettingsState>().notifyTradesImported();
+    final settings = context.read<SettingsState>();
+    settings.notifyTradesImported();
+    final allTrades = await db.select(db.trades).get();
+    if (!context.mounted) return;
+    final symbols = allTrades.map((trade) => trade.symbol).toSet();
+    for (final symbol in symbols) {
+      clearSyncCache(symbol);
+    }
+    unawaited(settings.syncTickers(symbols, syncCandles));
     toast(context, 'Imported $tradesCount trades');
   }
 
@@ -268,6 +277,18 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _syncAllTickers(BuildContext context) async {
+    final settings = context.read<SettingsState>();
+    if (settings.syncInProgress) return;
+
+    final trades = await db.select(db.trades).get();
+    final symbols = trades.map((trade) => trade.symbol).toSet();
+    for (final symbol in symbols) {
+      clearSyncCache(symbol);
+    }
+    await settings.syncTickers(symbols, syncCandles);
   }
 
   Widget _sectionHeader(String text) => Padding(
@@ -496,6 +517,41 @@ class _SettingsPageState extends State<SettingsPage> {
               title: const Text('Import CSV'),
               onTap: () => _importCsv(context),
             ),
+          ),
+          ListTile(
+            onTap:
+                settings.syncInProgress ? null : () => _syncAllTickers(context),
+            leading: settings.syncInProgress
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(
+                    settings.syncFailed > 0 ? Icons.sync_problem : Icons.sync,
+                  ),
+            title: const Text('Sync'),
+            subtitle: settings.syncInProgress
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Syncing ${settings.syncingSymbol ?? ''} '
+                        '(${settings.syncCompleted}/${settings.syncTotal})',
+                      ),
+                      const SizedBox(height: 6),
+                      LinearProgressIndicator(value: settings.syncProgress),
+                    ],
+                  )
+                : Text(
+                    settings.syncTotal == 0
+                        ? 'No sync running'
+                        : settings.syncFailed == 0
+                            ? 'Last sync completed '
+                                '${settings.syncCompleted}/${settings.syncTotal}'
+                            : 'Last sync completed with '
+                                '${settings.syncFailed} failed',
+                  ),
           ),
           Tooltip(
             message: 'Permanently delete all holdings, trades, and candles',

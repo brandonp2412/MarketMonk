@@ -102,4 +102,67 @@ void main() {
     expect(currency.currencyName, 'NZD');
     expect(exchangeRate, 1.7);
   });
+
+  test('ticker sync reports progress and refreshes portfolio data', () async {
+    final settings = SettingsState();
+    await settings.initialized;
+    final synced = <String>[];
+    final initialVersion = settings.tradesVersion;
+
+    await settings.syncTickers(['MSFT', 'AAPL', 'AAPL'], (symbol) async {
+      synced.add(symbol);
+    });
+
+    expect(synced, ['AAPL', 'MSFT']);
+    expect(settings.syncInProgress, isFalse);
+    expect(settings.syncCompleted, 2);
+    expect(settings.syncTotal, 2);
+    expect(settings.syncFailed, 0);
+    expect(settings.syncingSymbol, isNull);
+    expect(settings.syncProgress, 1.0);
+    expect(settings.tradesVersion, initialVersion + 1);
+  });
+
+  test('ticker sync continues after an individual ticker fails', () async {
+    final settings = SettingsState();
+    await settings.initialized;
+    final synced = <String>[];
+
+    await settings.syncTickers(['AAPL', 'FAIL', 'MSFT'], (symbol) async {
+      synced.add(symbol);
+      if (symbol == 'FAIL') throw StateError('network failed');
+    });
+
+    expect(synced, ['AAPL', 'FAIL', 'MSFT']);
+    expect(settings.syncCompleted, 3);
+    expect(settings.syncFailed, 1);
+    expect(settings.lastSyncError, contains('network failed'));
+    expect(settings.syncInProgress, isFalse);
+  });
+
+  test('ticker sync queues requests made while another sync is running',
+      () async {
+    final settings = SettingsState();
+    await settings.initialized;
+    final synced = <String>[];
+    final firstStarted = Completer<void>();
+    final releaseFirst = Completer<void>();
+
+    final first = settings.syncTickers(['AAPL'], (symbol) async {
+      synced.add(symbol);
+      firstStarted.complete();
+      await releaseFirst.future;
+    });
+    await firstStarted.future;
+    final second = settings.syncTickers(['MSFT'], (symbol) async {
+      synced.add(symbol);
+    });
+
+    expect(synced, ['AAPL']);
+    releaseFirst.complete();
+    await Future.wait([first, second]);
+
+    expect(synced, ['AAPL', 'MSFT']);
+    expect(settings.syncInProgress, isFalse);
+  });
 }

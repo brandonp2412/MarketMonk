@@ -268,11 +268,76 @@ class SettingsState extends ChangeNotifier {
   }
 
   int tradesVersion = 0;
+  bool syncInProgress = false;
+  int syncCompleted = 0;
+  int syncTotal = 0;
+  int syncFailed = 0;
+  String? syncingSymbol;
+  String? lastSyncError;
+  Future<void>? _activeTickerSync;
 
-  /// Increments [tradesVersion] to signal that the trades table has changed.
+  double? get syncProgress => syncTotal == 0 ? null : syncCompleted / syncTotal;
+
+  /// Increments [tradesVersion] to signal that portfolio data has changed.
   void notifyTradesImported() {
     tradesVersion++;
     notifyListeners();
     talker.debug('Notified listeners of a trade-data change');
+  }
+
+  /// Synchronizes [symbols] sequentially while exposing progress to the UI.
+  /// Requests made during an active sync are queued and run afterwards.
+  Future<void> syncTickers(
+    Iterable<String> symbols,
+    Future<void> Function(String symbol) sync,
+  ) async {
+    while (_activeTickerSync != null) {
+      await _activeTickerSync;
+    }
+
+    final future = _runTickerSync(symbols, sync);
+    _activeTickerSync = future;
+    try {
+      await future;
+    } finally {
+      if (identical(_activeTickerSync, future)) _activeTickerSync = null;
+    }
+  }
+
+  Future<void> _runTickerSync(
+    Iterable<String> symbols,
+    Future<void> Function(String symbol) sync,
+  ) async {
+    final uniqueSymbols = symbols.toSet().toList()..sort();
+    syncInProgress = true;
+    syncCompleted = 0;
+    syncTotal = uniqueSymbols.length;
+    syncFailed = 0;
+    syncingSymbol = null;
+    lastSyncError = null;
+    notifyListeners();
+
+    for (final symbol in uniqueSymbols) {
+      syncingSymbol = symbol;
+      notifyListeners();
+      try {
+        await sync(symbol);
+      } catch (error, stackTrace) {
+        syncFailed++;
+        lastSyncError = error.toString();
+        talker.handle(error, stackTrace, 'Ticker sync failed for $symbol');
+      } finally {
+        syncCompleted++;
+        notifyListeners();
+      }
+    }
+
+    syncingSymbol = null;
+    syncInProgress = false;
+    tradesVersion++;
+    notifyListeners();
+    talker.info(
+      'Ticker sync completed: $syncCompleted/$syncTotal, $syncFailed failed',
+    );
   }
 }
