@@ -563,62 +563,70 @@ class ChartsPageState extends State<ChartsPage>
       Color(0xFFFF5722),
       Color(0xFF607D8B),
     ];
+    final hasText = _searchController.text.isNotEmpty;
 
     // Stack layout: the chart fills the full height so fl_chart's tooltip
     // canvas extends behind the search bar, letting tooltips render above
     // their data points without being obscured. The search bar floats on top
     // as the last-painted child (highest z-order).
-    return Stack(
-      children: [
-        if (_mode == _ChartMode.searching)
-          Padding(
-            padding: EdgeInsets.only(top: _overlayHeight + 8),
-            child: _buildSearchResults(),
-          )
-        else
-          _buildChartContent(settings, accountColors),
-        Align(
-          alignment: Alignment.topCenter,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              // The page can briefly receive tiny constraints while a desktop
-              // window is being created or resized. SearchBar has a minimum
-              // interactive height, so laying it out in that space produces a
-              // RenderFlex overflow. It is safe to defer this visual overlay:
-              // the next real layout re-measures and displays it normally.
-              if (constraints.maxHeight < 72 || constraints.maxWidth < 120) {
-                return const SizedBox.shrink();
-              }
+    return PopScope<void>(
+      canPop: !hasText,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (hasText) _clearSearch();
+      },
+      child: Stack(
+        children: [
+          if (_mode == _ChartMode.searching)
+            Padding(
+              padding: EdgeInsets.only(top: _overlayHeight + 8),
+              child: _buildSearchResults(),
+            )
+          else
+            _buildChartContent(settings, accountColors),
+          Align(
+            alignment: Alignment.topCenter,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // The page can briefly receive tiny constraints while a desktop
+                // window is being created or resized. SearchBar has a minimum
+                // interactive height, so laying it out in that space produces a
+                // RenderFlex overflow. It is safe to defer this visual overlay:
+                // the next real layout re-measures and displays it normally.
+                if (constraints.maxHeight < 72 || constraints.maxWidth < 120) {
+                  return const SizedBox.shrink();
+                }
 
-              return NotificationListener<SizeChangedLayoutNotification>(
-                onNotification: (_) {
-                  WidgetsBinding.instance.addPostFrameCallback(
-                    (_) => _measureOverlay(),
-                  );
-                  return true;
-                },
-                child: SizeChangedLayoutNotifier(
-                  child: Column(
-                    key: _overlayKey,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildSearchBar(),
-                      if (_networkLoading)
-                        LinearProgressIndicator(
-                          minHeight: 2,
-                          value: _syncProgress,
-                          color: Theme.of(context).colorScheme.primary,
-                        )
-                      else
-                        const SizedBox(height: 2),
-                    ],
+                return NotificationListener<SizeChangedLayoutNotification>(
+                  onNotification: (_) {
+                    WidgetsBinding.instance.addPostFrameCallback(
+                      (_) => _measureOverlay(),
+                    );
+                    return true;
+                  },
+                  child: SizeChangedLayoutNotifier(
+                    child: Column(
+                      key: _overlayKey,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildSearchBar(),
+                        if (_networkLoading)
+                          LinearProgressIndicator(
+                            minHeight: 2,
+                            value: _syncProgress,
+                            color: Theme.of(context).colorScheme.primary,
+                          )
+                        else
+                          const SizedBox(height: 2),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
