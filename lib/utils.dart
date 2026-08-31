@@ -366,6 +366,37 @@ Future<void> insertCandles(
   }
 }
 
+/// Stores daily IBKR bars in the same candle cache used by chart rendering.
+Future<void> insertIbkrCandles(
+  List<IbkrHistoricalCandle> dataList,
+  String symbol, {
+  Database? database,
+}) async {
+  const int batchSize = 1000;
+  final d = database ?? db;
+
+  for (int i = 0; i < dataList.length; i += batchSize) {
+    final batch = dataList.skip(i).take(batchSize).map((data) {
+      return CandlesCompanion.insert(
+        date: data.date,
+        symbol: symbol,
+        open: Value(data.open),
+        high: Value(data.high),
+        low: Value(data.low),
+        close: Value(data.close),
+        adjClose: Value(data.close),
+        volume: Value(data.volume),
+      );
+    }).toList();
+
+    await d.batch((batchBuilder) {
+      batchBuilder.insertAllOnConflictUpdate(d.candles, batch);
+    });
+
+    talker.debug('Stored ${i + batch.length} IBKR candle records');
+  }
+}
+
 Future<Candle?> findClosestDate(DateTime date, String symbol) {
   final dateOnly = DateTime(date.year, date.month, date.day);
   final timestamp = dateOnly.millisecondsSinceEpoch / 1000;
@@ -411,18 +442,19 @@ void clearSyncCache(String symbol) =>
 /// Removes all symbols from the sync guard (e.g. after a full manual refresh).
 void clearAllSyncCache() => _syncedSymbols.clear();
 
-/// Syncs candles for a symbol from Yahoo Finance. Does not touch any other
-/// table — the position data is computed on demand from trades + candles.
+/// Syncs daily candles for [symbol], preferring the configured IBKR service.
 ///
-/// Skips the network call if the symbol has already been synced today in this
-/// session, or if the local DB already has today's data.
-///
-/// Pass [database] to write into a specific account's DB instead of the
-/// global active-account [db].
-Future<void> syncCandles(String symbol, {Database? database}) async {
+/// IBKR is used for current broker stock positions. If IBKR historical data is
+/// unavailable, Yahoo remains the fallback source. The first successful IBKR
+/// sync seeds up to ten years of bars; later daily refreshes request one year.
+Future<void> syncCandles(
+  String symbol, {
+  Database? database,
+  IbkrAccountConfig? ibkrConfig,
+  String syncNamespace = 'Default',
+}) async {
   final d = database ?? db;
 
-  // Roll the guard over on a new calendar day
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
   if (_syncGuardDate != today) {
@@ -430,42 +462,72 @@ Future<void> syncCandles(String symbol, {Database? database}) async {
     _syncGuardDate = today;
   }
 
-  // Guard key includes the DB identity so different accounts sync independently.
   final guardKey = '${d.hashCode}:$symbol';
   if (_syncedSymbols.contains(guardKey)) return;
-  _syncedSymbols.add(guardKey); // mark before async gap to prevent races
-
-  // Lazily populate this symbol's native currency and its exchange rate.
-  // Fires in the background so it doesn't block candle loading.
-  unawaited(_fetchSymbolCurrencyAndRate(symbol));
+  _syncedSymbols.add(guardKey);
 
   try {
-    var latest = await (d.candles.select()
+    final latest = await (d.candles.select()
           ..where((tbl) => tbl.symbol.equals(symbol))
           ..orderBy([
             (u) => OrderingTerm(expression: u.date, mode: OrderingMode.desc),
           ])
           ..limit(1))
         .getSingleOrNull();
+    final latestDay = latest == null
+        ? null
+        : DateTime(latest.date.year, latest.date.month, latest.date.day);
+
+    if (ibkrConfig?.isConfigured == true) {
+      final prefs = await SharedPreferences.getInstance();
+      final seedKey =
+          'ibkrHistorySeeded:${ibkrConfig!.baseUrl}:$syncNamespace:$symbol';
+      final seeded = prefs.getBool(seedKey) ?? false;
+      if (seeded && latestDay != null && !today.isAfter(latestDay)) return;
+
+      try {
+        final history = await IbkrApiClient(ibkrConfig).fetchHistoricalCandles(
+          symbol,
+          years: seeded && latest != null ? 1 : 10,
+        );
+        if (history.candles.isEmpty) {
+          throw StateError('IBKR returned no historical candles');
+        }
+
+        final normalizedCurrency = cacheSymbolMeta(symbol, history.currency);
+        await prefs.setString('symbolRawCurrency_$symbol', history.currency);
+        if (normalizedCurrency != 'USD' &&
+            !allRatesFromUsd.containsKey(normalizedCurrency)) {
+          await _fetchAndCacheRate(normalizedCurrency);
+        }
+        await insertIbkrCandles(history.candles, symbol, database: d);
+        await prefs.setBool(seedKey, true);
+        talker.info('Completed IBKR candle sync');
+        return;
+      } catch (error) {
+        talker.warning(
+          'IBKR candle sync failed for $symbol; falling back to Yahoo: $error',
+        );
+      }
+    }
+
+    unawaited(_fetchSymbolCurrencyAndRate(symbol));
 
     if (latest == null) {
       final response = await const YahooFinanceDailyReader().getDailyDTOs(
         symbol,
       );
       await insertCandles(response.candlesData, symbol, database: d);
-      talker.info('Completed initial candle sync');
-    } else if (today.isAfter(
-      DateTime(latest.date.year, latest.date.month, latest.date.day),
-    )) {
+      talker.info('Completed initial Yahoo candle sync');
+    } else if (today.isAfter(latestDay!)) {
       final response = await const YahooFinanceDailyReader().getDailyDTOs(
         symbol,
         startDate: latest.date,
       );
       await insertCandles(response.candlesData, symbol, database: d);
-      talker.info('Completed incremental candle sync');
+      talker.info('Completed incremental Yahoo candle sync');
     }
   } catch (error, stackTrace) {
-    // Remove from guard on failure so next attempt can retry
     _syncedSymbols.remove(guardKey);
     talker.handle(error, stackTrace, 'Candle sync failed');
     rethrow;

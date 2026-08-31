@@ -1,9 +1,11 @@
 import 'dart:io';
 
+import 'package:drift/drift.dart' hide Column;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/ibkr_api.dart';
@@ -11,7 +13,9 @@ import 'package:market_monk/main.dart' as app;
 import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
+import 'package:market_monk/ticker_line.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> _pumpUntil(
   WidgetTester tester,
@@ -85,6 +89,11 @@ void main() {
     );
     final alphabeticallyFirst = [...stocks]
       ..sort((a, b) => a.symbol.compareTo(b.symbol));
+    final liveHistory = await IbkrApiClient(
+      liveConfig,
+    ).fetchHistoricalCandles(largest.symbol, years: 1);
+    expect(liveHistory.candles.length, greaterThan(100));
+    expect(liveHistory.candles.last.close, greaterThan(0));
 
     app.db = Database.connect(NativeDatabase.memory());
     final settings = SettingsState();
@@ -129,6 +138,8 @@ void main() {
     await _pumpUntilGone(tester, find.text('Interactive Brokers — Default'));
     expect(accounts.ibkrConfigFor().enabled, isTrue);
     expect(accounts.ibkrConfigFor().baseUrl, url);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('favoriteStocks', [largest.symbol]);
 
     await tester.pumpWidget(
       _page(
@@ -148,5 +159,25 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(HoldingsPage), findsOneWidget);
     await _pumpUntil(tester, find.text(alphabeticallyFirst.first.symbol));
+
+    await tester.tap(find.byKey(const Key('ChartPage')));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(ChartsPage), findsOneWidget);
+    await _pumpUntil(tester, find.text(largest.symbol));
+    await tester.tap(find.text(largest.symbol).first);
+    await _pumpUntil(
+      tester,
+      find.byType(TickerLine),
+      timeout: const Duration(seconds: 60),
+    );
+
+    final storedCandles = await (app.db.candles.select()
+          ..where((candle) => candle.symbol.equals(largest.symbol)))
+        .get();
+    expect(storedCandles.length, greaterThan(100));
+    expect(
+      prefs.getBool('ibkrHistorySeeded:$url:Default:${largest.symbol}'),
+      isTrue,
+    );
   });
 }

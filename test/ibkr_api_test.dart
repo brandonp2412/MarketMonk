@@ -48,6 +48,52 @@ void main() {
     expect(snapshot.positions.single.marketValue, 2000);
   });
 
+  test('IBKR client authenticates and parses historical candles', () async {
+    Uri? requestedUri;
+    final client = IbkrApiClient(
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test/base/',
+        token: 'secret-token',
+      ),
+      get: (uri, {headers}) async {
+        requestedUri = uri;
+        return http.Response(
+          '''{"read_only":true,"source":"native","symbol":"AAPL","currency":"USD","candles":[{"date":"2026-08-28","open":198,"high":202,"low":197,"close":200,"volume":1234}]}''',
+          200,
+        );
+      },
+    );
+
+    final history = await client.fetchHistoricalCandles('AAPL', years: 10);
+
+    expect(
+      requestedUri.toString(),
+      'https://ibkr.example.test/base/v1/historical?symbol=AAPL&years=10',
+    );
+    expect(history.symbol, 'AAPL');
+    expect(history.currency, 'USD');
+    expect(history.candles, hasLength(1));
+    expect(history.candles.single.date, DateTime(2026, 8, 28));
+    expect(history.candles.single.close, 200);
+    expect(history.candles.single.volume, 1234);
+  });
+
+  test('IBKR historical years are bounded', () {
+    final client = IbkrApiClient(
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'secret-token',
+      ),
+    );
+
+    expect(
+      () => client.fetchHistoricalCandles('AAPL', years: 11),
+      throwsRangeError,
+    );
+  });
+
   test('IBKR client exposes server error details', () async {
     final client = IbkrApiClient(
       const IbkrAccountConfig(

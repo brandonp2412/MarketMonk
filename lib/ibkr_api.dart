@@ -95,6 +95,58 @@ class IbkrPosition {
       );
 }
 
+/// One daily historical candle returned by the self-hosted IBKR service.
+class IbkrHistoricalCandle {
+  final DateTime date;
+  final double open;
+  final double high;
+  final double low;
+  final double close;
+  final int volume;
+
+  const IbkrHistoricalCandle({
+    required this.date,
+    required this.open,
+    required this.high,
+    required this.low,
+    required this.close,
+    required this.volume,
+  });
+
+  factory IbkrHistoricalCandle.fromJson(Map<String, dynamic> json) =>
+      IbkrHistoricalCandle(
+        date: DateTime.parse(json['date'] as String),
+        open: (json['open'] as num).toDouble(),
+        high: (json['high'] as num).toDouble(),
+        low: (json['low'] as num).toDouble(),
+        close: (json['close'] as num).toDouble(),
+        volume: (json['volume'] as num?)?.toInt() ?? 0,
+      );
+}
+
+/// Historical daily bars and quote currency for one IBKR stock position.
+class IbkrHistoricalSeries {
+  final String symbol;
+  final String currency;
+  final List<IbkrHistoricalCandle> candles;
+
+  const IbkrHistoricalSeries({
+    required this.symbol,
+    required this.currency,
+    required this.candles,
+  });
+
+  factory IbkrHistoricalSeries.fromJson(Map<String, dynamic> json) =>
+      IbkrHistoricalSeries(
+        symbol: json['symbol'] as String? ?? '',
+        currency: json['currency'] as String? ?? 'USD',
+        candles: (json['candles'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(IbkrHistoricalCandle.fromJson)
+            .toList(),
+      );
+}
+
 /// Current read-only snapshot returned by the MarketMonk IBKR API.
 class IbkrPortfolioSnapshot {
   final String account;
@@ -152,7 +204,27 @@ class IbkrApiClient {
     );
   }
 
-  Future<http.Response> _request(String path) async {
+  /// Fetches up to [years] years of daily bars for a current IBKR stock position.
+  Future<IbkrHistoricalSeries> fetchHistoricalCandles(
+    String symbol, {
+    int years = 10,
+  }) async {
+    if (years < 1 || years > 10) {
+      throw RangeError.range(years, 1, 10, 'years');
+    }
+    final response = await _request(
+      '/v1/historical',
+      queryParameters: {'symbol': symbol, 'years': '$years'},
+    );
+    return IbkrHistoricalSeries.fromJson(
+      json.decode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  Future<http.Response> _request(
+    String path, {
+    Map<String, String>? queryParameters,
+  }) async {
     if (!config.isConfigured) {
       throw StateError('IBKR API is not fully configured');
     }
@@ -162,7 +234,7 @@ class IbkrApiClient {
     }
     final uri = base.replace(
       path: '${base.path.replaceFirst(RegExp(r'/$'), '')}$path',
-      query: null,
+      queryParameters: queryParameters,
       fragment: null,
     );
     final response = await _get(

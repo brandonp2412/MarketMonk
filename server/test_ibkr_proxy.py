@@ -1,6 +1,7 @@
 import json
 import threading
 import unittest
+from datetime import date
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 from types import SimpleNamespace
@@ -46,12 +47,33 @@ class FakeClient:
             "positions": [],
         }
 
+    def historical(self, symbol, years):
+        return {
+            "read_only": True,
+            "source": "native",
+            "symbol": symbol,
+            "currency": "USD",
+            "candles": [
+                {
+                    "date": "2026-08-28",
+                    "open": 198,
+                    "high": 202,
+                    "low": 197,
+                    "close": 200,
+                    "volume": 1000,
+                }
+            ],
+        }
+
 
 class FailingClient:
     def ensure_account_visible(self) -> None:
         raise IbkrError("IBKR Client Portal Gateway is awaiting browser authentication")
 
     def portfolio(self):
+        raise AssertionError("not reached")
+
+    def historical(self, symbol, years):
         raise AssertionError("not reached")
 
 
@@ -91,6 +113,7 @@ class FakeNativeIb:
         self.connected = False
         self.connect_kwargs = None
         self.disconnected = False
+        self.historical_request = None
 
     def connect(self, host, port, **kwargs):
         self.connected = True
@@ -129,6 +152,19 @@ class FakeNativeIb:
         return [
             SimpleNamespace(tag="NetLiquidation", value="1000", currency="USD"),
             SimpleNamespace(tag="CashBalance", value="100", currency="USD"),
+        ]
+
+    def reqHistoricalData(self, contract, **kwargs):
+        self.historical_request = (contract, kwargs)
+        return [
+            SimpleNamespace(
+                date=date(2026, 8, 28),
+                open=198,
+                high=202,
+                low=197,
+                close=200,
+                volume=1234,
+            )
         ]
 
 
@@ -209,6 +245,38 @@ class ProxyTests(unittest.TestCase):
         self.assertEqual(kwargs["account"], "U1234567")
         self.assertEqual(kwargs["fetchFields"], 9)
 
+    def test_native_backend_reads_historical_candles_for_held_stock(self):
+        fake = FakeNativeIb()
+        client = NativeIbkrClient(
+            config(backend="native", tws_port=4003), ib_factory=lambda: fake
+        )
+
+        history = client.historical("AAPL", 10)
+
+        self.assertEqual(history["source"], "native")
+        self.assertTrue(history["read_only"])
+        self.assertEqual(history["symbol"], "AAPL")
+        self.assertEqual(history["currency"], "USD")
+        self.assertEqual(history["candles"][0]["date"], "2026-08-28")
+        self.assertEqual(history["candles"][0]["close"], 200)
+        self.assertEqual(history["candles"][0]["volume"], 1234)
+        contract, kwargs = fake.historical_request
+        self.assertEqual(contract.exchange, "SMART")
+        self.assertEqual(kwargs["durationStr"], "10 Y")
+        self.assertEqual(kwargs["barSizeSetting"], "1 day")
+        self.assertEqual(kwargs["whatToShow"], "TRADES")
+        self.assertTrue(kwargs["useRTH"])
+        self.assertTrue(fake.disconnected)
+
+    def test_native_historical_rejects_non_held_symbol(self):
+        fake = FakeNativeIb()
+        client = NativeIbkrClient(
+            config(backend="native", tws_port=4003), ib_factory=lambda: fake
+        )
+
+        with self.assertRaisesRegex(IbkrError, "current stock positions only"):
+            client.historical("MSFT", 1)
+
     def test_http_api_requires_bearer_and_returns_portfolio(self):
         server = ThreadingHTTPServer(
             ("127.0.0.1", 0), make_handler(FakeClient(), "x" * 32)
@@ -234,6 +302,17 @@ class ProxyTests(unittest.TestCase):
         body = json.loads(response.read())
         self.assertTrue(body["read_only"])
         self.assertEqual(body["account"], "****1234")
+
+        connection.request(
+            "GET",
+            "/v1/historical?symbol=AAPL&years=10",
+            headers={"Authorization": f"Bearer {'x' * 32}"},
+        )
+        historical = connection.getresponse()
+        self.assertEqual(historical.status, 200)
+        historical_body = json.loads(historical.read())
+        self.assertEqual(historical_body["symbol"], "AAPL")
+        self.assertEqual(historical_body["candles"][0]["close"], 200)
         connection.close()
 
     def test_health_surfaces_browser_authentication(self):

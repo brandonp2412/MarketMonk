@@ -8,6 +8,7 @@ import 'package:market_monk/candle_ticker.dart';
 import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
+import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/settings_page.dart';
@@ -110,6 +111,23 @@ class ChartsPageState extends State<ChartsPage>
     await prefs.setInt('chartPeriodDays', days);
   }
 
+  Future<List<Position>> _positionsForAccount(
+    Database accountDb,
+    IbkrAccountConfig ibkrConfig,
+  ) async {
+    final trades = await accountDb.trades.select().get();
+    if (ibkrConfig.enabled) {
+      if (!ibkrConfig.isConfigured) {
+        throw StateError('IBKR portfolio source is not fully configured');
+      }
+      final snapshot = await IbkrApiClient(ibkrConfig).fetchPortfolio();
+      return computeIbkrPositions(snapshot.positions, trades);
+    }
+    final symbols = trades.map((trade) => trade.symbol).toSet().toList();
+    final prices = await fetchLatestPrices(symbols, database: accountDb);
+    return computePositions(trades, prices);
+  }
+
   Future<void> _syncCandlesInBackground() async {
     if (!mounted) return;
     final accountManager = context.read<AccountManager>();
@@ -122,10 +140,15 @@ class ChartsPageState extends State<ChartsPage>
                 ? Database()
                 : Database('market-monk-$accountName'));
         try {
-          final trades = await accountDb.trades.select().get();
-          final symbols = trades.map((t) => t.symbol).toSet().toList();
-          for (final s in symbols) {
-            await syncCandles(s, database: accountDb);
+          final ibkrConfig = accountManager.ibkrConfigFor(accountName);
+          final positions = await _positionsForAccount(accountDb, ibkrConfig);
+          for (final position in positions) {
+            await syncCandles(
+              position.symbol,
+              database: accountDb,
+              ibkrConfig: ibkrConfig,
+              syncNamespace: accountName,
+            );
           }
         } finally {
           if (!isActive) await accountDb.close();
@@ -165,8 +188,13 @@ class ChartsPageState extends State<ChartsPage>
   Future<void> _refreshAllPortfolioCandles() async {
     final accountManager = context.read<AccountManager>();
 
-    // Pre-collect all (db, isActive, symbols) so we know the total up front.
-    final tasks = <({Database db, bool isActive, List<String> symbols})>[];
+    final tasks = <({
+      Database db,
+      bool isActive,
+      String accountName,
+      IbkrAccountConfig ibkrConfig,
+      List<String> symbols,
+    })>[];
     for (final accountName in accountManager.accounts) {
       final isActive = accountName == accountManager.activeAccount;
       final accountDb = isActive
@@ -175,9 +203,16 @@ class ChartsPageState extends State<ChartsPage>
               ? Database()
               : Database('market-monk-$accountName'));
       try {
-        final trades = await accountDb.trades.select().get();
-        final symbols = trades.map((t) => t.symbol).toSet().toList();
-        tasks.add((db: accountDb, isActive: isActive, symbols: symbols));
+        final ibkrConfig = accountManager.ibkrConfigFor(accountName);
+        final positions = await _positionsForAccount(accountDb, ibkrConfig);
+        final task = (
+          db: accountDb,
+          isActive: isActive,
+          accountName: accountName,
+          ibkrConfig: ibkrConfig,
+          symbols: positions.map((position) => position.symbol).toList(),
+        );
+        tasks.add(task);
       } catch (_) {
         if (!isActive) await accountDb.close();
       }
@@ -190,7 +225,12 @@ class ChartsPageState extends State<ChartsPage>
     for (final task in tasks) {
       try {
         for (final symbol in task.symbols) {
-          await syncCandles(symbol, database: task.db);
+          await syncCandles(
+            symbol,
+            database: task.db,
+            ibkrConfig: task.ibkrConfig,
+            syncNamespace: task.accountName,
+          );
           done++;
           if (mounted) {
             setState(() => _syncProgress = total > 0 ? done / total : null);
@@ -219,7 +259,12 @@ class ChartsPageState extends State<ChartsPage>
     try {
       if (_mode == _ChartMode.stock && _selectedSymbol != null) {
         clearSyncCache(_selectedSymbol!);
-        await syncCandles(_selectedSymbol!);
+        final accountManager = context.read<AccountManager>();
+        await syncCandles(
+          _selectedSymbol!,
+          ibkrConfig: accountManager.ibkrConfigFor(),
+          syncNamespace: accountManager.activeAccount,
+        );
         if (mounted) _setStockStream(_selectedSymbol!);
       } else {
         await _refreshAllPortfolioCandles();
@@ -249,9 +294,15 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   Future<void> _syncFavoriteCandles() async {
+    final accountManager = context.read<AccountManager>();
+    final ibkrConfig = accountManager.ibkrConfigFor();
     for (final symbol in _favoriteStocks) {
       try {
-        await syncCandles(symbol);
+        await syncCandles(
+          symbol,
+          ibkrConfig: ibkrConfig,
+          syncNamespace: accountManager.activeAccount,
+        );
       } catch (_) {
         // Continue with remaining symbols on error
       }
@@ -275,7 +326,14 @@ class ChartsPageState extends State<ChartsPage>
     if (isFavorite) {
       toast(ctx, 'Removed as favorite');
     } else {
-      unawaited(syncCandles(symbol));
+      final accountManager = ctx.read<AccountManager>();
+      unawaited(
+        syncCandles(
+          symbol,
+          ibkrConfig: accountManager.ibkrConfigFor(),
+          syncNamespace: accountManager.activeAccount,
+        ),
+      );
       toast(ctx, 'Set as favorite');
     }
   }
@@ -301,10 +359,8 @@ class ChartsPageState extends State<ChartsPage>
               ? Database()
               : Database('market-monk-$accountName'));
       try {
-        final trades = await accountDb.trades.select().get();
-        final symbols = trades.map((t) => t.symbol).toSet().toList();
-        final prices = await fetchLatestPrices(symbols, database: accountDb);
-        final positions = computePositions(trades, prices);
+        final ibkrConfig = accountManager.ibkrConfigFor(accountName);
+        final positions = await _positionsForAccount(accountDb, ibkrConfig);
         newSeries[accountName] = await _buildPortfolioSeries(
           positions,
           accountDb,
@@ -462,7 +518,12 @@ class ChartsPageState extends State<ChartsPage>
     () async {
       String? err;
       try {
-        await syncCandles(symbol);
+        final accountManager = context.read<AccountManager>();
+        await syncCandles(
+          symbol,
+          ibkrConfig: accountManager.ibkrConfigFor(),
+          syncNamespace: accountManager.activeAccount,
+        );
       } catch (error, stackTrace) {
         talker.handle(error, stackTrace, 'Selected ticker sync failed');
         err = error.toString();

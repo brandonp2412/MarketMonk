@@ -6,6 +6,7 @@ The HTTP interface consumed by MarketMonk is the same for both supported backend
 
 - `GET /v1/health`
 - `GET /v1/portfolio`
+- `GET /v1/historical?symbol=AAPL&years=10`
 
 Every request requires `Authorization: Bearer <MARKET_MONK_IBKR_TOKEN>`. The bridge exposes no order endpoint and rejects POST requests.
 
@@ -17,11 +18,16 @@ MarketMonk uses `ib_async` only as the transport implementation for IBKR's docum
 
 IBKR documents `updatePortfolio` as providing position size, market price, market value, average cost, daily unrealized P/L, and daily realized P/L. Those values are normalized into MarketMonk's existing `/v1/portfolio` response.
 
+The native backend can also request daily `TRADES` historical bars for current stock positions. MarketMonk requests between one and ten years, uses regular trading hours, and routes through `SMART` when a portfolio contract does not include an API routing exchange. Historical availability follows the market-data permissions on the IBKR username. MarketMonk falls back to Yahoo for unheld symbols or when IBKR historical data is unavailable.
+
 Official IBKR documentation:
 
 - https://www.interactivebrokers.com/docs/tws-api/doc/introduction
 - https://www.interactivebrokers.com/docs/tws-api/doc/account-portfolio-data/account-updates/receiving-account-updates
 - https://www.interactivebrokers.com/docs/tws-api/doc/account-portfolio-data/account-updates/account-value-keys
+- https://interactivebrokers.github.io/tws-api/historical_bars.html
+- https://interactivebrokers.github.io/tws-api/historical_data.html
+- https://interactivebrokers.github.io/tws-api/historical_limitations.html
 
 The Python dependency is pinned in `requirements.txt`.
 
@@ -81,6 +87,8 @@ The default listener is `127.0.0.1:8091`. Put HTTPS or a private VPN in front of
 `GET /v1/health` connects to the selected IBKR backend and verifies that the configured account is visible. With no configured account ID, a single visible account is selected automatically; multiple visible accounts require `IBKR_ACCOUNT_ID`.
 
 `GET /v1/portfolio` returns a normalized read-only snapshot containing the masked account ID, summary values, ledger values, and current positions with quantity, average cost, current market price/value, daily realized P/L, daily unrealized P/L, currency, exchange, and contract ID when supplied by IBKR.
+
+`GET /v1/historical?symbol=AAPL&years=10` is available with the native backend for a current stock position visible to that IBKR session. `years` must be from 1 through 10. It returns daily OHLCV bars and the contract currency. The endpoint remains read-only and the service still exposes no order route.
 
 ## systemd
 

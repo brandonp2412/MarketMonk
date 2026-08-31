@@ -55,7 +55,6 @@ class HoldingsPageState extends State<HoldingsPage>
     super.initState();
     _stream = _buildStream();
     _preload();
-    _syncAllInBackground();
   }
 
   @override
@@ -107,6 +106,7 @@ class HoldingsPageState extends State<HoldingsPage>
   /// Fires candle syncs for all held symbols in the background without
   /// blocking the UI.
   Future<void> _syncAllInBackground() async {
+    final accountName = context.read<AccountManager>().activeAccount;
     try {
       final useIbkr = _lastIbkrConfig.enabled;
       final trades = await db.trades.select().get();
@@ -115,7 +115,11 @@ class HoldingsPageState extends State<HoldingsPage>
           ? positions.map((position) => position.symbol).toSet()
           : trades.map((trade) => trade.symbol).toSet();
       for (final symbol in symbols) {
-        await syncCandles(symbol);
+        await syncCandles(
+          symbol,
+          ibkrConfig: _lastIbkrConfig,
+          syncNamespace: accountName,
+        );
       }
     } catch (_) {
       // Silently ignore network errors on background sync
@@ -445,11 +449,16 @@ class HoldingsPageState extends State<HoldingsPage>
   }
 
   Future<void> _refreshCandles() async {
+    final accountManager = context.read<AccountManager>();
     clearAllSyncCache();
     await _preload();
     final symbols = _summaries.map((summary) => summary.symbol).toSet();
     for (final symbol in symbols) {
-      await syncCandles(symbol);
+      await syncCandles(
+        symbol,
+        ibkrConfig: accountManager.ibkrConfigFor(),
+        syncNamespace: accountManager.activeAccount,
+      );
     }
     if (mounted) setState(() => _stream = _buildStream());
   }

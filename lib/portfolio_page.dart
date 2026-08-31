@@ -42,7 +42,6 @@ class PortfolioPageState extends State<PortfolioPage>
     WidgetsBinding.instance.addObserver(this);
     stream = _buildStream();
     _preload();
-    _syncAllInBackground();
   }
 
   @override
@@ -108,6 +107,7 @@ class PortfolioPageState extends State<PortfolioPage>
   }
 
   Future<void> _syncAllInBackground() async {
+    final accountName = context.read<AccountManager>().activeAccount;
     try {
       final useIbkr = _lastIbkrConfig.enabled;
       final trades = await db.trades.select().get();
@@ -116,7 +116,11 @@ class PortfolioPageState extends State<PortfolioPage>
           ? positions.map((position) => position.symbol).toSet()
           : trades.map((trade) => trade.symbol).toSet();
       for (final symbol in symbols) {
-        await syncCandles(symbol);
+        await syncCandles(
+          symbol,
+          ibkrConfig: _lastIbkrConfig,
+          syncNamespace: accountName,
+        );
       }
       if (mounted) setState(() => _positions = positions);
     } catch (error, stackTrace) {

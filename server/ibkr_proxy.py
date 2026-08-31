@@ -12,10 +12,11 @@ import os
 import ssl
 import time
 from dataclasses import dataclass
+from datetime import date, datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 from urllib.request import HTTPSHandler, Request, build_opener
 
 
@@ -128,6 +129,11 @@ class ClientPortalIbkrClient:
             "positions": [_normalize_web_position(item) for item in positions],
         }
 
+    def historical(self, symbol: str, years: int) -> dict[str, Any]:
+        raise IbkrError(
+            "IBKR historical candles require the native TWS / IB Gateway backend"
+        )
+
     def _get(self, endpoint: str) -> Any:
         url = f"{self._config.gateway_url}/{endpoint.lstrip('/')}"
         request = Request(url, headers={"Accept": "application/json"}, method="GET")
@@ -195,6 +201,58 @@ class NativeIbkrClient:
         finally:
             ib.disconnect()
 
+    def historical(self, symbol: str, years: int) -> dict[str, Any]:
+        ib = self._connect()
+        try:
+            account = self._select_account(ib)
+            item = next(
+                (
+                    position
+                    for position in ib.portfolio(account)
+                    if str(getattr(position.contract, "symbol", "")).upper()
+                    == symbol.upper()
+                    and str(getattr(position.contract, "secType", "")).upper()
+                    == "STK"
+                ),
+                None,
+            )
+            if item is None:
+                raise IbkrError(
+                    "IBKR historical candles are available for current stock positions only"
+                )
+
+            contract = item.contract
+            if not str(getattr(contract, "exchange", "")).strip():
+                contract.exchange = "SMART"
+
+            bars = ib.reqHistoricalData(
+                contract,
+                endDateTime="",
+                durationStr=f"{years} Y",
+                barSizeSetting="1 day",
+                whatToShow="TRADES",
+                useRTH=True,
+                formatDate=1,
+                timeout=30,
+            )
+            if not bars:
+                raise IbkrError(f"IBKR returned no historical candles for {symbol}")
+
+            currency = str(getattr(contract, "currency", "") or "USD").strip()
+            return {
+                "read_only": True,
+                "source": "native",
+                "symbol": str(getattr(contract, "symbol", symbol)).strip(),
+                "currency": currency,
+                "candles": [_normalize_historical_bar(bar) for bar in bars],
+            }
+        except IbkrError:
+            raise
+        except Exception as error:
+            raise IbkrError(f"IBKR TWS API historical read failed: {error}") from error
+        finally:
+            ib.disconnect()
+
     def _connect(self) -> Any:
         ib = self._ib_factory()
         try:
@@ -240,12 +298,28 @@ def make_handler(client: Any, token: str) -> type[BaseHTTPRequestHandler]:
                 self._json(401, {"error": "unauthorized"})
                 return
 
+            parsed = urlparse(self.path)
             try:
-                if self.path == "/v1/health":
+                if parsed.path == "/v1/health":
                     client.ensure_account_visible()
                     self._json(200, {"status": "ok", "source": "ibkr"})
-                elif self.path == "/v1/portfolio":
+                elif parsed.path == "/v1/portfolio":
                     self._json(200, client.portfolio())
+                elif parsed.path == "/v1/historical":
+                    query = parse_qs(parsed.query)
+                    symbol = (query.get("symbol") or [""])[0].strip()
+                    if not symbol or len(symbol) > 32:
+                        self._json(400, {"error": "invalid symbol"})
+                        return
+                    try:
+                        years = int((query.get("years") or ["10"])[0])
+                    except ValueError:
+                        self._json(400, {"error": "invalid years"})
+                        return
+                    if not 1 <= years <= 10:
+                        self._json(400, {"error": "years must be between 1 and 10"})
+                        return
+                    self._json(200, client.historical(symbol, years))
                 else:
                     self._json(404, {"error": "not found"})
             except IbkrError as error:
@@ -308,6 +382,30 @@ def _normalize_web_position(value: Any) -> dict[str, Any]:
         "sector": _first_text(value, "sector"),
         "group": _first_text(value, "group"),
         "timestamp": _number(value.get("timestamp"), integer=True, default=0),
+    }
+
+
+def _normalize_historical_bar(bar: Any) -> dict[str, Any]:
+    raw_date = getattr(bar, "date", None)
+    if isinstance(raw_date, datetime):
+        candle_date = raw_date.date().isoformat()
+    elif isinstance(raw_date, date):
+        candle_date = raw_date.isoformat()
+    else:
+        text = str(raw_date or "").strip()
+        if len(text) == 8 and text.isdigit():
+            candle_date = f"{text[:4]}-{text[4:6]}-{text[6:]}"
+        else:
+            raise IbkrError("IBKR returned an invalid historical candle date")
+
+    volume = _finite_optional(getattr(bar, "volume", None))
+    return {
+        "date": candle_date,
+        "open": _number(getattr(bar, "open", None)),
+        "high": _number(getattr(bar, "high", None)),
+        "low": _number(getattr(bar, "low", None)),
+        "close": _number(getattr(bar, "close", None)),
+        "volume": max(0, int(volume or 0)),
     }
 
 
