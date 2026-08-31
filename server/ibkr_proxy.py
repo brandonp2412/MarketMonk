@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only MarketMonk proxy for the official IBKR Client Portal Web API."""
+"""Read-only MarketMonk proxy for IBKR Client Portal or native TWS APIs."""
 
 from __future__ import annotations
 
@@ -10,9 +10,10 @@ import json
 import math
 import os
 import ssl
+import time
 from dataclasses import dataclass
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlparse
 from urllib.request import HTTPSHandler, Request, build_opener
@@ -20,15 +21,23 @@ from urllib.request import HTTPSHandler, Request, build_opener
 
 @dataclass(frozen=True)
 class Config:
-    gateway_url: str
+    backend: str
     account_id: str | None
     bind: str
     port: int
     token: str
+    gateway_url: str
     verify_gateway_tls: bool
+    tws_host: str
+    tws_port: int
+    tws_client_id: int
 
     @classmethod
     def from_env(cls) -> "Config":
+        backend = os.getenv("IBKR_BACKEND", "client_portal").strip().lower()
+        if backend not in {"client_portal", "native"}:
+            raise ValueError("IBKR_BACKEND must be client_portal or native")
+
         gateway_url = os.getenv(
             "IBKR_GATEWAY_URL", "https://127.0.0.1:5000/v1/api"
         ).rstrip("/")
@@ -36,28 +45,46 @@ class Config:
         bind = os.getenv("MARKET_MONK_IBKR_BIND", "127.0.0.1").strip()
         port = int(os.getenv("MARKET_MONK_IBKR_PORT", "8091"))
         token = os.getenv("MARKET_MONK_IBKR_TOKEN", "").strip()
+        tws_host = os.getenv("IBKR_TWS_HOST", "127.0.0.1").strip()
+        tws_port = int(os.getenv("IBKR_TWS_PORT", "4001"))
+        tws_client_id = int(os.getenv("IBKR_TWS_CLIENT_ID", "97"))
 
-        parsed = urlparse(gateway_url)
-        if parsed.scheme != "https" or not parsed.hostname:
-            raise ValueError("IBKR_GATEWAY_URL must be an https:// URL")
         if len(token) < 32:
             raise ValueError("MARKET_MONK_IBKR_TOKEN must be at least 32 characters")
         if not 1 <= port <= 65535:
             raise ValueError("MARKET_MONK_IBKR_PORT must be between 1 and 65535")
+        if not 1 <= tws_port <= 65535:
+            raise ValueError("IBKR_TWS_PORT must be between 1 and 65535")
+        if not tws_host:
+            raise ValueError("IBKR_TWS_HOST must not be empty")
+        if tws_client_id < 0:
+            raise ValueError("IBKR_TWS_CLIENT_ID must be non-negative")
+
+        parsed = urlparse(gateway_url)
+        if backend == "client_portal" and (
+            parsed.scheme != "https" or not parsed.hostname
+        ):
+            raise ValueError("IBKR_GATEWAY_URL must be an https:// URL")
 
         verify_raw = os.getenv("IBKR_GATEWAY_VERIFY_TLS")
         if verify_raw is None:
-            verify_gateway_tls = not _is_loopback(parsed.hostname)
+            verify_gateway_tls = bool(parsed.hostname) and not _is_loopback(
+                parsed.hostname
+            )
         else:
             verify_gateway_tls = _parse_bool(verify_raw)
 
         return cls(
-            gateway_url=gateway_url,
+            backend=backend,
             account_id=account_id,
             bind=bind,
             port=port,
             token=token,
+            gateway_url=gateway_url,
             verify_gateway_tls=verify_gateway_tls,
+            tws_host=tws_host,
+            tws_port=tws_port,
+            tws_client_id=tws_client_id,
         )
 
 
@@ -65,7 +92,7 @@ class IbkrError(RuntimeError):
     pass
 
 
-class IbkrClient:
+class ClientPortalIbkrClient:
     def __init__(self, config: Config):
         self._config = config
         context = ssl.create_default_context()
@@ -79,18 +106,7 @@ class IbkrClient:
         if not isinstance(accounts, list):
             raise IbkrError("IBKR returned an invalid account list")
         visible = [account for item in accounts if (account := _account_id(item))]
-        configured = self._config.account_id
-        if configured is not None:
-            if configured not in visible:
-                raise IbkrError("Configured IBKR account is not visible in this session")
-            return configured
-        if len(visible) == 1:
-            return visible[0]
-        if not visible:
-            raise IbkrError("No IBKR accounts are visible in this session")
-        raise IbkrError(
-            "Multiple IBKR accounts are visible; set IBKR_ACCOUNT_ID on the proxy"
-        )
+        return _select_account(visible, self._config.account_id)
 
     def portfolio(self) -> dict[str, Any]:
         raw_account = self.ensure_account_visible()
@@ -106,9 +122,10 @@ class IbkrClient:
         return {
             "account": _mask_account(raw_account),
             "read_only": True,
+            "source": "client_portal",
             "summary": _sanitize_account(summary, raw_account),
             "ledger": _sanitize_account(ledger, raw_account),
-            "positions": [_normalize_position(item) for item in positions],
+            "positions": [_normalize_web_position(item) for item in positions],
         }
 
     def _get(self, endpoint: str) -> Any:
@@ -129,9 +146,92 @@ class IbkrClient:
             raise IbkrError("IBKR Gateway returned invalid JSON") from error
 
 
-def make_handler(client: IbkrClient, token: str) -> type[BaseHTTPRequestHandler]:
+class NativeIbkrClient:
+    def __init__(
+        self,
+        config: Config,
+        ib_factory: Callable[[], Any] | None = None,
+    ):
+        self._config = config
+        if ib_factory is None:
+            try:
+                from ib_async import IB
+                from ib_async.ib import StartupFetch
+            except ImportError as error:
+                raise IbkrError(
+                    "Native IBKR backend requires ib_async; install server/requirements.txt"
+                ) from error
+            ib_factory = IB
+            self._startup_fetch = StartupFetch.POSITIONS | StartupFetch.ACCOUNT_UPDATES
+        else:
+            self._startup_fetch = 9
+        self._ib_factory = ib_factory
+
+    def ensure_account_visible(self) -> str:
+        ib = self._connect()
+        try:
+            return self._select_account(ib)
+        finally:
+            ib.disconnect()
+
+    def portfolio(self) -> dict[str, Any]:
+        ib = self._connect()
+        try:
+            account = self._select_account(ib)
+            items = list(ib.portfolio(account))
+            values = list(ib.accountValues(account))
+            return {
+                "account": _mask_account(account),
+                "read_only": True,
+                "source": "native",
+                "summary": _native_summary(values),
+                "ledger": _native_ledger(values),
+                "positions": [_normalize_native_position(item) for item in items],
+            }
+        except IbkrError:
+            raise
+        except Exception as error:
+            raise IbkrError(f"IBKR TWS API portfolio read failed: {error}") from error
+        finally:
+            ib.disconnect()
+
+    def _connect(self) -> Any:
+        ib = self._ib_factory()
+        try:
+            ib.connect(
+                self._config.tws_host,
+                self._config.tws_port,
+                clientId=self._config.tws_client_id,
+                timeout=20,
+                readonly=True,
+                account=self._config.account_id or "",
+                fetchFields=self._startup_fetch,
+            )
+            return ib
+        except Exception as error:
+            try:
+                ib.disconnect()
+            except Exception:
+                pass
+            raise IbkrError(f"Cannot reach IBKR TWS API: {error}") from error
+
+    def _select_account(self, ib: Any) -> str:
+        try:
+            visible = list(ib.managedAccounts())
+        except Exception as error:
+            raise IbkrError(f"Cannot read IBKR managed accounts: {error}") from error
+        return _select_account(visible, self._config.account_id)
+
+
+def make_client(config: Config) -> Any:
+    if config.backend == "native":
+        return NativeIbkrClient(config)
+    return ClientPortalIbkrClient(config)
+
+
+def make_handler(client: Any, token: str) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
-        server_version = "MarketMonkIBKR/1"
+        server_version = "MarketMonkIBKR/2"
 
         def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
             supplied = self.headers.get("Authorization", "")
@@ -172,7 +272,20 @@ def make_handler(client: IbkrClient, token: str) -> type[BaseHTTPRequestHandler]
     return Handler
 
 
-def _normalize_position(value: Any) -> dict[str, Any]:
+def _select_account(visible: list[str], configured: str | None) -> str:
+    visible = [account.strip() for account in visible if account.strip()]
+    if configured is not None:
+        if configured not in visible:
+            raise IbkrError("Configured IBKR account is not visible in this session")
+        return configured
+    if len(visible) == 1:
+        return visible[0]
+    if not visible:
+        raise IbkrError("No IBKR accounts are visible in this session")
+    raise IbkrError("Multiple IBKR accounts are visible; set IBKR_ACCOUNT_ID on the proxy")
+
+
+def _normalize_web_position(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise IbkrError("IBKR returned an invalid position")
     symbol = _first_text(value, "description", "ticker", "contractDesc")
@@ -196,6 +309,77 @@ def _normalize_position(value: Any) -> dict[str, Any]:
         "group": _first_text(value, "group"),
         "timestamp": _number(value.get("timestamp"), integer=True, default=0),
     }
+
+
+def _normalize_native_position(item: Any) -> dict[str, Any]:
+    contract = item.contract
+    symbol = str(getattr(contract, "symbol", "")).strip()
+    security_type = str(getattr(contract, "secType", "")).strip()
+    if not symbol or not security_type:
+        raise IbkrError("IBKR native position is missing its symbol or security type")
+    exchange = str(
+        getattr(contract, "primaryExchange", "") or getattr(contract, "exchange", "")
+    ).strip()
+    return {
+        "symbol": symbol,
+        "security_type": security_type,
+        "currency": str(getattr(contract, "currency", "") or "USD").strip(),
+        "exchange": exchange,
+        "conid": _number(getattr(contract, "conId", 0), integer=True, default=0),
+        "quantity": _number(getattr(item, "position", 0.0), default=0.0),
+        "market_price": _finite_optional(getattr(item, "marketPrice", None)),
+        "market_value": _finite_optional(getattr(item, "marketValue", None)),
+        "average_cost": _finite_optional(getattr(item, "averageCost", None)),
+        "unrealized_pnl": _finite_optional(getattr(item, "unrealizedPNL", None)),
+        "realized_pnl": _finite_optional(getattr(item, "realizedPNL", None)),
+        "sector": "",
+        "group": "",
+        "timestamp": int(time.time()),
+    }
+
+
+def _native_summary(values: list[Any]) -> dict[str, Any]:
+    summary: dict[str, Any] = {}
+    for item in values:
+        tag = str(getattr(item, "tag", "")).strip()
+        if not tag:
+            continue
+        summary[tag.lower()] = {
+            "value": _native_value(getattr(item, "value", "")),
+            "currency": str(getattr(item, "currency", "")).strip(),
+        }
+    return summary
+
+
+def _native_ledger(values: list[Any]) -> dict[str, Any]:
+    ledger: dict[str, dict[str, Any]] = {}
+    for item in values:
+        currency = str(getattr(item, "currency", "")).strip()
+        tag = str(getattr(item, "tag", "")).strip()
+        if not currency or not tag:
+            continue
+        ledger.setdefault(currency, {})[tag.lower()] = _native_value(
+            getattr(item, "value", "")
+        )
+    return ledger
+
+
+def _native_value(value: Any) -> Any:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    return parsed if math.isfinite(parsed) else str(value)
+
+
+def _finite_optional(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if math.isfinite(parsed) else None
 
 
 def _optional_number(value: dict[str, Any], *names: str) -> float | None:
@@ -269,11 +453,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.parse_args()
     config = Config.from_env()
-    server = ThreadingHTTPServer(
-        (config.bind, config.port),
-        make_handler(IbkrClient(config), config.token),
+    client = make_client(config)
+    server = HTTPServer((config.bind, config.port), make_handler(client, config.token))
+    print(
+        f"MarketMonk IBKR proxy ({config.backend}) listening on "
+        f"{config.bind}:{config.port}"
     )
-    print(f"MarketMonk IBKR proxy listening on {config.bind}:{config.port}")
     server.serve_forever()
 
 

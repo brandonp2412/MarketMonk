@@ -3,15 +3,34 @@ import threading
 import unittest
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
+from types import SimpleNamespace
 
 from ibkr_proxy import (
+    ClientPortalIbkrClient,
     Config,
-    IbkrClient,
     IbkrError,
+    NativeIbkrClient,
     _mask_account,
-    _normalize_position,
+    _normalize_web_position,
     make_handler,
 )
+
+
+def config(**overrides):
+    values = {
+        "backend": "client_portal",
+        "account_id": "U1234567",
+        "bind": "127.0.0.1",
+        "port": 8091,
+        "token": "x" * 32,
+        "gateway_url": "https://127.0.0.1:5000/v1/api",
+        "verify_gateway_tls": False,
+        "tws_host": "127.0.0.1",
+        "tws_port": 4001,
+        "tws_client_id": 97,
+    }
+    values.update(overrides)
+    return Config(**values)
 
 
 class FakeClient:
@@ -36,16 +55,9 @@ class FailingClient:
         raise AssertionError("not reached")
 
 
-class RecordingIbkrClient(IbkrClient):
+class RecordingIbkrClient(ClientPortalIbkrClient):
     def __init__(self, account_id="U1234567"):
-        self._config = Config(
-            gateway_url="https://127.0.0.1:5000/v1/api",
-            account_id=account_id,
-            bind="127.0.0.1",
-            port=8091,
-            token="x" * 32,
-            verify_gateway_tls=False,
-        )
+        self._config = config(account_id=account_id)
         self.endpoints = []
 
     def _get(self, endpoint):
@@ -74,9 +86,55 @@ class RecordingIbkrClient(IbkrClient):
         return responses[endpoint]
 
 
+class FakeNativeIb:
+    def __init__(self):
+        self.connected = False
+        self.connect_kwargs = None
+        self.disconnected = False
+
+    def connect(self, host, port, **kwargs):
+        self.connected = True
+        self.connect_kwargs = (host, port, kwargs)
+
+    def disconnect(self):
+        self.disconnected = True
+
+    def managedAccounts(self):
+        return ["U1234567"]
+
+    def portfolio(self, account):
+        assert account == "U1234567"
+        contract = SimpleNamespace(
+            symbol="AAPL",
+            secType="STK",
+            currency="USD",
+            primaryExchange="NASDAQ",
+            exchange="SMART",
+            conId=265598,
+        )
+        return [
+            SimpleNamespace(
+                contract=contract,
+                position=2,
+                marketPrice=200,
+                marketValue=400,
+                averageCost=190,
+                unrealizedPNL=20,
+                realizedPNL=4,
+            )
+        ]
+
+    def accountValues(self, account):
+        assert account == "U1234567"
+        return [
+            SimpleNamespace(tag="NetLiquidation", value="1000", currency="USD"),
+            SimpleNamespace(tag="CashBalance", value="100", currency="USD"),
+        ]
+
+
 class ProxyTests(unittest.TestCase):
     def test_normalizes_official_portfolio2_shape(self):
-        position = _normalize_position(
+        position = _normalize_web_position(
             {
                 "position": 12.0,
                 "conid": "9408",
@@ -110,7 +168,7 @@ class ProxyTests(unittest.TestCase):
 
         self.assertEqual(portfolio["account"], "****4567")
 
-    def test_portfolio_uses_only_documented_read_only_endpoints(self):
+    def test_client_portal_uses_documented_read_only_endpoints(self):
         client = RecordingIbkrClient()
 
         portfolio = client.portfolio()
@@ -126,7 +184,30 @@ class ProxyTests(unittest.TestCase):
         )
         self.assertEqual(portfolio["positions"][0]["symbol"], "AAPL")
         self.assertEqual(portfolio["summary"]["accountcode"]["value"], "****4567")
+        self.assertEqual(portfolio["source"], "client_portal")
         self.assertTrue(portfolio["read_only"])
+
+    def test_native_backend_reads_portfolio_without_order_calls(self):
+        fake = FakeNativeIb()
+        client = NativeIbkrClient(
+            config(backend="native", tws_port=4003), ib_factory=lambda: fake
+        )
+
+        portfolio = client.portfolio()
+
+        self.assertEqual(portfolio["source"], "native")
+        self.assertEqual(portfolio["account"], "****4567")
+        self.assertEqual(portfolio["positions"][0]["symbol"], "AAPL")
+        self.assertEqual(portfolio["positions"][0]["market_value"], 400)
+        self.assertEqual(portfolio["positions"][0]["realized_pnl"], 4)
+        self.assertEqual(portfolio["summary"]["netliquidation"]["value"], 1000)
+        self.assertEqual(portfolio["ledger"]["USD"]["cashbalance"], 100)
+        self.assertTrue(fake.disconnected)
+        host, port, kwargs = fake.connect_kwargs
+        self.assertEqual((host, port), ("127.0.0.1", 4003))
+        self.assertTrue(kwargs["readonly"])
+        self.assertEqual(kwargs["account"], "U1234567")
+        self.assertEqual(kwargs["fetchFields"], 9)
 
     def test_http_api_requires_bearer_and_returns_portfolio(self):
         server = ThreadingHTTPServer(

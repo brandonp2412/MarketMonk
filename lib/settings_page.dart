@@ -283,141 +283,14 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _showIbkrSettings(BuildContext context) async {
     final accounts = context.read<AccountManager>();
     final account = accounts.activeAccount;
-    final current = accounts.ibkrConfigFor(account);
-    final urlController = TextEditingController(text: current.baseUrl);
-    final tokenController = TextEditingController(text: current.token);
-    var enabled = current.enabled;
-    var checking = false;
-    String? status;
-    var statusOk = false;
-
-    Future<bool> checkConnection(StateSetter setDialogState) async {
-      final config = IbkrAccountConfig(
-        enabled: true,
-        baseUrl: urlController.text.trim(),
-        token: tokenController.text.trim(),
-      );
-      setDialogState(() {
-        checking = true;
-        status = null;
-      });
-      try {
-        await IbkrApiClient(config).testConnection();
-        setDialogState(() {
-          checking = false;
-          statusOk = true;
-          status = 'Connected to IBKR';
-        });
-        return true;
-      } catch (error) {
-        setDialogState(() {
-          checking = false;
-          statusOk = false;
-          status = error.toString().replaceFirst('Bad state: ', '');
-        });
-        return false;
-      }
-    }
-
-    try {
-      await showDialog<void>(
-        context: context,
-        builder: (dialogContext) => StatefulBuilder(
-          builder: (dialogContext, setDialogState) => AlertDialog(
-            title: Text('Interactive Brokers — $account'),
-            content: SizedBox(
-              width: 440,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Use IBKR portfolio data'),
-                    subtitle: const Text(
-                      'Positions and current valuations come from your self-hosted API. Historical charts continue to use Yahoo.',
-                    ),
-                    value: enabled,
-                    onChanged: checking
-                        ? null
-                        : (value) => setDialogState(() => enabled = value),
-                  ),
-                  TextField(
-                    controller: urlController,
-                    enabled: !checking,
-                    keyboardType: TextInputType.url,
-                    decoration: const InputDecoration(
-                      labelText: 'API URL',
-                      hintText: 'https://ibkr.example.com',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: tokenController,
-                    enabled: !checking,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Bearer token',
-                    ),
-                  ),
-                  if (status != null) ...[
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Icon(
-                          statusOk ? Icons.check_circle : Icons.error_outline,
-                          color: statusOk
-                              ? Colors.green
-                              : Theme.of(dialogContext).colorScheme.error,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text(status!)),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: checking ? null : () => Navigator.pop(dialogContext),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed:
-                    checking ? null : () => checkConnection(setDialogState),
-                child: const Text('Test'),
-              ),
-              FilledButton(
-                onPressed: checking
-                    ? null
-                    : () async {
-                        final config = IbkrAccountConfig(
-                          enabled: enabled,
-                          baseUrl: urlController.text.trim(),
-                          token: tokenController.text.trim(),
-                        );
-                        if (enabled && !await checkConnection(setDialogState)) {
-                          return;
-                        }
-                        await accounts.setIbkrConfig(account, config);
-                        if (dialogContext.mounted) Navigator.pop(dialogContext);
-                      },
-                child: checking
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Save'),
-              ),
-            ],
-          ),
-        ),
-      );
-    } finally {
-      urlController.dispose();
-      tokenController.dispose();
-    }
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _IbkrSettingsDialog(
+        accounts: accounts,
+        account: account,
+        current: accounts.ibkrConfigFor(account),
+      ),
+    );
   }
 
   Future<void> _syncAllTickers(BuildContext context) async {
@@ -907,6 +780,160 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     );
   }
+}
+
+class _IbkrSettingsDialog extends StatefulWidget {
+  final AccountManager accounts;
+  final String account;
+  final IbkrAccountConfig current;
+
+  const _IbkrSettingsDialog({
+    required this.accounts,
+    required this.account,
+    required this.current,
+  });
+
+  @override
+  State<_IbkrSettingsDialog> createState() => _IbkrSettingsDialogState();
+}
+
+class _IbkrSettingsDialogState extends State<_IbkrSettingsDialog> {
+  late final TextEditingController _urlController;
+  late final TextEditingController _tokenController;
+  late bool _enabled;
+  var _checking = false;
+  String? _status;
+  var _statusOk = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _urlController = TextEditingController(text: widget.current.baseUrl);
+    _tokenController = TextEditingController(text: widget.current.token);
+    _enabled = widget.current.enabled;
+  }
+
+  @override
+  void dispose() {
+    _urlController.dispose();
+    _tokenController.dispose();
+    super.dispose();
+  }
+
+  IbkrAccountConfig _config({required bool enabled}) => IbkrAccountConfig(
+        enabled: enabled,
+        baseUrl: _urlController.text.trim(),
+        token: _tokenController.text.trim(),
+      );
+
+  Future<bool> _checkConnection() async {
+    setState(() {
+      _checking = true;
+      _status = null;
+    });
+    try {
+      await IbkrApiClient(_config(enabled: true)).testConnection();
+      if (!mounted) return false;
+      setState(() {
+        _checking = false;
+        _statusOk = true;
+        _status = 'Connected to IBKR';
+      });
+      return true;
+    } catch (error) {
+      if (!mounted) return false;
+      setState(() {
+        _checking = false;
+        _statusOk = false;
+        _status = error.toString().replaceFirst('Bad state: ', '');
+      });
+      return false;
+    }
+  }
+
+  Future<void> _save() async {
+    final config = _config(enabled: _enabled);
+    if (_enabled && !await _checkConnection()) return;
+    await widget.accounts.setIbkrConfig(widget.account, config);
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: Text('Interactive Brokers — ${widget.account}'),
+        content: SizedBox(
+          width: 440,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Use IBKR portfolio data'),
+                  subtitle: const Text(
+                    'Positions and current valuations come from your self-hosted API. Historical charts continue to use Yahoo.',
+                  ),
+                  value: _enabled,
+                  onChanged: _checking
+                      ? null
+                      : (value) => setState(() => _enabled = value),
+                ),
+                TextField(
+                  controller: _urlController,
+                  enabled: !_checking,
+                  keyboardType: TextInputType.url,
+                  decoration: const InputDecoration(
+                    labelText: 'API URL',
+                    hintText: 'https://ibkr.example.com',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _tokenController,
+                  enabled: !_checking,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Bearer token'),
+                ),
+                if (_status != null) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(
+                        _statusOk ? Icons.check_circle : Icons.error_outline,
+                        color: _statusOk
+                            ? Colors.green
+                            : Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(_status!)),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _checking ? null : () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: _checking ? null : _checkConnection,
+            child: const Text('Test'),
+          ),
+          FilledButton(
+            onPressed: _checking ? null : _save,
+            child: _checking
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Save'),
+          ),
+        ],
+      );
 }
 
 class _ColorPicker extends StatelessWidget {

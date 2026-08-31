@@ -48,7 +48,7 @@ Install [flutter](https://docs.flutter.dev/get-started/install) to run this app.
 
 ## Interactive Brokers
 
-MarketMonk can use the standalone read-only proxy in [`server/`](server/) as the current portfolio source. The proxy talks directly to the official IBKR Client Portal Web API and is independent of any personal trading bot. Historical chart candles continue to use Yahoo so MarketMonk does not need to take over an IBKR brokerage session just to draw charts.
+MarketMonk can use the standalone read-only proxy in [`server/`](server/) as the current portfolio source. The recommended backend connects to the standard TWS / IB Gateway socket API; the Client Portal Web API remains available as an alternative. The proxy is independent of any personal trading bot or login automation. Historical chart candles continue to use Yahoo.
 
 ## Migrations
 
