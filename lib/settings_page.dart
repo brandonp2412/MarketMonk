@@ -871,7 +871,7 @@ class _IbkrSettingsDialogState extends State<_IbkrSettingsDialog> {
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Use IBKR portfolio data'),
                   subtitle: const Text(
-                    'Positions and current valuations come from your self-hosted API. Historical charts continue to use Yahoo.',
+                    'Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.',
                   ),
                   value: _enabled,
                   onChanged: _checking

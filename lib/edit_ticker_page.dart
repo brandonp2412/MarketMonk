@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart' as material;
@@ -439,8 +441,6 @@ class _EditTickerPageState extends State<EditTickerPage> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          Navigator.of(context).pop();
-
           final name = symbol.text
               .split(' ')
               .sublist(1)
@@ -461,7 +461,16 @@ class _EditTickerPageState extends State<EditTickerPage> {
             ),
           );
 
-          await syncCandles(tickerSymbol);
+          if (context.mounted) Navigator.of(context).pop();
+          unawaited(
+            syncCandles(tickerSymbol).catchError((error, stackTrace) {
+              talker.handle(
+                error,
+                stackTrace,
+                'Failed to refresh candles after saving trade',
+              );
+            }),
+          );
         },
         label: const Text('Save'),
         icon: const Icon(Icons.save),

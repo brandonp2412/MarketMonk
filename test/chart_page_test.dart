@@ -62,4 +62,41 @@ void main() {
       expect(find.text('Refresh'), findsNothing);
     },
   );
+
+  testWidgets('exact ticker fallback is available while search is loading',
+      (WidgetTester tester) async {
+    db = Database.connect(
+      DatabaseConnection(
+        NativeDatabase.memory(),
+        closeStreamsSynchronously: true,
+      ),
+    );
+    final accounts = AccountManager();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: const MyApp(),
+      ),
+    );
+    await tester.pump();
+
+    final search = find.descendant(
+      of: find.byType(SearchBar),
+      matching: find.byType(EditableText),
+    );
+    await tester.enterText(search, 'GLD');
+    await tester.pump();
+
+    expect(find.text('Use "GLD" anyway'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.pump();
+    expect(find.text('Use "GLD" anyway'), findsNothing);
+
+    await db.close();
+  });
 }

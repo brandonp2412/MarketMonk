@@ -730,12 +730,9 @@ class ChartsPageState extends State<ChartsPage>
 
   Widget _buildSearchResults() {
     final query = _searchController.text.trim().toUpperCase();
-    if (_searchLoading) {
-      return const Center();
-    }
 
-    // "Use anyway" tile — always shown at the bottom so the user can force a
-    // known symbol that the Yahoo Finance search API doesn't surface (e.g. GLD).
+    // "Use anyway" tile — always shown so a known symbol remains usable even
+    // while Yahoo search is slow or unavailable (e.g. GLD).
     final useAnywayTile = ListTile(
       leading: const Icon(Icons.open_in_new),
       title: Text('Use "$query" anyway'),
@@ -743,7 +740,7 @@ class ChartsPageState extends State<ChartsPage>
       onTap: () => _selectSymbol(query),
     );
 
-    if (_searchResults.isEmpty) {
+    if (_searchLoading || _searchResults.isEmpty) {
       return Column(mainAxisSize: MainAxisSize.min, children: [useAnywayTile]);
     }
 

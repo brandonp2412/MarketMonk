@@ -60,9 +60,19 @@ String symbolPriceUnit(String symbol) {
 }
 
 /// Ensures the native currency and its exchange rate are cached for [symbol].
-/// Returns immediately if already cached. Safe to call concurrently.
-Future<void> fetchSymbolCurrencyAndRate(String symbol) =>
-    _fetchSymbolCurrencyAndRate(symbol);
+/// Returns immediately if already cached. Remote metadata is best-effort so
+/// local portfolio and chart UI remain responsive when Yahoo is unavailable.
+Future<void> fetchSymbolCurrencyAndRate(String symbol) async {
+  try {
+    await _fetchSymbolCurrencyAndRate(symbol).timeout(
+      const Duration(seconds: 2),
+    );
+  } on TimeoutException {
+    talker.warning(
+      'Symbol currency metadata timed out; using cached/default currency',
+    );
+  }
+}
 
 /// Formats [v] (assumed to be in USD) in the user's display currency.
 String fmtCurrency(double v) => currency.format(v * exchangeRate);
@@ -291,9 +301,9 @@ Future<Map<String, double>> fetchLatestPrices(
   final d = database ?? db;
 
   // Every computePositions caller fetches prices first, so this is the choke
-  // point that guarantees currency + cent-divisor metadata is loaded before
-  // positions are computed (GBp candles would otherwise be read as GBP, #30).
-  await Future.wait(symbols.map(_fetchSymbolCurrencyAndRate));
+  // point that tries to load currency + cent-divisor metadata before positions
+  // are computed (GBp candles would otherwise be read as GBP, #30).
+  await Future.wait(symbols.map(fetchSymbolCurrencyAndRate));
 
   final ph = List.filled(symbols.length, '?').join(', ');
   try {
@@ -621,24 +631,29 @@ class YahooFinanceApi {
     if (query.isEmpty) return [];
 
     return await _debounce(() async {
-      final response = await http.get(
-        Uri.parse('$_baseUrl?q=${Uri.encodeComponent(query)}'),
-      );
+      try {
+        final response = await http
+            .get(Uri.parse('$_baseUrl?q=${Uri.encodeComponent(query)}'))
+            .timeout(const Duration(seconds: 5));
 
-      if (response.statusCode != 200) {
-        talker.warning('Ticker search returned HTTP ${response.statusCode}');
+        if (response.statusCode != 200) {
+          talker.warning('Ticker search returned HTTP ${response.statusCode}');
+          return [];
+        }
+
+        final Map<String, dynamic> data = json.decode(response.body);
+        final List<dynamic> quotes = data['quotes'] ?? [];
+
+        // Include EQUITYs, ETFs, and ETNs — all have tradeable candle data.
+        const tradeable = {'EQUITY', 'ETF', 'ETN'};
+        return quotes
+            .where((quote) => tradeable.contains(quote['quoteType']))
+            .map((quote) => StockResult.fromJson(quote))
+            .toList();
+      } catch (error, stackTrace) {
+        talker.handle(error, stackTrace, 'Ticker search request failed');
         return [];
       }
-
-      final Map<String, dynamic> data = json.decode(response.body);
-      final List<dynamic> quotes = data['quotes'] ?? [];
-
-      // Include EQUITYs, ETFs, and ETNs — all have tradeable candle data.
-      const tradeable = {'EQUITY', 'ETF', 'ETN'};
-      return quotes
-          .where((quote) => tradeable.contains(quote['quoteType']))
-          .map((quote) => StockResult.fromJson(quote))
-          .toList();
     });
   }
 
