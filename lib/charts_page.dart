@@ -20,6 +20,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 enum _ChartMode { portfolio, searching, stock }
 
+class _LoadedChartPortfolio {
+  final List<Position> positions;
+  final double? currentValueUsd;
+
+  const _LoadedChartPortfolio({
+    required this.positions,
+    required this.currentValueUsd,
+  });
+}
+
 class ChartsPage extends StatefulWidget {
   const ChartsPage({super.key});
 
@@ -70,6 +80,7 @@ class ChartsPageState extends State<ChartsPage>
 
   int _lastTradesVersion = 0;
   String _lastAccountsKey = '';
+  int _lastIbkrRefreshVersion = 0;
 
   @override
   void initState() {
@@ -111,7 +122,7 @@ class ChartsPageState extends State<ChartsPage>
     await prefs.setInt('chartPeriodDays', days);
   }
 
-  Future<List<Position>> _positionsForAccount(
+  Future<_LoadedChartPortfolio> _portfolioForAccount(
     Database accountDb,
     IbkrAccountConfig ibkrConfig,
   ) async {
@@ -121,11 +132,18 @@ class ChartsPageState extends State<ChartsPage>
         throw StateError('IBKR portfolio source is not fully configured');
       }
       final snapshot = await IbkrApiClient(ibkrConfig).fetchPortfolio();
-      return computeIbkrPositions(snapshot.positions, trades);
+      cacheIbkrAccountExchangeRate(snapshot);
+      return _LoadedChartPortfolio(
+        positions: await computeIbkrPositions(snapshot.positions, trades),
+        currentValueUsd: snapshot.netLiquidationUsd?.value,
+      );
     }
     final symbols = trades.map((trade) => trade.symbol).toSet().toList();
     final prices = await fetchLatestPrices(symbols, database: accountDb);
-    return computePositions(trades, prices);
+    return _LoadedChartPortfolio(
+      positions: computePositions(trades, prices),
+      currentValueUsd: null,
+    );
   }
 
   Future<void> _syncCandlesInBackground() async {
@@ -141,8 +159,8 @@ class ChartsPageState extends State<ChartsPage>
                 : Database('market-monk-$accountName'));
         try {
           final ibkrConfig = accountManager.ibkrConfigFor(accountName);
-          final positions = await _positionsForAccount(accountDb, ibkrConfig);
-          for (final position in positions) {
+          final loaded = await _portfolioForAccount(accountDb, ibkrConfig);
+          for (final position in loaded.positions) {
             await syncCandles(
               position.symbol,
               database: accountDb,
@@ -167,9 +185,17 @@ class ChartsPageState extends State<ChartsPage>
       if (version > 0) _loadAllPortfolios();
     }
     final accountManager = context.watch<AccountManager>();
-    final accountsKey = accountManager.accounts.join(',');
-    if (accountsKey != _lastAccountsKey) {
+    final accountsKey =
+        '${accountManager.activeAccount}|${accountManager.accounts.join(',')}';
+    final ibkrRefreshVersion = accountManager.ibkrRefreshVersion;
+    final ibkrChanged = ibkrRefreshVersion != _lastIbkrRefreshVersion;
+    if (accountsKey != _lastAccountsKey || ibkrChanged) {
       _lastAccountsKey = accountsKey;
+      _lastIbkrRefreshVersion = ibkrRefreshVersion;
+      if (ibkrChanged) {
+        clearAllSyncCache();
+        unawaited(_syncCandlesInBackground());
+      }
       _loadAllPortfolios();
       if (_selectedSymbol != null) _setStockStream(_selectedSymbol!);
     }
@@ -204,13 +230,13 @@ class ChartsPageState extends State<ChartsPage>
               : Database('market-monk-$accountName'));
       try {
         final ibkrConfig = accountManager.ibkrConfigFor(accountName);
-        final positions = await _positionsForAccount(accountDb, ibkrConfig);
+        final loaded = await _portfolioForAccount(accountDb, ibkrConfig);
         final task = (
           db: accountDb,
           isActive: isActive,
           accountName: accountName,
           ibkrConfig: ibkrConfig,
-          symbols: positions.map((position) => position.symbol).toList(),
+          symbols: loaded.positions.map((position) => position.symbol).toList(),
         );
         tasks.add(task);
       } catch (_) {
@@ -360,10 +386,11 @@ class ChartsPageState extends State<ChartsPage>
               : Database('market-monk-$accountName'));
       try {
         final ibkrConfig = accountManager.ibkrConfigFor(accountName);
-        final positions = await _positionsForAccount(accountDb, ibkrConfig);
+        final loaded = await _portfolioForAccount(accountDb, ibkrConfig);
         newSeries[accountName] = await _buildPortfolioSeries(
-          positions,
+          loaded.positions,
           accountDb,
+          currentValueUsd: loaded.currentValueUsd,
         );
       } catch (e) {
         newSeries[accountName] = [];
@@ -383,8 +410,9 @@ class ChartsPageState extends State<ChartsPage>
 
   Future<List<_DateValue>> _buildPortfolioSeries(
     List<Position> positions,
-    Database accountDb,
-  ) async {
+    Database accountDb, {
+    double? currentValueUsd,
+  }) async {
     if (positions.isEmpty) return [];
 
     final now = DateTime.now();
@@ -434,6 +462,10 @@ class ChartsPageState extends State<ChartsPage>
         }
         valueByDate[date] = total;
       }
+    }
+
+    if (currentValueUsd != null) {
+      valueByDate[DateTime(now.year, now.month, now.day)] = currentValueUsd;
     }
 
     var series = valueByDate.entries

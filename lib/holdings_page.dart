@@ -96,6 +96,7 @@ class HoldingsPageState extends State<HoldingsPage>
         throw StateError('IBKR portfolio source is not fully configured');
       }
       final snapshot = await IbkrApiClient(config).fetchPortfolio();
+      cacheIbkrAccountExchangeRate(snapshot);
       return computeIbkrPositions(snapshot.positions, trades);
     }
     final symbols = trades.map((trade) => trade.symbol).toSet().toList();

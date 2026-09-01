@@ -15,6 +15,16 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+class _LoadedPortfolio {
+  final List<Position> positions;
+  final IbkrAccountValue? netLiquidation;
+
+  const _LoadedPortfolio({
+    required this.positions,
+    required this.netLiquidation,
+  });
+}
+
 class PortfolioPage extends StatefulWidget {
   const PortfolioPage({super.key});
 
@@ -27,8 +37,9 @@ class PortfolioPageState extends State<PortfolioPage>
   @override
   bool get wantKeepAlive => true;
 
-  late Stream<List<Position>> stream;
+  late Stream<_LoadedPortfolio> _stream;
   List<Position> _positions = [];
+  IbkrAccountValue? _netLiquidation;
   int? touchedIndex;
   final _filterController = TextEditingController();
   String _filterText = '';
@@ -40,7 +51,7 @@ class PortfolioPageState extends State<PortfolioPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    stream = _buildStream();
+    _stream = _buildStream();
     _preload();
   }
 
@@ -58,7 +69,7 @@ class PortfolioPageState extends State<PortfolioPage>
       _lastIbkrConfig = ibkrConfig;
       _lastIbkrRefreshVersion = refreshVersion;
       setState(() {
-        stream = _buildStream();
+        _stream = _buildStream();
         _positions = [];
         touchedIndex = null;
       });
@@ -82,25 +93,37 @@ class PortfolioPageState extends State<PortfolioPage>
     super.dispose();
   }
 
-  Future<List<Position>> _loadPositions(List<Trade> trades) async {
+  Future<_LoadedPortfolio> _loadPortfolio(List<Trade> trades) async {
     final config = context.read<AccountManager>().ibkrConfigFor();
     if (config.enabled) {
       if (!config.isConfigured) {
         throw StateError('IBKR portfolio source is not fully configured');
       }
       final snapshot = await IbkrApiClient(config).fetchPortfolio();
-      return computeIbkrPositions(snapshot.positions, trades);
+      cacheIbkrAccountExchangeRate(snapshot);
+      return _LoadedPortfolio(
+        positions: await computeIbkrPositions(snapshot.positions, trades),
+        netLiquidation: snapshot.netLiquidation,
+      );
     }
     final symbols = trades.map((t) => t.symbol).toSet().toList();
     final prices = await fetchLatestPrices(symbols);
-    return computePositions(trades, prices);
+    return _LoadedPortfolio(
+      positions: computePositions(trades, prices),
+      netLiquidation: null,
+    );
   }
 
   Future<void> _preload() async {
     try {
       final trades = await db.trades.select().get();
-      final positions = await _loadPositions(trades);
-      if (mounted) setState(() => _positions = positions);
+      final loaded = await _loadPortfolio(trades);
+      if (mounted) {
+        setState(() {
+          _positions = loaded.positions;
+          _netLiquidation = loaded.netLiquidation;
+        });
+      }
     } catch (error, stackTrace) {
       talker.handle(error, stackTrace, 'Failed to preload portfolio positions');
     }
@@ -111,7 +134,8 @@ class PortfolioPageState extends State<PortfolioPage>
     try {
       final useIbkr = _lastIbkrConfig.enabled;
       final trades = await db.trades.select().get();
-      final positions = await _loadPositions(trades);
+      final loaded = await _loadPortfolio(trades);
+      final positions = loaded.positions;
       final symbols = useIbkr
           ? positions.map((position) => position.symbol).toSet()
           : trades.map((trade) => trade.symbol).toSet();
@@ -122,15 +146,20 @@ class PortfolioPageState extends State<PortfolioPage>
           syncNamespace: accountName,
         );
       }
-      if (mounted) setState(() => _positions = positions);
+      if (mounted) {
+        setState(() {
+          _positions = positions;
+          _netLiquidation = loaded.netLiquidation;
+        });
+      }
     } catch (error, stackTrace) {
       talker.handle(error, stackTrace, 'Background portfolio sync failed');
     }
-    if (mounted) setState(() => stream = _buildStream());
+    if (mounted) setState(() => _stream = _buildStream());
   }
 
-  Stream<List<Position>> _buildStream() =>
-      db.trades.select().watch().asyncMap(_loadPositions);
+  Stream<_LoadedPortfolio> _buildStream() =>
+      db.trades.select().watch().asyncMap(_loadPortfolio);
 
   Future<void> _updateCandles() async {
     clearAllSyncCache();
@@ -183,26 +212,36 @@ class PortfolioPageState extends State<PortfolioPage>
     super.build(context);
     return Scaffold(
       body: SafeArea(
-        child: StreamBuilder<List<Position>>(
-          stream: stream,
+        child: StreamBuilder<_LoadedPortfolio>(
+          stream: _stream,
           builder: _buildBody,
         ),
       ),
     );
   }
 
-  Widget _buildBody(BuildContext context, AsyncSnapshot<List<Position>> snap) {
+  Widget _buildBody(
+    BuildContext context,
+    AsyncSnapshot<_LoadedPortfolio> snap,
+  ) {
     if (snap.hasError) return Center(child: Text(snap.error.toString()));
 
-    final positions = snap.data ?? _positions;
+    final positions = snap.data?.positions ?? _positions;
+    final netLiquidation = snap.data?.netLiquidation ?? _netLiquidation;
 
     if (positions.isEmpty && !snap.hasData) {
       return const Center();
     }
 
-    if (snap.hasData && snap.data != _positions) {
+    if (snap.hasData &&
+        (snap.data!.positions != _positions ||
+            snap.data!.netLiquidation != _netLiquidation)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _positions = snap.data!);
+        if (!mounted) return;
+        setState(() {
+          _positions = snap.data!.positions;
+          _netLiquidation = snap.data!.netLiquidation;
+        });
       });
     }
     if (positions.isEmpty) {
@@ -283,6 +322,7 @@ class PortfolioPageState extends State<PortfolioPage>
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: _SummaryCard(
                 totalValue: totalValue,
+                netLiquidation: netLiquidation,
                 totalGain: totalGain,
                 totalGainPct: totalGainPct,
                 onExport: () => _exportCsv(context, positions),
@@ -443,12 +483,14 @@ class _PieHeaderDelegate extends SliverPersistentHeaderDelegate {
 
 class _SummaryCard extends StatelessWidget {
   final double totalValue;
+  final IbkrAccountValue? netLiquidation;
   final double totalGain;
   final double totalGainPct;
   final VoidCallback onExport;
 
   const _SummaryCard({
     required this.totalValue,
+    required this.netLiquidation,
     required this.totalGain,
     required this.totalGainPct,
     required this.onExport,
@@ -470,7 +512,12 @@ class _SummaryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  fmtCurrency(totalValue),
+                  netLiquidation == null
+                      ? fmtCurrency(totalValue)
+                      : fmtNativeCurrency(
+                          netLiquidation!.value,
+                          netLiquidation!.currency,
+                        ),
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 Text(

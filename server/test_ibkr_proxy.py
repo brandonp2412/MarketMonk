@@ -150,7 +150,13 @@ class FakeNativeIb:
     def accountValues(self, account):
         assert account == "U1234567"
         return [
-            SimpleNamespace(tag="NetLiquidation", value="1000", currency="USD"),
+            SimpleNamespace(tag="NetLiquidation", value="1700", currency="NZD"),
+            SimpleNamespace(
+                tag="NetLiquidationByCurrency", value="1700", currency="BASE"
+            ),
+            SimpleNamespace(
+                tag="NetLiquidationByCurrency", value="1000", currency="USD"
+            ),
             SimpleNamespace(tag="CashBalance", value="100", currency="USD"),
         ]
 
@@ -236,7 +242,10 @@ class ProxyTests(unittest.TestCase):
         self.assertEqual(portfolio["positions"][0]["symbol"], "AAPL")
         self.assertEqual(portfolio["positions"][0]["market_value"], 400)
         self.assertEqual(portfolio["positions"][0]["realized_pnl"], 4)
-        self.assertEqual(portfolio["summary"]["netliquidation"]["value"], 1000)
+        self.assertEqual(portfolio["summary"]["netliquidation"]["value"], 1700)
+        self.assertEqual(
+            portfolio["summary"]["netliquidationbycurrency:usd"]["value"], 1000
+        )
         self.assertEqual(portfolio["ledger"]["USD"]["cashbalance"], 100)
         self.assertTrue(fake.disconnected)
         host, port, kwargs = fake.connect_kwargs

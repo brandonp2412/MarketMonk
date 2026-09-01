@@ -51,6 +51,21 @@ String cacheSymbolMeta(String symbol, String rawCurrency) {
   return centInfo?.$1 ?? rawCurrency;
 }
 
+/// Uses IBKR's own base-currency conversion when the snapshot exposes the same
+/// net-liquidation value in both base currency and USD.
+void cacheIbkrAccountExchangeRate(IbkrPortfolioSnapshot snapshot) {
+  final base = snapshot.netLiquidation;
+  final usd = snapshot.netLiquidationUsd;
+  if (base == null ||
+      usd == null ||
+      base.currency.isEmpty ||
+      base.currency == 'USD' ||
+      usd.value == 0) {
+    return;
+  }
+  allRatesFromUsd[base.currency] = base.value / usd.value;
+}
+
 /// Label for the raw unit that [symbol]'s prices are quoted in — the cent
 /// code (e.g. "GBp") for cent-quoted stocks, else the currency symbol.
 String symbolPriceUnit(String symbol) {

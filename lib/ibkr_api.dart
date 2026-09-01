@@ -147,6 +147,23 @@ class IbkrHistoricalSeries {
       );
 }
 
+/// One monetary account value reported by IBKR.
+class IbkrAccountValue {
+  final double value;
+  final String currency;
+
+  const IbkrAccountValue({required this.value, required this.currency});
+
+  @override
+  bool operator ==(Object other) =>
+      other is IbkrAccountValue &&
+      value == other.value &&
+      currency == other.currency;
+
+  @override
+  int get hashCode => Object.hash(value, currency);
+}
+
 /// Current read-only snapshot returned by the MarketMonk IBKR API.
 class IbkrPortfolioSnapshot {
   final String account;
@@ -160,6 +177,31 @@ class IbkrPortfolioSnapshot {
     required this.summary,
     required this.ledger,
   });
+
+  /// Returns an account-summary monetary value by its IBKR tag.
+  IbkrAccountValue? summaryValue(String tag) {
+    final raw = summary[tag.toLowerCase()] ?? summary[tag];
+    if (raw is! Map<String, dynamic>) return null;
+    final amount = raw['value'] ?? raw['amount'];
+    if (amount is! num) return null;
+    return IbkrAccountValue(
+      value: amount.toDouble(),
+      currency: raw['currency'] as String? ?? '',
+    );
+  }
+
+  /// Account net liquidation in the broker-reported base currency.
+  IbkrAccountValue? get netLiquidation => summaryValue('netliquidation');
+
+  /// Account net liquidation expressed in USD when the broker reports it.
+  IbkrAccountValue? get netLiquidationUsd {
+    final explicitUsd = summaryValue('netliquidationbycurrency:usd');
+    if (explicitUsd?.currency == 'USD') return explicitUsd;
+    final byCurrency = summaryValue('netliquidationbycurrency');
+    if (byCurrency?.currency == 'USD') return byCurrency;
+    final total = netLiquidation;
+    return total?.currency == 'USD' ? total : null;
+  }
 
   factory IbkrPortfolioSnapshot.fromJson(Map<String, dynamic> json) {
     final positions = (json['positions'] as List<dynamic>? ?? const [])

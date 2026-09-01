@@ -442,10 +442,15 @@ def _native_summary(values: list[Any]) -> dict[str, Any]:
         tag = str(getattr(item, "tag", "")).strip()
         if not tag:
             continue
-        summary[tag.lower()] = {
+        currency = str(getattr(item, "currency", "")).strip()
+        entry = {
             "value": _native_value(getattr(item, "value", "")),
-            "currency": str(getattr(item, "currency", "")).strip(),
+            "currency": currency,
         }
+        key = tag.lower()
+        summary[key] = entry
+        if currency:
+            summary[f"{key}:{currency.lower()}"] = entry
     return summary
 
 

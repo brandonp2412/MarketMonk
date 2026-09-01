@@ -100,15 +100,20 @@ void main() {
     await settings.initialized;
     final accounts = app.AccountManager();
     await accounts.init();
+    await accounts.setIbkrConfig('Default', const IbkrAccountConfig());
 
     await tester.pumpWidget(
       _page(
         settings: settings,
         accounts: accounts,
-        child: const SettingsPage(),
+        child: const app.MyHomePage(),
       ),
     );
     await tester.pumpAndSettle();
+    expect(find.byType(ChartsPage), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.settings).first);
+    await tester.pumpAndSettle();
+    expect(find.byType(SettingsPage), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('Interactive Brokers'),
@@ -140,14 +145,7 @@ void main() {
     expect(accounts.ibkrConfigFor().baseUrl, url);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('favoriteStocks', [largest.symbol]);
-
-    await tester.pumpWidget(
-      _page(
-        settings: settings,
-        accounts: accounts,
-        child: const app.MyHomePage(),
-      ),
-    );
+    expect(find.byType(ChartsPage), findsOneWidget);
     await tester.pump();
 
     await tester.tap(find.byKey(const Key('PortfolioPage')));
@@ -163,6 +161,11 @@ void main() {
     await tester.tap(find.byKey(const Key('ChartPage')));
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(ChartsPage), findsOneWidget);
+    await _pumpUntil(tester, find.text('Default'));
+    expect(
+      find.text('No trades yet.\nSearch for a stock above to get started.'),
+      findsNothing,
+    );
     await _pumpUntil(tester, find.text(largest.symbol));
     await tester.tap(find.text(largest.symbol).first);
     await _pumpUntil(
