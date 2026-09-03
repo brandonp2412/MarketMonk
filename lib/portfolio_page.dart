@@ -26,7 +26,9 @@ class _LoadedPortfolio {
 }
 
 class PortfolioPage extends StatefulWidget {
-  const PortfolioPage({super.key});
+  final Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? ibkrLoader;
+
+  const PortfolioPage({super.key, this.ibkrLoader});
 
   @override
   State<PortfolioPage> createState() => PortfolioPageState();
@@ -99,7 +101,8 @@ class PortfolioPageState extends State<PortfolioPage>
       if (!config.isConfigured) {
         throw StateError('IBKR portfolio source is not fully configured');
       }
-      final snapshot = await IbkrApiClient(config).fetchPortfolio();
+      final snapshot = await (widget.ibkrLoader?.call(config) ??
+          IbkrApiClient(config).fetchPortfolio());
       cacheIbkrAccountExchangeRate(snapshot);
       return _LoadedPortfolio(
         positions: await computeIbkrPositions(snapshot.positions, trades),
@@ -220,14 +223,121 @@ class PortfolioPageState extends State<PortfolioPage>
     );
   }
 
+  void _retryPortfolio() {
+    setState(() => _stream = _buildStream());
+  }
+
+  void _openSettings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SettingsPage()),
+    );
+  }
+
+  Widget _buildLoadError(BuildContext context) {
+    final ibkrEnabled = context.watch<AccountManager>().ibkrConfigFor().enabled;
+    final title = ibkrEnabled
+        ? 'Couldn’t load Interactive Brokers'
+        : 'Couldn’t load portfolio';
+    final message = ibkrEnabled
+        ? 'MarketMonk couldn’t load your portfolio from your IBKR server. '
+            'Check the server connection, then try again.'
+        : 'MarketMonk couldn’t refresh your portfolio. Check your internet '
+            'connection, then try again.';
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.cloud_off_outlined,
+                    size: 48,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 20),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 12,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.icon(
+                        onPressed: _retryPortfolio,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Try again'),
+                      ),
+                      if (ibkrEnabled)
+                        OutlinedButton.icon(
+                          onPressed: _openSettings,
+                          icon: const Icon(Icons.settings_outlined),
+                          label: const Text('IBKR settings'),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRefreshWarning(BuildContext context) {
+    final ibkrEnabled = context.watch<AccountManager>().ibkrConfigFor().enabled;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+        child: Row(
+          children: [
+            Icon(
+              Icons.cloud_off_outlined,
+              color: Theme.of(context).colorScheme.error,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                ibkrEnabled
+                    ? 'Couldn’t refresh IBKR. Showing the last loaded portfolio.'
+                    : 'Couldn’t refresh market data. Showing the last loaded portfolio.',
+              ),
+            ),
+            TextButton(
+              onPressed: _retryPortfolio,
+              child: const Text('Try again'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildBody(
     BuildContext context,
     AsyncSnapshot<_LoadedPortfolio> snap,
   ) {
-    if (snap.hasError) return Center(child: Text(snap.error.toString()));
-
     final positions = snap.data?.positions ?? _positions;
     final netLiquidation = snap.data?.netLiquidation ?? _netLiquidation;
+
+    if (snap.hasError && positions.isEmpty) return _buildLoadError(context);
 
     if (positions.isEmpty && !snap.hasData) {
       return const Center();
@@ -317,6 +427,13 @@ class PortfolioPageState extends State<PortfolioPage>
       onRefresh: _updateCandles,
       child: CustomScrollView(
         slivers: [
+          if (snap.hasError)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: _buildRefreshWarning(context),
+              ),
+            ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
