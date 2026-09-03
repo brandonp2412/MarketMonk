@@ -1,0 +1,3 @@
+• Fix avoid blank portfolio loading states
+• Fix handle empty IBKR API responses
+• Fix show friendly portfolio load errors
