@@ -129,6 +129,28 @@ void main() {
     );
   });
 
+  test('IBKR client reports empty successful responses clearly', () async {
+    final client = IbkrApiClient(
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'secret-token',
+      ),
+      get: (_, {headers}) async => http.Response('', 200),
+    );
+
+    expect(
+      client.fetchPortfolio(),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'IBKR API returned an empty response for /v1/portfolio',
+        ),
+      ),
+    );
+  });
+
   test('IBKR positions use broker valuation and local trade metadata',
       () async {
     final trades = [

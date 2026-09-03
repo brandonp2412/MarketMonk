@@ -231,7 +231,7 @@ class IbkrApiClient {
 
   Future<void> testConnection() async {
     final response = await _request('/v1/health');
-    final body = json.decode(response.body) as Map<String, dynamic>;
+    final body = _decodeJsonObject(response, '/v1/health');
     if (body['status'] != 'ok') {
       throw StateError(
         body['detail'] ?? body['error'] ?? 'IBKR API unavailable',
@@ -242,7 +242,7 @@ class IbkrApiClient {
   Future<IbkrPortfolioSnapshot> fetchPortfolio() async {
     final response = await _request('/v1/portfolio');
     return IbkrPortfolioSnapshot.fromJson(
-      json.decode(response.body) as Map<String, dynamic>,
+      _decodeJsonObject(response, '/v1/portfolio'),
     );
   }
 
@@ -259,8 +259,22 @@ class IbkrApiClient {
       queryParameters: {'symbol': symbol, 'years': '$years'},
     );
     return IbkrHistoricalSeries.fromJson(
-      json.decode(response.body) as Map<String, dynamic>,
+      _decodeJsonObject(response, '/v1/historical'),
     );
+  }
+
+  Map<String, dynamic> _decodeJsonObject(http.Response response, String path) {
+    final body = response.body.trim();
+    if (body.isEmpty) {
+      throw StateError('IBKR API returned an empty response for $path');
+    }
+    try {
+      final decoded = json.decode(body);
+      if (decoded is Map<String, dynamic>) return decoded;
+    } on FormatException {
+      throw StateError('IBKR API returned invalid JSON for $path');
+    }
+    throw StateError('IBKR API returned an invalid response for $path');
   }
 
   Future<http.Response> _request(
