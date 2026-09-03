@@ -561,6 +561,7 @@ jobs:
 
       - name: VirusTotal Scan
         id: vt
+        continue-on-error: true
         uses: crazy-max/ghaction-virustotal@d34968c958ae283fe976efed637081b9f9dcf74f # v4
         with:
           vt_api_key: ${{ secrets.VT_API_KEY }}
@@ -571,6 +572,7 @@ jobs:
             android-apk/app-x86_64-release.apk
 
       - name: Append VirusTotal links to release
+        if: steps.vt.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: v${{ needs.version-bump.outputs.version }}
