@@ -1,0 +1,10 @@
+• Hide Linux integration tests on dwl
+• Support multi-file broker CSV imports
+• chore(android): target API 36
+• add native IBKR portfolio bridge
+• add self-hosted IBKR portfolio source
+• add ticker sync progress after imports
+• integrate Talker logging
+• source charts from IBKR history
+• Fix align IBKR account valuation
+• Fix apply currency changes immediately
