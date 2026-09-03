@@ -26,9 +26,12 @@ class _LoadedPortfolio {
 }
 
 class PortfolioPage extends StatefulWidget {
-  final Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? ibkrLoader;
+  final Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? _ibkrLoader;
 
-  const PortfolioPage({super.key, this.ibkrLoader});
+  const PortfolioPage({
+    super.key,
+    Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? ibkrLoader,
+  }) : _ibkrLoader = ibkrLoader;
 
   @override
   State<PortfolioPage> createState() => PortfolioPageState();
@@ -101,7 +104,7 @@ class PortfolioPageState extends State<PortfolioPage>
       if (!config.isConfigured) {
         throw StateError('IBKR portfolio source is not fully configured');
       }
-      final snapshot = await (widget.ibkrLoader?.call(config) ??
+      final snapshot = await (widget._ibkrLoader?.call(config) ??
           IbkrApiClient(config).fetchPortfolio());
       cacheIbkrAccountExchangeRate(snapshot);
       return _LoadedPortfolio(
