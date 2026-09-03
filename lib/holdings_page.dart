@@ -83,25 +83,42 @@ class HoldingsPageState extends State<HoldingsPage>
   /// before the watch() stream emits its first value.
   Future<void> _preload() async {
     try {
+      final accounts = context.read<AccountManager>();
       final trades = await db.trades.select().get();
+      final cached = accounts.portfolioCacheFor();
+      if (cached != null) {
+        final result = _summariesFromPositions(trades, cached.positions);
+        if (mounted) setState(() => _summaries = result);
+        return;
+      }
       final result = await _computeSummaries(trades);
       if (mounted) setState(() => _summaries = result);
     } catch (_) {}
   }
 
   Future<List<Position>> _loadPositions(List<Trade> trades) async {
-    final config = context.read<AccountManager>().ibkrConfigFor();
+    final accounts = context.read<AccountManager>();
+    final config = accounts.ibkrConfigFor();
+    final accountName = accounts.activeAccount;
     if (config.enabled) {
       if (!config.isConfigured) {
         throw StateError('IBKR portfolio source is not fully configured');
       }
       final snapshot = await IbkrApiClient(config).fetchPortfolio();
       cacheIbkrAccountExchangeRate(snapshot);
-      return computeIbkrPositions(snapshot.positions, trades);
+      final positions = await computeIbkrPositions(snapshot.positions, trades);
+      await accounts.cachePortfolio(
+        accountName,
+        positions,
+        snapshot.netLiquidation,
+      );
+      return positions;
     }
     final symbols = trades.map((trade) => trade.symbol).toSet().toList();
     final prices = await fetchLatestPrices(symbols);
-    return computePositions(trades, prices);
+    final positions = computePositions(trades, prices);
+    await accounts.cachePortfolio(accountName, positions, null);
+    return positions;
   }
 
   /// Fires candle syncs for all held symbols in the background without
@@ -128,8 +145,13 @@ class HoldingsPageState extends State<HoldingsPage>
     if (mounted) setState(() => _stream = _buildStream());
   }
 
-  Future<List<SymbolSummary>> _computeSummaries(List<Trade> trades) async {
-    final positions = await _loadPositions(trades);
+  Future<List<SymbolSummary>> _computeSummaries(List<Trade> trades) async =>
+      _summariesFromPositions(trades, await _loadPositions(trades));
+
+  List<SymbolSummary> _summariesFromPositions(
+    List<Trade> trades,
+    List<Position> positions,
+  ) {
     final positionMap = {
       for (final position in positions) position.symbol: position,
     };
@@ -371,7 +393,7 @@ class HoldingsPageState extends State<HoldingsPage>
     final summaries = snap.data ?? _summaries;
 
     if (summaries.isEmpty && !snap.hasData) {
-      return const Center();
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (snap.hasData && snap.data != _summaries) {

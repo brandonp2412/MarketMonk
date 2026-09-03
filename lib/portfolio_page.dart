@@ -45,6 +45,7 @@ class PortfolioPageState extends State<PortfolioPage>
   late Stream<_LoadedPortfolio> _stream;
   List<Position> _positions = [];
   IbkrAccountValue? _netLiquidation;
+  bool _hasCachedPortfolio = false;
   int? touchedIndex;
   final _filterController = TextEditingController();
   String _filterText = '';
@@ -67,6 +68,7 @@ class PortfolioPageState extends State<PortfolioPage>
     final account = accounts.activeAccount;
     final ibkrConfig = accounts.ibkrConfigFor(account);
     final refreshVersion = accounts.ibkrRefreshVersion;
+    final cached = accounts.portfolioCacheFor(account);
     if (account != _lastAccount ||
         ibkrConfig != _lastIbkrConfig ||
         refreshVersion != _lastIbkrRefreshVersion) {
@@ -75,7 +77,9 @@ class PortfolioPageState extends State<PortfolioPage>
       _lastIbkrRefreshVersion = refreshVersion;
       setState(() {
         _stream = _buildStream();
-        _positions = [];
+        _positions = cached?.positions ?? [];
+        _netLiquidation = cached?.netLiquidation;
+        _hasCachedPortfolio = cached != null;
         touchedIndex = null;
       });
       _preload();
@@ -128,7 +132,13 @@ class PortfolioPageState extends State<PortfolioPage>
         setState(() {
           _positions = loaded.positions;
           _netLiquidation = loaded.netLiquidation;
+          _hasCachedPortfolio = true;
         });
+        await context.read<AccountManager>().cachePortfolio(
+              context.read<AccountManager>().activeAccount,
+              loaded.positions,
+              loaded.netLiquidation,
+            );
       }
     } catch (error, stackTrace) {
       talker.handle(error, stackTrace, 'Failed to preload portfolio positions');
@@ -156,7 +166,13 @@ class PortfolioPageState extends State<PortfolioPage>
         setState(() {
           _positions = positions;
           _netLiquidation = loaded.netLiquidation;
+          _hasCachedPortfolio = true;
         });
+        await context.read<AccountManager>().cachePortfolio(
+              accountName,
+              positions,
+              loaded.netLiquidation,
+            );
       }
     } catch (error, stackTrace) {
       talker.handle(error, stackTrace, 'Background portfolio sync failed');
@@ -342,8 +358,8 @@ class PortfolioPageState extends State<PortfolioPage>
 
     if (snap.hasError && positions.isEmpty) return _buildLoadError(context);
 
-    if (positions.isEmpty && !snap.hasData) {
-      return const Center();
+    if (positions.isEmpty && !snap.hasData && !_hasCachedPortfolio) {
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (snap.hasData &&
@@ -354,6 +370,7 @@ class PortfolioPageState extends State<PortfolioPage>
         setState(() {
           _positions = snap.data!.positions;
           _netLiquidation = snap.data!.netLiquidation;
+          _hasCachedPortfolio = true;
         });
       });
     }
