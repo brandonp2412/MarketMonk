@@ -105,7 +105,7 @@ jobs:
           script: ./scripts/ci-screenshots.sh
 
       - name: Upload screenshots
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: screenshots-${{ matrix.device_type }}
           path: fastlane/metadata/android/en-US/images/${{ matrix.device_type }}
@@ -193,19 +193,19 @@ jobs:
           echo "Current version: $CURRENT_VERSION+$CURRENT_BUILD_NUMBER"
 
       - name: Download phone screenshots
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: screenshots-phoneScreenshots
           path: fastlane/metadata/android/en-US/images/phoneScreenshots
 
       - name: Download seven-inch screenshots
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: screenshots-sevenInchScreenshots
           path: fastlane/metadata/android/en-US/images/sevenInchScreenshots
 
       - name: Download ten-inch screenshots
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: screenshots-tenInchScreenshots
           path: fastlane/metadata/android/en-US/images/tenInchScreenshots
@@ -409,7 +409,7 @@ jobs:
 
       - name: Upload APK artifact
         if: github.actor != 'nektos/act'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           retention-days: 7
           name: android-apk
@@ -419,7 +419,7 @@ jobs:
 
       - name: Upload AAB artifact
         if: github.actor != 'nektos/act'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           retention-days: 7
           name: android-aab
@@ -465,7 +465,7 @@ jobs:
 
       - name: Upload Linux artifact
         if: github.actor != 'nektos/act'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           retention-days: 7
           name: linux-app
@@ -506,7 +506,7 @@ jobs:
 
       - name: Upload Windows artifact
         if: github.actor != 'nektos/act'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           retention-days: 7
           name: windows-app
@@ -526,12 +526,12 @@ jobs:
           persist-credentials: false
 
       - name: Download all artifacts
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: artifacts
 
       - name: Create Release
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: v${{ needs.version-bump.outputs.version }}
           name: Market Monk v${{ needs.version-bump.outputs.version }}
@@ -556,7 +556,7 @@ jobs:
           persist-credentials: false
 
       - name: Download Android artifacts
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: android-apk
           path: android-apk
@@ -564,7 +564,7 @@ jobs:
       - name: VirusTotal Scan
         id: vt
         continue-on-error: true
-        uses: crazy-max/ghaction-virustotal@d34968c958ae283fe976efed637081b9f9dcf74f # v4
+        uses: crazy-max/ghaction-virustotal@936d8c5c00afe97d3d9a1af26d017cfdf26800a2 # v5.0.0
         with:
           vt_api_key: ${{ secrets.VT_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
