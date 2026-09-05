@@ -1,0 +1,2 @@
+• Polish empty states
+• Fix cache IBKR chart period data
