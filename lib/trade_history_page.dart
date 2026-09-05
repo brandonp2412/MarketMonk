@@ -24,16 +24,15 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
   @override
   void initState() {
     super.initState();
-    _tradesStream =
-        (db.trades.select()
-              ..where((t) => t.symbol.equals(widget.summary.symbol))
-              ..orderBy([
-                (t) => OrderingTerm(
+    _tradesStream = (db.trades.select()
+          ..where((t) => t.symbol.equals(widget.summary.symbol))
+          ..orderBy([
+            (t) => OrderingTerm(
                   expression: t.tradeDate,
                   mode: OrderingMode.desc,
                 ),
-              ]))
-            .watch();
+          ]))
+        .watch();
     fetchSymbolCurrencyAndRate(widget.summary.symbol).then((_) {
       if (mounted) setState(() {});
     });
@@ -167,9 +166,8 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                     (t) => _TradeTile(
                       trade: t,
                       centDiv: centDiv,
-                      onLongPress: ibkrManaged
-                          ? null
-                          : () => _showTradeActions(t),
+                      onLongPress:
+                          ibkrManaged ? null : () => _showTradeActions(t),
                     ),
                   ),
                 ] else
@@ -186,13 +184,13 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                       onAction: ibkrManaged
                           ? null
                           : () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => EditTickerPage(
-                                  symbol: widget.summary.symbol,
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => EditTickerPage(
+                                    symbol: widget.summary.symbol,
+                                  ),
                                 ),
                               ),
-                            ),
                     ),
                   ),
               ],
@@ -340,9 +338,8 @@ class _TradeTile extends StatelessWidget {
                 '${trade.realizedPL >= 0 ? '+' : ''}${fmtNativeCurrency(trade.realizedPL / centDiv, symbolCurrency(trade.symbol))}',
                 style: TextStyle(
                   fontSize: 11,
-                  color: trade.realizedPL >= 0
-                      ? Colors.green
-                      : Colors.redAccent,
+                  color:
+                      trade.realizedPL >= 0 ? Colors.green : Colors.redAccent,
                 ),
               ),
           ],
@@ -408,14 +405,14 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
 
     await (db.trades.update()..where((t) => t.id.equals(widget.trade.id)))
         .write(
-          TradesCompanion(
-            quantity: Value(_isBuy ? qty : -qty),
-            price: Value(price),
-            tradeType: Value(_isBuy ? 'open' : 'close'),
-            tradeDate: Value(_tradeDate),
-            realizedPL: Value(realizedPL),
-          ),
-        );
+      TradesCompanion(
+        quantity: Value(_isBuy ? qty : -qty),
+        price: Value(price),
+        tradeType: Value(_isBuy ? 'open' : 'close'),
+        tradeDate: Value(_tradeDate),
+        realizedPL: Value(realizedPL),
+      ),
+    );
 
     if (mounted) Navigator.pop(context);
   }

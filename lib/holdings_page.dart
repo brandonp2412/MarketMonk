@@ -161,8 +161,7 @@ class HoldingsPageState extends State<HoldingsPage>
     for (final t in trades) {
       if (q.isNotEmpty &&
           !t.symbol.toLowerCase().contains(q) &&
-          !t.name.toLowerCase().contains(q))
-        continue;
+          !t.name.toLowerCase().contains(q)) continue;
       bySymbol.putIfAbsent(t.symbol, () => []).add(t);
     }
 
@@ -365,23 +364,23 @@ class HoldingsPageState extends State<HoldingsPage>
       floatingActionButton: ibkrManaged
           ? null
           : _selecting
-          ? FloatingActionButton.extended(
-              onPressed: () => _deleteSelected(context),
-              label: Text('Delete (${_selectedSymbols.length})'),
-              icon: const Icon(Icons.delete),
-            )
-          : Padding(
-              padding: const EdgeInsets.only(bottom: bottomNavHeight),
-              child: FloatingActionButton.extended(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const EditTickerPage()),
+              ? FloatingActionButton.extended(
+                  onPressed: () => _deleteSelected(context),
+                  label: Text('Delete (${_selectedSymbols.length})'),
+                  icon: const Icon(Icons.delete),
+                )
+              : Padding(
+                  padding: const EdgeInsets.only(bottom: bottomNavHeight),
+                  child: FloatingActionButton.extended(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const EditTickerPage()),
+                    ),
+                    label: const Text('Add'),
+                    icon: const Icon(Icons.add),
+                    tooltip: 'Add trade',
+                  ),
                 ),
-                label: const Text('Add'),
-                icon: const Icon(Icons.add),
-                tooltip: 'Add trade',
-              ),
-            ),
     );
   }
 
@@ -410,28 +409,28 @@ class HoldingsPageState extends State<HoldingsPage>
         icon: ibkrManaged
             ? Icons.account_balance_rounded
             : query.isEmpty
-            ? Icons.candlestick_chart_rounded
-            : Icons.search_off_rounded,
+                ? Icons.candlestick_chart_rounded
+                : Icons.search_off_rounded,
         title: ibkrManaged
             ? 'No IBKR stocks found'
             : query.isEmpty
-            ? 'No stocks yet'
-            : 'No matching stocks',
+                ? 'No stocks yet'
+                : 'No matching stocks',
         message: ibkrManaged
             ? 'Refresh your portfolio or check your Interactive Brokers connection.'
             : query.isEmpty
-            ? 'Import a CSV or add your first trade manually.'
-            : 'Nothing matches “$query”. You can add that ticker now.',
+                ? 'Import a CSV or add your first trade manually.'
+                : 'Nothing matches “$query”. You can add that ticker now.',
         actionLabel: ibkrManaged
             ? 'IBKR settings'
             : query.isEmpty
-            ? 'Import CSV'
-            : 'Add ${query.toUpperCase()}',
+                ? 'Import CSV'
+                : 'Add ${query.toUpperCase()}',
         actionIcon: ibkrManaged
             ? Icons.settings_rounded
             : query.isEmpty
-            ? Icons.upload_file_rounded
-            : Icons.add_rounded,
+                ? Icons.upload_file_rounded
+                : Icons.add_rounded,
         onAction: () => Navigator.push(
           context,
           MaterialPageRoute(
@@ -572,9 +571,8 @@ class _SymbolTile extends StatelessWidget {
                   Text(
                     'Realized today: ${realizedToday >= 0 ? '+' : ''}${fmtCurrency(realizedToday)}',
                     style: TextStyle(
-                      color: realizedToday >= 0
-                          ? Colors.green
-                          : Colors.redAccent,
+                      color:
+                          realizedToday >= 0 ? Colors.green : Colors.redAccent,
                       fontSize: 12,
                     ),
                   )

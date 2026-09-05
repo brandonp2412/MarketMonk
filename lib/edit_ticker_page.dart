@@ -65,33 +65,32 @@ class _EditTickerPageState extends State<EditTickerPage> {
     Iterable<Expression<Object>> groupBy = [db.candles.date];
     if (years > 0 || months > 5) groupBy = [weekExpression];
 
-    stream =
-        (db.selectOnly(db.candles)
-              ..addColumns([db.candles.date, db.candles.close])
-              ..where(
-                db.candles.symbol.equals(symbol.text.split(' ').first) &
-                    db.candles.date.isBiggerOrEqualValue(after),
-              )
-              ..orderBy([
-                OrderingTerm(
-                  expression: db.candles.date,
-                  mode: OrderingMode.asc,
+    stream = (db.selectOnly(db.candles)
+          ..addColumns([db.candles.date, db.candles.close])
+          ..where(
+            db.candles.symbol.equals(symbol.text.split(' ').first) &
+                db.candles.date.isBiggerOrEqualValue(after),
+          )
+          ..orderBy([
+            OrderingTerm(
+              expression: db.candles.date,
+              mode: OrderingMode.asc,
+            ),
+          ])
+          ..groupBy(groupBy))
+        .watch()
+        .map(
+          (results) => results
+              .map(
+                (result) => CandleTicker(
+                  candle: CandlesCompanion(
+                    date: Value(result.read(db.candles.date)!),
+                    close: Value(result.read(db.candles.close)!),
+                  ),
                 ),
-              ])
-              ..groupBy(groupBy))
-            .watch()
-            .map(
-              (results) => results
-                  .map(
-                    (result) => CandleTicker(
-                      candle: CandlesCompanion(
-                        date: Value(result.read(db.candles.date)!),
-                        close: Value(result.read(db.candles.close)!),
-                      ),
-                    ),
-                  )
-                  .toList(),
-            );
+              )
+              .toList(),
+        );
     setState(() {});
   }
 
@@ -114,9 +113,8 @@ class _EditTickerPageState extends State<EditTickerPage> {
         },
       );
 
-    final candles = snapshot.data!
-        .map((tickerCandle) => tickerCandle.candle)
-        .toList();
+    final candles =
+        snapshot.data!.map((tickerCandle) => tickerCandle.candle).toList();
     if (candles.isEmpty) return const SizedBox();
     final centDiv = symbolCentDivisor(symbol.text.split(' ').first);
     List<FlSpot> spots = [];
@@ -221,15 +219,14 @@ class _EditTickerPageState extends State<EditTickerPage> {
                     child: Autocomplete<String>(
                       optionsBuilder:
                           (TextEditingValue textEditingValue) async {
-                            final api = YahooFinanceApi();
-                            final results = await api.searchTickers(
-                              textEditingValue.text,
-                            );
-                            return results.map(
-                              (result) =>
-                                  '${result.symbol} (${result.longname})',
-                            );
-                          },
+                        final api = YahooFinanceApi();
+                        final results = await api.searchTickers(
+                          textEditingValue.text,
+                        );
+                        return results.map(
+                          (result) => '${result.symbol} (${result.longname})',
+                        );
+                      },
                       initialValue: symbol.value,
                       onSelected: (value) async {
                         setStream();
@@ -256,72 +253,71 @@ class _EditTickerPageState extends State<EditTickerPage> {
 
                         final results = await stream?.first;
                         if (results == null) return;
-                        price.text = results.last.candle.close.value
-                            .toStringAsFixed(2);
+                        price.text =
+                            results.last.candle.close.value.toStringAsFixed(2);
                       },
-                      fieldViewBuilder:
-                          (
-                            BuildContext context,
-                            TextEditingController fieldTextEditingController,
-                            FocusNode fieldFocusNode,
-                            VoidCallback onFieldSubmitted,
-                          ) {
-                            symbol = fieldTextEditingController;
-                            autocomplete = fieldFocusNode;
-                            Widget leading = const Padding(
-                              padding: EdgeInsets.only(left: 16.0, right: 8.0),
-                              child: Icon(Icons.search),
-                            );
-                            if (loading)
-                              leading = const Padding(
-                                padding: EdgeInsets.only(
-                                  left: 16.0,
-                                  right: 8.0,
-                                ),
-                                child: SizedBox(height: 24, width: 24),
+                      fieldViewBuilder: (
+                        BuildContext context,
+                        TextEditingController fieldTextEditingController,
+                        FocusNode fieldFocusNode,
+                        VoidCallback onFieldSubmitted,
+                      ) {
+                        symbol = fieldTextEditingController;
+                        autocomplete = fieldFocusNode;
+                        Widget leading = const Padding(
+                          padding: EdgeInsets.only(left: 16.0, right: 8.0),
+                          child: Icon(Icons.search),
+                        );
+                        if (loading)
+                          leading = const Padding(
+                            padding: EdgeInsets.only(
+                              left: 16.0,
+                              right: 8.0,
+                            ),
+                            child: SizedBox(height: 24, width: 24),
+                          );
+
+                        return SearchBar(
+                          trailing: getTrailing,
+                          controller: fieldTextEditingController,
+                          leading: leading,
+                          focusNode: fieldFocusNode,
+                          hintText: 'Search...',
+                          onTap: () => selectAll(symbol),
+                          textInputAction: TextInputAction.next,
+                          onSubmitted: (text) async {
+                            selectAll(amount);
+                            symbol.text = text.toUpperCase();
+                            setStream();
+
+                            setState(() {
+                              loading = true;
+                            });
+                            final tickerSymbol = text.split(' ').first;
+                            try {
+                              await syncCandles(tickerSymbol);
+                              await fetchSymbolCurrencyAndRate(
+                                tickerSymbol,
                               );
-
-                            return SearchBar(
-                              trailing: getTrailing,
-                              controller: fieldTextEditingController,
-                              leading: leading,
-                              focusNode: fieldFocusNode,
-                              hintText: 'Search...',
-                              onTap: () => selectAll(symbol),
-                              textInputAction: TextInputAction.next,
-                              onSubmitted: (text) async {
-                                selectAll(amount);
-                                symbol.text = text.toUpperCase();
-                                setStream();
-
-                                setState(() {
-                                  loading = true;
-                                });
-                                final tickerSymbol = text.split(' ').first;
-                                try {
-                                  await syncCandles(tickerSymbol);
-                                  await fetchSymbolCurrencyAndRate(
-                                    tickerSymbol,
-                                  );
-                                } catch (error, stackTrace) {
-                                  if (context.mounted)
-                                    toast(context, error.toString());
-                                  talker.handle(
-                                    error,
-                                    stackTrace,
-                                    'Failed to sync entered ticker',
-                                  );
-                                } finally {
-                                  setState(() {
-                                    loading = false;
-                                    _nativeCurrency = symbolCurrency(
-                                      tickerSymbol,
-                                    );
-                                  });
-                                }
-                              },
-                            );
+                            } catch (error, stackTrace) {
+                              if (context.mounted)
+                                toast(context, error.toString());
+                              talker.handle(
+                                error,
+                                stackTrace,
+                                'Failed to sync entered ticker',
+                              );
+                            } finally {
+                              setState(() {
+                                loading = false;
+                                _nativeCurrency = symbolCurrency(
+                                  tickerSymbol,
+                                );
+                              });
+                            }
                           },
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(height: 12),

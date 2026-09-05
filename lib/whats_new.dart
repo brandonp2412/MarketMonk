@@ -104,8 +104,8 @@ class _WhatsNewState extends State<WhatsNew> {
               Text(
                 log.created,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
-                ),
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
               ),
               const SizedBox(height: 4),
               Text(log.content),

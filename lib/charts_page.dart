@@ -161,7 +161,8 @@ class ChartsPageState extends State<ChartsPage>
           final snapshot = await (widget._ibkrLoader?.call(ibkrConfig) ??
               IbkrApiClient(ibkrConfig).fetchPortfolio());
           cacheIbkrAccountExchangeRate(snapshot);
-          final positions = await computeIbkrPositions(snapshot.positions, trades);
+          final positions =
+              await computeIbkrPositions(snapshot.positions, trades);
           final currentValueUsd = snapshot.netLiquidationUsd?.value;
           await accountManager.cachePortfolio(
             accountName,
@@ -195,8 +196,8 @@ class ChartsPageState extends State<ChartsPage>
         final accountDb = isActive
             ? db
             : (accountName == 'Default'
-                  ? Database()
-                  : Database('market-monk-$accountName'));
+                ? Database()
+                : Database('market-monk-$accountName'));
         try {
           final ibkrConfig = accountManager.ibkrConfigFor(accountName);
           final loaded = await _portfolioForAccount(
@@ -260,23 +261,20 @@ class ChartsPageState extends State<ChartsPage>
   Future<void> _refreshAllPortfolioCandles() async {
     final accountManager = context.read<AccountManager>();
 
-    final tasks =
-        <
-          ({
-            Database db,
-            bool isActive,
-            String accountName,
-            IbkrAccountConfig ibkrConfig,
-            List<String> symbols,
-          })
-        >[];
+    final tasks = <({
+      Database db,
+      bool isActive,
+      String accountName,
+      IbkrAccountConfig ibkrConfig,
+      List<String> symbols,
+    })>[];
     for (final accountName in accountManager.accounts) {
       final isActive = accountName == accountManager.activeAccount;
       final accountDb = isActive
           ? db
           : (accountName == 'Default'
-                ? Database()
-                : Database('market-monk-$accountName'));
+              ? Database()
+              : Database('market-monk-$accountName'));
       try {
         final ibkrConfig = accountManager.ibkrConfigFor(accountName);
         final loaded = await _portfolioForAccount(
@@ -437,8 +435,8 @@ class ChartsPageState extends State<ChartsPage>
       final accountDb = isActive
           ? db
           : (accountName == 'Default'
-                ? Database()
-                : Database('market-monk-$accountName'));
+              ? Database()
+              : Database('market-monk-$accountName'));
       try {
         final ibkrConfig = accountManager.ibkrConfigFor(accountName);
         final loaded = await _portfolioForAccount(
@@ -484,17 +482,14 @@ class ChartsPageState extends State<ChartsPage>
     final Map<String, Map<DateTime, double>> pricesBySymbol = {};
 
     for (final symbol in sharesMap.keys) {
-      final rows =
-          await (accountDb.candles.select()
-                ..where(
-                  (c) =>
-                      c.symbol.equals(symbol) & c.date.isBiggerThanValue(after),
-                )
-                ..orderBy([
-                  (c) =>
-                      OrderingTerm(expression: c.date, mode: OrderingMode.asc),
-                ]))
-              .get();
+      final rows = await (accountDb.candles.select()
+            ..where(
+              (c) => c.symbol.equals(symbol) & c.date.isBiggerThanValue(after),
+            )
+            ..orderBy([
+              (c) => OrderingTerm(expression: c.date, mode: OrderingMode.asc),
+            ]))
+          .get();
       final centDiv = symbolCentDivisor(symbol);
       final nativeRate = allRatesFromUsd[symbolCurrency(symbol)] ?? 1.0;
       pricesBySymbol[symbol] = {
@@ -531,9 +526,10 @@ class ChartsPageState extends State<ChartsPage>
       valueByDate[DateTime(now.year, now.month, now.day)] = currentValueUsd;
     }
 
-    var series =
-        valueByDate.entries.map((e) => _DateValue(e.key, e.value)).toList()
-          ..sort((a, b) => a.date.compareTo(b.date));
+    var series = valueByDate.entries
+        .map((e) => _DateValue(e.key, e.value))
+        .toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
 
     if (days > 0 && series.length > days) {
       series = series.sublist(series.length - days);
@@ -647,37 +643,36 @@ class ChartsPageState extends State<ChartsPage>
     if (years > 0 || months > 5) groupBy = [weekExpression];
 
     final capturedDays = days;
-    _stockStream =
-        (db.selectOnly(db.candles)
-              ..addColumns([db.candles.date, db.candles.close])
-              ..where(
-                db.candles.symbol.equals(symbol) &
-                    db.candles.date.isBiggerThanValue(after),
-              )
-              ..orderBy([
-                OrderingTerm(
-                  expression: db.candles.date,
-                  mode: OrderingMode.asc,
-                ),
-              ])
-              ..groupBy(groupBy))
-            .watch()
-            .map((results) {
-              var list = results
-                  .map(
-                    (result) => CandleTicker(
-                      candle: CandlesCompanion(
-                        date: Value(result.read(db.candles.date)!),
-                        close: Value(result.read(db.candles.close)!),
-                      ),
-                    ),
-                  )
-                  .toList();
-              if (capturedDays > 0 && list.length > capturedDays) {
-                list = list.sublist(list.length - capturedDays);
-              }
-              return list;
-            });
+    _stockStream = (db.selectOnly(db.candles)
+          ..addColumns([db.candles.date, db.candles.close])
+          ..where(
+            db.candles.symbol.equals(symbol) &
+                db.candles.date.isBiggerThanValue(after),
+          )
+          ..orderBy([
+            OrderingTerm(
+              expression: db.candles.date,
+              mode: OrderingMode.asc,
+            ),
+          ])
+          ..groupBy(groupBy))
+        .watch()
+        .map((results) {
+      var list = results
+          .map(
+            (result) => CandleTicker(
+              candle: CandlesCompanion(
+                date: Value(result.read(db.candles.date)!),
+                close: Value(result.read(db.candles.close)!),
+              ),
+            ),
+          )
+          .toList();
+      if (capturedDays > 0 && list.length > capturedDays) {
+        list = list.sublist(list.length - capturedDays);
+      }
+      return list;
+    });
     setState(() {});
   }
 
@@ -1177,9 +1172,8 @@ class ChartsPageState extends State<ChartsPage>
               ? 'Search for a stock to start building your portfolio history.'
               : 'Show your portfolios again to restore the chart.',
           actionLabel: allEmpty ? 'Search stocks' : 'Show all',
-          actionIcon: allEmpty
-              ? Icons.search_rounded
-              : Icons.visibility_rounded,
+          actionIcon:
+              allEmpty ? Icons.search_rounded : Icons.visibility_rounded,
           onAction: () {
             if (allEmpty) {
               setState(() => _mode = _ChartMode.searching);
@@ -1315,14 +1309,12 @@ class ChartsPageState extends State<ChartsPage>
                         ? visibleKeys[spot.barIndex]
                         : '';
                     final accountIdx = accounts.indexOf(accountName);
-                    final spotColor =
-                        accountColors[accountIdx.clamp(
-                          0,
-                          accountColors.length - 1,
-                        )];
-                    final label = visibleKeys.length > 1
-                        ? '$accountName\n'
-                        : '';
+                    final spotColor = accountColors[accountIdx.clamp(
+                      0,
+                      accountColors.length - 1,
+                    )];
+                    final label =
+                        visibleKeys.length > 1 ? '$accountName\n' : '';
                     return LineTooltipItem(
                       '$label${fmtCurrency(spot.y)}\n$date',
                       Theme.of(
@@ -1610,15 +1602,13 @@ class _FavoriteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final stream =
-        (db.candles.select()
-              ..where((c) => c.symbol.equals(symbol))
-              ..orderBy([
-                (c) =>
-                    OrderingTerm(expression: c.date, mode: OrderingMode.desc),
-              ])
-              ..limit(2))
-            .watch();
+    final stream = (db.candles.select()
+          ..where((c) => c.symbol.equals(symbol))
+          ..orderBy([
+            (c) => OrderingTerm(expression: c.date, mode: OrderingMode.desc),
+          ])
+          ..limit(2))
+        .watch();
 
     return Container(
       width: 92,
@@ -1662,9 +1652,8 @@ class _FavoriteCard extends StatelessWidget {
                             candles.first.close,
                           )
                         : null;
-                    final changeColor = (pct ?? 0) >= 0
-                        ? Colors.green
-                        : Colors.redAccent;
+                    final changeColor =
+                        (pct ?? 0) >= 0 ? Colors.green : Colors.redAccent;
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
