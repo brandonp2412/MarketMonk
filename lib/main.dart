@@ -55,10 +55,12 @@ Database db = Database();
 class CachedPortfolioData {
   final List<Position> positions;
   final IbkrAccountValue? netLiquidation;
+  final double? netLiquidationUsd;
 
   const CachedPortfolioData({
     required this.positions,
     required this.netLiquidation,
+    this.netLiquidationUsd,
   });
 
   Map<String, dynamic> toJson() => {
@@ -85,6 +87,7 @@ class CachedPortfolioData {
                 'value': netLiquidation!.value,
                 'currency': netLiquidation!.currency,
               },
+        'netLiquidationUsd': netLiquidationUsd,
       };
 
   factory CachedPortfolioData.fromJson(Map<String, dynamic> json) {
@@ -124,6 +127,7 @@ class CachedPortfolioData {
               currency: rawNetLiquidation['currency'] as String? ?? '',
             )
           : null,
+      netLiquidationUsd: (json['netLiquidationUsd'] as num?)?.toDouble(),
     );
   }
 }
@@ -190,11 +194,13 @@ class AccountManager extends ChangeNotifier {
   Future<void> cachePortfolio(
     String name,
     List<Position> positions,
-    IbkrAccountValue? netLiquidation,
-  ) async {
+    IbkrAccountValue? netLiquidation, {
+    double? netLiquidationUsd,
+  }) async {
     _portfolioCache[name] = CachedPortfolioData(
       positions: List.unmodifiable(positions),
       netLiquidation: netLiquidation,
+      netLiquidationUsd: netLiquidationUsd,
     );
     final prefs = await SharedPreferences.getInstance();
     await _savePortfolioCache(prefs);

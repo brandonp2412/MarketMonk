@@ -106,6 +106,7 @@ void main() {
       'Default',
       [cachedPosition()],
       const IbkrAccountValue(value: 5500, currency: 'USD'),
+      netLiquidationUsd: 5500,
     );
 
     final reloaded = AccountManager();
@@ -116,6 +117,7 @@ void main() {
     expect(cached!.positions.single.symbol, 'VOO');
     expect(cached.positions.single.currentPrice, 550);
     expect(cached.netLiquidation?.value, 5500);
+    expect(cached.netLiquidationUsd, 5500);
   });
 
   testWidgets('portfolio shows a friendly IBKR error instead of exception text',

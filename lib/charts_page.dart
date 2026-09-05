@@ -32,7 +32,12 @@ class _LoadedChartPortfolio {
 }
 
 class ChartsPage extends StatefulWidget {
-  const ChartsPage({super.key});
+  final Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? _ibkrLoader;
+
+  const ChartsPage({
+    super.key,
+    Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? ibkrLoader,
+  }) : _ibkrLoader = ibkrLoader;
 
   @override
   State<ChartsPage> createState() => ChartsPageState();
@@ -73,6 +78,7 @@ class ChartsPageState extends State<ChartsPage>
   String? _portfolioError;
   bool _portfolioLoading = false;
   final Set<String> _hiddenAccounts = {};
+  final Map<String, Future<_LoadedChartPortfolio>> _ibkrLoads = {};
 
   // Search
   List<StockResult> _searchResults = [];
@@ -124,20 +130,53 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   Future<_LoadedChartPortfolio> _portfolioForAccount(
+    String accountName,
     Database accountDb,
     IbkrAccountConfig ibkrConfig,
-  ) async {
+    AccountManager accountManager, {
+    bool refreshIbkr = false,
+  }) async {
     final trades = await accountDb.trades.select().get();
     if (ibkrConfig.enabled) {
+      final cached = accountManager.portfolioCacheFor(accountName);
+      if (!refreshIbkr && cached != null) {
+        return _LoadedChartPortfolio(
+          positions: cached.positions,
+          currentValueUsd: cached.netLiquidationUsd,
+        );
+      }
       if (!ibkrConfig.isConfigured) {
+        if (cached != null) {
+          return _LoadedChartPortfolio(
+            positions: cached.positions,
+            currentValueUsd: cached.netLiquidationUsd,
+          );
+        }
         throw StateError('IBKR portfolio source is not fully configured');
       }
-      final snapshot = await IbkrApiClient(ibkrConfig).fetchPortfolio();
-      cacheIbkrAccountExchangeRate(snapshot);
-      return _LoadedChartPortfolio(
-        positions: await computeIbkrPositions(snapshot.positions, trades),
-        currentValueUsd: snapshot.netLiquidationUsd?.value,
-      );
+
+      final loadKey = '$accountName|${ibkrConfig.hashCode}';
+      return _ibkrLoads.putIfAbsent(loadKey, () async {
+        try {
+          final snapshot = await (widget._ibkrLoader?.call(ibkrConfig) ??
+              IbkrApiClient(ibkrConfig).fetchPortfolio());
+          cacheIbkrAccountExchangeRate(snapshot);
+          final positions = await computeIbkrPositions(snapshot.positions, trades);
+          final currentValueUsd = snapshot.netLiquidationUsd?.value;
+          await accountManager.cachePortfolio(
+            accountName,
+            positions,
+            snapshot.netLiquidation,
+            netLiquidationUsd: currentValueUsd,
+          );
+          return _LoadedChartPortfolio(
+            positions: positions,
+            currentValueUsd: currentValueUsd,
+          );
+        } finally {
+          _ibkrLoads.remove(loadKey);
+        }
+      });
     }
     final symbols = trades.map((trade) => trade.symbol).toSet().toList();
     final prices = await fetchLatestPrices(symbols, database: accountDb);
@@ -147,7 +186,7 @@ class ChartsPageState extends State<ChartsPage>
     );
   }
 
-  Future<void> _syncCandlesInBackground() async {
+  Future<void> _syncCandlesInBackground({bool refreshIbkr = false}) async {
     if (!mounted) return;
     final accountManager = context.read<AccountManager>();
     try {
@@ -160,7 +199,13 @@ class ChartsPageState extends State<ChartsPage>
                   : Database('market-monk-$accountName'));
         try {
           final ibkrConfig = accountManager.ibkrConfigFor(accountName);
-          final loaded = await _portfolioForAccount(accountDb, ibkrConfig);
+          final loaded = await _portfolioForAccount(
+            accountName,
+            accountDb,
+            ibkrConfig,
+            accountManager,
+            refreshIbkr: refreshIbkr,
+          );
           for (final position in loaded.positions) {
             await syncCandles(
               position.symbol,
@@ -195,7 +240,7 @@ class ChartsPageState extends State<ChartsPage>
       _lastIbkrRefreshVersion = ibkrRefreshVersion;
       if (ibkrChanged) {
         clearAllSyncCache();
-        unawaited(_syncCandlesInBackground());
+        unawaited(_syncCandlesInBackground(refreshIbkr: true));
       }
       _loadAllPortfolios();
       if (_selectedSymbol != null) _setStockStream(_selectedSymbol!);
@@ -234,7 +279,13 @@ class ChartsPageState extends State<ChartsPage>
                 : Database('market-monk-$accountName'));
       try {
         final ibkrConfig = accountManager.ibkrConfigFor(accountName);
-        final loaded = await _portfolioForAccount(accountDb, ibkrConfig);
+        final loaded = await _portfolioForAccount(
+          accountName,
+          accountDb,
+          ibkrConfig,
+          accountManager,
+          refreshIbkr: true,
+        );
         final task = (
           db: accountDb,
           isActive: isActive,
@@ -390,7 +441,12 @@ class ChartsPageState extends State<ChartsPage>
                 : Database('market-monk-$accountName'));
       try {
         final ibkrConfig = accountManager.ibkrConfigFor(accountName);
-        final loaded = await _portfolioForAccount(accountDb, ibkrConfig);
+        final loaded = await _portfolioForAccount(
+          accountName,
+          accountDb,
+          ibkrConfig,
+          accountManager,
+        );
         newSeries[accountName] = await _buildPortfolioSeries(
           loaded.positions,
           accountDb,

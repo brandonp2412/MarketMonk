@@ -19,10 +19,12 @@ import 'package:share_plus/share_plus.dart';
 class _LoadedPortfolio {
   final List<Position> positions;
   final IbkrAccountValue? netLiquidation;
+  final double? netLiquidationUsd;
 
   const _LoadedPortfolio({
     required this.positions,
     required this.netLiquidation,
+    required this.netLiquidationUsd,
   });
 }
 
@@ -116,6 +118,7 @@ class PortfolioPageState extends State<PortfolioPage>
       return _LoadedPortfolio(
         positions: await computeIbkrPositions(snapshot.positions, trades),
         netLiquidation: snapshot.netLiquidation,
+        netLiquidationUsd: snapshot.netLiquidationUsd?.value,
       );
     }
     final symbols = trades.map((t) => t.symbol).toSet().toList();
@@ -123,6 +126,7 @@ class PortfolioPageState extends State<PortfolioPage>
     return _LoadedPortfolio(
       positions: computePositions(trades, prices),
       netLiquidation: null,
+      netLiquidationUsd: null,
     );
   }
 
@@ -140,6 +144,7 @@ class PortfolioPageState extends State<PortfolioPage>
           context.read<AccountManager>().activeAccount,
           loaded.positions,
           loaded.netLiquidation,
+          netLiquidationUsd: loaded.netLiquidationUsd,
         );
       }
     } catch (error, stackTrace) {
@@ -174,6 +179,7 @@ class PortfolioPageState extends State<PortfolioPage>
           accountName,
           positions,
           loaded.netLiquidation,
+          netLiquidationUsd: loaded.netLiquidationUsd,
         );
       }
     } catch (error, stackTrace) {
