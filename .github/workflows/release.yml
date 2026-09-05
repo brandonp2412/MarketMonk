@@ -168,6 +168,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       build_number: ${{ steps.version.outputs.build_number }}
+      commit_sha: ${{ steps.release.outputs.commit_sha }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -224,13 +225,17 @@ jobs:
 
           NEW_VERSION="$MAJOR.$MINOR.$PATCH"
           NEW_BUILD_NUMBER=$((CURRENT_BUILD_NUMBER + 1))
+          CURRENT_MSIX_VERSION=$(grep 'msix_version:' pubspec.yaml | sed 's/.*msix_version: *//')
+          IFS='.' read -ra MSIX_VERSION_PARTS <<< "$CURRENT_MSIX_VERSION"
+          NEW_MSIX_VERSION="${MSIX_VERSION_PARTS[0]}.${MSIX_VERSION_PARTS[1]}.$((${MSIX_VERSION_PARTS[2]} + 1)).${MSIX_VERSION_PARTS[3]}"
 
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "build_number=$NEW_BUILD_NUMBER" >> "$GITHUB_OUTPUT"
           echo "New version: $NEW_VERSION+$NEW_BUILD_NUMBER"
 
           sed -i "s/^version: .*/version: $NEW_VERSION+$NEW_BUILD_NUMBER/" pubspec.yaml
-          echo "Updated pubspec.yaml with new version"
+          sed -i "s/msix_version: .*/msix_version: $NEW_MSIX_VERSION/" pubspec.yaml
+          echo "Updated pubspec.yaml with new app and MSIX versions"
 
       - name: Generate changelog
         id: changelog
@@ -292,6 +297,7 @@ jobs:
           fi
 
       - name: Commit and push version bump
+        id: release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
@@ -302,6 +308,7 @@ jobs:
           gh auth setup-git
           git pull --rebase origin main
           git push origin main
+          echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Create and push tag
         env:
@@ -511,6 +518,136 @@ jobs:
           retention-days: 7
           name: windows-app
           path: market_monk-windows-${{ needs.version-bump.outputs.version }}.zip
+
+  deploy-windows-store:
+    needs: [version-bump, build-windows]
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ needs.version-bump.outputs.commit_sha }}
+          persist-credentials: false
+
+      - name: Setup Flutter from submodule
+        run: |
+          git submodule update --init --recursive flutter
+          echo "$env:GITHUB_WORKSPACE\flutter\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          flutter\bin\flutter config --no-analytics
+
+      - name: Get Flutter dependencies
+        run: flutter\bin\flutter pub get --enforce-lockfile
+
+      - name: Build MSIX
+        run: flutter pub run msix:create
+
+      - name: Setup .NET 9.0
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Setup Microsoft Store CLI
+        uses: microsoft/setup-msstore-cli@cc9910a8d59f2eb55cbb83df0a3800cf3b5300e0 # v1.4
+
+      - name: Configure Microsoft Store CLI
+        env:
+          MSSTORE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          MSSTORE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          MSSTORE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
+        run: msstore reconfigure --tenantId $env:MSSTORE_TENANT_ID --clientId $env:MSSTORE_CLIENT_ID --clientSecret $env:MSSTORE_CLIENT_SECRET --sellerId $env:MSSTORE_SELLER_ID
+
+      - name: Prepare Microsoft Store for submission
+        shell: pwsh
+        env:
+          PRODUCT_ID: ${{ secrets.PRODUCT_ID }}
+          TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        run: |
+          # Microsoft requires an active package rollout to be finalized before creating a new submission:
+          # https://learn.microsoft.com/en-us/windows/apps/publish/gradual-package-rollout
+          $token = Invoke-RestMethod `
+            -Method Post `
+            -Uri "https://login.microsoftonline.com/$env:TENANT_ID/oauth2/token" `
+            -ContentType "application/x-www-form-urlencoded" `
+            -Body @{
+              grant_type = "client_credentials"
+              client_id = $env:CLIENT_ID
+              client_secret = $env:CLIENT_SECRET
+              resource = "https://manage.devcenter.microsoft.com"
+            }
+          $headers = @{ Authorization = "Bearer $($token.access_token)" }
+          $appUrl = "https://manage.devcenter.microsoft.com/v1.0/my/applications/$env:PRODUCT_ID"
+          $failedStatuses = @("CommitFailed", "PreProcessingFailed", "CertificationFailed", "ReleaseFailed", "PublishFailed")
+          $pendingDeadline = (Get-Date).AddMinutes(45)
+
+          while ($true) {
+            $app = Invoke-RestMethod -Headers $headers -Uri $appUrl
+            $pendingId = $app.pendingApplicationSubmission.id
+            if ([string]::IsNullOrWhiteSpace($pendingId)) {
+              break
+            }
+
+            $pending = Invoke-RestMethod -Headers $headers -Uri "$appUrl/submissions/$pendingId"
+            Write-Host "Existing Store submission $pendingId status=$($pending.status)"
+            if ($pending.status -in $failedStatuses) {
+              Write-Host "Existing submission is failed; msstore will replace it."
+              break
+            }
+            if ((Get-Date) -ge $pendingDeadline) {
+              throw "Timed out waiting for the existing Microsoft Store submission to finish."
+            }
+            Start-Sleep -Seconds 30
+          }
+
+          $app = Invoke-RestMethod -Headers $headers -Uri $appUrl
+          $submissionId = $app.lastPublishedApplicationSubmission.id
+          if ([string]::IsNullOrWhiteSpace($submissionId)) {
+            Write-Host "No published Store submission exists yet; no rollout to finalize."
+            exit 0
+          }
+
+          $rolloutUrl = "$appUrl/submissions/$submissionId/packagerollout"
+          $rollout = Invoke-RestMethod -Headers $headers -Uri $rolloutUrl
+          Write-Host "Published submission rollout status=$($rollout.packageRolloutStatus) percentage=$($rollout.packageRolloutPercentage)"
+
+          if ($rollout.packageRolloutStatus -eq "PackageRolloutInProgress") {
+            $rollout = Invoke-RestMethod `
+              -Method Post `
+              -Headers $headers `
+              -ContentType "application/json" `
+              -Uri "$appUrl/submissions/$submissionId/finalizepackagerollout"
+            if ($rollout.packageRolloutStatus -ne "PackageRolloutComplete") {
+              throw "Microsoft Store did not complete the active package rollout."
+            }
+            Write-Host "Finalized active Microsoft Store package rollout."
+          }
+
+      - name: Publish to Microsoft Store
+        shell: pwsh
+        env:
+          PRODUCT_ID: ${{ secrets.PRODUCT_ID }}
+        run: |
+          $packages = @(Get-ChildItem -Path "build/windows/x64/runner/Release" -Filter "*.msix" -File -Recurse)
+          if ($packages.Count -ne 1) {
+            throw "Expected exactly one generated MSIX package, found $($packages.Count)."
+          }
+
+          $package = $packages[0]
+          $packageDirectory = $package.Directory.FullName
+          Write-Host "Publishing $($package.FullName) to Microsoft Store product $env:PRODUCT_ID"
+          & msstore publish . --inputDirectory $packageDirectory --appId $env:PRODUCT_ID
+          if ($LASTEXITCODE -ne 0) {
+            throw "Microsoft Store publish failed with exit code $LASTEXITCODE."
+          }
+
+          Write-Host "Verifying Microsoft Store submission status"
+          & msstore submission status $env:PRODUCT_ID
+          if ($LASTEXITCODE -ne 0) {
+            throw "Microsoft Store submission status verification failed with exit code $LASTEXITCODE."
+          }
 
   create-release:
     needs: [version-bump, build-android, build-linux, build-windows]
