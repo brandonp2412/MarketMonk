@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/candle_ticker.dart';
 import 'package:market_monk/database.dart';
+import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/ticker_line.dart';
@@ -64,32 +65,33 @@ class _EditTickerPageState extends State<EditTickerPage> {
     Iterable<Expression<Object>> groupBy = [db.candles.date];
     if (years > 0 || months > 5) groupBy = [weekExpression];
 
-    stream = (db.selectOnly(db.candles)
-          ..addColumns([db.candles.date, db.candles.close])
-          ..where(
-            db.candles.symbol.equals(symbol.text.split(' ').first) &
-                db.candles.date.isBiggerOrEqualValue(after),
-          )
-          ..orderBy([
-            OrderingTerm(
-              expression: db.candles.date,
-              mode: OrderingMode.asc,
-            ),
-          ])
-          ..groupBy(groupBy))
-        .watch()
-        .map(
-          (results) => results
-              .map(
-                (result) => CandleTicker(
-                  candle: CandlesCompanion(
-                    date: Value(result.read(db.candles.date)!),
-                    close: Value(result.read(db.candles.close)!),
-                  ),
-                ),
+    stream =
+        (db.selectOnly(db.candles)
+              ..addColumns([db.candles.date, db.candles.close])
+              ..where(
+                db.candles.symbol.equals(symbol.text.split(' ').first) &
+                    db.candles.date.isBiggerOrEqualValue(after),
               )
-              .toList(),
-        );
+              ..orderBy([
+                OrderingTerm(
+                  expression: db.candles.date,
+                  mode: OrderingMode.asc,
+                ),
+              ])
+              ..groupBy(groupBy))
+            .watch()
+            .map(
+              (results) => results
+                  .map(
+                    (result) => CandleTicker(
+                      candle: CandlesCompanion(
+                        date: Value(result.read(db.candles.date)!),
+                        close: Value(result.read(db.candles.close)!),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            );
     setState(() {});
   }
 
@@ -100,13 +102,21 @@ class _EditTickerPageState extends State<EditTickerPage> {
     if (snapshot.hasError) return ErrorWidget(snapshot.error.toString());
     if (snapshot.data == null) return const SizedBox();
     if (snapshot.data!.isEmpty && !loading)
-      return const ListTile(
-        title: Text("No data found"),
-        subtitle: Text("Are you sure you typed it correctly?"),
+      return AppEmptyState(
+        icon: Icons.search_off_rounded,
+        title: 'No market data found',
+        message: 'Check the ticker symbol and try again.',
+        actionLabel: 'Try another ticker',
+        actionIcon: Icons.edit_rounded,
+        onAction: () {
+          symbol.clear();
+          setState(() {});
+        },
       );
 
-    final candles =
-        snapshot.data!.map((tickerCandle) => tickerCandle.candle).toList();
+    final candles = snapshot.data!
+        .map((tickerCandle) => tickerCandle.candle)
+        .toList();
     if (candles.isEmpty) return const SizedBox();
     final centDiv = symbolCentDivisor(symbol.text.split(' ').first);
     List<FlSpot> spots = [];
@@ -211,14 +221,15 @@ class _EditTickerPageState extends State<EditTickerPage> {
                     child: Autocomplete<String>(
                       optionsBuilder:
                           (TextEditingValue textEditingValue) async {
-                        final api = YahooFinanceApi();
-                        final results = await api.searchTickers(
-                          textEditingValue.text,
-                        );
-                        return results.map(
-                          (result) => '${result.symbol} (${result.longname})',
-                        );
-                      },
+                            final api = YahooFinanceApi();
+                            final results = await api.searchTickers(
+                              textEditingValue.text,
+                            );
+                            return results.map(
+                              (result) =>
+                                  '${result.symbol} (${result.longname})',
+                            );
+                          },
                       initialValue: symbol.value,
                       onSelected: (value) async {
                         setStream();
@@ -245,72 +256,72 @@ class _EditTickerPageState extends State<EditTickerPage> {
 
                         final results = await stream?.first;
                         if (results == null) return;
-                        price.text =
-                            results.last.candle.close.value.toStringAsFixed(2);
+                        price.text = results.last.candle.close.value
+                            .toStringAsFixed(2);
                       },
-                      fieldViewBuilder: (
-                        BuildContext context,
-                        TextEditingController fieldTextEditingController,
-                        FocusNode fieldFocusNode,
-                        VoidCallback onFieldSubmitted,
-                      ) {
-                        symbol = fieldTextEditingController;
-                        autocomplete = fieldFocusNode;
-                        Widget leading = const Padding(
-                          padding: EdgeInsets.only(left: 16.0, right: 8.0),
-                          child: Icon(Icons.search),
-                        );
-                        if (loading)
-                          leading = const Padding(
-                            padding: EdgeInsets.only(
-                              left: 16.0,
-                              right: 8.0,
-                            ),
-                            child: SizedBox(
-                              height: 24,
-                              width: 24,
-                            ),
-                          );
-
-                        return SearchBar(
-                          trailing: getTrailing,
-                          controller: fieldTextEditingController,
-                          leading: leading,
-                          focusNode: fieldFocusNode,
-                          hintText: 'Search...',
-                          onTap: () => selectAll(symbol),
-                          textInputAction: TextInputAction.next,
-                          onSubmitted: (text) async {
-                            selectAll(amount);
-                            symbol.text = text.toUpperCase();
-                            setStream();
-
-                            setState(() {
-                              loading = true;
-                            });
-                            final tickerSymbol = text.split(' ').first;
-                            try {
-                              await syncCandles(tickerSymbol);
-                              await fetchSymbolCurrencyAndRate(tickerSymbol);
-                            } catch (error, stackTrace) {
-                              if (context.mounted)
-                                toast(context, error.toString());
-                              talker.handle(
-                                error,
-                                stackTrace,
-                                'Failed to sync entered ticker',
+                      fieldViewBuilder:
+                          (
+                            BuildContext context,
+                            TextEditingController fieldTextEditingController,
+                            FocusNode fieldFocusNode,
+                            VoidCallback onFieldSubmitted,
+                          ) {
+                            symbol = fieldTextEditingController;
+                            autocomplete = fieldFocusNode;
+                            Widget leading = const Padding(
+                              padding: EdgeInsets.only(left: 16.0, right: 8.0),
+                              child: Icon(Icons.search),
+                            );
+                            if (loading)
+                              leading = const Padding(
+                                padding: EdgeInsets.only(
+                                  left: 16.0,
+                                  right: 8.0,
+                                ),
+                                child: SizedBox(height: 24, width: 24),
                               );
-                            } finally {
-                              setState(() {
-                                loading = false;
-                                _nativeCurrency = symbolCurrency(
-                                  tickerSymbol,
-                                );
-                              });
-                            }
+
+                            return SearchBar(
+                              trailing: getTrailing,
+                              controller: fieldTextEditingController,
+                              leading: leading,
+                              focusNode: fieldFocusNode,
+                              hintText: 'Search...',
+                              onTap: () => selectAll(symbol),
+                              textInputAction: TextInputAction.next,
+                              onSubmitted: (text) async {
+                                selectAll(amount);
+                                symbol.text = text.toUpperCase();
+                                setStream();
+
+                                setState(() {
+                                  loading = true;
+                                });
+                                final tickerSymbol = text.split(' ').first;
+                                try {
+                                  await syncCandles(tickerSymbol);
+                                  await fetchSymbolCurrencyAndRate(
+                                    tickerSymbol,
+                                  );
+                                } catch (error, stackTrace) {
+                                  if (context.mounted)
+                                    toast(context, error.toString());
+                                  talker.handle(
+                                    error,
+                                    stackTrace,
+                                    'Failed to sync entered ticker',
+                                  );
+                                } finally {
+                                  setState(() {
+                                    loading = false;
+                                    _nativeCurrency = symbolCurrency(
+                                      tickerSymbol,
+                                    );
+                                  });
+                                }
+                              },
+                            );
                           },
-                        );
-                      },
                     ),
                   ),
                   const SizedBox(height: 12),

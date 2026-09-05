@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
+import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_page.dart';
@@ -160,7 +161,8 @@ class HoldingsPageState extends State<HoldingsPage>
     for (final t in trades) {
       if (q.isNotEmpty &&
           !t.symbol.toLowerCase().contains(q) &&
-          !t.name.toLowerCase().contains(q)) continue;
+          !t.name.toLowerCase().contains(q))
+        continue;
       bySymbol.putIfAbsent(t.symbol, () => []).add(t);
     }
 
@@ -363,23 +365,23 @@ class HoldingsPageState extends State<HoldingsPage>
       floatingActionButton: ibkrManaged
           ? null
           : _selecting
-              ? FloatingActionButton.extended(
-                  onPressed: () => _deleteSelected(context),
-                  label: Text('Delete (${_selectedSymbols.length})'),
-                  icon: const Icon(Icons.delete),
-                )
-              : Padding(
-                  padding: const EdgeInsets.only(bottom: bottomNavHeight),
-                  child: FloatingActionButton.extended(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const EditTickerPage()),
-                    ),
-                    label: const Text('Add'),
-                    icon: const Icon(Icons.add),
-                    tooltip: 'Add trade',
-                  ),
+          ? FloatingActionButton.extended(
+              onPressed: () => _deleteSelected(context),
+              label: Text('Delete (${_selectedSymbols.length})'),
+              icon: const Icon(Icons.delete),
+            )
+          : Padding(
+              padding: const EdgeInsets.only(bottom: bottomNavHeight),
+              child: FloatingActionButton.extended(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const EditTickerPage()),
                 ),
+                label: const Text('Add'),
+                icon: const Icon(Icons.add),
+                tooltip: 'Add trade',
+              ),
+            ),
     );
   }
 
@@ -403,24 +405,41 @@ class HoldingsPageState extends State<HoldingsPage>
     }
 
     if (summaries.isEmpty) {
-      return ListTile(
-        title: Text(ibkrManaged ? 'No IBKR stocks found' : 'No stocks found'),
-        subtitle: ibkrManaged
-            ? const Text(
-                'Pull to refresh or check Interactive Brokers settings',
-              )
-            : _search.text.isEmpty
-                ? const Text('Import a CSV or tap + to add manually')
-                : Text('Tap to add ${_search.text}'),
-        onTap: ibkrManaged || _search.text.isEmpty
-            ? null
-            : () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        EditTickerPage(symbol: _search.text.toUpperCase()),
-                  ),
-                ),
+      final query = _search.text.trim();
+      return AppEmptyState(
+        icon: ibkrManaged
+            ? Icons.account_balance_rounded
+            : query.isEmpty
+            ? Icons.candlestick_chart_rounded
+            : Icons.search_off_rounded,
+        title: ibkrManaged
+            ? 'No IBKR stocks found'
+            : query.isEmpty
+            ? 'No stocks yet'
+            : 'No matching stocks',
+        message: ibkrManaged
+            ? 'Refresh your portfolio or check your Interactive Brokers connection.'
+            : query.isEmpty
+            ? 'Import a CSV or add your first trade manually.'
+            : 'Nothing matches “$query”. You can add that ticker now.',
+        actionLabel: ibkrManaged
+            ? 'IBKR settings'
+            : query.isEmpty
+            ? 'Import CSV'
+            : 'Add ${query.toUpperCase()}',
+        actionIcon: ibkrManaged
+            ? Icons.settings_rounded
+            : query.isEmpty
+            ? Icons.upload_file_rounded
+            : Icons.add_rounded,
+        onAction: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ibkrManaged || query.isEmpty
+                ? const SettingsPage()
+                : EditTickerPage(symbol: query.toUpperCase()),
+          ),
+        ),
       );
     }
 
@@ -553,8 +572,9 @@ class _SymbolTile extends StatelessWidget {
                   Text(
                     'Realized today: ${realizedToday >= 0 ? '+' : ''}${fmtCurrency(realizedToday)}',
                     style: TextStyle(
-                      color:
-                          realizedToday >= 0 ? Colors.green : Colors.redAccent,
+                      color: realizedToday >= 0
+                          ? Colors.green
+                          : Colors.redAccent,
                       fontSize: 12,
                     ),
                   )

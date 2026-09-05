@@ -5,6 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/database.dart';
+import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/logging.dart';
@@ -108,8 +109,9 @@ class PortfolioPageState extends State<PortfolioPage>
       if (!config.isConfigured) {
         throw StateError('IBKR portfolio source is not fully configured');
       }
-      final snapshot = await (widget._ibkrLoader?.call(config) ??
-          IbkrApiClient(config).fetchPortfolio());
+      final snapshot =
+          await (widget._ibkrLoader?.call(config) ??
+              IbkrApiClient(config).fetchPortfolio());
       cacheIbkrAccountExchangeRate(snapshot);
       return _LoadedPortfolio(
         positions: await computeIbkrPositions(snapshot.positions, trades),
@@ -135,10 +137,10 @@ class PortfolioPageState extends State<PortfolioPage>
           _hasCachedPortfolio = true;
         });
         await context.read<AccountManager>().cachePortfolio(
-              context.read<AccountManager>().activeAccount,
-              loaded.positions,
-              loaded.netLiquidation,
-            );
+          context.read<AccountManager>().activeAccount,
+          loaded.positions,
+          loaded.netLiquidation,
+        );
       }
     } catch (error, stackTrace) {
       talker.handle(error, stackTrace, 'Failed to preload portfolio positions');
@@ -169,10 +171,10 @@ class PortfolioPageState extends State<PortfolioPage>
           _hasCachedPortfolio = true;
         });
         await context.read<AccountManager>().cachePortfolio(
-              accountName,
-              positions,
-              loaded.netLiquidation,
-            );
+          accountName,
+          positions,
+          loaded.netLiquidation,
+        );
       }
     } catch (error, stackTrace) {
       talker.handle(error, stackTrace, 'Background portfolio sync failed');
@@ -260,9 +262,9 @@ class PortfolioPageState extends State<PortfolioPage>
         : 'Couldn’t load portfolio';
     final message = ibkrEnabled
         ? 'MarketMonk couldn’t load your portfolio from your IBKR server. '
-            'Check the server connection, then try again.'
+              'Check the server connection, then try again.'
         : 'MarketMonk couldn’t refresh your portfolio. Check your internet '
-            'connection, then try again.';
+              'connection, then try again.';
 
     return Center(
       child: Padding(
@@ -375,23 +377,25 @@ class PortfolioPageState extends State<PortfolioPage>
       });
     }
     if (positions.isEmpty) {
-      final ibkrEnabled =
-          context.watch<AccountManager>().ibkrConfigFor().enabled;
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(ibkrEnabled ? 'No IBKR stock positions' : 'No holdings yet'),
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SettingsPage()),
-              ),
-              icon: Icon(ibkrEnabled ? Icons.settings : Icons.upload_file),
-              label: Text(ibkrEnabled ? 'IBKR settings' : 'Import CSV'),
-            ),
-          ],
+      final ibkrEnabled = context
+          .watch<AccountManager>()
+          .ibkrConfigFor()
+          .enabled;
+      return AppEmptyState(
+        icon: ibkrEnabled
+            ? Icons.account_balance_rounded
+            : Icons.pie_chart_outline_rounded,
+        title: ibkrEnabled ? 'No IBKR stock positions' : 'No holdings yet',
+        message: ibkrEnabled
+            ? 'Check your Interactive Brokers connection or refresh your account.'
+            : 'Import your trades to build your portfolio.',
+        actionLabel: ibkrEnabled ? 'IBKR settings' : 'Import CSV',
+        actionIcon: ibkrEnabled
+            ? Icons.settings_rounded
+            : Icons.upload_file_rounded,
+        onAction: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SettingsPage()),
         ),
       );
     }
@@ -409,17 +413,18 @@ class PortfolioPageState extends State<PortfolioPage>
     final filtered = query.isEmpty
         ? sorted
         : sorted
-            .where(
-              (p) =>
-                  p.symbol.toLowerCase().contains(query) ||
-                  p.name.toLowerCase().contains(query),
-            )
-            .toList();
+              .where(
+                (p) =>
+                    p.symbol.toLowerCase().contains(query) ||
+                    p.name.toLowerCase().contains(query),
+              )
+              .toList();
 
     final colors = _buildColors(context, sorted.length);
     // Holdings can change while this page is kept alive (for example, after
     // switching accounts). Do not use a selection from the previous list.
-    final selectedIndex = touchedIndex != null &&
+    final selectedIndex =
+        touchedIndex != null &&
             touchedIndex! >= 0 &&
             touchedIndex! < sorted.length
         ? touchedIndex
@@ -558,8 +563,9 @@ class PortfolioPageState extends State<PortfolioPage>
                   changePct: p.change,
                   isHighlighted: sortedIndex == selectedIndex,
                   onTap: () => setState(
-                    () => touchedIndex =
-                        touchedIndex == sortedIndex ? null : sortedIndex,
+                    () => touchedIndex = touchedIndex == sortedIndex
+                        ? null
+                        : sortedIndex,
                   ),
                 );
               },

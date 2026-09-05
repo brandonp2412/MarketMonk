@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:market_monk/empty_state.dart';
 
 class WhatsNew extends StatefulWidget {
   const WhatsNew({super.key});
@@ -82,7 +83,11 @@ class _WhatsNewState extends State<WhatsNew> {
       return const Center(child: Text('Unable to load release notes.'));
     }
     if (_changelogs.isEmpty) {
-      return const Center(child: Text('No release notes available.'));
+      return const AppEmptyState(
+        icon: Icons.newspaper_rounded,
+        title: 'No release notes available',
+        message: 'There is nothing new to show yet.',
+      );
     }
 
     return ListView.separated(
@@ -99,8 +104,8 @@ class _WhatsNewState extends State<WhatsNew> {
               Text(
                 log.created,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                  color: Theme.of(context).colorScheme.primary,
+                ),
               ),
               const SizedBox(height: 4),
               Text(log.content),
