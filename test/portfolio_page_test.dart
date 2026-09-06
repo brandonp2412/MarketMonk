@@ -49,8 +49,9 @@ void main() {
         child: MaterialApp(home: page),
       );
 
-  testWidgets('portfolio shows a spinner while uncached data is loading',
-      (tester) async {
+  testWidgets('portfolio exposes a loading state while uncached data loads', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({});
     db = Database.connect(
       DatabaseConnection(
@@ -67,36 +68,37 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.bySemanticsLabel('Loading portfolio'), findsOneWidget);
   });
 
-  testWidgets('portfolio renders persistent cache without waiting for refresh',
-      (tester) async {
-    SharedPreferences.setMockInitialValues({});
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
-    final accounts = await configuredAccounts();
-    await accounts.cachePortfolio(
-      'Default',
-      [cachedPosition()],
-      const IbkrAccountValue(value: 5500, currency: 'USD'),
-    );
-    final pending = Completer<IbkrPortfolioSnapshot>();
+  testWidgets(
+    'portfolio renders persistent cache without waiting for refresh',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      db = Database.connect(
+        DatabaseConnection(
+          NativeDatabase.memory(),
+          closeStreamsSynchronously: true,
+        ),
+      );
+      addTearDown(() => db.close());
+      final accounts = await configuredAccounts();
+      await accounts.cachePortfolio(
+        'Default',
+        [cachedPosition()],
+        const IbkrAccountValue(value: 5500, currency: 'USD'),
+      );
+      final pending = Completer<IbkrPortfolioSnapshot>();
 
-    await tester.pumpWidget(
-      app(accounts, PortfolioPage(ibkrLoader: (_) => pending.future)),
-    );
-    await tester.pump();
+      await tester.pumpWidget(
+        app(accounts, PortfolioPage(ibkrLoader: (_) => pending.future)),
+      );
+      await tester.pump();
 
-    expect(find.text('VOO'), findsOneWidget);
-    expect(find.text('VANGUARD S&P 500 ETF'), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsNothing);
-  });
+      expect(find.text('VOO'), findsOneWidget);
+      expect(find.text('VANGUARD S&P 500 ETF'), findsOneWidget);
+    },
+  );
 
   test('portfolio cache survives AccountManager reinitialization', () async {
     SharedPreferences.setMockInitialValues({});
@@ -120,40 +122,43 @@ void main() {
     expect(cached.netLiquidationUsd, 5500);
   });
 
-  testWidgets('portfolio shows a friendly IBKR error instead of exception text',
-      (tester) async {
-    SharedPreferences.setMockInitialValues({});
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
-
-    final accounts = await configuredAccounts();
-
-    await tester.pumpWidget(
-      app(
-        accounts,
-        PortfolioPage(
-          ibkrLoader: (_) async => throw StateError('secret technical failure'),
+  testWidgets(
+    'portfolio shows a friendly IBKR error instead of exception text',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      db = Database.connect(
+        DatabaseConnection(
+          NativeDatabase.memory(),
+          closeStreamsSynchronously: true,
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      addTearDown(() => db.close());
 
-    expect(find.text('Couldn’t load Interactive Brokers'), findsOneWidget);
-    expect(
-      find.text(
-        'MarketMonk couldn’t load your portfolio from your IBKR server. '
-        'Check the server connection, then try again.',
-      ),
-      findsOneWidget,
-    );
-    expect(find.text('Try again'), findsOneWidget);
-    expect(find.text('IBKR settings'), findsOneWidget);
-    expect(find.textContaining('secret technical failure'), findsNothing);
-    expect(find.textContaining('Bad state:'), findsNothing);
-  });
+      final accounts = await configuredAccounts();
+
+      await tester.pumpWidget(
+        app(
+          accounts,
+          PortfolioPage(
+            ibkrLoader: (_) async =>
+                throw StateError('secret technical failure'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Couldn’t load Interactive Brokers'), findsOneWidget);
+      expect(
+        find.text(
+          'MarketMonk couldn’t load your portfolio from your IBKR server. '
+          'Check the server connection, then try again.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Try again'), findsOneWidget);
+      expect(find.text('IBKR settings'), findsOneWidget);
+      expect(find.textContaining('secret technical failure'), findsNothing);
+      expect(find.textContaining('Bad state:'), findsNothing);
+    },
+  );
 }

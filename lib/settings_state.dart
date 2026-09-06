@@ -136,7 +136,6 @@ class SettingsState extends ChangeNotifier {
     notifyListeners();
     talker.debug('Loaded application settings');
 
-    // Refresh exchange rate in background
     _fetchAndApplyRate(displayCurrency);
   }
 

@@ -47,7 +47,6 @@ class _SettingsPageState extends State<SettingsPage> {
   };
 
   Future<void> _importCsv(BuildContext context) async {
-    // Step 1: broker selection dialog
     BrokerCsvParser? selectedParser;
     BrokerCsvParser currentSelection = supportedBrokers.first;
 
@@ -114,14 +113,12 @@ class _SettingsPageState extends State<SettingsPage> {
 
     if (selectedParser == null || !context.mounted) return;
 
-    // Step 2: pick one or more CSV files
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['csv'],
     );
     if (result == null || !context.mounted) return;
 
-    // Step 3: parse all selected files as one import batch
     ParseResult parsed;
     final contents = <String>[];
     try {
@@ -157,7 +154,6 @@ class _SettingsPageState extends State<SettingsPage> {
       return;
     }
 
-    // Step 4: preview dialog
     bool confirmed = false;
     if (!context.mounted) return;
     await showDialog<void>(
@@ -210,7 +206,6 @@ class _SettingsPageState extends State<SettingsPage> {
 
     if (!confirmed || !context.mounted) return;
 
-    // Step 5: insert into DB
     final tradesCount = await importTrades(parsed.trades);
     if (!context.mounted) return;
     final settings = context.read<SettingsState>();
@@ -333,7 +328,6 @@ class _SettingsPageState extends State<SettingsPage> {
       appBar: AppBar(title: const Text("Settings")),
       body: ListView(
         children: [
-          // ── Appearance ──────────────────────────────────────────────────
           _sectionHeader('Appearance'),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
@@ -417,7 +411,6 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
 
-          // ── Charts ──────────────────────────────────────────────────────
           _sectionHeader('Charts'),
           Tooltip(
             message:
@@ -487,7 +480,6 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
 
-          // ── Accounts ─────────────────────────────────────────────────────
           _sectionHeader('Accounts'),
           ListTile(
             leading: const Icon(Icons.manage_accounts),
@@ -524,7 +516,6 @@ class _SettingsPageState extends State<SettingsPage> {
             },
           ),
 
-          // ── Data ─────────────────────────────────────────────────────────
           _sectionHeader('Data'),
           Tooltip(
             message: 'Download the database file for the entire app',

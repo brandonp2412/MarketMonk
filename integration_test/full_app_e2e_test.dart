@@ -55,10 +55,11 @@ Future<void> _waitForTradeCount(int count) async {
 }
 
 Future<void> _seedCandlesIfMissing(String symbol, double price) async {
-  final existing = await (app.db.select(app.db.candles)
-        ..where((row) => row.symbol.equals(symbol))
-        ..limit(1))
-      .getSingleOrNull();
+  final existing =
+      await (app.db.select(app.db.candles)
+            ..where((row) => row.symbol.equals(symbol))
+            ..limit(1))
+          .getSingleOrNull();
   if (existing != null) return;
 
   final today = DateTime.now();
@@ -169,10 +170,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(ChartsPage), findsOneWidget);
-    expect(find.byKey(const Key('ChartPage')), findsOneWidget);
-    expect(find.byKey(const Key('PortfolioPage')), findsOneWidget);
-    expect(find.byKey(const Key('HoldingsPage')), findsOneWidget);
+    expect(find.text('Search stocks...'), findsOneWidget);
+    expect(find.bySemanticsLabel('Charts'), findsOneWidget);
+    expect(find.bySemanticsLabel('Portfolio'), findsOneWidget);
+    expect(find.bySemanticsLabel('Holdings'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.settings).first);
     await _pumpUntil(tester, find.byType(SettingsPage));
@@ -245,7 +246,7 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.list_alt).hitTestable().last);
     await tester.pump(const Duration(milliseconds: 500));
-    expect(find.byType(HoldingsPage), findsOneWidget);
+    expect(find.bySemanticsLabel('Add trade'), findsOneWidget);
 
     await _addLocalTrade(
       tester,

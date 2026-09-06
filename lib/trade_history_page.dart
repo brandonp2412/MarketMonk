@@ -79,7 +79,6 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                // Summary card
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(

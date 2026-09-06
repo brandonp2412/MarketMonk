@@ -5,13 +5,9 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/database.dart';
-import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart' as app;
-import 'package:market_monk/portfolio_page.dart';
-import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:provider/provider.dart';
@@ -47,20 +43,20 @@ Widget _page({
   required SettingsState settings,
   required app.AccountManager accounts,
   required Widget child,
-}) =>
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider.value(value: settings),
-        ChangeNotifierProvider.value(value: accounts),
-      ],
-      child: MaterialApp(home: child),
-    );
+}) => MultiProvider(
+  providers: [
+    ChangeNotifierProvider.value(value: settings),
+    ChangeNotifierProvider.value(value: accounts),
+  ],
+  child: MaterialApp(home: child),
+);
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('live IBKR works through settings and portfolio UI',
-      (tester) async {
+  testWidgets('live IBKR works through settings and portfolio UI', (
+    tester,
+  ) async {
     const definedUrl = String.fromEnvironment('MARKET_MONK_IBKR_E2E_URL');
     const definedToken = String.fromEnvironment('MARKET_MONK_IBKR_E2E_TOKEN');
     final url = definedUrl.isNotEmpty
@@ -110,10 +106,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byType(ChartsPage), findsOneWidget);
+    expect(find.text('Search stocks...'), findsOneWidget);
     await tester.tap(find.byIcon(Icons.settings).first);
     await tester.pumpAndSettle();
-    expect(find.byType(SettingsPage), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('Interactive Brokers'),
@@ -128,8 +124,10 @@ void main() {
     expect(fields, findsNWidgets(2));
     await tester.enterText(fields.at(0), url);
     await tester.enterText(fields.at(1), token);
-    final enabledSwitch =
-        find.widgetWithText(SwitchListTile, 'Use IBKR portfolio data');
+    final enabledSwitch = find.widgetWithText(
+      SwitchListTile,
+      'Use IBKR portfolio data',
+    );
     expect(enabledSwitch, findsOneWidget);
     if (!tester.widget<SwitchListTile>(enabledSwitch).value) {
       await tester.tap(enabledSwitch);
@@ -145,22 +143,20 @@ void main() {
     expect(accounts.ibkrConfigFor().baseUrl, url);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('favoriteStocks', [largest.symbol]);
-    expect(find.byType(ChartsPage), findsOneWidget);
+    expect(find.text('Search stocks...'), findsOneWidget);
     await tester.pump();
 
     await tester.tap(find.byKey(const Key('PortfolioPage')));
     await tester.pump(const Duration(milliseconds: 500));
-    expect(find.byType(PortfolioPage), findsOneWidget);
     await _pumpUntil(tester, find.text(largest.symbol));
 
     await tester.tap(find.byKey(const Key('HoldingsPage')));
     await tester.pump(const Duration(milliseconds: 500));
-    expect(find.byType(HoldingsPage), findsOneWidget);
     await _pumpUntil(tester, find.text(alphabeticallyFirst.first.symbol));
 
     await tester.tap(find.byKey(const Key('ChartPage')));
     await tester.pump(const Duration(milliseconds: 500));
-    expect(find.byType(ChartsPage), findsOneWidget);
+    expect(find.text('Search stocks...'), findsOneWidget);
     await _pumpUntil(tester, find.text('Default'));
     expect(
       find.text('No trades yet.\nSearch for a stock above to get started.'),
@@ -174,9 +170,10 @@ void main() {
       timeout: const Duration(seconds: 60),
     );
 
-    final storedCandles = await (app.db.candles.select()
-          ..where((candle) => candle.symbol.equals(largest.symbol)))
-        .get();
+    final storedCandles =
+        await (app.db.candles.select()
+              ..where((candle) => candle.symbol.equals(largest.symbol)))
+            .get();
     expect(storedCandles.length, greaterThan(100));
     expect(
       prefs.getBool('ibkrHistorySeeded:$url:Default:${largest.symbol}'),

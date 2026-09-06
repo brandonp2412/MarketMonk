@@ -107,25 +107,27 @@ class PortfolioPageState extends State<PortfolioPage>
 
   Future<_LoadedPortfolio> _loadPortfolio(List<Trade> trades) async {
     final config = context.read<AccountManager>().ibkrConfigFor();
-    if (config.enabled) {
-      if (!config.isConfigured) {
-        throw StateError('IBKR portfolio source is not fully configured');
-      }
-      final snapshot = await (widget._ibkrLoader?.call(config) ??
-          IbkrApiClient(config).fetchPortfolio());
-      cacheIbkrAccountExchangeRate(snapshot);
+    if (!config.enabled) {
+      final symbols = trades.map((t) => t.symbol).toSet().toList();
+      final prices = await fetchLatestPrices(symbols);
       return _LoadedPortfolio(
-        positions: await computeIbkrPositions(snapshot.positions, trades),
-        netLiquidation: snapshot.netLiquidation,
-        netLiquidationUsd: snapshot.netLiquidationUsd?.value,
+        positions: computePositions(trades, prices),
+        netLiquidation: null,
+        netLiquidationUsd: null,
       );
     }
-    final symbols = trades.map((t) => t.symbol).toSet().toList();
-    final prices = await fetchLatestPrices(symbols);
+
+    if (!config.isConfigured) {
+      throw StateError('IBKR portfolio source is not fully configured');
+    }
+
+    final snapshot = await (widget._ibkrLoader?.call(config) ??
+        IbkrApiClient(config).fetchPortfolio());
+    cacheIbkrAccountExchangeRate(snapshot);
     return _LoadedPortfolio(
-      positions: computePositions(trades, prices),
-      netLiquidation: null,
-      netLiquidationUsd: null,
+      positions: await computeIbkrPositions(snapshot.positions, trades),
+      netLiquidation: snapshot.netLiquidation,
+      netLiquidationUsd: snapshot.netLiquidationUsd?.value,
     );
   }
 
@@ -366,7 +368,12 @@ class PortfolioPageState extends State<PortfolioPage>
     if (snap.hasError && positions.isEmpty) return _buildLoadError(context);
 
     if (positions.isEmpty && !snap.hasData && !_hasCachedPortfolio) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(
+        child: Semantics(
+          label: 'Loading portfolio',
+          child: const CircularProgressIndicator(),
+        ),
+      );
     }
 
     if (snap.hasData &&
@@ -407,7 +414,6 @@ class PortfolioPageState extends State<PortfolioPage>
     final totalGain = totalValue - totalCost;
     final totalGainPct = totalCost > 0 ? (totalGain / totalCost) * 100 : 0.0;
 
-    // Sort by value descending for consistent colours
     final sorted = [...positions]
       ..sort((a, b) => b.currentValue.compareTo(a.currentValue));
 

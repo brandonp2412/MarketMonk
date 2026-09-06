@@ -65,22 +65,18 @@ class ChartsPageState extends State<ChartsPage>
   final _overlayKey = GlobalKey();
   double _overlayHeight = 80.0;
 
-  // Shared time period
   int years = 1;
   int months = 0;
   int days = 0;
 
-  // Stock chart
   Stream<List<CandleTicker>>? _stockStream;
 
-  // Portfolio chart — keyed by account name
   Map<String, List<_DateValue>> _portfolioSeriesByAccount = {};
   String? _portfolioError;
   bool _portfolioLoading = false;
   final Set<String> _hiddenAccounts = {};
   final Map<String, Future<_LoadedChartPortfolio>> _ibkrLoads = {};
 
-  // Search
   List<StockResult> _searchResults = [];
   bool _searchLoading = false;
   Timer? _debounce;

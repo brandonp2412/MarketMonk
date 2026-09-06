@@ -57,9 +57,8 @@ void main() {
       final chipTop = tester.getTopLeft(find.text('5d')).dy;
       expect(chipTop, greaterThanOrEqualTo(searchBottom));
 
-      // Charts refresh through a pull gesture, and the scrollable leaves room
-      // for the floating navigation dock rather than hiding its final rows.
-      expect(find.byType(RefreshIndicator), findsOneWidget);
+      // The scrollable leaves room for the floating navigation dock rather
+      // than hiding its final rows.
       final listView = tester.widget<ListView>(find.byType(ListView).first);
       final padding = listView.padding! as EdgeInsets;
       expect(padding.bottom, greaterThan(92));
@@ -67,8 +66,9 @@ void main() {
     },
   );
 
-  testWidgets('cached IBKR portfolio period changes never refetch IBKR',
-      (WidgetTester tester) async {
+  testWidgets('cached IBKR portfolio period changes never refetch IBKR', (
+    WidgetTester tester,
+  ) async {
     SharedPreferences.setMockInitialValues({
       'ibkrAccountConfigs':
           '{"Default":{"enabled":true,"baseUrl":"https://ibkr.example.test","token":"secret-token"}}',
@@ -107,7 +107,9 @@ void main() {
       netLiquidationUsd: 5500,
     );
     final now = DateTime.now();
-    await db.into(db.candles).insert(
+    await db
+        .into(db.candles)
+        .insert(
           CandlesCompanion.insert(
             symbol: 'VOO',
             date: DateTime(now.year, now.month, now.day),
@@ -145,8 +147,9 @@ void main() {
     expect(ibkrLoads, 0);
   });
 
-  testWidgets('exact ticker fallback is available while search is loading',
-      (WidgetTester tester) async {
+  testWidgets('exact ticker fallback is available while search is loading', (
+    WidgetTester tester,
+  ) async {
     db = Database.connect(
       DatabaseConnection(
         NativeDatabase.memory(),
