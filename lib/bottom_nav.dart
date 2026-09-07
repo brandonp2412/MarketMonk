@@ -6,9 +6,6 @@ import 'package:flutter/material.dart';
 /// behind it needs this clearance plus a small visual gap.
 const double bottomNavHeight = 92;
 
-/// Variant 1: "Pill dock" — a compact centered pill where the selected tab
-/// expands horizontally to reveal its label while unselected tabs collapse
-/// to icon-only circles.
 class BottomNav extends StatelessWidget {
   final List<String> tabs;
   final int currentIndex;

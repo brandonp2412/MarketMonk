@@ -786,6 +786,7 @@ class ChartsPageState extends State<ChartsPage>
     final leading = hasText
         ? IconButton(
             icon: const Icon(Icons.arrow_back),
+            tooltip: 'Back',
             padding: const EdgeInsets.only(left: 16, right: 8),
             onPressed: _clearSearch,
           )
@@ -815,6 +816,7 @@ class ChartsPageState extends State<ChartsPage>
               context,
               MaterialPageRoute(builder: (_) => const SettingsPage()),
             ),
+            tooltip: 'Settings',
             icon: const Icon(Icons.settings),
           ),
         ],

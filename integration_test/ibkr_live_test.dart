@@ -13,6 +13,16 @@ import 'package:market_monk/ticker_line.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+Finder _navTab(String label) => find.descendant(
+      of: find.byWidgetPredicate(
+        (widget) =>
+            widget is Semantics &&
+            widget.properties.label == label &&
+            widget.properties.button == true,
+      ),
+      matching: find.byType(GestureDetector),
+    );
+
 Future<void> _pumpUntil(
   WidgetTester tester,
   Finder finder, {
@@ -43,13 +53,14 @@ Widget _page({
   required SettingsState settings,
   required app.AccountManager accounts,
   required Widget child,
-}) => MultiProvider(
-  providers: [
-    ChangeNotifierProvider.value(value: settings),
-    ChangeNotifierProvider.value(value: accounts),
-  ],
-  child: MaterialApp(home: child),
-);
+}) =>
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: settings),
+        ChangeNotifierProvider.value(value: accounts),
+      ],
+      child: MaterialApp(home: child),
+    );
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -107,7 +118,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Search stocks...'), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.settings).first);
+    await tester.tap(find.byTooltip('Settings'));
     await tester.pumpAndSettle();
     expect(find.text('Settings'), findsOneWidget);
 
@@ -146,16 +157,17 @@ void main() {
     expect(find.text('Search stocks...'), findsOneWidget);
     await tester.pump();
 
-    await tester.tap(find.byKey(const Key('PortfolioPage')));
-    await tester.pump(const Duration(milliseconds: 500));
-    await _pumpUntil(tester, find.text(largest.symbol));
+    await tester.tap(_navTab('Portfolio'));
+    await _pumpUntil(tester, find.text(largest.symbol).hitTestable());
 
-    await tester.tap(find.byKey(const Key('HoldingsPage')));
-    await tester.pump(const Duration(milliseconds: 500));
-    await _pumpUntil(tester, find.text(alphabeticallyFirst.first.symbol));
+    await tester.tap(_navTab('Holdings'));
+    await _pumpUntil(
+      tester,
+      find.text(alphabeticallyFirst.first.symbol).hitTestable(),
+    );
 
-    await tester.tap(find.byKey(const Key('ChartPage')));
-    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(_navTab('Charts'));
+    await tester.pumpAndSettle();
     expect(find.text('Search stocks...'), findsOneWidget);
     await _pumpUntil(tester, find.text('Default'));
     expect(
@@ -170,10 +182,9 @@ void main() {
       timeout: const Duration(seconds: 60),
     );
 
-    final storedCandles =
-        await (app.db.candles.select()
-              ..where((candle) => candle.symbol.equals(largest.symbol)))
-            .get();
+    final storedCandles = await (app.db.candles.select()
+          ..where((candle) => candle.symbol.equals(largest.symbol)))
+        .get();
     expect(storedCandles.length, greaterThan(100));
     expect(
       prefs.getBool('ibkrHistorySeeded:$url:Default:${largest.symbol}'),

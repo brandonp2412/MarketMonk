@@ -18,6 +18,16 @@ import 'package:market_monk/trade_history_page.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+Finder _navTab(String label) => find.descendant(
+      of: find.byWidgetPredicate(
+        (widget) =>
+            widget is Semantics &&
+            widget.properties.label == label &&
+            widget.properties.button == true,
+      ),
+      matching: find.byType(GestureDetector),
+    );
+
 Future<void> _pumpUntil(
   WidgetTester tester,
   Finder finder, {
@@ -55,11 +65,10 @@ Future<void> _waitForTradeCount(int count) async {
 }
 
 Future<void> _seedCandlesIfMissing(String symbol, double price) async {
-  final existing =
-      await (app.db.select(app.db.candles)
-            ..where((row) => row.symbol.equals(symbol))
-            ..limit(1))
-          .getSingleOrNull();
+  final existing = await (app.db.select(app.db.candles)
+        ..where((row) => row.symbol.equals(symbol))
+        ..limit(1))
+      .getSingleOrNull();
   if (existing != null) return;
 
   final today = DateTime.now();
@@ -112,7 +121,9 @@ Future<void> _addLocalTrade(
   required String price,
   required int expectedTradeCount,
 }) async {
-  await tester.tap(find.text('Add'));
+  final addTrade = find.byTooltip('Add trade').hitTestable();
+  await _pumpUntil(tester, addTrade);
+  await tester.tap(addTrade);
   await _pumpUntil(tester, find.byType(EditTickerPage));
   await tester.pumpAndSettle();
 
@@ -175,7 +186,7 @@ void main() {
     expect(find.bySemanticsLabel('Portfolio'), findsOneWidget);
     expect(find.bySemanticsLabel('Holdings'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.settings).first);
+    await tester.tap(find.byTooltip('Settings'));
     await _pumpUntil(tester, find.byType(SettingsPage));
 
     await tester.tap(find.text('Dark'));
@@ -244,9 +255,8 @@ void main() {
     await tester.tap(find.byTooltip('Back'));
     await _pumpUntilGone(tester, find.byType(SettingsPage));
 
-    await tester.tap(find.byIcon(Icons.list_alt).hitTestable().last);
-    await tester.pump(const Duration(milliseconds: 500));
-    expect(find.bySemanticsLabel('Add trade'), findsOneWidget);
+    await tester.tap(_navTab('Holdings'));
+    await _pumpUntil(tester, find.byTooltip('Add trade').hitTestable());
 
     await _addLocalTrade(
       tester,
@@ -284,9 +294,8 @@ void main() {
     await tester.tap(find.byTooltip('Back'));
     await _pumpUntil(tester, find.byType(HoldingsPage));
 
-    await tester.tap(find.byIcon(Icons.pie_chart).hitTestable().last);
-    await _pumpUntil(tester, find.byType(PortfolioPage));
-    await _pumpUntil(tester, find.text('MSFT'));
+    await tester.tap(_navTab('Portfolio'));
+    await _pumpUntil(tester, find.text('MSFT').hitTestable());
     final filter = find.descendant(
       of: find.byType(PortfolioPage),
       matching: find.byType(TextField),
@@ -319,8 +328,9 @@ void main() {
     }
     expect(portfolioMsft, findsWidgets);
 
-    await tester.tap(find.byIcon(Icons.insights).hitTestable().last);
-    await _pumpUntil(tester, find.byType(ChartsPage));
+    await tester.tap(_navTab('Charts'));
+    await tester.pumpAndSettle();
+    expect(find.text('Search stocks...'), findsOneWidget);
     final chartSearch = find
         .descendant(
           of: find.byType(ChartsPage),
@@ -348,7 +358,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
     }
 
-    await tester.tap(find.byIcon(Icons.arrow_back).first);
+    await tester.tap(find.byTooltip('Back').first);
     await tester.pump();
     expect(find.text('MSFT'), findsWidgets);
     await _pumpUntilGone(
@@ -357,10 +367,10 @@ void main() {
       timeout: const Duration(seconds: 8),
     );
 
-    await tester.tap(find.byIcon(Icons.list_alt).hitTestable().last);
-    await _pumpUntil(tester, find.byType(HoldingsPage));
-    await _pumpUntil(tester, find.text('MSFT'));
-    await tester.tap(find.text('MSFT').first);
+    await tester.tap(_navTab('Holdings'));
+    final visibleMsft = find.text('MSFT').hitTestable();
+    await _pumpUntil(tester, visibleMsft);
+    await tester.tap(visibleMsft.first);
     await _pumpUntil(tester, find.byType(TradeHistoryPage));
     await tester.longPress(find.text('BUY'));
     await tester.pumpAndSettle();
@@ -368,7 +378,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(TextButton, 'Delete'));
     await _waitForTradeCount(0);
-    await _pumpUntil(tester, find.text('No trade history imported yet'));
+    await _pumpUntil(tester, find.text('No trade history yet'));
 
     await tester.tap(find.byTooltip('Back'));
     await _pumpUntil(tester, find.byType(HoldingsPage));
@@ -397,7 +407,7 @@ void main() {
     await tester.enterText(holdingsSearch, '');
     await tester.pump();
 
-    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.tap(find.byTooltip('Show menu'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Settings'));
     await _pumpUntil(tester, find.byType(SettingsPage));

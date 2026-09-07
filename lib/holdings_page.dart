@@ -101,24 +101,24 @@ class HoldingsPageState extends State<HoldingsPage>
     final accounts = context.read<AccountManager>();
     final config = accounts.ibkrConfigFor();
     final accountName = accounts.activeAccount;
-    if (config.enabled) {
-      if (!config.isConfigured) {
-        throw StateError('IBKR portfolio source is not fully configured');
-      }
-      final snapshot = await IbkrApiClient(config).fetchPortfolio();
-      cacheIbkrAccountExchangeRate(snapshot);
-      final positions = await computeIbkrPositions(snapshot.positions, trades);
-      await accounts.cachePortfolio(
-        accountName,
-        positions,
-        snapshot.netLiquidation,
-      );
+    if (!config.enabled) {
+      final symbols = trades.map((trade) => trade.symbol).toSet().toList();
+      final prices = await fetchLatestPrices(symbols);
+      final positions = computePositions(trades, prices);
+      await accounts.cachePortfolio(accountName, positions, null);
       return positions;
     }
-    final symbols = trades.map((trade) => trade.symbol).toSet().toList();
-    final prices = await fetchLatestPrices(symbols);
-    final positions = computePositions(trades, prices);
-    await accounts.cachePortfolio(accountName, positions, null);
+    if (!config.isConfigured) {
+      throw StateError('IBKR portfolio source is not fully configured');
+    }
+    final snapshot = await IbkrApiClient(config).fetchPortfolio();
+    cacheIbkrAccountExchangeRate(snapshot);
+    final positions = await computeIbkrPositions(snapshot.positions, trades);
+    await accounts.cachePortfolio(
+      accountName,
+      positions,
+      snapshot.netLiquidation,
+    );
     return positions;
   }
 
