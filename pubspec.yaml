@@ -54,7 +54,7 @@ flutter:
 msix_config:
   msstore_appId: 9PP4HKV1CMWC
   display_name: MarketMonk
-  publisher_display_name: CodeSail Academy
+  publisher_display_name: Brandon Dick
   identity_name: FrisbeeSoftware.MarketMonk
   msix_version: 1.0.14.0
   logo_path: assets/meditation.png
