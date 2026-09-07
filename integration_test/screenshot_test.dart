@@ -196,12 +196,12 @@ Future<void> generateScreenshot({
   await appWrapper();
   await tester.pumpAndSettle();
 
-  final tab = switch (tabBarState) {
-    TabBarState.chart => 'ChartPage',
-    TabBarState.portfolio => 'PortfolioPage',
-    TabBarState.holdings => 'HoldingsPage',
+  final tabLabel = switch (tabBarState) {
+    TabBarState.chart => 'Charts',
+    TabBarState.portfolio => 'Portfolio',
+    TabBarState.holdings => 'Holdings',
   };
-  await tester.tap(find.byKey(Key(tab)));
+  await tester.tap(find.bySemanticsLabel(tabLabel));
   await tester.pumpAndSettle();
 
   if (navigateToPage != null) {

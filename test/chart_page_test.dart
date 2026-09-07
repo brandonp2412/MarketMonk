@@ -176,7 +176,7 @@ void main() {
 
     expect(find.text('Use "GLD" anyway'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.tap(find.byTooltip('Back'));
     await tester.pump();
     expect(find.text('Use "GLD" anyway'), findsNothing);
 
