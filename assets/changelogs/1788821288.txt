@@ -1,0 +1,2 @@
+• Prefer user-facing navigation in favorites test
+• Simplify portfolio loading and E2E interactions
