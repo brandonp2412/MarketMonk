@@ -107,9 +107,7 @@ void main() {
       netLiquidationUsd: 5500,
     );
     final now = DateTime.now();
-    await db
-        .into(db.candles)
-        .insert(
+    await db.into(db.candles).insert(
           CandlesCompanion.insert(
             symbol: 'VOO',
             date: DateTime(now.year, now.month, now.day),

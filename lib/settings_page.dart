@@ -165,9 +165,7 @@ class _SettingsPageState extends State<SettingsPage> {
           child: ListView(
             shrinkWrap: true,
             children: [
-              ...parsed.trades
-                  .take(10)
-                  .map(
+              ...parsed.trades.take(10).map(
                     (t) => ListTile(
                       dense: true,
                       title: Text('${t.symbol} — ${t.tradeType.toUpperCase()}'),
@@ -298,10 +296,11 @@ class _SettingsPageState extends State<SettingsPage> {
     final config = accounts.ibkrConfigFor();
     final trades = await db.select(db.trades).get();
     final symbols = config.enabled
-        ? (await IbkrApiClient(config).fetchPortfolio()).positions
-              .where((position) => position.securityType == 'STK')
-              .map((position) => position.symbol)
-              .toSet()
+        ? (await IbkrApiClient(config).fetchPortfolio())
+            .positions
+            .where((position) => position.securityType == 'STK')
+            .map((position) => position.symbol)
+            .toSet()
         : trades.map((trade) => trade.symbol).toSet();
     for (final symbol in symbols) {
       clearSyncCache(symbol);
@@ -311,14 +310,14 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _sectionHeader(String text) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
-    child: Text(
-      text,
-      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-        color: Theme.of(context).colorScheme.primary,
-      ),
-    ),
-  );
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+        child: Text(
+          text,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -411,7 +410,6 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
           ),
-
           _sectionHeader('Charts'),
           Tooltip(
             message:
@@ -480,7 +478,6 @@ class _SettingsPageState extends State<SettingsPage> {
               ],
             ),
           ),
-
           _sectionHeader('Accounts'),
           ListTile(
             leading: const Icon(Icons.manage_accounts),
@@ -516,7 +513,6 @@ class _SettingsPageState extends State<SettingsPage> {
               );
             },
           ),
-
           _sectionHeader('Data'),
           Tooltip(
             message: 'Download the database file for the entire app',
@@ -525,9 +521,8 @@ class _SettingsPageState extends State<SettingsPage> {
               title: const Text('Export database'),
               onTap: () async {
                 Navigator.pop(context);
-                final activeAccount = context
-                    .read<AccountManager>()
-                    .activeAccount;
+                final activeAccount =
+                    context.read<AccountManager>().activeAccount;
                 final dbName = activeAccount == 'Default'
                     ? 'market-monk'
                     : 'market-monk-$activeAccount';
@@ -552,9 +547,8 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           ListTile(
-            onTap: settings.syncInProgress
-                ? null
-                : () => _syncAllTickers(context),
+            onTap:
+                settings.syncInProgress ? null : () => _syncAllTickers(context),
             leading: settings.syncInProgress
                 ? const SizedBox(
                     width: 24,
@@ -581,10 +575,10 @@ class _SettingsPageState extends State<SettingsPage> {
                     settings.syncTotal == 0
                         ? 'No sync running'
                         : settings.syncFailed == 0
-                        ? 'Last sync completed '
-                              '${settings.syncCompleted}/${settings.syncTotal}'
-                        : 'Last sync completed with '
-                              '${settings.syncFailed} failed',
+                            ? 'Last sync completed '
+                                '${settings.syncCompleted}/${settings.syncTotal}'
+                            : 'Last sync completed with '
+                                '${settings.syncFailed} failed',
                   ),
           ),
           Tooltip(
@@ -627,9 +621,8 @@ class _SettingsPageState extends State<SettingsPage> {
               title: const Text('Import database'),
               onTap: () async {
                 Navigator.pop(context);
-                final activeAccount = context
-                    .read<AccountManager>()
-                    .activeAccount;
+                final activeAccount =
+                    context.read<AccountManager>().activeAccount;
                 FilePickerResult? result = await FilePicker.pickFiles();
                 if (result == null) return;
 
@@ -658,8 +651,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   0x33,
                   0x00,
                 ];
-                final isValid =
-                    header.length == 16 &&
+                final isValid = header.length == 16 &&
                     List.generate(
                       16,
                       (i) => header[i] == sqliteMagic[i],
@@ -817,10 +809,10 @@ class _IbkrSettingsDialogState extends State<_IbkrSettingsDialog> {
   }
 
   IbkrAccountConfig _config({required bool enabled}) => IbkrAccountConfig(
-    enabled: enabled,
-    baseUrl: _urlController.text.trim(),
-    token: _tokenController.text.trim(),
-  );
+        enabled: enabled,
+        baseUrl: _urlController.text.trim(),
+        token: _tokenController.text.trim(),
+      );
 
   Future<bool> _checkConnection() async {
     setState(() {
@@ -856,80 +848,80 @@ class _IbkrSettingsDialogState extends State<_IbkrSettingsDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: Text('Interactive Brokers — ${widget.account}'),
-    content: SizedBox(
-      width: 440,
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Use IBKR portfolio data'),
-              subtitle: const Text(
-                'Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.',
-              ),
-              value: _enabled,
-              onChanged: _checking
-                  ? null
-                  : (value) => setState(() => _enabled = value),
-            ),
-            TextField(
-              controller: _urlController,
-              enabled: !_checking,
-              keyboardType: TextInputType.url,
-              decoration: const InputDecoration(
-                labelText: 'API URL',
-                hintText: 'https://ibkr.example.com',
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _tokenController,
-              enabled: !_checking,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Bearer token'),
-            ),
-            if (_status != null) ...[
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Icon(
-                    _statusOk ? Icons.check_circle : Icons.error_outline,
-                    color: _statusOk
-                        ? Colors.green
-                        : Theme.of(context).colorScheme.error,
+        title: Text('Interactive Brokers — ${widget.account}'),
+        content: SizedBox(
+          width: 440,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Use IBKR portfolio data'),
+                  subtitle: const Text(
+                    'Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.',
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(_status!)),
+                  value: _enabled,
+                  onChanged: _checking
+                      ? null
+                      : (value) => setState(() => _enabled = value),
+                ),
+                TextField(
+                  controller: _urlController,
+                  enabled: !_checking,
+                  keyboardType: TextInputType.url,
+                  decoration: const InputDecoration(
+                    labelText: 'API URL',
+                    hintText: 'https://ibkr.example.com',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _tokenController,
+                  enabled: !_checking,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Bearer token'),
+                ),
+                if (_status != null) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(
+                        _statusOk ? Icons.check_circle : Icons.error_outline,
+                        color: _statusOk
+                            ? Colors.green
+                            : Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(_status!)),
+                    ],
+                  ),
                 ],
-              ),
-            ],
-          ],
+              ],
+            ),
+          ),
         ),
-      ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: _checking ? null : () => Navigator.pop(context),
-        child: const Text('Cancel'),
-      ),
-      TextButton(
-        onPressed: _checking ? null : _checkConnection,
-        child: const Text('Test'),
-      ),
-      FilledButton(
-        onPressed: _checking ? null : _save,
-        child: _checking
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Text('Save'),
-      ),
-    ],
-  );
+        actions: [
+          TextButton(
+            onPressed: _checking ? null : () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: _checking ? null : _checkConnection,
+            child: const Text('Test'),
+          ),
+          FilledButton(
+            onPressed: _checking ? null : _save,
+            child: _checking
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Save'),
+          ),
+        ],
+      );
 }
 
 class _ColorPicker extends StatelessWidget {
