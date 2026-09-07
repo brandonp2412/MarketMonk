@@ -23,8 +23,6 @@ Future<void> _pumpApp(WidgetTester tester, AccountManager accounts) async {
 }
 
 void main() {
-  // Regression/feature test for issue #37: favorited stocks are surfaced as
-  // an inline row on the Chart tab's portfolio view.
   testWidgets(
     'favorites row renders a seeded favorite, navigates to its chart, '
     'and persists un-favoriting',
@@ -69,12 +67,10 @@ void main() {
 
       await _pumpApp(tester, accounts);
 
-      // Favorites row shows the seeded symbol with its latest price/change.
       expect(find.text('AAPL'), findsOneWidget);
       expect(find.textContaining('190'), findsWidgets);
       expect(find.textContaining('5.56%'), findsOneWidget);
 
-      // Tapping the card navigates into that stock's chart view.
       await tester.tap(find.text('AAPL'));
       await tester.pumpAndSettle();
 
@@ -85,7 +81,7 @@ void main() {
 
       expect(find.text('Removed as favorite'), findsOneWidget);
 
-      await tester.tap(find.byIcon(Icons.arrow_back));
+      await tester.tap(find.byTooltip('Back'));
       await tester.pumpAndSettle();
       expect(find.text('Favorite'), findsNothing);
 
