@@ -314,8 +314,9 @@ class _SettingsPageState extends State<SettingsPage> {
     padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
     child: Text(
       text,
-      style: Theme.of(context).textTheme.titleSmall
-          ?.copyWith(color: Theme.of(context).colorScheme.primary),
+      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+        color: Theme.of(context).colorScheme.primary,
+      ),
     ),
   );
 
@@ -413,7 +414,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
           _sectionHeader('Charts'),
           Tooltip(
-            message: 'Show a badge on the chart when the market is closed (weekends)',
+            message:
+                'Show a badge on the chart when the market is closed (weekends)',
             child: ListTile(
               title: const Text('Market closed indicator'),
               leading: settings.showMarketClosed
@@ -450,8 +452,9 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               Slider(
                 value: settings.curveSmoothness,
-                inactiveColor: Theme.of(context).colorScheme.primary
-                    .withValues(alpha: 0.24),
+                inactiveColor: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.24),
                 onChanged: (value) {
                   settings.setCurveSmoothness(value);
                 },

@@ -70,7 +70,8 @@ void main() {
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues({
-      'ibkrAccountConfigs': '{"Default":{"enabled":true,"baseUrl":"https://ibkr.example.test","token":"secret-token"}}',
+      'ibkrAccountConfigs':
+          '{"Default":{"enabled":true,"baseUrl":"https://ibkr.example.test","token":"secret-token"}}',
       'ibkrHistorySeeded:https://ibkr.example.test:Default:VOO': true,
     });
     db = Database.connect(
