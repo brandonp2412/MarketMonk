@@ -1,0 +1,7 @@
+• Fix Dart formatting in quality checks
+• Fix formatter drift
+• Match CI Dart formatting
+• fix(ci): restore Microsoft Store submissions
+• Fix do not exit on back pressed during search
+• Fix handle system back during chart search
+• Fix host privacy policy on GitHub Pages
