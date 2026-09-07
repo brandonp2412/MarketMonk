@@ -1,0 +1,2 @@
+• Update publisher name
+• fix(ci): bound screenshot emulator runtime
