@@ -312,7 +312,6 @@ class ChartsPageState extends State<ChartsPage>
           }
         }
       } catch (_) {
-        // Continue with remaining symbols on error
       } finally {
         if (!task.isActive) await task.db.close();
       }
@@ -378,9 +377,7 @@ class ChartsPageState extends State<ChartsPage>
           ibkrConfig: ibkrConfig,
           syncNamespace: accountManager.activeAccount,
         );
-      } catch (_) {
-        // Continue with remaining symbols on error
-      }
+      } catch (_) {}
     }
   }
 
@@ -1192,7 +1189,6 @@ class ChartsPageState extends State<ChartsPage>
       );
     }
 
-    // Union of all visible dates → shared X index axis
     final allDates = <DateTime>{};
     for (final series in visibleSeries.values) {
       for (final dv in series) allDates.add(dv.date);
