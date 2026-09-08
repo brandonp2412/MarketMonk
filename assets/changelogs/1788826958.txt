@@ -1,0 +1,2 @@
+• Prefer visible account action selector
+• Remove redundant exchange-rate comment
