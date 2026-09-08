@@ -144,7 +144,8 @@ Future<void> _addLocalTrade(
   await tester.enterText(fields.at(1), quantity);
   await tester.enterText(fields.at(2), price);
 
-  final saveButton = find.byType(FloatingActionButton).hitTestable();
+  final saveButton =
+      find.widgetWithText(FloatingActionButton, 'Save').hitTestable();
   expect(saveButton, findsOneWidget);
   await tester.tap(saveButton);
   await _waitForTradeCount(expectedTradeCount);
