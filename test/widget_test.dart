@@ -64,7 +64,7 @@ void main() {
       ).push(MaterialPageRoute(builder: (_) => const AccountsPage()));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byType(FloatingActionButton));
+      await tester.tap(find.byTooltip('Add account'));
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField), 'Test Account');

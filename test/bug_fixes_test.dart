@@ -66,7 +66,6 @@ void main() {
       final first = await _insertTrade(db, symbol: 'MSFT', quantity: 2);
       await _insertTrade(db, symbol: 'MSFT', quantity: 5);
 
-      // Edit ONLY the first trade
       await (db.trades.update()..where((t) => t.id.equals(first.id))).write(
         const TradesCompanion(quantity: Value(99)),
       );
