@@ -9,7 +9,6 @@ import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart' as app;
 import 'package:market_monk/settings_state.dart';
-import 'package:market_monk/ticker_line.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -178,7 +177,7 @@ void main() {
     await tester.tap(find.text(largest.symbol).first);
     await _pumpUntil(
       tester,
-      find.byType(TickerLine),
+      find.textContaining('period change'),
       timeout: const Duration(seconds: 60),
     );
 
