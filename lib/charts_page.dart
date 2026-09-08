@@ -135,19 +135,13 @@ class ChartsPageState extends State<ChartsPage>
     final trades = await accountDb.trades.select().get();
     if (ibkrConfig.enabled) {
       final cached = accountManager.portfolioCacheFor(accountName);
-      if (!refreshIbkr && cached != null) {
+      if (cached != null && (!refreshIbkr || !ibkrConfig.isConfigured)) {
         return _LoadedChartPortfolio(
           positions: cached.positions,
           currentValueUsd: cached.netLiquidationUsd,
         );
       }
       if (!ibkrConfig.isConfigured) {
-        if (cached != null) {
-          return _LoadedChartPortfolio(
-            positions: cached.positions,
-            currentValueUsd: cached.netLiquidationUsd,
-          );
-        }
         throw StateError('IBKR portfolio source is not fully configured');
       }
 
