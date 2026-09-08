@@ -174,7 +174,6 @@ class SettingsState extends ChangeNotifier {
         talker.info('Refreshed display exchange rate');
       }
     } catch (error, stackTrace) {
-      // Keep using cached rate on network failure
       talker.handle(
         error,
         stackTrace,
