@@ -1,0 +1,4 @@
+• Flatten cached IBKR portfolio flow
+• Flatten favorite toggle flow
+• Prefer visible chart readiness selector
+• Prefer visible trade save selector
