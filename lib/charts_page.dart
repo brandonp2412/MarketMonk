@@ -391,17 +391,17 @@ class ChartsPageState extends State<ChartsPage>
     if (!ctx.mounted) return;
     if (isFavorite) {
       toast(ctx, 'Removed as favorite');
-    } else {
-      final accountManager = ctx.read<AccountManager>();
-      unawaited(
-        syncCandles(
-          symbol,
-          ibkrConfig: accountManager.ibkrConfigFor(),
-          syncNamespace: accountManager.activeAccount,
-        ),
-      );
-      toast(ctx, 'Set as favorite');
+      return;
     }
+    final accountManager = ctx.read<AccountManager>();
+    unawaited(
+      syncCandles(
+        symbol,
+        ibkrConfig: accountManager.ibkrConfigFor(),
+        syncNamespace: accountManager.activeAccount,
+      ),
+    );
+    toast(ctx, 'Set as favorite');
   }
 
   Future<void> _loadAllPortfolios() async {
