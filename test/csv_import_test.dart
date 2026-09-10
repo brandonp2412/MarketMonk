@@ -101,6 +101,23 @@ void main() {
       expect(buy.tradeDate.day, 1);
     });
 
+    test('skips a trade whose Trade Time date is invalid', () {
+      final invalidDateCsv = _tigerCsvMinimal.replaceFirst(
+        '2025-03-01\n09:30:00, US/Eastern',
+        'not-a-date\n09:30:00, US/Eastern',
+      );
+
+      final invalidResult = TigerBrokersParser().parse(invalidDateCsv);
+
+      expect(invalidResult.trades, hasLength(2));
+      expect(
+        invalidResult.trades.where(
+          (trade) => trade.symbol == 'AAPL' && trade.tradeType == 'open',
+        ),
+        isEmpty,
+      );
+    });
+
     test('symbol extracted correctly from "Name (TICKER)" format', () {
       final symbols = result.trades.map((t) => t.symbol).toSet();
       expect(symbols, containsAll(['AAPL', 'META']));
@@ -200,6 +217,23 @@ void main() {
       expect(buy.tradeDate.year, 2026);
       expect(buy.tradeDate.month, 4);
       expect(buy.tradeDate.day, 13);
+    });
+
+    test('skips an execution whose TradeDate is invalid', () {
+      final invalidDateCsv = _ibkrCsvMinimal.replaceFirst(
+        '"20260414","20260413","NASDAQ","BUY"',
+        '"20260414","not-a-date","NASDAQ","BUY"',
+      );
+
+      final invalidResult = InteractiveBrokersParser().parse(invalidDateCsv);
+
+      expect(invalidResult.trades, hasLength(2));
+      expect(
+        invalidResult.trades.where(
+          (trade) => trade.tradeType == 'open' && trade.quantity == 10,
+        ),
+        isEmpty,
+      );
     });
 
     test('symbol and name extracted from dedicated columns', () {
@@ -333,5 +367,22 @@ void main() {
         expect(tCount, equals(2));
       },
     );
+
+    test('failed imports roll back the entire batch', () async {
+      await testDb.customStatement('''
+        CREATE TRIGGER reject_meta_trade
+        BEFORE INSERT ON trades
+        WHEN NEW.symbol = 'META'
+        BEGIN
+          SELECT RAISE(ABORT, 'reject META for test');
+        END
+      ''');
+      final result = TigerBrokersParser().parse(_tigerCsvMinimal);
+
+      await expectLater(importTrades(result.trades), throwsA(anything));
+
+      final stored = await testDb.trades.select().get();
+      expect(stored, isEmpty);
+    });
   });
 }

@@ -84,7 +84,8 @@ class TigerBrokersParser extends BrokerCsvParser {
       final tradeTimeRaw = row[row.length - 3].trim();
       final tradeDateStr =
           tradeTimeRaw.length >= 10 ? tradeTimeRaw.substring(0, 10) : '';
-      final tradeDate = DateTime.tryParse(tradeDateStr) ?? DateTime.now();
+      final tradeDate = _parseBrokerDate(tradeDateStr);
+      if (tradeDate == null) continue;
 
       trades.add(
         ImportedTrade(
@@ -186,13 +187,8 @@ class InteractiveBrokersParser extends BrokerCsvParser {
               .abs();
 
       // TradeDate column is "YYYYMMDD" (e.g. "20260413")
-      final raw = row[tradeDateIdx].trim();
-      final tradeDate = raw.length == 8
-          ? DateTime.tryParse(
-                '${raw.substring(0, 4)}-${raw.substring(4, 6)}-${raw.substring(6, 8)}',
-              ) ??
-              DateTime.now()
-          : DateTime.tryParse(raw) ?? DateTime.now();
+      final tradeDate = _parseBrokerDate(row[tradeDateIdx]);
+      if (tradeDate == null) continue;
 
       trades.add(
         ImportedTrade(
@@ -210,6 +206,28 @@ class InteractiveBrokersParser extends BrokerCsvParser {
 
     return ParseResult(trades: trades);
   }
+}
+
+DateTime? _parseBrokerDate(String raw) {
+  final value = raw.trim();
+  late final String isoDate;
+  if (RegExp(r'^\d{8}$').hasMatch(value)) {
+    isoDate =
+        '${value.substring(0, 4)}-${value.substring(4, 6)}-${value.substring(6, 8)}';
+  } else if (RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)) {
+    isoDate = value;
+  } else {
+    return null;
+  }
+
+  final parsed = DateTime.tryParse(isoDate);
+  if (parsed == null ||
+      parsed.year != int.parse(isoDate.substring(0, 4)) ||
+      parsed.month != int.parse(isoDate.substring(5, 7)) ||
+      parsed.day != int.parse(isoDate.substring(8, 10))) {
+    return null;
+  }
+  return parsed;
 }
 
 final List<BrokerCsvParser> supportedBrokers = [
@@ -230,22 +248,25 @@ BrokerCsvParser? detectBrokerCsv(
 }
 
 Future<int> importTrades(List<ImportedTrade> trades) async {
-  int count = 0;
-  for (final trade in trades) {
-    await db.trades.insertOne(
-      TradesCompanion(
-        symbol: Value(trade.symbol),
-        name: Value(trade.name),
-        quantity: Value(trade.quantity),
-        price: Value(trade.price),
-        tradeType: Value(trade.tradeType),
-        tradeDate: Value(trade.tradeDate),
-        realizedPL: Value(trade.realizedPL),
-        commission: Value(trade.commission),
-      ),
-    );
-    count++;
-  }
+  final count = await db.transaction(() async {
+    int inserted = 0;
+    for (final trade in trades) {
+      await db.trades.insertOne(
+        TradesCompanion(
+          symbol: Value(trade.symbol),
+          name: Value(trade.name),
+          quantity: Value(trade.quantity),
+          price: Value(trade.price),
+          tradeType: Value(trade.tradeType),
+          tradeDate: Value(trade.tradeDate),
+          realizedPL: Value(trade.realizedPL),
+          commission: Value(trade.commission),
+        ),
+      );
+      inserted++;
+    }
+    return inserted;
+  });
   talker.info('Imported $count trades');
   return count;
 }
