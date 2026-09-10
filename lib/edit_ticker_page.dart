@@ -252,7 +252,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                         }
 
                         final results = await stream?.first;
-                        if (results == null) return;
+                        if (results == null || results.isEmpty) return;
                         price.text =
                             results.last.candle.close.value.toStringAsFixed(2);
                       },
@@ -361,8 +361,14 @@ class _EditTickerPageState extends State<EditTickerPage> {
                     textInputAction: TextInputAction.next,
                     onSubmitted: (value) async {
                       if (autoSetPrice) return;
+                      final enteredPrice = double.tryParse(price.text.trim());
+                      if (enteredPrice == null ||
+                          !enteredPrice.isFinite ||
+                          enteredPrice <= 0) {
+                        return;
+                      }
                       final closest = await findClosestPrice(
-                        double.parse(price.text),
+                        enteredPrice,
                         symbol.text.split(' ').first,
                       );
 
@@ -448,21 +454,36 @@ class _EditTickerPageState extends State<EditTickerPage> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
+          final tickerSymbol = symbol.text.trim().split(' ').first;
+          final qty = double.tryParse(amount.text.trim());
+          final enteredPrice = double.tryParse(price.text.trim());
+          if (tickerSymbol.isEmpty) {
+            toast(context, 'Enter a ticker symbol.');
+            return;
+          }
+          if (qty == null || !qty.isFinite || qty <= 0) {
+            toast(context, 'Enter a valid amount greater than zero.');
+            return;
+          }
+          if (enteredPrice == null ||
+              !enteredPrice.isFinite ||
+              enteredPrice <= 0) {
+            toast(context, 'Enter a valid price greater than zero.');
+            return;
+          }
+
           final name = symbol.text
               .split(' ')
               .sublist(1)
               .join(' ')
               .replaceAll(RegExp(r'\(|\)'), '');
 
-          final tickerSymbol = symbol.text.split(' ').first;
-          final qty = double.parse(amount.text);
-
           await db.trades.insertOne(
             TradesCompanion.insert(
               symbol: tickerSymbol,
               name: name.isNotEmpty ? name : tickerSymbol,
               quantity: _isSell ? -qty : qty,
-              price: double.parse(price.text),
+              price: enteredPrice,
               tradeType: _isSell ? 'close' : 'open',
               tradeDate: _purchasedDate,
             ),
@@ -492,8 +513,14 @@ class _EditTickerPageState extends State<EditTickerPage> {
         builder: (context, snapshot) {
           if (snapshot.data == null) return const SizedBox();
 
+          final enteredPrice = double.tryParse(price.text.trim());
+          if (enteredPrice == null ||
+              !enteredPrice.isFinite ||
+              enteredPrice <= 0) {
+            return const SizedBox();
+          }
           final percentChange = safePercentChange(
-            double.parse(price.text),
+            enteredPrice,
             snapshot.data?.lastOrNull?.candle.close.value ?? 0,
           );
 
