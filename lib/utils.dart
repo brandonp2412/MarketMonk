@@ -249,6 +249,38 @@ Future<List<Position>> computeIbkrPositions(
   }).toList();
 }
 
+double _averageCostForOpenPosition(List<Trade> trades) {
+  final ordered = List<Trade>.from(trades)
+    ..sort((a, b) {
+      final byDate = a.tradeDate.compareTo(b.tradeDate);
+      return byDate != 0 ? byDate : a.id.compareTo(b.id);
+    });
+
+  var openShares = 0.0;
+  var averageCost = 0.0;
+  for (final trade in ordered) {
+    final quantity = trade.quantity;
+    if (quantity > 0) {
+      final previousLongShares = openShares > 0 ? openShares : 0.0;
+      final shortShares = openShares < 0 ? -openShares : 0.0;
+      final openingShares = quantity > shortShares ? quantity - shortShares : 0.0;
+      openShares += quantity;
+      if (openShares > 0) {
+        averageCost = previousLongShares > 0
+            ? (previousLongShares * averageCost + openingShares * trade.price) /
+                openShares
+            : trade.price;
+      } else {
+        averageCost = 0.0;
+      }
+    } else if (quantity < 0) {
+      openShares += quantity;
+      if (openShares <= 0) averageCost = 0.0;
+    }
+  }
+  return averageCost;
+}
+
 /// Computes open positions from a list of trades and a symbol→latestPrice map.
 /// Only returns positions with net shares > 0 (i.e. not fully closed).
 List<Position> computePositions(
@@ -269,12 +301,7 @@ List<Position> computePositions(
     if (netShares <= 0) continue; // closed position
 
     final buyTrades = symbolTrades.where((t) => t.quantity > 0).toList();
-    final totalBuyQty = buyTrades.fold(0.0, (sum, t) => sum + t.quantity);
-    final weightedCost = buyTrades.fold(
-      0.0,
-      (sum, t) => sum + t.quantity * t.price,
-    );
-    final avgCost = totalBuyQty > 0 ? weightedCost / totalBuyQty : 0.0;
+    final avgCost = _averageCostForOpenPosition(symbolTrades);
     final currentPrice = latestPrices[symbol] ?? avgCost;
 
     final name = symbolTrades.first.name;

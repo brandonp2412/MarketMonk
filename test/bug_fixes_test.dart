@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:market_monk/database.dart';
+import 'package:market_monk/utils.dart';
 import 'package:test/test.dart';
 
 /// Opens a fresh in-memory database at the current schema version.
@@ -82,6 +83,54 @@ void main() {
         closeTo(5.0, 0.001),
         reason: 'second trade must not be affected by the edit',
       );
+    });
+  });
+
+  group('average cost after sells', () {
+    Trade trade({
+      required int id,
+      required double quantity,
+      required double price,
+      required DateTime date,
+    }) =>
+        Trade(
+          id: id,
+          symbol: 'AAPL',
+          name: 'Apple',
+          quantity: quantity,
+          price: price,
+          tradeType: quantity > 0 ? 'open' : 'close',
+          tradeDate: date,
+          realizedPL: 0,
+          commission: 0,
+        );
+
+    test('partial sale does not leave sold shares in average cost', () {
+      final position = computePositions(
+        [
+          trade(id: 1, quantity: 10, price: 100, date: DateTime(2025, 1, 1)),
+          trade(id: 2, quantity: -9, price: 120, date: DateTime(2025, 2, 1)),
+          trade(id: 3, quantity: 1, price: 200, date: DateTime(2025, 3, 1)),
+        ],
+        {'AAPL': 210},
+      ).single;
+
+      expect(position.netShares, 2);
+      expect(position.avgCost, closeTo(150, 0.001));
+    });
+
+    test('fully closed position resets cost basis before reopening', () {
+      final position = computePositions(
+        [
+          trade(id: 1, quantity: 10, price: 100, date: DateTime(2025, 1, 1)),
+          trade(id: 2, quantity: -10, price: 120, date: DateTime(2025, 2, 1)),
+          trade(id: 3, quantity: 2, price: 200, date: DateTime(2025, 3, 1)),
+        ],
+        {'AAPL': 210},
+      ).single;
+
+      expect(position.netShares, 2);
+      expect(position.avgCost, closeTo(200, 0.001));
     });
   });
 }
