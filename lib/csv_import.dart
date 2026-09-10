@@ -149,28 +149,44 @@ class InteractiveBrokersParser extends BrokerCsvParser {
       return ParseResult(trades: []);
     }
 
+    final requiredIndexes = [
+      symbolIdx!,
+      descIdx!,
+      assetClassIdx!,
+      buySellIdx!,
+      quantityIdx!,
+      priceIdx!,
+      commissionIdx!,
+      tradeDateIdx!,
+      levelIdx!,
+    ];
+    final maxRequiredIndex = requiredIndexes.reduce(
+      (max, index) => index > max ? index : max,
+    );
+
     final trades = <ImportedTrade>[];
     for (final row in rows.skip(1)) {
-      if (row[assetClassIdx!].trim() != 'STK') continue;
-      if (row[levelIdx!].trim() != 'EXECUTION') continue;
+      if (row.length <= maxRequiredIndex) continue;
+      if (row[assetClassIdx].trim() != 'STK') continue;
+      if (row[levelIdx].trim() != 'EXECUTION') continue;
 
-      final symbol = row[symbolIdx!].trim();
+      final symbol = row[symbolIdx].trim();
       if (symbol.isEmpty) continue;
 
-      final buySell = row[buySellIdx!].trim();
+      final buySell = row[buySellIdx].trim();
       if (buySell != 'BUY' && buySell != 'SELL') continue;
 
-      final rawQty = double.tryParse(row[quantityIdx!].replaceAll(',', ''));
-      final price = double.tryParse(row[priceIdx!].replaceAll(',', ''));
+      final rawQty = double.tryParse(row[quantityIdx].replaceAll(',', ''));
+      final price = double.tryParse(row[priceIdx].replaceAll(',', ''));
       if (rawQty == null || price == null) continue;
 
       final quantity = buySell == 'SELL' ? -rawQty.abs() : rawQty.abs();
       final commission =
-          (double.tryParse(row[commissionIdx!].replaceAll(',', '')) ?? 0.0)
+          (double.tryParse(row[commissionIdx].replaceAll(',', '')) ?? 0.0)
               .abs();
 
       // TradeDate column is "YYYYMMDD" (e.g. "20260413")
-      final raw = row[tradeDateIdx!].trim();
+      final raw = row[tradeDateIdx].trim();
       final tradeDate = raw.length == 8
           ? DateTime.tryParse(
                 '${raw.substring(0, 4)}-${raw.substring(4, 6)}-${raw.substring(6, 8)}',
@@ -181,7 +197,7 @@ class InteractiveBrokersParser extends BrokerCsvParser {
       trades.add(
         ImportedTrade(
           symbol: symbol,
-          name: row[descIdx!].trim(),
+          name: row[descIdx].trim(),
           quantity: quantity,
           price: price,
           tradeType: buySell == 'BUY' ? 'open' : 'close',

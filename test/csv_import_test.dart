@@ -224,6 +224,17 @@ void main() {
       final headerOnly = _ibkrCsvMinimal.split('\n').first;
       expect(InteractiveBrokersParser().parse(headerOnly).trades, isEmpty);
     });
+
+    test('truncated execution row is skipped without aborting later trades',
+        () {
+      final lines = _ibkrCsvMinimal.trim().split('\n');
+      final csv = '${lines.first}\n"U1234","","","USD","STK"\n${lines[1]}\n';
+
+      final result = InteractiveBrokersParser().parse(csv);
+
+      expect(result.trades, hasLength(1));
+      expect(result.trades.single.symbol, 'AAPL');
+    });
   });
 
   group('broker detection', () {
