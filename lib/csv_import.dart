@@ -131,8 +131,8 @@ class InteractiveBrokersParser extends BrokerCsvParser {
     final assetClassIdx = col['AssetClass'];
     final buySellIdx = col['Buy/Sell'];
     final quantityIdx = col['Quantity'];
-    final priceIdx = col['Price'];
-    final commissionIdx = col['Commission'];
+    final priceIdx = col['TradePrice'] ?? col['Price'];
+    final commissionIdx = col['IBCommission'] ?? col['Commission'];
     final tradeDateIdx = col['TradeDate'];
     final levelIdx = col['LevelOfDetail'];
 

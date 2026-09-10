@@ -212,6 +212,22 @@ void main() {
       expect(buy.commission, closeTo(1.0, 0.001));
     });
 
+    test('parses current Flex Query price and commission column names', () {
+      final currentFlexCsv = _ibkrCsvMinimal
+          .replaceFirst('"Price"', '"TradePrice"')
+          .replaceFirst('"Commission"', '"IBCommission"');
+
+      final currentFlexResult =
+          InteractiveBrokersParser().parse(currentFlexCsv);
+
+      expect(currentFlexResult.trades, hasLength(3));
+      final buy = currentFlexResult.trades.firstWhere(
+        (trade) => trade.symbol == 'AAPL' && trade.quantity == 10,
+      );
+      expect(buy.price, closeTo(150.0, 0.001));
+      expect(buy.commission, closeTo(1.0, 0.001));
+    });
+
     test('TradeDate parsed correctly from YYYYMMDD format', () {
       final buy = result.trades.first;
       expect(buy.tradeDate.year, 2026);
