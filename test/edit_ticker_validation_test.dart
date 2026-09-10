@@ -39,6 +39,8 @@ void main() {
     );
     expect(await db.select(db.trades).get(), isEmpty);
     expect(tester.takeException(), null);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('invalid trade price is rejected without throwing',
@@ -60,5 +62,7 @@ void main() {
     );
     expect(await db.select(db.trades).get(), isEmpty);
     expect(tester.takeException(), null);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
   });
 }

@@ -41,6 +41,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
 
   final _yahooApi = YahooFinanceApi();
   FocusNode? autocomplete;
+  bool _ownsSymbolController = true;
 
   static final _dateDisplay = DateFormat('dd MMM yyyy');
 
@@ -53,7 +54,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
 
   @override
   void dispose() {
-    symbol.dispose();
+    if (_ownsSymbolController) symbol.dispose();
     amount.dispose();
     purchasedAt.dispose();
     price.dispose();
@@ -255,14 +256,18 @@ class _EditTickerPageState extends State<EditTickerPage> {
                           );
                           if (context.mounted) toast(context, error.toString());
                         } finally {
-                          setState(() {
-                            loading = false;
-                            _nativeCurrency = symbolCurrency(tickerSymbol);
-                          });
+                          if (mounted) {
+                            setState(() {
+                              loading = false;
+                              _nativeCurrency = symbolCurrency(tickerSymbol);
+                            });
+                          }
                         }
 
+                        if (!mounted) return;
                         final results = await stream?.first;
-                        if (results == null || results.isEmpty) return;
+                        if (!mounted || results == null || results.isEmpty)
+                          return;
                         price.text =
                             results.last.candle.close.value.toStringAsFixed(2);
                       },
@@ -272,7 +277,11 @@ class _EditTickerPageState extends State<EditTickerPage> {
                         FocusNode fieldFocusNode,
                         VoidCallback onFieldSubmitted,
                       ) {
-                        symbol = fieldTextEditingController;
+                        if (!identical(symbol, fieldTextEditingController)) {
+                          if (_ownsSymbolController) symbol.dispose();
+                          symbol = fieldTextEditingController;
+                          _ownsSymbolController = false;
+                        }
                         autocomplete = fieldFocusNode;
                         Widget leading = const Padding(
                           padding: EdgeInsets.only(left: 16.0, right: 8.0),
@@ -318,12 +327,14 @@ class _EditTickerPageState extends State<EditTickerPage> {
                                 'Failed to sync entered ticker',
                               );
                             } finally {
-                              setState(() {
-                                loading = false;
-                                _nativeCurrency = symbolCurrency(
-                                  tickerSymbol,
-                                );
-                              });
+                              if (mounted) {
+                                setState(() {
+                                  loading = false;
+                                  _nativeCurrency = symbolCurrency(
+                                    tickerSymbol,
+                                  );
+                                });
+                              }
                             }
                           },
                         );
@@ -382,7 +393,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                         symbol.text.split(' ').first,
                       );
 
-                      if (closest == null) return;
+                      if (!mounted || closest == null) return;
                       setState(() {
                         _purchasedDate = closest.date;
                         purchasedAt.text = _dateDisplay.format(closest.date);
@@ -405,7 +416,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                         firstDate: DateTime(0),
                         lastDate: DateTime.now(),
                       );
-                      if (date == null) return;
+                      if (!mounted || date == null) return;
                       setState(() {
                         _purchasedDate = date;
                         purchasedAt.text = _dateDisplay.format(date);
@@ -417,7 +428,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                         date,
                         symbol.text.split(' ').first,
                       );
-                      if (closest == null) return;
+                      if (!mounted || closest == null) return;
                       setState(() {
                         price.text = closest.close.toStringAsFixed(2);
                         autoSetPrice = true;
