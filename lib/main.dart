@@ -143,8 +143,17 @@ class AccountManager extends ChangeNotifier {
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
-    activeAccount = prefs.getString('activeAccount') ?? 'Default';
     accounts = prefs.getStringList('accounts') ?? ['Default'];
+    if (!accounts.contains('Default')) {
+      accounts = ['Default', ...accounts];
+      await prefs.setStringList('accounts', accounts);
+    }
+    activeAccount = prefs.getString('activeAccount') ?? 'Default';
+    if (!accounts.contains(activeAccount)) {
+      talker.warning('Saved active portfolio account no longer exists; using Default');
+      activeAccount = 'Default';
+      await prefs.setString('activeAccount', activeAccount);
+    }
     final savedPortfolioCache = prefs.getString('portfolioCacheV1');
     if (savedPortfolioCache != null) {
       try {
@@ -239,6 +248,10 @@ class AccountManager extends ChangeNotifier {
 
   Future<void> switchAccount(String name) async {
     if (name == activeAccount) return;
+    if (!accounts.contains(name)) {
+      talker.warning('Ignored switch to an unknown portfolio account');
+      return;
+    }
     await db.close();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('activeAccount', name);
