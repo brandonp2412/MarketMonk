@@ -640,61 +640,80 @@ Future<void> _fetchAndCacheRate(String currencyCode) async {
 class YahooFinanceApi {
   static const String _baseUrl =
       'https://query1.finance.yahoo.com/v1/finance/search';
+
+  final Future<http.Response> Function(Uri) _searchFetcher;
   Timer? _debounceTimer;
+  Completer<List<StockResult>>? _pendingSearch;
 
-  Future<List<StockResult>> searchTickers(String query) async {
-    if (query.isEmpty) return [];
+  YahooFinanceApi({Future<http.Response> Function(Uri)? searchFetcher})
+    : _searchFetcher = searchFetcher ?? http.get;
 
-    return await _debounce(() async {
-      try {
-        final response = await http
-            .get(Uri.parse('$_baseUrl?q=${Uri.encodeComponent(query)}'))
-            .timeout(const Duration(seconds: 5));
-
-        if (response.statusCode != 200) {
-          talker.warning('Ticker search returned HTTP ${response.statusCode}');
-          return [];
-        }
-
-        final Map<String, dynamic> data = json.decode(response.body);
-        final List<dynamic> quotes = data['quotes'] ?? [];
-
-        // Include EQUITYs, ETFs, and ETNs — all have tradeable candle data.
-        const tradeable = {'EQUITY', 'ETF', 'ETN'};
-        return quotes
-            .where((quote) => tradeable.contains(quote['quoteType']))
-            .map((quote) => StockResult.fromJson(quote))
-            .toList();
-      } catch (error, stackTrace) {
-        talker.handle(error, stackTrace, 'Ticker search request failed');
-        return [];
-      }
-    });
-  }
-
-  Future<T> _debounce<T>(Future<T> Function() action) {
-    final completer = Completer<T>();
-
-    if (_debounceTimer?.isActive ?? false) {
-      _debounceTimer!.cancel();
+  Future<List<StockResult>> searchTickers(String query) {
+    final trimmedQuery = query.trim();
+    if (trimmedQuery.isEmpty) {
+      cancelPendingSearch();
+      return Future.value([]);
     }
+
+    cancelPendingSearch();
+    final completer = Completer<List<StockResult>>();
+    _pendingSearch = completer;
 
     _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
       try {
-        final result = await action();
-        completer.complete(result);
+        final result = await _performSearch(trimmedQuery);
+        if (!completer.isCompleted) completer.complete(result);
       } catch (error, stackTrace) {
         talker.handle(error, stackTrace, 'Ticker search request failed');
-        completer.completeError(error, stackTrace);
+        if (!completer.isCompleted) completer.complete([]);
+      } finally {
+        if (identical(_pendingSearch, completer)) {
+          _pendingSearch = null;
+          _debounceTimer = null;
+        }
       }
     });
 
     return completer.future;
   }
 
-  void dispose() {
-    _debounceTimer?.cancel();
+  Future<List<StockResult>> _performSearch(String query) async {
+    try {
+      final response = await _searchFetcher(
+        Uri.parse('$_baseUrl?q=${Uri.encodeComponent(query)}'),
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode != 200) {
+        talker.warning('Ticker search returned HTTP ${response.statusCode}');
+        return [];
+      }
+
+      final Map<String, dynamic> data = json.decode(response.body);
+      final List<dynamic> quotes = data['quotes'] ?? [];
+
+      // Include EQUITYs, ETFs, and ETNs — all have tradeable candle data.
+      const tradeable = {'EQUITY', 'ETF', 'ETN'};
+      return quotes
+          .where((quote) => tradeable.contains(quote['quoteType']))
+          .map((quote) => StockResult.fromJson(quote))
+          .toList();
+    } catch (error, stackTrace) {
+      talker.handle(error, stackTrace, 'Ticker search request failed');
+      return [];
+    }
   }
+
+  void cancelPendingSearch() {
+    _debounceTimer?.cancel();
+    _debounceTimer = null;
+    final pending = _pendingSearch;
+    _pendingSearch = null;
+    if (pending != null && !pending.isCompleted) {
+      pending.complete([]);
+    }
+  }
+
+  void dispose() => cancelPendingSearch();
 }
 
 class StockResult {

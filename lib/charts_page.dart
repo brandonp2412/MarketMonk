@@ -77,9 +77,9 @@ class ChartsPageState extends State<ChartsPage>
   final Set<String> _hiddenAccounts = {};
   final Map<String, Future<_LoadedChartPortfolio>> _ibkrLoads = {};
 
+  final _yahooApi = YahooFinanceApi();
   List<StockResult> _searchResults = [];
   bool _searchLoading = false;
-  Timer? _debounce;
 
   int _lastTradesVersion = 0;
   String _lastAccountsKey = '';
@@ -242,7 +242,7 @@ class ChartsPageState extends State<ChartsPage>
   void dispose() {
     _searchController.dispose();
     _searchFocus.dispose();
-    _debounce?.cancel();
+    _yahooApi.dispose();
     super.dispose();
   }
 
@@ -541,8 +541,8 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   void _onSearchChanged(String text) {
-    if (text.isEmpty) {
-      _debounce?.cancel();
+    if (text.trim().isEmpty) {
+      _yahooApi.cancelPendingSearch();
       setState(() {
         _mode = _ChartMode.portfolio;
         _searchResults = [];
@@ -554,22 +554,22 @@ class ChartsPageState extends State<ChartsPage>
       _mode = _ChartMode.searching;
       _searchLoading = true;
     });
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () async {
-      final api = YahooFinanceApi();
-      try {
-        final results = await api.searchTickers(text);
-        if (!mounted) return;
-        setState(() {
-          _searchResults = results;
-          _searchLoading = false;
-        });
-      } catch (error, stackTrace) {
-        talker.handle(error, stackTrace, 'Ticker search failed');
-        if (!mounted) return;
-        setState(() => _searchLoading = false);
-      }
-    });
+    unawaited(_runTickerSearch(text));
+  }
+
+  Future<void> _runTickerSearch(String text) async {
+    try {
+      final results = await _yahooApi.searchTickers(text);
+      if (!mounted || _searchController.text != text) return;
+      setState(() {
+        _searchResults = results;
+        _searchLoading = false;
+      });
+    } catch (error, stackTrace) {
+      talker.handle(error, stackTrace, 'Ticker search failed');
+      if (!mounted || _searchController.text != text) return;
+      setState(() => _searchLoading = false);
+    }
   }
 
   void _selectStock(StockResult result) => _selectSymbol(result.symbol);
@@ -680,7 +680,7 @@ class ChartsPageState extends State<ChartsPage>
   void _clearSearch() {
     _searchController.clear();
     _searchFocus.unfocus();
-    _debounce?.cancel();
+    _yahooApi.cancelPendingSearch();
     setState(() {
       _mode = _ChartMode.portfolio;
       _searchResults = [];

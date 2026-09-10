@@ -39,6 +39,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
   int months = 0;
   int days = 5;
 
+  final _yahooApi = YahooFinanceApi();
   FocusNode? autocomplete;
 
   static final _dateDisplay = DateFormat('dd MMM yyyy');
@@ -48,6 +49,16 @@ class _EditTickerPageState extends State<EditTickerPage> {
     super.initState();
     purchasedAt.text = _dateDisplay.format(_purchasedDate);
     setStream();
+  }
+
+  @override
+  void dispose() {
+    symbol.dispose();
+    amount.dispose();
+    purchasedAt.dispose();
+    price.dispose();
+    _yahooApi.dispose();
+    super.dispose();
   }
 
   void setStream() {
@@ -219,8 +230,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                     child: Autocomplete<String>(
                       optionsBuilder:
                           (TextEditingValue textEditingValue) async {
-                        final api = YahooFinanceApi();
-                        final results = await api.searchTickers(
+                        final results = await _yahooApi.searchTickers(
                           textEditingValue.text,
                         );
                         return results.map(
