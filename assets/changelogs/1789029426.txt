@@ -1,0 +1,2 @@
+• Guard invalid trade input
+• Harden broker trade imports
