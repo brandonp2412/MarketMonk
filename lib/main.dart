@@ -263,7 +263,9 @@ class AccountManager extends ChangeNotifier {
   }
 
   Future<void> renameAccount(String oldName, String newName) async {
-    if (newName.isEmpty || accounts.contains(newName)) return;
+    if (oldName == 'Default' || newName.isEmpty || accounts.contains(newName)) {
+      return;
+    }
     final dir = await getApplicationSupportDirectory();
     final oldFileName =
         oldName == 'Default' ? 'market-monk' : 'market-monk-$oldName';

@@ -37,17 +37,18 @@ class AccountsPage extends StatelessWidget {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined),
-                  tooltip: 'Rename account',
-                  onPressed: () => _renameAccount(context, accounts, name),
-                ),
-                if (name != 'Default')
+                if (name != 'Default') ...[
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined),
+                    tooltip: 'Rename account',
+                    onPressed: () => _renameAccount(context, accounts, name),
+                  ),
                   IconButton(
                     icon: const Icon(Icons.delete_outline),
                     tooltip: 'Delete account',
                     onPressed: () => _confirmDelete(context, accounts, name),
                   ),
+                ],
               ],
             ),
           );

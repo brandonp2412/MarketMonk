@@ -33,6 +33,22 @@ void main() {
     expect(find.bySemanticsLabel('Holdings'), findsOneWidget);
   });
 
+  testWidgets('default account cannot be renamed', (WidgetTester tester) async {
+    final accounts = AccountManager();
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: accounts,
+        child: const MaterialApp(home: AccountsPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Default'), findsOneWidget);
+    expect(find.byTooltip('Rename account'), findsNothing);
+    expect(find.byTooltip('Delete account'), findsNothing);
+  });
+
   testWidgets(
     'adding account does not cause overlay assertion while MyApp rebuilds',
     (WidgetTester tester) async {
