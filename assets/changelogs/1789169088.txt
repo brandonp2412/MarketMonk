@@ -1,0 +1,1 @@
+• Harden Patrol tests against timing
