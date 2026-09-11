@@ -1,0 +1,7 @@
+• Fix average cost after position sales
+• Fix trade editor lifecycle cleanup
+• Preserve Nox MarketMonk fixes
+• Protect default portfolio account
+• Repair stale portfolio account state
+• Fix accept current IBKR Flex trade columns
+• Fix publish MarketMonk releases to Google Play
