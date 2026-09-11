@@ -85,7 +85,9 @@ void main() {
       final accounts = await configuredAccounts();
       await accounts.cachePortfolio(
         'Default',
-        [cachedPosition()],
+        [
+          cachedPosition(),
+        ],
         const IbkrAccountValue(value: 5500, currency: 'USD'),
       );
       final pending = Completer<IbkrPortfolioSnapshot>();
