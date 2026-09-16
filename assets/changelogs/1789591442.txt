@@ -1,0 +1,1 @@
+• Fix native-currency valuation fallback (#25)
