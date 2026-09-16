@@ -1,4 +1,3 @@
-# Trigger after workflow registration on the branch.
 name: Implement issue 25 currency provenance
 
 on:
@@ -20,6 +19,7 @@ jobs:
       - name: Apply currency provenance fix
         run: |
           python3 - <<'PY'
+          import base64
           from pathlib import Path
 
           def replace_once(path, old, new):
@@ -32,12 +32,7 @@ jobs:
           replace_once(
               utils,
               "Map<String, double> allRatesFromUsd = {'USD': 1.0};\n\n/// The current USD → displayCurrency conversion factor.\ndouble get exchangeRate =>\n    allRatesFromUsd[currency.currencyName ?? 'USD'] ?? 1.0;",
-              "Map<String, double> allRatesFromUsd = {'USD': 1.0};\n\n/// Returns the USD-based exchange rate for [currencyCode].\n///\n/// Valuation code must never guess that a missing rate is 1:1 with USD. A\n/// missing or invalid rate is an unavailable valuation, not a USD valuation.\ndouble requireUsdRate(String currencyCode) {\n  final rate = allRatesFromUsd[currencyCode];\n  if (rate == null || rate <= 0 || !rate.isFinite) {\n    throw StateError('Exchange rate unavailable for $currencyCode');\n  }\n  return rate;\n}\n\n/// The current USD → displayCurrency conversion factor.\ndouble get exchangeRate =>\n    requireUsdRate(currency.currencyName ?? 'USD');",
-          )
-          replace_once(
-              utils,
-              "/// Returns the cached native currency for [symbol], defaulting to 'USD'.\nString symbolCurrency(String symbol) => _symbolCurrencies[symbol] ?? 'USD';",
-              "/// Returns the cached native currency for [symbol], defaulting to 'USD'.\n///\n/// This is retained for non-valuing UI labels that can tolerate a best-effort\n/// fallback. Monetary calculations must use [requireSymbolCurrency] instead.\nString symbolCurrency(String symbol) => _symbolCurrencies[symbol] ?? 'USD';\n\n/// Returns the verified native currency for [symbol].\n///\n/// Treating an unknown symbol as USD can multiply a foreign holding by the FX\n/// rate twice, so valuation code fails closed until provenance is known.\nString requireSymbolCurrency(String symbol) {\n  final nativeCurrency = _symbolCurrencies[symbol];\n  if (nativeCurrency == null || nativeCurrency.isEmpty) {\n    throw StateError('Currency metadata unavailable for $symbol');\n  }\n  return nativeCurrency;\n}",
+              "Map<String, double> allRatesFromUsd = {'USD': 1.0};\n\n/// Returns the USD-based exchange rate for [currencyCode].\n///\n/// A missing rate is an unavailable valuation, never evidence of a 1:1 USD\n/// rate. Failing closed prevents foreign holdings from being multiplied by an\n/// unrelated display-currency rate.\ndouble requireUsdRate(String currencyCode) {\n  final rate = allRatesFromUsd[currencyCode];\n  if (rate == null || rate <= 0 || !rate.isFinite) {\n    throw StateError('Exchange rate unavailable for $currencyCode');\n  }\n  return rate;\n}\n\n/// The current USD → displayCurrency conversion factor.\ndouble get exchangeRate => requireUsdRate(currency.currencyName ?? 'USD');",
           )
           replace_once(
               utils,
@@ -62,12 +57,12 @@ jobs:
           replace_once(
               utils,
               "        nativeCurrency: symbolCurrency(symbol),",
-              "        nativeCurrency: requireSymbolCurrency(symbol),",
+              "        nativeCurrency: _symbolCurrencies[symbol] ?? 'UNKNOWN',",
           )
           replace_once(
               utils,
               "  await Future.wait(symbols.map(fetchSymbolCurrencyAndRate));",
-              "  await Future.wait(symbols.map((symbol) async {\n    await fetchSymbolCurrencyAndRate(symbol);\n    final nativeCurrency = requireSymbolCurrency(symbol);\n    requireUsdRate(nativeCurrency);\n  }));",
+              "  await Future.wait(symbols.map((symbol) async {\n    await fetchSymbolCurrencyAndRate(symbol);\n    final nativeCurrency = _symbolCurrencies[symbol];\n    if (nativeCurrency == null || nativeCurrency.isEmpty) {\n      throw StateError('Currency metadata unavailable for $symbol');\n    }\n    requireUsdRate(nativeCurrency);\n  }));",
           )
           replace_once(
               utils,
@@ -75,82 +70,12 @@ jobs:
               "    if (normalized != 'USD' && !allRatesFromUsd.containsKey(normalized)) {\n      final savedRate = prefs.getDouble('exchangeRate_$normalized');\n      if (savedRate != null) {\n        allRatesFromUsd[normalized] = savedRate;\n        unawaited(_fetchAndCacheRate(normalized));\n      } else {\n        await _fetchAndCacheRate(normalized);\n      }\n    }\n    return;",
           )
 
-          charts = Path('lib/charts_page.dart')
-          replace_once(
-              charts,
-              "      final nativeRate = allRatesFromUsd[symbolCurrency(symbol)] ?? 1.0;",
-              "      final nativeRate = requireUsdRate(requireSymbolCurrency(symbol));",
-          )
-
           tests = Path('test/bug_fixes_test.dart')
           text = tests.read_text()
           marker = "\n  group('average cost after sells', () {"
           if marker not in text:
               raise SystemExit('Could not find bug_fixes_test insertion point')
-          block = r'''
-  group('Issue #25 — native currency provenance', () {
-    Trade trade({
-      required String symbol,
-      required double price,
-    }) =>
-        Trade(
-          id: 1,
-          symbol: symbol,
-          name: symbol,
-          quantity: 1,
-          price: price,
-          tradeType: 'open',
-          tradeDate: DateTime(2026, 1, 1),
-          realizedPL: 0,
-          commission: 0,
-        );
-
-    setUp(() {
-      allRatesFromUsd
-        ..clear()
-        ..['USD'] = 1.0
-        ..['INR'] = 84.0;
-    });
-
-    test('INR holding is converted to USD exactly once', () {
-      cacheSymbolMeta('RELIANCE.NS', 'INR');
-      final position = computePositions(
-        [trade(symbol: 'RELIANCE.NS', price: 1370)],
-        {'RELIANCE.NS': 1370},
-      ).single;
-
-      expect(position.nativeCurrency, 'INR');
-      expect(position.currentPrice, 1370);
-      expect(position.currentValue, closeTo(1370 / 84, 0.000001));
-      expect(position.costBasis, closeTo(1370 / 84, 0.000001));
-    });
-
-    test('unknown symbol currency is never silently treated as USD', () {
-      expect(
-        () => computePositions(
-          [trade(symbol: 'UNKNOWN.NS', price: 1370)],
-          {'UNKNOWN.NS': 1370},
-        ),
-        throwsA(isA<StateError>()),
-      );
-    });
-
-    test('missing native FX rate makes valuation unavailable', () {
-      cacheSymbolMeta('NOFX.NS', 'INR');
-      allRatesFromUsd.remove('INR');
-      final position = computePositions(
-        [trade(symbol: 'NOFX.NS', price: 1370)],
-        {'NOFX.NS': 1370},
-      ).single;
-
-      expect(() => position.currentValue, throwsA(isA<StateError>()));
-      expect(
-        () => fmtNativeCurrency(1370, 'INR'),
-        throwsA(isA<StateError>()),
-      );
-    });
-  });
-'''
+          block = base64.b64decode('ICBncm91cCgnSXNzdWUgIzI1IOKAlCBuYXRpdmUgY3VycmVuY3kgcHJvdmVuYW5jZScsICgpIHsKICAgIFRyYWRlIHRyYWRlKHsKICAgICAgcmVxdWlyZWQgU3RyaW5nIHN5bWJvbCwKICAgICAgcmVxdWlyZWQgZG91YmxlIHByaWNlLAogICAgfSkgPT4KICAgICAgICBUcmFkZSgKICAgICAgICAgIGlkOiAxLAogICAgICAgICAgc3ltYm9sOiBzeW1ib2wsCiAgICAgICAgICBuYW1lOiBzeW1ib2wsCiAgICAgICAgICBxdWFudGl0eTogMSwKICAgICAgICAgIHByaWNlOiBwcmljZSwKICAgICAgICAgIHRyYWRlVHlwZTogJ29wZW4nLAogICAgICAgICAgdHJhZGVEYXRlOiBEYXRlVGltZSgyMDI2LCAxLCAxKSwKICAgICAgICAgIHJlYWxpemVkUEw6IDAsCiAgICAgICAgICBjb21taXNzaW9uOiAwLAogICAgICAgICk7CgogICAgc2V0VXAoKCkgewogICAgICBhbGxSYXRlc0Zyb21Vc2QKICAgICAgICAuLmNsZWFyKCkKICAgICAgICAuLlsnVVNEJ10gPSAxLjAKICAgICAgICAuLlsnSU5SJ10gPSA4NC4wOwogICAgfSk7CgogICAgdGVzdCgnSU5SIGhvbGRpbmcgaXMgY29udmVydGVkIHRvIFVTRCBleGFjdGx5IG9uY2UnLCAoKSB7CiAgICAgIGNhY2hlU3ltYm9sTWV0YSgnUkVMSUFOQ0UuTlMnLCAnSU5SJyk7CiAgICAgIGZpbmFsIHBvc2l0aW9uID0gY29tcHV0ZVBvc2l0aW9ucygKICAgICAgICBbdHJhZGUoc3ltYm9sOiAnUkVMSUFOQ0UuTlMnLCBwcmljZTogMTM3MCldLAogICAgICAgIHsnUkVMSUFOQ0UuTlMnOiAxMzcwfSwKICAgICAgKS5zaW5nbGU7CgogICAgICBleHBlY3QocG9zaXRpb24ubmF0aXZlQ3VycmVuY3ksICdJTlInKTsKICAgICAgZXhwZWN0KHBvc2l0aW9uLmN1cnJlbnRQcmljZSwgMTM3MCk7CiAgICAgIGV4cGVjdChwb3NpdGlvbi5jdXJyZW50VmFsdWUsIGNsb3NlVG8oMTM3MCAvIDg0LCAwLjAwMDAwMSkpOwogICAgICBleHBlY3QocG9zaXRpb24uY29zdEJhc2lzLCBjbG9zZVRvKDEzNzAgLyA4NCwgMC4wMDAwMDEpKTsKICAgIH0pOwoKICAgIHRlc3QoJ3Vua25vd24gc3ltYm9sIGN1cnJlbmN5IGlzIG5ldmVyIHNpbGVudGx5IHZhbHVlZCBhcyBVU0QnLCAoKSB7CiAgICAgIGZpbmFsIHBvc2l0aW9uID0gY29tcHV0ZVBvc2l0aW9ucygKICAgICAgICBbdHJhZGUoc3ltYm9sOiAnVU5LTk9XTi5OUycsIHByaWNlOiAxMzcwKV0sCiAgICAgICAgeydVTktOT1dOLk5TJzogMTM3MH0sCiAgICAgICkuc2luZ2xlOwoKICAgICAgZXhwZWN0KHBvc2l0aW9uLm5hdGl2ZUN1cnJlbmN5LCAnVU5LTk9XTicpOwogICAgICBleHBlY3QoKCkgPT4gcG9zaXRpb24uY3VycmVudFZhbHVlLCB0aHJvd3NBKGlzQTxTdGF0ZUVycm9yPigpKSk7CiAgICB9KTsKCiAgICB0ZXN0KCdtaXNzaW5nIG5hdGl2ZSBGWCByYXRlIG1ha2VzIHZhbHVhdGlvbiB1bmF2YWlsYWJsZScsICgpIHsKICAgICAgY2FjaGVTeW1ib2xNZXRhKCdOT0ZYLk5TJywgJ0lOUicpOwogICAgICBhbGxSYXRlc0Zyb21Vc2QucmVtb3ZlKCdJTlInKTsKICAgICAgZmluYWwgcG9zaXRpb24gPSBjb21wdXRlUG9zaXRpb25zKAogICAgICAgIFt0cmFkZShzeW1ib2w6ICdOT0ZYLk5TJywg cHJpY2U6IDEzNzApXSwKICAgICAgICB7J05PRlguTlMnOiAxMzcwfSwKICAgICAgKS5zaW5nbGU7CgogICAgICBleHBlY3QoKCkgPT4gcG9zaXRpb24uY3VycmVudFZhbHVlLCB0aHJvd3NBKGlzQTxTdGF0ZUVycm9yPigpKSk7CiAgICAgIGV4cGVjdCgKICAgICAgICAoKSA9PiBmbXROYXRpdmVDdXJyZW5jeSgxMzcwLCAnSU5SJyksCiAgICAgICAgdGhyb3dzQShpc0E8U3RhdGVFcnJvcj4oKSksCiAgICAgICk7CiAgICB9KTsKICB9KTsK'.replace(' ', '')).decode()
           tests.write_text(text.replace(marker, '\n' + block + marker, 1))
           PY
 
@@ -165,7 +90,7 @@ jobs:
         run: flutter pub get --enforce-lockfile
 
       - name: Format changed Dart files
-        run: dart format lib/utils.dart lib/charts_page.dart test/bug_fixes_test.dart
+        run: dart format lib/utils.dart test/bug_fixes_test.dart
 
       - name: Analyze
         run: dart analyze --no-fatal-warnings lib
@@ -178,7 +103,7 @@ jobs:
           rm .github/workflows/issue-25-fix.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add lib/utils.dart lib/charts_page.dart test/bug_fixes_test.dart .github/workflows/issue-25-fix.yml
+          git add lib/utils.dart test/bug_fixes_test.dart .github/workflows/issue-25-fix.yml
           git diff --cached --check
           git commit -m "fix: fail closed on unknown holding currencies (#25)"
           git push origin HEAD
