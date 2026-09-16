@@ -18,9 +18,21 @@ var currency = NumberFormat.simpleCurrency();
 /// Populated by SettingsState on startup and currency change.
 Map<String, double> allRatesFromUsd = {'USD': 1.0};
 
+/// Returns the USD-based exchange rate for [currencyCode].
+///
+/// A missing rate is an unavailable valuation, never evidence of a 1:1 USD
+/// rate. Failing closed prevents foreign holdings from being multiplied by an
+/// unrelated display-currency rate.
+double requireUsdRate(String currencyCode) {
+  final rate = allRatesFromUsd[currencyCode];
+  if (rate == null || rate <= 0 || !rate.isFinite) {
+    throw StateError('Exchange rate unavailable for $currencyCode');
+  }
+  return rate;
+}
+
 /// The current USD → displayCurrency conversion factor.
-double get exchangeRate =>
-    allRatesFromUsd[currency.currencyName ?? 'USD'] ?? 1.0;
+double get exchangeRate => requireUsdRate(currency.currencyName ?? 'USD');
 
 /// Yahoo Finance uses cent-based currency codes for some exchanges.
 /// Maps cent code → (parent ISO code, divisor from cents to base units).
@@ -98,7 +110,7 @@ String fmtCurrency(double v) => currency.format(v * exchangeRate);
 /// Example: fmtNativeCurrency(1370.0, 'INR') with display=USD and
 /// allRatesFromUsd['INR']=84 → formats 1370/84 ≈ $16.31.
 String fmtNativeCurrency(double v, String nativeCurrency) {
-  final nativeRate = allRatesFromUsd[nativeCurrency] ?? 1.0;
+  final nativeRate = requireUsdRate(nativeCurrency);
   return fmtCurrency(v / nativeRate);
 }
 
@@ -109,7 +121,7 @@ String fmtCompactCurrency(double v) =>
 
 /// Compact axis label for [v] denominated in [nativeCurrency].
 String fmtCompactNativeCurrency(double v, String nativeCurrency) {
-  final nativeRate = allRatesFromUsd[nativeCurrency] ?? 1.0;
+  final nativeRate = requireUsdRate(nativeCurrency);
   return fmtCompactCurrency(v / nativeRate);
 }
 
@@ -174,7 +186,7 @@ class Position {
   /// Conversion factor from [nativeCurrency] to USD.
   /// All monetary getters below return values in USD so that
   /// [fmtCurrency] (which applies USD → displayCurrency) works correctly.
-  double get _nativeToUsd => 1.0 / (allRatesFromUsd[nativeCurrency] ?? 1.0);
+  double get _nativeToUsd => 1.0 / requireUsdRate(nativeCurrency);
 
   /// Percentage gain/loss relative to average cost. Currency-agnostic.
   double get change => safePercentChange(avgCost, currentPrice);
@@ -209,11 +221,15 @@ Future<List<Position>> computeIbkrPositions(
       .toList();
 
   for (final position in stockPositions) {
-    cacheSymbolMeta(position.symbol, position.currency);
-    if (position.currency != 'USD' &&
-        !allRatesFromUsd.containsKey(position.currency)) {
-      await _fetchAndCacheRate(position.currency);
+    final nativeCurrency = cacheSymbolMeta(
+      position.symbol,
+      position.currency,
+    );
+    if (nativeCurrency != 'USD' &&
+        !allRatesFromUsd.containsKey(nativeCurrency)) {
+      await _fetchAndCacheRate(nativeCurrency);
     }
+    requireUsdRate(nativeCurrency);
   }
 
   return stockPositions.map((broker) {
@@ -263,7 +279,8 @@ double _averageCostForOpenPosition(List<Trade> trades) {
     if (quantity > 0) {
       final previousLongShares = openShares > 0 ? openShares : 0.0;
       final shortShares = openShares < 0 ? -openShares : 0.0;
-      final openingShares = quantity > shortShares ? quantity - shortShares : 0.0;
+      final openingShares =
+          quantity > shortShares ? quantity - shortShares : 0.0;
       openShares += quantity;
       if (openShares > 0) {
         averageCost = previousLongShares > 0
@@ -319,7 +336,7 @@ List<Position> computePositions(
       Position(
         symbol: symbol,
         name: name,
-        nativeCurrency: symbolCurrency(symbol),
+        nativeCurrency: _symbolCurrencies[symbol] ?? 'UNKNOWN',
         netShares: netShares,
         avgCost: avgCost / centDiv,
         currentPrice: currentPrice / centDiv,
@@ -345,7 +362,14 @@ Future<Map<String, double>> fetchLatestPrices(
   // Every computePositions caller fetches prices first, so this is the choke
   // point that tries to load currency + cent-divisor metadata before positions
   // are computed (GBp candles would otherwise be read as GBP, #30).
-  await Future.wait(symbols.map(fetchSymbolCurrencyAndRate));
+  await Future.wait(symbols.map((symbol) async {
+    await fetchSymbolCurrencyAndRate(symbol);
+    final nativeCurrency = _symbolCurrencies[symbol];
+    if (nativeCurrency == null || nativeCurrency.isEmpty) {
+      throw StateError('Currency metadata unavailable for $symbol');
+    }
+    requireUsdRate(nativeCurrency);
+  }));
 
   final ph = List.filled(symbols.length, '?').join(', ');
   try {
@@ -601,8 +625,12 @@ Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
     final normalized = cacheSymbolMeta(symbol, savedRaw);
     if (normalized != 'USD' && !allRatesFromUsd.containsKey(normalized)) {
       final savedRate = prefs.getDouble('exchangeRate_$normalized');
-      if (savedRate != null) allRatesFromUsd[normalized] = savedRate;
-      unawaited(_fetchAndCacheRate(normalized));
+      if (savedRate != null) {
+        allRatesFromUsd[normalized] = savedRate;
+        unawaited(_fetchAndCacheRate(normalized));
+      } else {
+        await _fetchAndCacheRate(normalized);
+      }
     }
     return;
   }
@@ -673,7 +701,7 @@ class YahooFinanceApi {
   Completer<List<StockResult>>? _pendingSearch;
 
   YahooFinanceApi({Future<http.Response> Function(Uri)? searchFetcher})
-    : _searchFetcher = searchFetcher ?? http.get;
+      : _searchFetcher = searchFetcher ?? http.get;
 
   Future<List<StockResult>> searchTickers(String query) {
     final trimmedQuery = query.trim();

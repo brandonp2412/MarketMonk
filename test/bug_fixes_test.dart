@@ -86,6 +86,69 @@ void main() {
     });
   });
 
+  group('Issue #25 — native currency provenance', () {
+    Trade trade({
+      required String symbol,
+      required double price,
+    }) =>
+        Trade(
+          id: 1,
+          symbol: symbol,
+          name: symbol,
+          quantity: 1,
+          price: price,
+          tradeType: 'open',
+          tradeDate: DateTime(2026, 1, 1),
+          realizedPL: 0,
+          commission: 0,
+        );
+
+    setUp(() {
+      allRatesFromUsd
+        ..clear()
+        ..['USD'] = 1.0
+        ..['INR'] = 84.0;
+    });
+
+    test('INR holding is converted to USD exactly once', () {
+      cacheSymbolMeta('RELIANCE.NS', 'INR');
+      final position = computePositions(
+        [trade(symbol: 'RELIANCE.NS', price: 1370)],
+        {'RELIANCE.NS': 1370},
+      ).single;
+
+      expect(position.nativeCurrency, 'INR');
+      expect(position.currentPrice, 1370);
+      expect(position.currentValue, closeTo(1370 / 84, 0.000001));
+      expect(position.costBasis, closeTo(1370 / 84, 0.000001));
+    });
+
+    test('unknown symbol currency is never silently valued as USD', () {
+      final position = computePositions(
+        [trade(symbol: 'UNKNOWN.NS', price: 1370)],
+        {'UNKNOWN.NS': 1370},
+      ).single;
+
+      expect(position.nativeCurrency, 'UNKNOWN');
+      expect(() => position.currentValue, throwsA(isA<StateError>()));
+    });
+
+    test('missing native FX rate makes valuation unavailable', () {
+      cacheSymbolMeta('NOFX.NS', 'INR');
+      allRatesFromUsd.remove('INR');
+      final position = computePositions(
+        [trade(symbol: 'NOFX.NS', price: 1370)],
+        {'NOFX.NS': 1370},
+      ).single;
+
+      expect(() => position.currentValue, throwsA(isA<StateError>()));
+      expect(
+        () => fmtNativeCurrency(1370, 'INR'),
+        throwsA(isA<StateError>()),
+      );
+    });
+  });
+
   group('average cost after sells', () {
     Trade trade({
       required int id,
