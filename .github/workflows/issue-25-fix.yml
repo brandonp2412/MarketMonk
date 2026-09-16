@@ -1,3 +1,4 @@
+# Trigger after workflow registration on the branch.
 name: Implement issue 25 currency provenance
 
 on:
