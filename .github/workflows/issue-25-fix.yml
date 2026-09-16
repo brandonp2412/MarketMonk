@@ -1,0 +1,183 @@
+name: Implement issue 25 currency provenance
+
+on:
+  push:
+    branches: [fix/issue-25-currency-provenance]
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Apply currency provenance fix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              text = path.read_text()
+              if text.count(old) != 1:
+                  raise SystemExit(f'Expected exactly one match in {path}: {old[:80]!r}')
+              path.write_text(text.replace(old, new, 1))
+
+          utils = Path('lib/utils.dart')
+          replace_once(
+              utils,
+              "Map<String, double> allRatesFromUsd = {'USD': 1.0};\n\n/// The current USD → displayCurrency conversion factor.\ndouble get exchangeRate =>\n    allRatesFromUsd[currency.currencyName ?? 'USD'] ?? 1.0;",
+              "Map<String, double> allRatesFromUsd = {'USD': 1.0};\n\n/// Returns the USD-based exchange rate for [currencyCode].\n///\n/// Valuation code must never guess that a missing rate is 1:1 with USD. A\n/// missing or invalid rate is an unavailable valuation, not a USD valuation.\ndouble requireUsdRate(String currencyCode) {\n  final rate = allRatesFromUsd[currencyCode];\n  if (rate == null || rate <= 0 || !rate.isFinite) {\n    throw StateError('Exchange rate unavailable for $currencyCode');\n  }\n  return rate;\n}\n\n/// The current USD → displayCurrency conversion factor.\ndouble get exchangeRate =>\n    requireUsdRate(currency.currencyName ?? 'USD');",
+          )
+          replace_once(
+              utils,
+              "/// Returns the cached native currency for [symbol], defaulting to 'USD'.\nString symbolCurrency(String symbol) => _symbolCurrencies[symbol] ?? 'USD';",
+              "/// Returns the cached native currency for [symbol], defaulting to 'USD'.\n///\n/// This is retained for non-valuing UI labels that can tolerate a best-effort\n/// fallback. Monetary calculations must use [requireSymbolCurrency] instead.\nString symbolCurrency(String symbol) => _symbolCurrencies[symbol] ?? 'USD';\n\n/// Returns the verified native currency for [symbol].\n///\n/// Treating an unknown symbol as USD can multiply a foreign holding by the FX\n/// rate twice, so valuation code fails closed until provenance is known.\nString requireSymbolCurrency(String symbol) {\n  final nativeCurrency = _symbolCurrencies[symbol];\n  if (nativeCurrency == null || nativeCurrency.isEmpty) {\n    throw StateError('Currency metadata unavailable for $symbol');\n  }\n  return nativeCurrency;\n}",
+          )
+          replace_once(
+              utils,
+              "String fmtNativeCurrency(double v, String nativeCurrency) {\n  final nativeRate = allRatesFromUsd[nativeCurrency] ?? 1.0;\n  return fmtCurrency(v / nativeRate);\n}",
+              "String fmtNativeCurrency(double v, String nativeCurrency) {\n  final nativeRate = requireUsdRate(nativeCurrency);\n  return fmtCurrency(v / nativeRate);\n}",
+          )
+          replace_once(
+              utils,
+              "String fmtCompactNativeCurrency(double v, String nativeCurrency) {\n  final nativeRate = allRatesFromUsd[nativeCurrency] ?? 1.0;\n  return fmtCompactCurrency(v / nativeRate);\n}",
+              "String fmtCompactNativeCurrency(double v, String nativeCurrency) {\n  final nativeRate = requireUsdRate(nativeCurrency);\n  return fmtCompactCurrency(v / nativeRate);\n}",
+          )
+          replace_once(
+              utils,
+              "  double get _nativeToUsd => 1.0 / (allRatesFromUsd[nativeCurrency] ?? 1.0);",
+              "  double get _nativeToUsd => 1.0 / requireUsdRate(nativeCurrency);",
+          )
+          replace_once(
+              utils,
+              "  for (final position in stockPositions) {\n    cacheSymbolMeta(position.symbol, position.currency);\n    if (position.currency != 'USD' &&\n        !allRatesFromUsd.containsKey(position.currency)) {\n      await _fetchAndCacheRate(position.currency);\n    }\n  }",
+              "  for (final position in stockPositions) {\n    final nativeCurrency = cacheSymbolMeta(\n      position.symbol,\n      position.currency,\n    );\n    if (nativeCurrency != 'USD' &&\n        !allRatesFromUsd.containsKey(nativeCurrency)) {\n      await _fetchAndCacheRate(nativeCurrency);\n    }\n    requireUsdRate(nativeCurrency);\n  }",
+          )
+          replace_once(
+              utils,
+              "        nativeCurrency: symbolCurrency(symbol),",
+              "        nativeCurrency: requireSymbolCurrency(symbol),",
+          )
+          replace_once(
+              utils,
+              "  await Future.wait(symbols.map(fetchSymbolCurrencyAndRate));",
+              "  await Future.wait(symbols.map((symbol) async {\n    await fetchSymbolCurrencyAndRate(symbol);\n    final nativeCurrency = requireSymbolCurrency(symbol);\n    requireUsdRate(nativeCurrency);\n  }));",
+          )
+          replace_once(
+              utils,
+              "    if (normalized != 'USD' && !allRatesFromUsd.containsKey(normalized)) {\n      final savedRate = prefs.getDouble('exchangeRate_$normalized');\n      if (savedRate != null) allRatesFromUsd[normalized] = savedRate;\n      unawaited(_fetchAndCacheRate(normalized));\n    }\n    return;",
+              "    if (normalized != 'USD' && !allRatesFromUsd.containsKey(normalized)) {\n      final savedRate = prefs.getDouble('exchangeRate_$normalized');\n      if (savedRate != null) {\n        allRatesFromUsd[normalized] = savedRate;\n        unawaited(_fetchAndCacheRate(normalized));\n      } else {\n        await _fetchAndCacheRate(normalized);\n      }\n    }\n    return;",
+          )
+
+          charts = Path('lib/charts_page.dart')
+          replace_once(
+              charts,
+              "      final nativeRate = allRatesFromUsd[symbolCurrency(symbol)] ?? 1.0;",
+              "      final nativeRate = requireUsdRate(requireSymbolCurrency(symbol));",
+          )
+
+          tests = Path('test/bug_fixes_test.dart')
+          text = tests.read_text()
+          marker = "\n  group('average cost after sells', () {"
+          if marker not in text:
+              raise SystemExit('Could not find bug_fixes_test insertion point')
+          block = r'''
+  group('Issue #25 — native currency provenance', () {
+    Trade trade({
+      required String symbol,
+      required double price,
+    }) =>
+        Trade(
+          id: 1,
+          symbol: symbol,
+          name: symbol,
+          quantity: 1,
+          price: price,
+          tradeType: 'open',
+          tradeDate: DateTime(2026, 1, 1),
+          realizedPL: 0,
+          commission: 0,
+        );
+
+    setUp(() {
+      allRatesFromUsd
+        ..clear()
+        ..['USD'] = 1.0
+        ..['INR'] = 84.0;
+    });
+
+    test('INR holding is converted to USD exactly once', () {
+      cacheSymbolMeta('RELIANCE.NS', 'INR');
+      final position = computePositions(
+        [trade(symbol: 'RELIANCE.NS', price: 1370)],
+        {'RELIANCE.NS': 1370},
+      ).single;
+
+      expect(position.nativeCurrency, 'INR');
+      expect(position.currentPrice, 1370);
+      expect(position.currentValue, closeTo(1370 / 84, 0.000001));
+      expect(position.costBasis, closeTo(1370 / 84, 0.000001));
+    });
+
+    test('unknown symbol currency is never silently treated as USD', () {
+      expect(
+        () => computePositions(
+          [trade(symbol: 'UNKNOWN.NS', price: 1370)],
+          {'UNKNOWN.NS': 1370},
+        ),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('missing native FX rate makes valuation unavailable', () {
+      cacheSymbolMeta('NOFX.NS', 'INR');
+      allRatesFromUsd.remove('INR');
+      final position = computePositions(
+        [trade(symbol: 'NOFX.NS', price: 1370)],
+        {'NOFX.NS': 1370},
+      ).single;
+
+      expect(() => position.currentValue, throwsA(isA<StateError>()));
+      expect(
+        () => fmtNativeCurrency(1370, 'INR'),
+        throwsA(isA<StateError>()),
+      );
+    });
+  });
+'''
+          tests.write_text(text.replace(marker, '\n' + block + marker, 1))
+          PY
+
+      - name: Setup Flutter from submodule
+        run: |
+          export PATH="$PATH:$PWD/flutter/bin"
+          echo "$PWD/flutter/bin" >> "$GITHUB_PATH"
+          flutter --version
+          flutter config --no-analytics
+
+      - name: Get dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Format changed Dart files
+        run: dart format lib/utils.dart lib/charts_page.dart test/bug_fixes_test.dart
+
+      - name: Analyze
+        run: dart analyze --no-fatal-warnings lib
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Commit implementation
+        run: |
+          rm .github/workflows/issue-25-fix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/utils.dart lib/charts_page.dart test/bug_fixes_test.dart .github/workflows/issue-25-fix.yml
+          git diff --cached --check
+          git commit -m "fix: fail closed on unknown holding currencies (#25)"
+          git push origin HEAD
