@@ -80,6 +80,7 @@ class ChartsPageState extends State<ChartsPage>
 
   Map<String, List<_DateValue>> _portfolioSeriesByAccount = {};
   Map<String, double> _portfolioReturnsByAccount = {};
+  Set<String> _currentHoldingsReplayAccounts = {};
   String? _portfolioError;
   bool _portfolioLoading = false;
   final Set<String> _hiddenAccounts = {};
@@ -438,6 +439,7 @@ class ChartsPageState extends State<ChartsPage>
 
     final newSeries = <String, List<_DateValue>>{};
     final newReturns = <String, double>{};
+    final newCurrentHoldingsReplayAccounts = <String>{};
     String? firstError;
 
     for (final accountName in accounts) {
@@ -480,10 +482,14 @@ class ChartsPageState extends State<ChartsPage>
             );
           }
         }
-        newSeries[accountName] = await _buildPortfolioSeries(
+        final fallback = await _buildPortfolioSeries(
           loaded.positions,
           accountDb,
         );
+        newSeries[accountName] = fallback.series;
+        if (fallback.currentHoldingsReplay) {
+          newCurrentHoldingsReplayAccounts.add(accountName);
+        }
       } catch (e) {
         newSeries[accountName] = [];
         firstError ??= e.toString();
@@ -496,16 +502,20 @@ class ChartsPageState extends State<ChartsPage>
     setState(() {
       _portfolioSeriesByAccount = newSeries;
       _portfolioReturnsByAccount = newReturns;
+      _currentHoldingsReplayAccounts = newCurrentHoldingsReplayAccounts;
       _portfolioError = firstError;
       _portfolioLoading = false;
     });
   }
 
-  Future<List<_DateValue>> _buildPortfolioSeries(
+  Future<({List<_DateValue> series, bool currentHoldingsReplay})>
+      _buildPortfolioSeries(
     List<Position> positions,
     Database accountDb,
   ) async {
-    if (positions.isEmpty) return [];
+    if (positions.isEmpty) {
+      return (series: const <_DateValue>[], currentHoldingsReplay: false);
+    }
 
     final now = DateTime.now();
     final after = days > 0
@@ -519,6 +529,7 @@ class ChartsPageState extends State<ChartsPage>
                 ),
           ]))
         .get();
+    final currentHoldingsReplay = trades.isEmpty;
     final symbols = {
       ...positions.map((position) => position.symbol),
       ...trades.map((trade) => trade.symbol),
@@ -551,7 +562,12 @@ class ChartsPageState extends State<ChartsPage>
 
     final Map<String, double> lastKnown = {};
     final Map<DateTime, double> valueByDate = {};
-    final Map<String, double> shares = {};
+    final Map<String, double> shares = currentHoldingsReplay
+        ? {
+            for (final position in positions)
+              position.symbol: position.netShares,
+          }
+        : {};
     var tradeIndex = 0;
 
     for (final date in sortedDates) {
@@ -614,7 +630,10 @@ class ChartsPageState extends State<ChartsPage>
       series = byWeek.values.toList()..sort((a, b) => a.date.compareTo(b.date));
     }
 
-    return series;
+    return (
+      series: series,
+      currentHoldingsReplay: currentHoldingsReplay,
+    );
   }
 
   ({List<_DateValue> series, double twrPercent}) _buildBrokerPerformanceSeries(
@@ -1547,9 +1566,26 @@ class ChartsPageState extends State<ChartsPage>
     final idx = accounts.indexOf(accountName);
     final dotColor = accountColors[idx.clamp(0, accountColors.length - 1)];
     final brokerReturn = _portfolioReturnsByAccount[accountName];
+    final currentHoldingsReplay =
+        _currentHoldingsReplayAccounts.contains(accountName);
+    final hasHistory = brokerReturn != null || series.length > 1;
     final pct = brokerReturn ??
-        safePercentChange(series.first.value, series.last.value);
-    final returnColor = pct >= 0 ? Colors.green : Colors.redAccent;
+        (hasHistory
+            ? safePercentChange(series.first.value, series.last.value)
+            : 0.0);
+    final returnColor = hasHistory
+        ? (pct >= 0 ? Colors.green : Colors.redAccent)
+        : Theme.of(context).colorScheme.onSurfaceVariant;
+    final returnKind = brokerReturn != null
+        ? ' TWR'
+        : currentHoldingsReplay
+            ? ' holdings'
+            : ' value';
+    final changeKind = brokerReturn != null
+        ? 'value change'
+        : currentHoldingsReplay
+            ? 'current holdings change'
+            : 'holdings change';
     final change = series.last.value - series.first.value;
     final isHidden = _hiddenAccounts.contains(accountName);
 
@@ -1590,13 +1626,16 @@ class ChartsPageState extends State<ChartsPage>
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        pct >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
-                        color: returnColor,
-                        size: 18,
-                      ),
+                      if (hasHistory)
+                        Icon(
+                          pct >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
+                          color: returnColor,
+                          size: 18,
+                        ),
                       Text(
-                        '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%${brokerReturn == null ? ' value' : ' TWR'}',
+                        hasHistory
+                            ? '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%$returnKind'
+                            : 'History unavailable',
                         style: Theme.of(
                           context,
                         ).textTheme.titleMedium!.copyWith(color: returnColor),
@@ -1615,7 +1654,9 @@ class ChartsPageState extends State<ChartsPage>
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: Text(
-                    '${change >= 0 ? '+' : ''}${fmtCurrency(change)} ${brokerReturn == null ? 'holdings change' : 'value change'}',
+                    hasHistory
+                        ? '${change >= 0 ? '+' : ''}${fmtCurrency(change)} $changeKind'
+                        : 'Historical prices unavailable',
                     style: TextStyle(color: returnColor, fontSize: 13),
                   ),
                 ),

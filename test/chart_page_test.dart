@@ -110,6 +110,13 @@ void main() {
     await db.into(db.candles).insert(
           CandlesCompanion.insert(
             symbol: 'VOO',
+            date: DateTime(now.year, now.month, now.day - 20),
+            close: const Value(500),
+          ),
+        );
+    await db.into(db.candles).insert(
+          CandlesCompanion.insert(
+            symbol: 'VOO',
             date: DateTime(now.year, now.month, now.day),
             close: const Value(550),
           ),
@@ -136,6 +143,7 @@ void main() {
 
     expect(ibkrLoads, 0);
     expect(find.textContaining('5,500'), findsWidgets);
+    expect(find.textContaining('+10.00% holdings'), findsOneWidget);
 
     await tester.tap(find.text('5d'));
     await tester.pumpAndSettle();
