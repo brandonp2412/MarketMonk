@@ -14,10 +14,22 @@ if [[ -n "${SCREENSHOT_SCREEN_SIZE:-}" ]]; then
   expected_dimensions="${SCREENSHOT_SCREEN_SIZE/x/ x }"
 fi
 
-flutter drive --profile \
-  --driver=test_driver/integration_test.dart \
-  --target=integration_test/screenshot_test.dart \
-  -d "emulator-$EMULATOR_PORT"
+run_screenshot_drive() {
+  timeout --signal=INT --kill-after=30s 14m \
+    flutter drive --profile \
+      --driver=test_driver/integration_test.dart \
+      --target=integration_test/screenshot_test.dart \
+      -d "emulator-$EMULATOR_PORT"
+}
+
+if ! run_screenshot_drive; then
+  echo "Screenshot drive failed or timed out; resetting the app and retrying once." >&2
+  adb -s "emulator-$EMULATOR_PORT" shell am force-stop com.codesail.market_monk || true
+  adb -s "emulator-$EMULATOR_PORT" shell pm clear com.codesail.market_monk || true
+  adb -s "emulator-$EMULATOR_PORT" wait-for-device
+  sleep 2
+  run_screenshot_drive
+fi
 
 for number in 1 2 3 4 5 6; do
   screenshot="$screenshot_dir/${number}_en-US.png"
