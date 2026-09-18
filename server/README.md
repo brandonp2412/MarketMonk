@@ -7,6 +7,7 @@ The HTTP interface consumed by MarketMonk is the same for both supported backend
 - `GET /v1/health`
 - `GET /v1/portfolio`
 - `GET /v1/historical?symbol=AAPL&years=10`
+- `GET /v1/performance?period=1M`
 
 Every request requires `Authorization: Bearer <MARKET_MONK_IBKR_TOKEN>`. The bridge exposes no order endpoint and rejects POST requests.
 
@@ -18,7 +19,7 @@ MarketMonk uses `ib_async` only as the transport implementation for IBKR's docum
 
 IBKR documents `updatePortfolio` as providing position size, market price, market value, average cost, daily unrealized P/L, and daily realized P/L. Those values are normalized into MarketMonk's existing `/v1/portfolio` response.
 
-The native backend can also request daily `TRADES` historical bars for current stock positions. MarketMonk requests between one and ten years, uses regular trading hours, and routes through `SMART` when a portfolio contract does not include an API routing exchange. Historical availability follows the market-data permissions on the IBKR username. MarketMonk falls back to Yahoo for unheld symbols or when IBKR historical data is unavailable.
+The native backend can also request daily `TRADES` historical bars for current stock positions. MarketMonk requests between one and ten years, uses regular trading hours, and routes through `SMART` when a portfolio contract does not include an API routing exchange. Historical availability follows the market-data permissions on the IBKR username. MarketMonk falls back to Yahoo for unheld symbols or when IBKR historical data is unavailable. PortfolioAnalyst performance history is not exposed by the native TWS socket API, so `/v1/performance` is available only with the Client Portal backend.
 
 Official IBKR documentation:
 
@@ -39,8 +40,10 @@ The original Client Portal Web API backend remains available with `IBKR_BACKEND=
 - `GET /portfolio2/{accountId}/positions`
 - `GET /portfolio/{accountId}/summary`
 - `GET /portfolio/{accountId}/ledger`
+- `GET /iserver/marketdata/history`
+- `POST /pa/performance`
 
-It never initializes an `/iserver` brokerage session. Retail Client Portal Gateway authentication still requires the normal browser login and periodic reauthentication according to IBKR's supported flow.
+The PortfolioAnalyst response is normalized into daily account NAV plus IBKR's cumulative time-weighted return series. Retail Client Portal Gateway authentication still requires the normal browser login and periodic reauthentication according to IBKR's supported flow.
 
 Official IBKR documentation:
 
@@ -88,7 +91,9 @@ The default listener is `127.0.0.1:8091`. Put HTTPS or a private VPN in front of
 
 `GET /v1/portfolio` returns a normalized read-only snapshot containing the masked account ID, summary values, ledger values, and current positions with quantity, average cost, current market price/value, daily realized P/L, daily unrealized P/L, currency, exchange, and contract ID when supplied by IBKR.
 
-`GET /v1/historical?symbol=AAPL&years=10` is available with the native backend for a current stock position visible to that IBKR session. `years` must be from 1 through 10. It returns daily OHLCV bars and the contract currency. The endpoint remains read-only and the service still exposes no order route.
+`GET /v1/historical?symbol=AAPL&years=10` is available for a current stock position visible to the selected backend. `years` must be from 1 through 10. It returns daily OHLCV bars and the contract currency. The endpoint remains read-only and the service still exposes no order route.
+
+`GET /v1/performance?period=1M` is available with the Client Portal backend and returns PortfolioAnalyst NAV plus cumulative TWR data. Supported periods are `1D`, `7D`, `MTD`, `1M`, `3M`, `6M`, `12M`, and `YTD`.
 
 ## systemd
 

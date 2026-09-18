@@ -147,6 +147,76 @@ class IbkrHistoricalSeries {
       );
 }
 
+/// Broker-reported account NAV and time-weighted return history.
+class IbkrPerformanceSeries {
+  final String period;
+  final String measure;
+  final String currency;
+  final DateTime? startDate;
+  final double? startNav;
+  final List<DateTime> dates;
+  final List<double> nav;
+  final List<DateTime> returnDates;
+  final List<double> returns;
+
+  const IbkrPerformanceSeries({
+    required this.period,
+    required this.measure,
+    required this.currency,
+    required this.startDate,
+    required this.startNav,
+    required this.dates,
+    required this.nav,
+    required this.returnDates,
+    required this.returns,
+  });
+
+  factory IbkrPerformanceSeries.fromJson(Map<String, dynamic> json) {
+    final dates = (json['dates'] as List<dynamic>? ?? const [])
+        .map((value) => _parseIbkrDate(value.toString()))
+        .toList();
+    final nav = (json['nav'] as List<dynamic>? ?? const [])
+        .map((value) => (value as num).toDouble())
+        .toList();
+    final returnDates = (json['return_dates'] as List<dynamic>? ?? const [])
+        .map((value) => _parseIbkrDate(value.toString()))
+        .toList();
+    final returns = (json['returns'] as List<dynamic>? ?? const [])
+        .map((value) => (value as num).toDouble())
+        .toList();
+    if (dates.length != nav.length || returnDates.length != returns.length) {
+      throw const FormatException(
+        'IBKR performance series lengths do not match',
+      );
+    }
+    final rawStartDate = json['start_date']?.toString();
+    return IbkrPerformanceSeries(
+      period: json['period'] as String? ?? '',
+      measure: json['measure'] as String? ?? 'TWR',
+      currency: json['currency'] as String? ?? 'USD',
+      startDate: rawStartDate == null || rawStartDate.isEmpty
+          ? null
+          : _parseIbkrDate(rawStartDate),
+      startNav: (json['start_nav'] as num?)?.toDouble(),
+      dates: dates,
+      nav: nav,
+      returnDates: returnDates,
+      returns: returns,
+    );
+  }
+}
+
+DateTime _parseIbkrDate(String value) {
+  if (!RegExp(r'^\d{8}$').hasMatch(value)) {
+    throw FormatException('Invalid IBKR date: $value');
+  }
+  return DateTime(
+    int.parse(value.substring(0, 4)),
+    int.parse(value.substring(4, 6)),
+    int.parse(value.substring(6, 8)),
+  );
+}
+
 /// One monetary account value reported by IBKR.
 class IbkrAccountValue {
   final double value;
@@ -243,6 +313,22 @@ class IbkrApiClient {
     final response = await _request('/v1/portfolio');
     return IbkrPortfolioSnapshot.fromJson(
       _decodeJsonObject(response, '/v1/portfolio'),
+    );
+  }
+
+  /// Fetches IBKR PortfolioAnalyst NAV and TWR history for [period].
+  Future<IbkrPerformanceSeries> fetchPerformance(String period) async {
+    const validPeriods = {'1D', '7D', 'MTD', '1M', '3M', '6M', '12M', 'YTD'};
+    final normalized = period.trim().toUpperCase();
+    if (!validPeriods.contains(normalized)) {
+      throw ArgumentError.value(period, 'period', 'Unsupported IBKR period');
+    }
+    final response = await _request(
+      '/v1/performance',
+      queryParameters: {'period': normalized},
+    );
+    return IbkrPerformanceSeries.fromJson(
+      _decodeJsonObject(response, '/v1/performance'),
     );
   }
 

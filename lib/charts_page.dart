@@ -23,21 +23,28 @@ enum _ChartMode { portfolio, searching, stock }
 
 class _LoadedChartPortfolio {
   final List<Position> positions;
+  final IbkrAccountValue? currentValue;
   final double? currentValueUsd;
 
   const _LoadedChartPortfolio({
     required this.positions,
+    required this.currentValue,
     required this.currentValueUsd,
   });
 }
 
 class ChartsPage extends StatefulWidget {
   final Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? _ibkrLoader;
+  final Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
+      _ibkrPerformanceLoader;
 
   const ChartsPage({
     super.key,
     Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? ibkrLoader,
-  }) : _ibkrLoader = ibkrLoader;
+    Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
+        ibkrPerformanceLoader,
+  })  : _ibkrLoader = ibkrLoader,
+        _ibkrPerformanceLoader = ibkrPerformanceLoader;
 
   @override
   State<ChartsPage> createState() => ChartsPageState();
@@ -72,9 +79,11 @@ class ChartsPageState extends State<ChartsPage>
   Stream<List<CandleTicker>>? _stockStream;
 
   Map<String, List<_DateValue>> _portfolioSeriesByAccount = {};
+  Map<String, double> _portfolioReturnsByAccount = {};
   String? _portfolioError;
   bool _portfolioLoading = false;
   final Set<String> _hiddenAccounts = {};
+  final Set<String> _performanceUnsupported = {};
   final Map<String, Future<_LoadedChartPortfolio>> _ibkrLoads = {};
 
   final _yahooApi = YahooFinanceApi();
@@ -138,6 +147,7 @@ class ChartsPageState extends State<ChartsPage>
       if (cached != null && (!refreshIbkr || !ibkrConfig.isConfigured)) {
         return _LoadedChartPortfolio(
           positions: cached.positions,
+          currentValue: cached.netLiquidation,
           currentValueUsd: cached.netLiquidationUsd,
         );
       }
@@ -153,6 +163,7 @@ class ChartsPageState extends State<ChartsPage>
           cacheIbkrAccountExchangeRate(snapshot);
           final positions =
               await computeIbkrPositions(snapshot.positions, trades);
+          final currentValue = snapshot.netLiquidation;
           final currentValueUsd = snapshot.netLiquidationUsd?.value;
           await accountManager.cachePortfolio(
             accountName,
@@ -162,6 +173,7 @@ class ChartsPageState extends State<ChartsPage>
           );
           return _LoadedChartPortfolio(
             positions: positions,
+            currentValue: currentValue,
             currentValueUsd: currentValueUsd,
           );
         } finally {
@@ -173,6 +185,7 @@ class ChartsPageState extends State<ChartsPage>
     final prices = await fetchLatestPrices(symbols, database: accountDb);
     return _LoadedChartPortfolio(
       positions: computePositions(trades, prices),
+      currentValue: null,
       currentValueUsd: null,
     );
   }
@@ -197,9 +210,14 @@ class ChartsPageState extends State<ChartsPage>
             accountManager,
             refreshIbkr: refreshIbkr,
           );
-          for (final position in loaded.positions) {
+          final trades = await accountDb.trades.select().get();
+          final symbols = {
+            ...loaded.positions.map((position) => position.symbol),
+            ...trades.map((trade) => trade.symbol),
+          };
+          for (final symbol in symbols) {
             await syncCandles(
-              position.symbol,
+              symbol,
               database: accountDb,
               ibkrConfig: ibkrConfig,
               syncNamespace: accountName,
@@ -274,12 +292,16 @@ class ChartsPageState extends State<ChartsPage>
           accountManager,
           refreshIbkr: true,
         );
+        final trades = await accountDb.trades.select().get();
         final task = (
           db: accountDb,
           isActive: isActive,
           accountName: accountName,
           ibkrConfig: ibkrConfig,
-          symbols: loaded.positions.map((position) => position.symbol).toList(),
+          symbols: {
+            ...loaded.positions.map((position) => position.symbol),
+            ...trades.map((trade) => trade.symbol),
+          }.toList(),
         );
         tasks.add(task);
       } catch (_) {
@@ -415,6 +437,7 @@ class ChartsPageState extends State<ChartsPage>
     });
 
     final newSeries = <String, List<_DateValue>>{};
+    final newReturns = <String, double>{};
     String? firstError;
 
     for (final accountName in accounts) {
@@ -432,10 +455,34 @@ class ChartsPageState extends State<ChartsPage>
           ibkrConfig,
           accountManager,
         );
+        if (ibkrConfig.isConfigured &&
+            years <= 1 &&
+            !_performanceUnsupported.contains(ibkrConfig.baseUrl)) {
+          try {
+            final performance = await (widget._ibkrPerformanceLoader?.call(
+                  ibkrConfig,
+                  '12M',
+                ) ??
+                IbkrApiClient(ibkrConfig).fetchPerformance('12M'));
+            final brokerSeries = _buildBrokerPerformanceSeries(
+              performance,
+              loaded,
+            );
+            if (brokerSeries.series.isNotEmpty) {
+              newSeries[accountName] = brokerSeries.series;
+              newReturns[accountName] = brokerSeries.twrPercent;
+              continue;
+            }
+          } catch (error) {
+            _performanceUnsupported.add(ibkrConfig.baseUrl);
+            talker.warning(
+              'IBKR performance history unavailable; using holdings history: $error',
+            );
+          }
+        }
         newSeries[accountName] = await _buildPortfolioSeries(
           loaded.positions,
           accountDb,
-          currentValueUsd: loaded.currentValueUsd,
         );
       } catch (e) {
         newSeries[accountName] = [];
@@ -448,6 +495,7 @@ class ChartsPageState extends State<ChartsPage>
     if (!mounted) return;
     setState(() {
       _portfolioSeriesByAccount = newSeries;
+      _portfolioReturnsByAccount = newReturns;
       _portfolioError = firstError;
       _portfolioLoading = false;
     });
@@ -455,20 +503,29 @@ class ChartsPageState extends State<ChartsPage>
 
   Future<List<_DateValue>> _buildPortfolioSeries(
     List<Position> positions,
-    Database accountDb, {
-    double? currentValueUsd,
-  }) async {
+    Database accountDb,
+  ) async {
     if (positions.isEmpty) return [];
 
     final now = DateTime.now();
     final after = days > 0
         ? DateTime(now.year, now.month, now.day - days - 4)
         : DateTime(now.year - years, now.month - months, now.day - 1);
-
-    final sharesMap = {for (final p in positions) p.symbol: p.netShares};
+    final trades = await (accountDb.trades.select()
+          ..orderBy([
+            (trade) => OrderingTerm(
+                  expression: trade.tradeDate,
+                  mode: OrderingMode.asc,
+                ),
+          ]))
+        .get();
+    final symbols = {
+      ...positions.map((position) => position.symbol),
+      ...trades.map((trade) => trade.symbol),
+    };
     final Map<String, Map<DateTime, double>> pricesBySymbol = {};
 
-    for (final symbol in sharesMap.keys) {
+    for (final symbol in symbols) {
       final rows = await (accountDb.candles.select()
             ..where(
               (c) => c.symbol.equals(symbol) & c.date.isBiggerThanValue(after),
@@ -494,23 +551,48 @@ class ChartsPageState extends State<ChartsPage>
 
     final Map<String, double> lastKnown = {};
     final Map<DateTime, double> valueByDate = {};
+    final Map<String, double> shares = {};
+    var tradeIndex = 0;
 
     for (final date in sortedDates) {
-      for (final symbol in sharesMap.keys) {
+      while (tradeIndex < trades.length &&
+          !DateTime(
+            trades[tradeIndex].tradeDate.year,
+            trades[tradeIndex].tradeDate.month,
+            trades[tradeIndex].tradeDate.day,
+          ).isAfter(date)) {
+        final trade = trades[tradeIndex];
+        shares[trade.symbol] = (shares[trade.symbol] ?? 0) + trade.quantity;
+        tradeIndex++;
+      }
+      for (final symbol in symbols) {
         final price = pricesBySymbol[symbol]?[date];
         if (price != null) lastKnown[symbol] = price;
       }
-      if (lastKnown.length == sharesMap.length) {
-        var total = 0.0;
-        for (final entry in sharesMap.entries) {
-          total += entry.value * lastKnown[entry.key]!;
+
+      var total = 0.0;
+      var hasHoldings = false;
+      var complete = true;
+      for (final entry in shares.entries) {
+        if (entry.value.abs() < 1e-9) continue;
+        hasHoldings = true;
+        final price = lastKnown[entry.key];
+        if (price == null) {
+          complete = false;
+          break;
         }
-        valueByDate[date] = total;
+        total += entry.value * price;
       }
+      if (hasHoldings && complete) valueByDate[date] = total;
     }
 
-    if (currentValueUsd != null) {
-      valueByDate[DateTime(now.year, now.month, now.day)] = currentValueUsd;
+    final currentHoldingsValueUsd = positions.fold<double>(
+      0,
+      (sum, position) => sum + position.currentValue,
+    );
+    if (currentHoldingsValueUsd.isFinite && currentHoldingsValueUsd > 0) {
+      valueByDate[DateTime(now.year, now.month, now.day)] =
+          currentHoldingsValueUsd;
     }
 
     var series = valueByDate.entries
@@ -533,6 +615,86 @@ class ChartsPageState extends State<ChartsPage>
     }
 
     return series;
+  }
+
+  ({List<_DateValue> series, double twrPercent}) _buildBrokerPerformanceSeries(
+    IbkrPerformanceSeries performance,
+    _LoadedChartPortfolio loaded,
+  ) {
+    if (performance.nav.isEmpty || performance.dates.isEmpty) {
+      return (series: const [], twrPercent: 0);
+    }
+
+    var basePerUsd = allRatesFromUsd[performance.currency] ?? 1.0;
+    final currentValue = loaded.currentValue;
+    final currentValueUsd = loaded.currentValueUsd;
+    if (currentValue != null &&
+        currentValueUsd != null &&
+        currentValueUsd > 0 &&
+        currentValue.currency == performance.currency) {
+      basePerUsd = currentValue.value / currentValueUsd;
+    }
+    if (!basePerUsd.isFinite || basePerUsd <= 0) basePerUsd = 1.0;
+
+    final points = <_DateValue>[];
+    if (performance.startDate != null && performance.startNav != null) {
+      points.add(
+        _DateValue(performance.startDate!, performance.startNav! / basePerUsd),
+      );
+    }
+    for (var index = 0; index < performance.dates.length; index++) {
+      points.add(
+        _DateValue(
+          performance.dates[index],
+          performance.nav[index] / basePerUsd,
+        ),
+      );
+    }
+    points.sort((a, b) => a.date.compareTo(b.date));
+    if (points.isEmpty) return (series: const [], twrPercent: 0);
+
+    final anchor = points.last.date;
+    int baselineIndex;
+    if (days > 0) {
+      baselineIndex =
+          (points.length - days).clamp(0, points.length - 1).toInt();
+    } else {
+      final cutoff = DateTime(
+        anchor.year - years,
+        anchor.month - months,
+        anchor.day,
+      );
+      baselineIndex = 0;
+      for (var index = 0; index < points.length; index++) {
+        if (!points[index].date.isAfter(cutoff)) baselineIndex = index;
+      }
+    }
+    var series = points.sublist(baselineIndex);
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    if (currentValueUsd != null && currentValueUsd.isFinite) {
+      final livePoint = _DateValue(today, currentValueUsd);
+      if (series.isNotEmpty && series.last.date == today) {
+        series = [...series.sublist(0, series.length - 1), livePoint];
+      } else {
+        series = [...series, livePoint];
+      }
+    }
+
+    final baselineDate = points[baselineIndex].date;
+    var startReturn = 0.0;
+    var endReturn = 0.0;
+    for (var index = 0; index < performance.returnDates.length; index++) {
+      final value = performance.returns[index];
+      if (!performance.returnDates[index].isAfter(baselineDate)) {
+        startReturn = value;
+      }
+      endReturn = value;
+    }
+    final denominator = 1 + startReturn;
+    final twr = denominator == 0 ? 0.0 : ((1 + endReturn) / denominator) - 1;
+    return (series: series, twrPercent: twr * 100);
   }
 
   static int _isoWeek(DateTime date) {
@@ -1384,7 +1546,9 @@ class ChartsPageState extends State<ChartsPage>
   ) {
     final idx = accounts.indexOf(accountName);
     final dotColor = accountColors[idx.clamp(0, accountColors.length - 1)];
-    final pct = safePercentChange(series.first.value, series.last.value);
+    final brokerReturn = _portfolioReturnsByAccount[accountName];
+    final pct = brokerReturn ??
+        safePercentChange(series.first.value, series.last.value);
     final returnColor = pct >= 0 ? Colors.green : Colors.redAccent;
     final change = series.last.value - series.first.value;
     final isHidden = _hiddenAccounts.contains(accountName);
@@ -1432,7 +1596,7 @@ class ChartsPageState extends State<ChartsPage>
                         size: 18,
                       ),
                       Text(
-                        '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%',
+                        '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%${brokerReturn == null ? ' value' : ' TWR'}',
                         style: Theme.of(
                           context,
                         ).textTheme.titleMedium!.copyWith(color: returnColor),
@@ -1451,7 +1615,7 @@ class ChartsPageState extends State<ChartsPage>
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: Text(
-                    '${change >= 0 ? '+' : ''}${fmtCurrency(change)} period change',
+                    '${change >= 0 ? '+' : ''}${fmtCurrency(change)} ${brokerReturn == null ? 'holdings change' : 'value change'}',
                     style: TextStyle(color: returnColor, fontSize: 13),
                   ),
                 ),

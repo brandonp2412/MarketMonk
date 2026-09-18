@@ -145,6 +145,100 @@ void main() {
     expect(ibkrLoads, 0);
   });
 
+  testWidgets('IBKR portfolio summary uses broker TWR when available', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'ibkrAccountConfigs':
+          '{"Default":{"enabled":true,"baseUrl":"https://ibkr.example.test","token":"secret-token"}}',
+      'ibkrHistorySeeded:https://ibkr.example.test:Default:VOO': true,
+      'chartPeriodYears': 0,
+      'chartPeriodMonths': 1,
+      'chartPeriodDays': 0,
+    });
+    db = Database.connect(
+      DatabaseConnection(
+        NativeDatabase.memory(),
+        closeStreamsSynchronously: true,
+      ),
+    );
+    addTearDown(() => db.close());
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(1200, 1000);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final accounts = AccountManager();
+    await accounts.init();
+    final cachedPosition = Position(
+      symbol: 'VOO',
+      name: 'VANGUARD S&P 500 ETF',
+      nativeCurrency: 'USD',
+      netShares: 10,
+      avgCost: 500,
+      currentPrice: 550,
+      firstBuyDate: DateTime(2025),
+      lastBuyDate: DateTime(2026),
+    );
+    await accounts.cachePortfolio(
+      'Default',
+      [cachedPosition],
+      const IbkrAccountValue(value: 333989.91, currency: 'NZD'),
+      netLiquidationUsd: 196500,
+    );
+    final now = DateTime.now();
+    await db.into(db.candles).insert(
+          CandlesCompanion.insert(
+            symbol: 'VOO',
+            date: DateTime(now.year, now.month, now.day),
+            close: const Value(550),
+          ),
+        );
+
+    var performanceLoads = 0;
+    Future<IbkrPerformanceSeries> performanceLoader(
+      IbkrAccountConfig _,
+      String period,
+    ) async {
+      performanceLoads++;
+      expect(period, '12M');
+      return IbkrPerformanceSeries(
+        period: period,
+        measure: 'TWR',
+        currency: 'NZD',
+        startDate: DateTime(2026, 8, 17),
+        startNav: 336605.45,
+        dates: [DateTime(2026, 8, 18), DateTime(2026, 9, 16)],
+        nav: const [335900, 333989.91],
+        returnDates: [DateTime(2026, 8, 18), DateTime(2026, 9, 16)],
+        returns: const [0, 0.0549],
+      );
+    }
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: ChartsPage(
+              ibkrLoader: (_) async => throw StateError('cache should be used'),
+              ibkrPerformanceLoader: performanceLoader,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(performanceLoads, greaterThan(0));
+    expect(find.textContaining('+5.49% TWR'), findsOneWidget);
+  });
+
   testWidgets('exact ticker fallback is available while search is loading', (
     WidgetTester tester,
   ) async {

@@ -16,7 +16,7 @@ from datetime import date, datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs, quote, urlparse
+from urllib.parse import parse_qs, quote, urlencode, urlparse
 from urllib.request import HTTPSHandler, Request, build_opener
 
 
@@ -101,6 +101,7 @@ class ClientPortalIbkrClient:
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
         self._opener = build_opener(HTTPSHandler(context=context))
+        self._performance_cache: dict[str, tuple[float, dict[str, Any]]] = {}
 
     def ensure_account_visible(self) -> str:
         accounts = self._get("portfolio/accounts")
@@ -130,15 +131,94 @@ class ClientPortalIbkrClient:
         }
 
     def historical(self, symbol: str, years: int) -> dict[str, Any]:
-        raise IbkrError(
-            "IBKR historical candles require the native TWS / IB Gateway backend"
+        raw_account = self.ensure_account_visible()
+        account = quote(raw_account, safe="")
+        positions = self._get(f"portfolio2/{account}/positions")
+        if not isinstance(positions, list):
+            raise IbkrError("IBKR returned an invalid position list")
+        position = next(
+            (
+                item
+                for item in positions
+                if str(item.get("description", "")).strip().upper() == symbol.upper()
+                and str(item.get("secType", "")).strip().upper() == "STK"
+            ),
+            None,
         )
+        if position is None:
+            raise IbkrError(
+                "IBKR historical candles are available for current stock positions only"
+            )
+        conid = _number(position.get("conid"))
+        if conid is None or conid <= 0:
+            raise IbkrError(f"IBKR position {symbol} is missing its contract ID")
+
+        query = urlencode(
+            {
+                "conid": int(conid),
+                "period": f"{years}y",
+                "bar": "1d",
+                "outsideRth": "false",
+            }
+        )
+        raw = self._get(f"iserver/marketdata/history?{query}")
+        if not isinstance(raw, dict) or not isinstance(raw.get("data"), list):
+            raise IbkrError("IBKR returned invalid historical market data")
+        volume_factor = _number(raw.get("volumeFactor")) or 1
+        candles = [
+            _normalize_web_historical_bar(bar, volume_factor)
+            for bar in raw["data"]
+            if isinstance(bar, dict)
+        ]
+        if not candles:
+            raise IbkrError(f"IBKR returned no historical candles for {symbol}")
+        return {
+            "read_only": True,
+            "source": "client_portal",
+            "symbol": symbol.upper(),
+            "currency": str(position.get("currency") or "USD").strip(),
+            "candles": candles,
+        }
+
+    def performance(self, period: str) -> dict[str, Any]:
+        cached = self._performance_cache.get(period)
+        now = time.monotonic()
+        if cached is not None and now - cached[0] < 14 * 60:
+            return cached[1]
+        account = self.ensure_account_visible()
+        raw = self._post("pa/performance", {"acctIds": [account], "period": period})
+        result = _normalize_web_performance(raw, period, account)
+        self._performance_cache[period] = (now, result)
+        return result
 
     def _get(self, endpoint: str) -> Any:
         url = f"{self._config.gateway_url}/{endpoint.lstrip('/')}"
         request = Request(url, headers={"Accept": "application/json"}, method="GET")
         try:
             with self._opener.open(request, timeout=20) as response:
+                return json.load(response)
+        except HTTPError as error:
+            if error.code in (401, 403):
+                raise IbkrError(
+                    "IBKR Client Portal Gateway is awaiting browser authentication"
+                ) from error
+            raise IbkrError(f"IBKR Gateway returned HTTP {error.code}") from error
+        except URLError as error:
+            raise IbkrError(f"Cannot reach IBKR Gateway: {error.reason}") from error
+        except (json.JSONDecodeError, UnicodeDecodeError) as error:
+            raise IbkrError("IBKR Gateway returned invalid JSON") from error
+
+    def _post(self, endpoint: str, body: dict[str, Any]) -> Any:
+        url = f"{self._config.gateway_url}/{endpoint.lstrip('/')}"
+        payload = json.dumps(body, separators=(",", ":")).encode("utf-8")
+        request = Request(
+            url,
+            data=payload,
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with self._opener.open(request, timeout=30) as response:
                 return json.load(response)
         except HTTPError as error:
             if error.code in (401, 403):
@@ -253,6 +333,9 @@ class NativeIbkrClient:
         finally:
             ib.disconnect()
 
+    def performance(self, period: str) -> dict[str, Any]:
+        raise IbkrError("IBKR performance requires the Client Portal backend")
+
     def _connect(self) -> Any:
         ib = self._ib_factory()
         try:
@@ -320,6 +403,13 @@ def make_handler(client: Any, token: str) -> type[BaseHTTPRequestHandler]:
                         self._json(400, {"error": "years must be between 1 and 10"})
                         return
                     self._json(200, client.historical(symbol, years))
+                elif parsed.path == "/v1/performance":
+                    query = parse_qs(parsed.query)
+                    period = (query.get("period") or ["1M"])[0].strip().upper()
+                    if period not in {"1D", "7D", "MTD", "1M", "3M", "6M", "12M", "YTD"}:
+                        self._json(400, {"error": "invalid performance period"})
+                        return
+                    self._json(200, client.performance(period))
                 else:
                     self._json(404, {"error": "not found"})
             except IbkrError as error:
@@ -382,6 +472,75 @@ def _normalize_web_position(value: Any) -> dict[str, Any]:
         "sector": _first_text(value, "sector"),
         "group": _first_text(value, "group"),
         "timestamp": _number(value.get("timestamp"), integer=True, default=0),
+    }
+
+
+def _normalize_web_historical_bar(
+    bar: dict[str, Any], volume_factor: float
+) -> dict[str, Any]:
+    timestamp = _number(bar.get("t"))
+    if timestamp is None or timestamp <= 0:
+        raise IbkrError("IBKR returned an invalid historical candle date")
+    day = datetime.fromtimestamp(timestamp / 1000).date().isoformat()
+    return {
+        "date": day,
+        "open": _required_number(bar.get("o")),
+        "high": _required_number(bar.get("h")),
+        "low": _required_number(bar.get("l")),
+        "close": _required_number(bar.get("c")),
+        "volume": int(round((_number(bar.get("v")) or 0) * volume_factor)),
+    }
+
+
+def _normalize_web_performance(
+    raw: Any, period: str, account: str
+) -> dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise IbkrError("IBKR returned invalid performance data")
+    nav = raw.get("nav")
+    cps = raw.get("cps")
+    if not isinstance(nav, dict) or not isinstance(cps, dict):
+        raise IbkrError("IBKR returned incomplete performance data")
+    nav_entries = nav.get("data")
+    return_entries = cps.get("data")
+    if not isinstance(nav_entries, list) or not isinstance(return_entries, list):
+        raise IbkrError("IBKR returned incomplete performance data")
+
+    def matching(entries: list[Any]) -> dict[str, Any] | None:
+        for entry in entries:
+            if isinstance(entry, dict) and entry.get("id") == account:
+                return entry
+        return next((entry for entry in entries if isinstance(entry, dict)), None)
+
+    nav_entry = matching(nav_entries)
+    return_entry = matching(return_entries)
+    if nav_entry is None or return_entry is None:
+        raise IbkrError("IBKR returned no performance data for the configured account")
+    dates = nav.get("dates")
+    navs = nav_entry.get("navs")
+    return_dates = cps.get("dates")
+    returns = return_entry.get("returns")
+    if not isinstance(dates, list) or not isinstance(navs, list) or len(dates) != len(navs):
+        raise IbkrError("IBKR returned invalid NAV history")
+    if (
+        not isinstance(return_dates, list)
+        or not isinstance(returns, list)
+        or len(return_dates) != len(returns)
+    ):
+        raise IbkrError("IBKR returned invalid return history")
+    start_nav = nav_entry.get("startNAV")
+    return {
+        "read_only": True,
+        "source": "client_portal",
+        "period": period,
+        "measure": str(raw.get("pm") or "TWR"),
+        "currency": str(nav_entry.get("baseCurrency") or "USD"),
+        "start_date": start_nav.get("date") if isinstance(start_nav, dict) else None,
+        "start_nav": _number(start_nav.get("val")) if isinstance(start_nav, dict) else None,
+        "dates": [str(value) for value in dates],
+        "nav": [_required_number(value) for value in navs],
+        "return_dates": [str(value) for value in return_dates],
+        "returns": [_required_number(value) for value in returns],
     }
 
 
@@ -483,6 +642,13 @@ def _finite_optional(value: Any) -> float | None:
     except (TypeError, ValueError):
         return None
     return parsed if math.isfinite(parsed) else None
+
+
+def _required_number(value: Any) -> float:
+    parsed = _number(value)
+    if parsed is None:
+        raise IbkrError("IBKR returned a missing numeric field")
+    return parsed
 
 
 def _optional_number(value: dict[str, Any], *names: str) -> float | None:

@@ -65,6 +65,21 @@ class FakeClient:
             ],
         }
 
+    def performance(self, period):
+        return {
+            "read_only": True,
+            "source": "client_portal",
+            "period": period,
+            "measure": "TWR",
+            "currency": "NZD",
+            "start_date": "20260817",
+            "start_nav": 320000,
+            "dates": ["20260818", "20260916"],
+            "nav": [321000, 333000],
+            "return_dates": ["20260818", "20260916"],
+            "returns": [0.001, 0.0549],
+        }
+
 
 class FailingClient:
     def ensure_account_visible(self) -> None:
@@ -76,14 +91,33 @@ class FailingClient:
     def historical(self, symbol, years):
         raise AssertionError("not reached")
 
+    def performance(self, period):
+        raise AssertionError("not reached")
+
 
 class RecordingIbkrClient(ClientPortalIbkrClient):
     def __init__(self, account_id="U1234567"):
         self._config = config(account_id=account_id)
         self.endpoints = []
+        self.posts = []
+        self._performance_cache = {}
 
     def _get(self, endpoint):
         self.endpoints.append(endpoint)
+        if endpoint.startswith("iserver/marketdata/history?"):
+            return {
+                "volumeFactor": 100,
+                "data": [
+                    {
+                        "o": 198,
+                        "h": 202,
+                        "l": 197,
+                        "c": 200,
+                        "v": 12.34,
+                        "t": 1787875200000,
+                    }
+                ],
+            }
         responses = {
             "portfolio/accounts": [{"accountId": "U1234567"}],
             "portfolio2/U1234567/positions": [
@@ -106,6 +140,33 @@ class RecordingIbkrClient(ClientPortalIbkrClient):
             "portfolio/U1234567/ledger": {},
         }
         return responses[endpoint]
+
+    def _post(self, endpoint, body):
+        self.posts.append((endpoint, body))
+        return {
+            "nav": {
+                "dates": ["20260818", "20260916"],
+                "data": [
+                    {
+                        "id": "U1234567",
+                        "navs": [321000, 333000],
+                        "startNAV": {"date": "20260817", "val": 320000},
+                        "baseCurrency": "NZD",
+                    }
+                ],
+            },
+            "cps": {
+                "dates": ["20260818", "20260916"],
+                "data": [
+                    {
+                        "id": "U1234567",
+                        "returns": [0.001, 0.0549],
+                        "baseCurrency": "NZD",
+                    }
+                ],
+            },
+            "pm": "TWR",
+        }
 
 
 class FakeNativeIb:
@@ -229,6 +290,34 @@ class ProxyTests(unittest.TestCase):
         self.assertEqual(portfolio["source"], "client_portal")
         self.assertTrue(portfolio["read_only"])
 
+    def test_client_portal_reads_historical_candles_for_held_stock(self):
+        client = RecordingIbkrClient()
+
+        history = client.historical("AAPL", 1)
+
+        self.assertEqual(history["source"], "client_portal")
+        self.assertEqual(history["currency"], "USD")
+        self.assertEqual(history["candles"][0]["close"], 200)
+        self.assertEqual(history["candles"][0]["volume"], 1234)
+        self.assertTrue(
+            any(endpoint.startswith("iserver/marketdata/history?") for endpoint in client.endpoints)
+        )
+
+    def test_client_portal_returns_broker_twr_and_nav_history(self):
+        client = RecordingIbkrClient()
+
+        performance = client.performance("1M")
+
+        self.assertEqual(performance["measure"], "TWR")
+        self.assertEqual(performance["currency"], "NZD")
+        self.assertEqual(performance["start_nav"], 320000)
+        self.assertEqual(performance["nav"][-1], 333000)
+        self.assertEqual(performance["returns"][-1], 0.0549)
+        self.assertEqual(
+            client.posts,
+            [("pa/performance", {"acctIds": ["U1234567"], "period": "1M"})],
+        )
+
     def test_native_backend_reads_portfolio_without_order_calls(self):
         fake = FakeNativeIb()
         client = NativeIbkrClient(
@@ -322,6 +411,17 @@ class ProxyTests(unittest.TestCase):
         historical_body = json.loads(historical.read())
         self.assertEqual(historical_body["symbol"], "AAPL")
         self.assertEqual(historical_body["candles"][0]["close"], 200)
+
+        connection.request(
+            "GET",
+            "/v1/performance?period=1M",
+            headers={"Authorization": f"Bearer {'x' * 32}"},
+        )
+        performance = connection.getresponse()
+        self.assertEqual(performance.status, 200)
+        performance_body = json.loads(performance.read())
+        self.assertEqual(performance_body["measure"], "TWR")
+        self.assertEqual(performance_body["returns"][-1], 0.0549)
         connection.close()
 
     def test_health_surfaces_browser_authentication(self):
