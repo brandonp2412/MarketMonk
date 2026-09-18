@@ -1,0 +1,1 @@
+• Fix correct IBKR portfolio performance history
