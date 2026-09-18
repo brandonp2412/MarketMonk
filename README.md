@@ -17,17 +17,17 @@ Track stocks on any platform 📈
 <p float="left">
 <a href="https://play.google.com/store/apps/details?id=com.codesail.market_monk"><img alt="Get it on Google Play" style="height: 80px !important" src="./docs/get-it-on-google-play.png"/></a>
 <a href="https://f-droid.org/packages/com.codesail.market_monk"><img src="./docs/get-it-on-fdroid.png" alt="Get it on F-Droid" style="height: 80px !important"></a>
-<a href="https://apps.microsoft.com/detail/9PP4HKV1CMWC?mode=direct"><img src="./docs/download-msstore.svg" style="height: 80px !important"/></a>
+<a href="https://apps.microsoft.com/detail/9PP4HKV1CMWC?mode=direct"><img alt="Download MarketMonk from the Microsoft Store" src="./docs/download-msstore.svg" style="height: 80px !important"/></a>
 </p>
 
 <br />
 <p float="left">
-    <img src="docs/screenshot5.jpg" height="700"/>
-    <img src="docs/screenshot6.jpg" height="700"/>
-    <img src="docs/screenshot4.jpg" height="700"/>
-    <img src="docs/screenshot3.jpg" height="700"/>
-    <img src="docs/screenshot1.jpg" height="700"/>
-    <img src="docs/screenshot2.jpg" height="700"/>
+    <img alt="MarketMonk holdings overview" src="fastlane/metadata/android/en-US/images/phoneScreenshots/5_en-US.png" height="700"/>
+    <img alt="MarketMonk holding trade history" src="fastlane/metadata/android/en-US/images/phoneScreenshots/6_en-US.png" height="700"/>
+    <img alt="MarketMonk edit ticker screen" src="fastlane/metadata/android/en-US/images/phoneScreenshots/4_en-US.png" height="700"/>
+    <img alt="MarketMonk settings screen" src="fastlane/metadata/android/en-US/images/phoneScreenshots/3_en-US.png" height="700"/>
+    <img alt="MarketMonk stock chart" src="fastlane/metadata/android/en-US/images/phoneScreenshots/1_en-US.png" height="700"/>
+    <img alt="MarketMonk portfolio screen" src="fastlane/metadata/android/en-US/images/phoneScreenshots/2_en-US.png" height="700"/>
 </p>
 
 # Donations
