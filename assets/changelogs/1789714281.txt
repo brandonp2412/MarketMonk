@@ -1,0 +1,1 @@
+• Fix show IBKR holdings history without trades
