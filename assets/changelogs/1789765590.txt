@@ -1,0 +1,1 @@
+• Fix populate README chart screenshot
