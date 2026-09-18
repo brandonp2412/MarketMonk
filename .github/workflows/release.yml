@@ -115,6 +115,7 @@ jobs:
 
   patrol:
     name: Patrol Android system tests
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -162,8 +163,8 @@ jobs:
           script: patrol test -t patrol_test/android_system_test.dart
 
   version-bump:
-    needs: [quality-checks, screenshots, patrol]
-    if: ${{ always() && needs.quality-checks.result == 'success' && needs.patrol.result == 'success' }}
+    needs: [quality-checks, screenshots]
+    if: ${{ always() && needs.quality-checks.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

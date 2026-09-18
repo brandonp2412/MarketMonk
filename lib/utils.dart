@@ -362,14 +362,16 @@ Future<Map<String, double>> fetchLatestPrices(
   // Every computePositions caller fetches prices first, so this is the choke
   // point that tries to load currency + cent-divisor metadata before positions
   // are computed (GBp candles would otherwise be read as GBP, #30).
-  await Future.wait(symbols.map((symbol) async {
-    await fetchSymbolCurrencyAndRate(symbol);
-    final nativeCurrency = _symbolCurrencies[symbol];
-    if (nativeCurrency == null || nativeCurrency.isEmpty) {
-      throw StateError('Currency metadata unavailable for $symbol');
-    }
-    requireUsdRate(nativeCurrency);
-  }));
+  await Future.wait(
+    symbols.map((symbol) async {
+      await fetchSymbolCurrencyAndRate(symbol);
+      final nativeCurrency = _symbolCurrencies[symbol];
+      if (nativeCurrency == null || nativeCurrency.isEmpty) {
+        throw StateError('Currency metadata unavailable for $symbol');
+      }
+      requireUsdRate(nativeCurrency);
+    }),
+  );
 
   final ph = List.filled(symbols.length, '?').join(', ');
   try {

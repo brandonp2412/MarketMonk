@@ -150,7 +150,9 @@ class AccountManager extends ChangeNotifier {
     }
     activeAccount = prefs.getString('activeAccount') ?? 'Default';
     if (!accounts.contains(activeAccount)) {
-      talker.warning('Saved active portfolio account no longer exists; using Default');
+      talker.warning(
+        'Saved active portfolio account no longer exists; using Default',
+      );
       activeAccount = 'Default';
       await prefs.setString('activeAccount', activeAccount);
     }
