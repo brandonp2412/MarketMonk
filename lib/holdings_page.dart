@@ -140,9 +140,7 @@ class HoldingsPageState extends State<HoldingsPage>
           syncNamespace: accountName,
         );
       }
-    } catch (_) {
-      // Silently ignore network errors on background sync
-    }
+    } catch (_) {}
     if (mounted) setState(() => _stream = _buildStream());
   }
 
