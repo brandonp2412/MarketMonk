@@ -264,6 +264,69 @@ class AccountManager extends ChangeNotifier {
     talker.info('Switched active portfolio account');
   }
 
+  Future<void> importDatabase(File sourceFile) async {
+    final dbName = activeAccount == 'Default'
+        ? 'market-monk'
+        : 'market-monk-$activeAccount';
+    final dbFolder = await getApplicationSupportDirectory();
+    final targetFile = File(p.join(dbFolder.path, '$dbName.sqlite'));
+    final stagedFile = File('${targetFile.path}.importing');
+    final backupFile = File('${targetFile.path}.pre-import');
+    final sourcePath = p.normalize(p.absolute(sourceFile.path));
+    final targetPath = p.normalize(p.absolute(targetFile.path));
+    final sourceIsTarget = sourcePath == targetPath;
+
+    if (!sourceIsTarget) {
+      if (await stagedFile.exists()) await stagedFile.delete();
+      await sourceFile.copy(stagedFile.path);
+    }
+
+    await db.close();
+
+    try {
+      if (await backupFile.exists()) await backupFile.delete();
+      if (await targetFile.exists()) {
+        await targetFile.copy(backupFile.path);
+      }
+
+      if (!sourceIsTarget) {
+        await stagedFile.copy(targetFile.path);
+      }
+
+      for (final suffix in ['-wal', '-shm']) {
+        final sidecar = File('${targetFile.path}$suffix');
+        if (await sidecar.exists()) await sidecar.delete();
+      }
+
+      db = Database(dbName);
+      await db.customSelect('PRAGMA user_version').getSingle();
+
+      clearAllSyncCache();
+      notifyListeners();
+      talker.info('Imported database for active portfolio account');
+
+      if (await backupFile.exists()) await backupFile.delete();
+    } catch (error, stackTrace) {
+      try {
+        await db.close();
+      } catch (_) {}
+
+      for (final suffix in ['-wal', '-shm']) {
+        final sidecar = File('${targetFile.path}$suffix');
+        if (await sidecar.exists()) await sidecar.delete();
+      }
+      if (await backupFile.exists()) {
+        await backupFile.copy(targetFile.path);
+      }
+      db = Database(dbName);
+      talker.handle(error, stackTrace, 'Failed to import portfolio database');
+      rethrow;
+    } finally {
+      if (await stagedFile.exists()) await stagedFile.delete();
+      if (await backupFile.exists()) await backupFile.delete();
+    }
+  }
+
   Future<void> addAccount(String name) async {
     if (accounts.contains(name)) return;
     accounts = [...accounts, name];

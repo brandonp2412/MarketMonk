@@ -8,7 +8,6 @@ import 'package:intl/intl.dart';
 import 'package:market_monk/accounts_page.dart';
 import 'package:market_monk/whats_new.dart';
 import 'package:market_monk/csv_import.dart';
-import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_state.dart';
@@ -218,6 +217,69 @@ class _SettingsPageState extends State<SettingsPage> {
     }
     unawaited(settings.syncTickers(symbols, syncCandles));
     toast(context, 'Imported $tradesCount trades');
+  }
+
+  Future<void> _importDatabase(BuildContext context) async {
+    final accounts = context.read<AccountManager>();
+    final result = await FilePicker.pickFiles();
+    if (!context.mounted || result == null) return;
+
+    final selectedPath = result.files.single.path;
+    if (selectedPath == null) {
+      toast(context, 'Could not access the selected database');
+      return;
+    }
+
+    final sourceFile = File(selectedPath);
+    try {
+      final raf = await sourceFile.open();
+      final header = await raf.read(16);
+      await raf.close();
+
+      const sqliteMagic = [
+        0x53,
+        0x51,
+        0x4C,
+        0x69,
+        0x74,
+        0x65,
+        0x20,
+        0x66,
+        0x6F,
+        0x72,
+        0x6D,
+        0x61,
+        0x74,
+        0x20,
+        0x33,
+        0x00,
+      ];
+      final isValid = header.length == sqliteMagic.length &&
+          List.generate(
+            sqliteMagic.length,
+            (i) => header[i] == sqliteMagic[i],
+          ).every((matches) => matches);
+      if (!isValid) {
+        if (context.mounted) {
+          toast(context, 'Selected file is not a valid database');
+        }
+        return;
+      }
+
+      await accounts.importDatabase(sourceFile);
+    } catch (_) {
+      if (context.mounted) {
+        toast(context, 'Database import failed');
+      }
+      return;
+    }
+
+    if (!context.mounted) return;
+    toast(context, 'Database imported');
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const MyHomePage()),
+      (_) => false,
+    );
   }
 
   Future<void> _showCurrencyPicker(
@@ -619,59 +681,7 @@ class _SettingsPageState extends State<SettingsPage> {
             child: ListTile(
               leading: const Icon(Icons.upload),
               title: const Text('Import database'),
-              onTap: () async {
-                Navigator.pop(context);
-                final activeAccount =
-                    context.read<AccountManager>().activeAccount;
-                FilePickerResult? result = await FilePicker.pickFiles();
-                if (result == null) return;
-
-                File sourceFile = File(result.files.single.path!);
-
-                // Validate SQLite magic header before overwriting the database.
-                // SQLite files start with "SQLite format 3\0" (16 bytes).
-                final raf = await sourceFile.open();
-                final header = await raf.read(16);
-                await raf.close();
-                const sqliteMagic = [
-                  0x53,
-                  0x51,
-                  0x4C,
-                  0x69,
-                  0x74,
-                  0x65,
-                  0x20,
-                  0x66,
-                  0x6F,
-                  0x72,
-                  0x6D,
-                  0x61,
-                  0x74,
-                  0x20,
-                  0x33,
-                  0x00,
-                ];
-                final isValid = header.length == 16 &&
-                    List.generate(
-                      16,
-                      (i) => header[i] == sqliteMagic[i],
-                    ).every((b) => b);
-                if (!isValid) {
-                  if (!context.mounted) return;
-                  toast(context, 'Selected file is not a valid database');
-                  return;
-                }
-
-                final dbName = activeAccount == 'Default'
-                    ? 'market-monk'
-                    : 'market-monk-$activeAccount';
-                final dbFolder = await getApplicationSupportDirectory();
-                await db.close();
-                await sourceFile.copy(p.join(dbFolder.path, '$dbName.sqlite'));
-                db = Database(dbName);
-                if (!context.mounted) return;
-                Navigator.pushNamedAndRemoveUntil(context, '/', (_) => false);
-              },
+              onTap: () => _importDatabase(context),
             ),
           ),
           if (Platform.isAndroid || Platform.isWindows) ...[
