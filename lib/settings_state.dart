@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/utils.dart';
 import 'package:market_monk/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -56,6 +57,7 @@ class SettingsState extends ChangeNotifier {
   late final Future<void> initialized;
 
   ThemeMode theme = ThemeMode.system;
+  String? languageCode;
   bool systemColors = false;
   bool curveLines = false;
   double curveSmoothness = 0.35;
@@ -70,6 +72,9 @@ class SettingsState extends ChangeNotifier {
       : _rateFetcher = rateFetcher ?? http.get {
     initialized = init();
   }
+
+  /// Locale selected by the user, or null to follow the device locale.
+  Locale? get locale => languageCode == null ? null : Locale(languageCode!);
 
   /// Returns the supported ISO 4217 currency for [locale], falling back to USD.
   static String currencyForLocale(Locale locale) {
@@ -109,6 +114,14 @@ class SettingsState extends ChangeNotifier {
         theme = ThemeMode.system;
         break;
     }
+
+    final savedLanguageCode = prefs.getString('languageCode');
+    final supportedLanguageCodes = AppLocalizations.supportedLocales
+        .map((locale) => locale.languageCode)
+        .toSet();
+    languageCode = supportedLanguageCodes.contains(savedLanguageCode)
+        ? savedLanguageCode
+        : null;
 
     systemColors = prefs.getBool('systemColors') ?? false;
     curveLines = prefs.getBool('curveLines') ?? false;
@@ -227,6 +240,23 @@ class SettingsState extends ChangeNotifier {
   void setTheme(ThemeMode value) {
     theme = value;
     notifyListeners();
+  }
+
+  Future<void> setLanguageCode(String? value) async {
+    final isSupported = value == null ||
+        AppLocalizations.supportedLocales.any(
+          (locale) => locale.languageCode == value,
+        );
+    if (!isSupported) return;
+
+    languageCode = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    if (value == null) {
+      await prefs.remove('languageCode');
+    } else {
+      await prefs.setString('languageCode', value);
+    }
   }
 
   void setSeedColor(Color value) async {

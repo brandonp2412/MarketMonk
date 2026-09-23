@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:market_monk/l10n/app_localizations.dart';
 
 /// Total height this floating dock occupies, including its outer padding.
 ///
@@ -49,7 +50,7 @@ class BottomNav extends StatelessWidget {
               final index = entry.key;
               final tab = entry.value;
               final isSelected = index == currentIndex;
-              final label = _getLabelForTab(tab);
+              final label = _getLabelForTab(context, tab);
 
               return Semantics(
                 label: label,
@@ -124,16 +125,16 @@ class BottomNav extends StatelessWidget {
     }
   }
 
-  String _getLabelForTab(String tab) {
+  String _getLabelForTab(BuildContext context, String tab) {
     switch (tab) {
       case 'ChartPage':
-        return 'Charts';
+        return context.l10n.text('Charts');
       case 'PortfolioPage':
-        return 'Portfolio';
+        return context.l10n.text('Portfolio');
       case 'HoldingsPage':
-        return 'Holdings';
+        return context.l10n.text('Holdings');
       default:
-        return 'Error';
+        return context.l10n.text('Error');
     }
   }
 }

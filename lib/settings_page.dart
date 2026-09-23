@@ -9,6 +9,7 @@ import 'package:market_monk/accounts_page.dart';
 import 'package:market_monk/whats_new.dart';
 import 'package:market_monk/csv_import.dart';
 import 'package:market_monk/ibkr_api.dart';
+import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/ticker_line.dart';
@@ -19,6 +20,17 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher_string.dart';
+
+const _languageNames = <String, String>{
+  'en': 'English',
+  'de': 'Deutsch',
+  'es': 'Español',
+  'fr': 'Français',
+  'pt': 'Português',
+  'ja': '日本語',
+  'ko': '한국어',
+  'zh': '简体中文',
+};
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -387,28 +399,28 @@ class _SettingsPageState extends State<SettingsPage> {
     final settings = context.watch<SettingsState>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Settings")),
+      appBar: AppBar(title: Text(context.l10n.text('Settings'))),
       body: ListView(
         children: [
-          _sectionHeader('Appearance'),
+          _sectionHeader(context.l10n.text('Appearance')),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
             child: SegmentedButton<ThemeMode>(
-              segments: const [
+              segments: [
                 ButtonSegment(
                   value: ThemeMode.system,
-                  label: Text('System'),
-                  icon: Icon(Icons.brightness_auto),
+                  label: Text(context.l10n.text('System')),
+                  icon: const Icon(Icons.brightness_auto),
                 ),
                 ButtonSegment(
                   value: ThemeMode.dark,
-                  label: Text('Dark'),
-                  icon: Icon(Icons.dark_mode),
+                  label: Text(context.l10n.text('Dark')),
+                  icon: const Icon(Icons.dark_mode),
                 ),
                 ButtonSegment(
                   value: ThemeMode.light,
-                  label: Text('Light'),
-                  icon: Icon(Icons.light_mode),
+                  label: Text(context.l10n.text('Light')),
+                  icon: const Icon(Icons.light_mode),
                 ),
               ],
               selected: {settings.theme},
@@ -421,10 +433,35 @@ class _SettingsPageState extends State<SettingsPage> {
               },
             ),
           ),
+          ListTile(
+            leading: const Icon(Icons.language),
+            title: Text(context.l10n.text('Language')),
+            trailing: DropdownButton<String>(
+              value: settings.languageCode ?? 'system',
+              underline: const SizedBox.shrink(),
+              items: [
+                DropdownMenuItem(
+                  value: 'system',
+                  child: Text(context.l10n.text('System default')),
+                ),
+                ..._languageNames.entries.map(
+                  (entry) => DropdownMenuItem(
+                    value: entry.key,
+                    child: Text(entry.value),
+                  ),
+                ),
+              ],
+              onChanged: (value) => settings.setLanguageCode(
+                value == 'system' ? null : value,
+              ),
+            ),
+          ),
           Tooltip(
-            message: 'Use the primary color of your device for the app',
+            message: context.l10n.text(
+              'Use the primary color of your device for the app',
+            ),
             child: ListTile(
-              title: const Text('System color scheme'),
+              title: Text(context.l10n.text('System color scheme')),
               leading: settings.systemColors
                   ? const Icon(Icons.color_lens)
                   : const Icon(Icons.color_lens_outlined),
@@ -436,9 +473,10 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           ListTile(
-            title: const Text('Pure black (AMOLED)'),
+            title: Text(context.l10n.text('Pure black (AMOLED)')),
             leading: const Icon(Icons.contrast),
-            subtitle: const Text('Use pure black for AMOLED displays'),
+            subtitle:
+                Text(context.l10n.text('Use pure black for AMOLED displays')),
             trailing: Switch(
               value: settings.pureBlack,
               onChanged: (value) => settings.setPureBlack(value),
@@ -449,7 +487,8 @@ class _SettingsPageState extends State<SettingsPage> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Tooltip(
-              message: 'How dates are displayed below graphs',
+              message:
+                  context.l10n.text('How dates are displayed below graphs'),
               child: DropdownButtonFormField<String>(
                 initialValue: settings.dateFormat,
                 items: const [
@@ -466,18 +505,24 @@ class _SettingsPageState extends State<SettingsPage> {
                 ],
                 onChanged: (value) => settings.setDateFormat(value ?? 'd/M/yy'),
                 decoration: InputDecoration(
-                  labelText:
-                      'Date format (${DateFormat(settings.dateFormat).format(DateTime.now())})',
+                  labelText: context.l10n.text(
+                    'Date format ({example})',
+                    {
+                      'example': DateFormat(settings.dateFormat)
+                          .format(DateTime.now()),
+                    },
+                  ),
                 ),
               ),
             ),
           ),
-          _sectionHeader('Charts'),
+          _sectionHeader(context.l10n.text('Charts')),
           Tooltip(
-            message:
-                'Show a badge on the chart when the market is closed (weekends)',
+            message: context.l10n.text(
+              'Show a badge on the chart when the market is closed (weekends)',
+            ),
             child: ListTile(
-              title: const Text('Market closed indicator'),
+              title: Text(context.l10n.text('Market closed indicator')),
               leading: settings.showMarketClosed
                   ? const Icon(Icons.schedule)
                   : const Icon(Icons.schedule_outlined),
@@ -490,9 +535,9 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           Tooltip(
-            message: 'Use wavy curves in the graphs page',
+            message: context.l10n.text('Use wavy curves in the graphs page'),
             child: ListTile(
-              title: const Text('Curve line graphs'),
+              title: Text(context.l10n.text('Curve line graphs')),
               leading: const Icon(Icons.insights),
               onTap: () => settings.setCurveLines(!settings.curveLines),
               trailing: Switch(
@@ -506,7 +551,7 @@ class _SettingsPageState extends State<SettingsPage> {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text(
-                  "Curve smoothness",
+                  context.l10n.text('Curve smoothness'),
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
               ),
@@ -540,10 +585,10 @@ class _SettingsPageState extends State<SettingsPage> {
               ],
             ),
           ),
-          _sectionHeader('Accounts'),
+          _sectionHeader(context.l10n.text('Accounts')),
           ListTile(
             leading: const Icon(Icons.manage_accounts),
-            title: const Text('Manage accounts'),
+            title: Text(context.l10n.text('Manage accounts')),
             subtitle: Text(context.watch<AccountManager>().activeAccount),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.push(
@@ -553,7 +598,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           ListTile(
             leading: const Icon(Icons.currency_exchange),
-            title: const Text('Currencies'),
+            title: Text(context.l10n.text('Currencies')),
             subtitle: Text(settings.visibleCurrencies.join(', ')),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showCurrencyPicker(context, settings),
@@ -564,7 +609,7 @@ class _SettingsPageState extends State<SettingsPage> {
               final config = accounts.ibkrConfigFor();
               return ListTile(
                 leading: const Icon(Icons.account_balance),
-                title: const Text('Interactive Brokers'),
+                title: Text(context.l10n.text('Interactive Brokers')),
                 subtitle: Text(
                   config.enabled
                       ? 'IBKR portfolio source • ${config.baseUrl}'
@@ -575,12 +620,13 @@ class _SettingsPageState extends State<SettingsPage> {
               );
             },
           ),
-          _sectionHeader('Data'),
+          _sectionHeader(context.l10n.text('Data')),
           Tooltip(
-            message: 'Download the database file for the entire app',
+            message: context.l10n
+                .text('Download the database file for the entire app'),
             child: ListTile(
               leading: const Icon(Icons.download),
-              title: const Text('Export database'),
+              title: Text(context.l10n.text('Export database')),
               onTap: () async {
                 Navigator.pop(context);
                 final activeAccount =
@@ -601,10 +647,11 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           Tooltip(
-            message: 'Import holdings from a broker CSV export',
+            message:
+                context.l10n.text('Import holdings from a broker CSV export'),
             child: ListTile(
               leading: const Icon(Icons.table_chart),
-              title: const Text('Import CSV'),
+              title: Text(context.l10n.text('Import CSV')),
               onTap: () => _importCsv(context),
             ),
           ),
@@ -620,7 +667,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 : Icon(
                     settings.syncFailed > 0 ? Icons.sync_problem : Icons.sync,
                   ),
-            title: const Text('Sync'),
+            title: Text(context.l10n.text('Sync')),
             subtitle: settings.syncInProgress
                 ? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -644,10 +691,12 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
           ),
           Tooltip(
-            message: 'Permanently delete all holdings, trades, and candles',
+            message: context.l10n.text(
+              'Permanently delete all holdings, trades, and candles',
+            ),
             child: ListTile(
               leading: const Icon(Icons.delete_forever),
-              title: const Text('Delete all data'),
+              title: Text(context.l10n.text('Delete all data')),
               onTap: () async {
                 final confirmed = await showDialog<bool>(
                   context: context,
@@ -677,10 +726,10 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           Tooltip(
-            message: 'Import a .sqlite database',
+            message: context.l10n.text('Import a .sqlite database'),
             child: ListTile(
               leading: const Icon(Icons.upload),
-              title: const Text('Import database'),
+              title: Text(context.l10n.text('Import database')),
               onTap: () => _importDatabase(context),
             ),
           ),
@@ -690,13 +739,13 @@ class _SettingsPageState extends State<SettingsPage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Text(
-                "About",
+                context.l10n.text('About'),
                 style: Theme.of(context).textTheme.headlineLarge,
               ),
             ),
             ListTile(
               leading: const Icon(Icons.new_releases_outlined),
-              title: const Text("What's New"),
+              title: Text(context.l10n.text("What's New")),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.push(
                 context,
@@ -705,7 +754,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             ListTile(
               leading: const Icon(Icons.info_outline),
-              title: const Text("Version"),
+              title: Text(context.l10n.text('Version')),
               subtitle: FutureBuilder(
                 future: packageInfo,
                 builder: (context, snapshot) =>
@@ -719,7 +768,7 @@ class _SettingsPageState extends State<SettingsPage> {
               },
             ),
             ListTile(
-              title: const Text("Author"),
+              title: Text(context.l10n.text('Author')),
               leading: const Icon(Icons.person),
               subtitle: FutureBuilder(
                 future: packageInfo,
@@ -732,7 +781,7 @@ class _SettingsPageState extends State<SettingsPage> {
               },
             ),
             ListTile(
-              title: const Text("License"),
+              title: Text(context.l10n.text('License')),
               leading: const Icon(Icons.balance),
               subtitle: FutureBuilder(
                 future: packageInfo,
@@ -746,7 +795,7 @@ class _SettingsPageState extends State<SettingsPage> {
               },
             ),
             ListTile(
-              title: const Text("Source code"),
+              title: Text(context.l10n.text('Source code')),
               leading: const Icon(Icons.code),
               subtitle: FutureBuilder(
                 future: packageInfo,
@@ -760,7 +809,7 @@ class _SettingsPageState extends State<SettingsPage> {
               },
             ),
             ListTile(
-              title: const Text("Donate"),
+              title: Text(context.l10n.text('Donate')),
               leading: const Icon(Icons.favorite_outline),
               subtitle: FutureBuilder(
                 future: packageInfo,
@@ -959,7 +1008,10 @@ class _ColorPicker extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('App color', style: Theme.of(context).textTheme.bodyMedium),
+          Text(
+            context.l10n.text('App color'),
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
