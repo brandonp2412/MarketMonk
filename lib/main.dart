@@ -11,6 +11,7 @@ import 'package:market_monk/crash_logger.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/ibkr_api.dart';
+import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/settings_state.dart';
@@ -426,6 +427,9 @@ class MyApp extends StatelessWidget {
           useMaterial3: true,
         ),
         themeMode: settings.theme,
+        locale: settings.locale,
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
         home: const MyHomePage(),
       ),
     );
