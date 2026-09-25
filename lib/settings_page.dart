@@ -27,6 +27,7 @@ const _languageNames = <String, String>{
   'es': 'Español',
   'fr': 'Français',
   'pt': 'Português',
+  'hi': 'हिन्दी',
   'ja': '日本語',
   'ko': '한국어',
   'zh': '简体中文',
