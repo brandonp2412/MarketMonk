@@ -773,7 +773,7 @@ class _SettingsPageState extends State<SettingsPage> {
               leading: const Icon(Icons.person),
               subtitle: FutureBuilder(
                 future: packageInfo,
-                builder: (context, snapshot) => const Text("Brandon Presley"),
+                builder: (context, snapshot) => const Text("Brandon Dick"),
               ),
               onTap: () async {
                 if (Platform.isIOS || Platform.isMacOS) return;
