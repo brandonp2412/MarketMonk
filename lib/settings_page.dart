@@ -66,7 +66,7 @@ class _SettingsPageState extends State<SettingsPage> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('Select broker'),
+          title: Text(context.l10n.text('Select broker')),
           content: SizedBox(
             width: double.maxFinite,
             child: Column(
@@ -90,7 +90,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'How to get this CSV from ${currentSelection.name}:',
+                  context.l10n.text(
+                    'How to get this CSV from {broker}:',
+                    {'broker': currentSelection.name},
+                  ),
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: 4),
@@ -100,7 +103,9 @@ class _SettingsPageState extends State<SettingsPage> {
                     .map(
                       (entry) => Padding(
                         padding: const EdgeInsets.only(bottom: 4),
-                        child: Text('${entry.key + 1}. ${entry.value}'),
+                        child: Text(
+                          '${entry.key + 1}. ${context.l10n.text(entry.value)}',
+                        ),
                       ),
                     ),
               ],
@@ -109,14 +114,14 @@ class _SettingsPageState extends State<SettingsPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: Text(context.l10n.text('Cancel')),
             ),
             TextButton(
               onPressed: () {
                 selectedParser = currentSelection;
                 Navigator.pop(context);
               },
-              child: const Text('Continue'),
+              child: Text(context.l10n.text('Continue')),
             ),
           ],
         ),
@@ -144,7 +149,10 @@ class _SettingsPageState extends State<SettingsPage> {
       parsed = parseBrokerCsvBatch(selectedParser!, contents);
     } catch (e) {
       if (!context.mounted) return;
-      toast(context, 'Failed to parse CSV: $e');
+      toast(
+        context,
+        context.l10n.text('Failed to parse CSV: {error}', {'error': e}),
+      );
       return;
     }
 
@@ -161,7 +169,10 @@ class _SettingsPageState extends State<SettingsPage> {
           'These files look like ${detectedBroker.name} CSVs. Select ${detectedBroker.name} and try again.',
         );
       } else {
-        toast(context, 'No trades found in the selected files');
+        toast(
+          context,
+          context.l10n.text('No trades found in the selected files'),
+        );
       }
       return;
     }
@@ -171,7 +182,10 @@ class _SettingsPageState extends State<SettingsPage> {
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Import ${parsed.trades.length} trades'),
+        title: Text(
+          context.l10n
+              .text('Import {count} trades', {'count': parsed.trades.length}),
+        ),
         content: SizedBox(
           width: double.maxFinite,
           child: ListView(
@@ -203,14 +217,14 @@ class _SettingsPageState extends State<SettingsPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.text('Cancel')),
           ),
           TextButton(
             onPressed: () {
               confirmed = true;
               Navigator.pop(context);
             },
-            child: const Text('Import'),
+            child: Text(context.l10n.text('Import')),
           ),
         ],
       ),
@@ -229,7 +243,10 @@ class _SettingsPageState extends State<SettingsPage> {
       clearSyncCache(symbol);
     }
     unawaited(settings.syncTickers(symbols, syncCandles));
-    toast(context, 'Imported $tradesCount trades');
+    toast(
+      context,
+      context.l10n.text('Imported {count} trades', {'count': tradesCount}),
+    );
   }
 
   Future<void> _importDatabase(BuildContext context) async {
@@ -239,7 +256,10 @@ class _SettingsPageState extends State<SettingsPage> {
 
     final selectedPath = result.files.single.path;
     if (selectedPath == null) {
-      toast(context, 'Could not access the selected database');
+      toast(
+        context,
+        context.l10n.text('Could not access the selected database'),
+      );
       return;
     }
 
@@ -274,7 +294,10 @@ class _SettingsPageState extends State<SettingsPage> {
           ).every((matches) => matches);
       if (!isValid) {
         if (context.mounted) {
-          toast(context, 'Selected file is not a valid database');
+          toast(
+            context,
+            context.l10n.text('Selected file is not a valid database'),
+          );
         }
         return;
       }
@@ -282,13 +305,13 @@ class _SettingsPageState extends State<SettingsPage> {
       await accounts.importDatabase(sourceFile);
     } catch (_) {
       if (context.mounted) {
-        toast(context, 'Database import failed');
+        toast(context, context.l10n.text('Database import failed'));
       }
       return;
     }
 
     if (!context.mounted) return;
-    toast(context, 'Database imported');
+    toast(context, context.l10n.text('Database imported'));
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const MyHomePage()),
       (_) => false,
@@ -305,7 +328,7 @@ class _SettingsPageState extends State<SettingsPage> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('Display currencies'),
+          title: Text(context.l10n.text('Display currencies')),
           content: SizedBox(
             width: double.maxFinite,
             child: ListView(
@@ -333,7 +356,7 @@ class _SettingsPageState extends State<SettingsPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: Text(context.l10n.text('Cancel')),
             ),
             TextButton(
               onPressed: () {
@@ -342,7 +365,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 );
                 Navigator.pop(context);
               },
-              child: const Text('Save'),
+              child: Text(context.l10n.text('Save')),
             ),
           ],
         ),
@@ -613,8 +636,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 title: Text(context.l10n.text('Interactive Brokers')),
                 subtitle: Text(
                   config.enabled
-                      ? 'IBKR portfolio source • ${config.baseUrl}'
-                      : 'Use a self-hosted IBKR portfolio API',
+                      ? context.l10n.text(
+                          'IBKR portfolio source • {url}',
+                          {'url': config.baseUrl},
+                        )
+                      : context.l10n
+                          .text('Use a self-hosted IBKR portfolio API'),
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _showIbkrSettings(context),
@@ -674,8 +701,14 @@ class _SettingsPageState extends State<SettingsPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Syncing ${settings.syncingSymbol ?? ''} '
-                        '(${settings.syncCompleted}/${settings.syncTotal})',
+                        context.l10n.text(
+                          'Syncing {symbol} ({completed}/{total})',
+                          {
+                            'symbol': settings.syncingSymbol ?? '',
+                            'completed': settings.syncCompleted,
+                            'total': settings.syncTotal,
+                          },
+                        ),
                       ),
                       const SizedBox(height: 6),
                       LinearProgressIndicator(value: settings.syncProgress),
@@ -683,12 +716,19 @@ class _SettingsPageState extends State<SettingsPage> {
                   )
                 : Text(
                     settings.syncTotal == 0
-                        ? 'No sync running'
+                        ? context.l10n.text('No sync running')
                         : settings.syncFailed == 0
-                            ? 'Last sync completed '
-                                '${settings.syncCompleted}/${settings.syncTotal}'
-                            : 'Last sync completed with '
-                                '${settings.syncFailed} failed',
+                            ? context.l10n.text(
+                                'Last sync completed {completed}/{total}',
+                                {
+                                  'completed': settings.syncCompleted,
+                                  'total': settings.syncTotal,
+                                },
+                              )
+                            : context.l10n.text(
+                                'Last sync completed with {failed} failed',
+                                {'failed': settings.syncFailed},
+                              ),
                   ),
           ),
           Tooltip(
@@ -702,18 +742,20 @@ class _SettingsPageState extends State<SettingsPage> {
                 final confirmed = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text('Delete all data?'),
-                    content: const Text(
-                      'This will permanently delete all holdings, trades, and chart data. This cannot be undone.',
+                    title: Text(context.l10n.text('Delete all data?')),
+                    content: Text(
+                      context.l10n.text(
+                        'This will permanently delete all holdings, trades, and chart data. This cannot be undone.',
+                      ),
                     ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text('Cancel'),
+                        child: Text(context.l10n.text('Cancel')),
                       ),
                       TextButton(
                         onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text('Delete'),
+                        child: Text(context.l10n.text('Delete')),
                       ),
                     ],
                   ),
@@ -722,7 +764,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 await db.delete(db.trades).go();
                 await db.delete(db.candles).go();
                 if (!context.mounted) return;
-                toast(context, 'All data deleted');
+                toast(context, context.l10n.text('All data deleted'));
               },
             ),
           ),
@@ -801,7 +843,7 @@ class _SettingsPageState extends State<SettingsPage> {
               subtitle: FutureBuilder(
                 future: packageInfo,
                 builder: (context, snapshot) =>
-                    const Text("Check it out on GitHub"),
+                    Text(context.l10n.text('Check it out on GitHub')),
               ),
               onTap: () async {
                 if (Platform.isIOS || Platform.isMacOS) return;
@@ -815,7 +857,7 @@ class _SettingsPageState extends State<SettingsPage> {
               subtitle: FutureBuilder(
                 future: packageInfo,
                 builder: (context, snapshot) =>
-                    const Text("Help support this project"),
+                    Text(context.l10n.text('Help support this project')),
               ),
               onTap: () async {
                 if (Platform.isIOS || Platform.isMacOS) return;
@@ -885,7 +927,7 @@ class _IbkrSettingsDialogState extends State<_IbkrSettingsDialog> {
       setState(() {
         _checking = false;
         _statusOk = true;
-        _status = 'Connected to IBKR';
+        _status = context.l10n.text('Connected to IBKR');
       });
       return true;
     } catch (error) {
@@ -908,7 +950,12 @@ class _IbkrSettingsDialogState extends State<_IbkrSettingsDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: Text('Interactive Brokers — ${widget.account}'),
+        title: Text(
+          context.l10n.text(
+            'Interactive Brokers — {account}',
+            {'account': widget.account},
+          ),
+        ),
         content: SizedBox(
           width: 440,
           child: SingleChildScrollView(
@@ -917,9 +964,11 @@ class _IbkrSettingsDialogState extends State<_IbkrSettingsDialog> {
               children: [
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Use IBKR portfolio data'),
-                  subtitle: const Text(
-                    'Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.',
+                  title: Text(context.l10n.text('Use IBKR portfolio data')),
+                  subtitle: Text(
+                    context.l10n.text(
+                      'Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.',
+                    ),
                   ),
                   value: _enabled,
                   onChanged: _checking
@@ -930,8 +979,8 @@ class _IbkrSettingsDialogState extends State<_IbkrSettingsDialog> {
                   controller: _urlController,
                   enabled: !_checking,
                   keyboardType: TextInputType.url,
-                  decoration: const InputDecoration(
-                    labelText: 'API URL',
+                  decoration: InputDecoration(
+                    labelText: context.l10n.text('API URL'),
                     hintText: 'https://ibkr.example.com',
                   ),
                 ),
@@ -940,7 +989,9 @@ class _IbkrSettingsDialogState extends State<_IbkrSettingsDialog> {
                   controller: _tokenController,
                   enabled: !_checking,
                   obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Bearer token'),
+                  decoration: InputDecoration(
+                    labelText: context.l10n.text('Bearer token'),
+                  ),
                 ),
                 if (_status != null) ...[
                   const SizedBox(height: 12),
@@ -964,11 +1015,11 @@ class _IbkrSettingsDialogState extends State<_IbkrSettingsDialog> {
         actions: [
           TextButton(
             onPressed: _checking ? null : () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.text('Cancel')),
           ),
           TextButton(
             onPressed: _checking ? null : _checkConnection,
-            child: const Text('Test'),
+            child: Text(context.l10n.text('Test')),
           ),
           FilledButton(
             onPressed: _checking ? null : _save,
@@ -978,7 +1029,7 @@ class _IbkrSettingsDialogState extends State<_IbkrSettingsDialog> {
                     height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Save'),
+                : Text(context.l10n.text('Save')),
           ),
         ],
       );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/main.dart';
 import 'package:provider/provider.dart';
 
@@ -13,7 +14,7 @@ class AccountsPage extends StatelessWidget {
     final accounts = context.watch<AccountManager>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Accounts')),
+      appBar: AppBar(title: Text(context.l10n.text('Accounts'))),
       body: ListView.builder(
         itemCount: accounts.accounts.length,
         itemBuilder: (context, i) {
@@ -27,7 +28,7 @@ class AccountsPage extends StatelessWidget {
                   )
                 : const Icon(Icons.account_circle_outlined),
             title: Text(name),
-            subtitle: isActive ? const Text('Active') : null,
+            subtitle: isActive ? Text(context.l10n.text('Active')) : null,
             onTap: isActive
                 ? null
                 : () async {
@@ -40,12 +41,12 @@ class AccountsPage extends StatelessWidget {
                 if (name != 'Default') ...[
                   IconButton(
                     icon: const Icon(Icons.edit_outlined),
-                    tooltip: 'Rename account',
+                    tooltip: context.l10n.text('Rename account'),
                     onPressed: () => _renameAccount(context, accounts, name),
                   ),
                   IconButton(
                     icon: const Icon(Icons.delete_outline),
-                    tooltip: 'Delete account',
+                    tooltip: context.l10n.text('Delete account'),
                     onPressed: () => _confirmDelete(context, accounts, name),
                   ),
                 ],
@@ -56,9 +57,9 @@ class AccountsPage extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _addAccount(context, accounts),
-        label: const Text('New account'),
+        label: Text(context.l10n.text('New account')),
         icon: const Icon(Icons.add),
-        tooltip: 'Add account',
+        tooltip: context.l10n.text('Add account'),
       ),
     );
   }
@@ -101,21 +102,22 @@ class AccountsPage extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Delete "$name"?'),
-        content: const Text(
-          'All trades and data for this account will be permanently deleted. '
-          'This cannot be undone.',
+        title: Text(context.l10n.text('Delete "{name}"?', {'name': name})),
+        content: Text(
+          context.l10n.text(
+            'All trades and data for this account will be permanently deleted. This cannot be undone.',
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.text('Cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              'Delete',
-              style: TextStyle(color: Colors.redAccent),
+            child: Text(
+              context.l10n.text('Delete'),
+              style: const TextStyle(color: Colors.redAccent),
             ),
           ),
         ],
@@ -154,10 +156,12 @@ class _RenameAccountDialogState extends State<_RenameAccountDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Rename account'),
+      title: Text(context.l10n.text('Rename account')),
       content: TextField(
         controller: _controller,
-        decoration: const InputDecoration(labelText: 'Account name'),
+        decoration: InputDecoration(
+          labelText: context.l10n.text('Account name'),
+        ),
         autofocus: true,
         textCapitalization: TextCapitalization.words,
         onSubmitted: (value) => Navigator.pop(context, value.trim()),
@@ -165,11 +169,11 @@ class _RenameAccountDialogState extends State<_RenameAccountDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.text('Cancel')),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, _controller.text.trim()),
-          child: const Text('Rename'),
+          child: Text(context.l10n.text('Rename')),
         ),
       ],
     );
@@ -195,12 +199,12 @@ class _AddAccountDialogState extends State<_AddAccountDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('New account'),
+      title: Text(context.l10n.text('New account')),
       content: TextField(
         controller: _controller,
-        decoration: const InputDecoration(
-          labelText: 'Account name',
-          hintText: 'e.g. Retirement, ISA, Trading',
+        decoration: InputDecoration(
+          labelText: context.l10n.text('Account name'),
+          hintText: context.l10n.text('e.g. Retirement, ISA, Trading'),
         ),
         autofocus: true,
         textCapitalization: TextCapitalization.words,
@@ -209,11 +213,11 @@ class _AddAccountDialogState extends State<_AddAccountDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.text('Cancel')),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, _controller.text.trim()),
-          child: const Text('Add'),
+          child: Text(context.l10n.text('Add')),
         ),
       ],
     );

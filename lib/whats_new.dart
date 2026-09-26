@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/empty_state.dart';
+import 'package:market_monk/l10n/app_localizations.dart';
 
 class WhatsNew extends StatefulWidget {
   const WhatsNew({super.key});
@@ -80,13 +81,15 @@ class _WhatsNewState extends State<WhatsNew> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_loadFailed) {
-      return const Center(child: Text('Unable to load release notes.'));
+      return Center(
+        child: Text(context.l10n.text('Unable to load release notes.')),
+      );
     }
     if (_changelogs.isEmpty) {
-      return const AppEmptyState(
+      return AppEmptyState(
         icon: Icons.newspaper_rounded,
-        title: 'No release notes available',
-        message: 'There is nothing new to show yet.',
+        title: context.l10n.text('No release notes available'),
+        message: context.l10n.text('There is nothing new to show yet.'),
       );
     }
 
@@ -103,9 +106,10 @@ class _WhatsNewState extends State<WhatsNew> {
             children: [
               Text(
                 log.created,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleSmall
+                    ?.copyWith(color: Theme.of(context).colorScheme.primary),
               ),
               const SizedBox(height: 4),
               Text(log.content),
@@ -119,7 +123,7 @@ class _WhatsNewState extends State<WhatsNew> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("What's New")),
+      appBar: AppBar(title: Text(context.l10n.text("What's New"))),
       body: _buildBody(),
     );
   }

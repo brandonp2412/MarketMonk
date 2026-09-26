@@ -1,0 +1,15 @@
+Sigue acciones y entiende tu cartera de un vistazo.
+
+MarketMonk es una aplicación de seguimiento bursátil y de carteras para inversores que quieren una visión clara de los precios de mercado, sus posiciones y su rendimiento. Añade las acciones que sigues, crea tu cartera y explora gráficos de precios desde un panel sencillo.
+
+FUNCIONES
+
+• Sigue precios de acciones y el rendimiento del mercado
+• Crea y supervisa una cartera de inversión personal
+• Consulta gráficos de líneas para explorar movimientos de precios y ganancias
+• Organiza la información que más te importa
+• Ajusta la configuración a tu forma preferida de seguir tus inversiones
+
+MarketMonk está diseñado para que el seguimiento de carteras sea más fácil de leer, tanto si consultas una lista de seguimiento como si revisas tus inversiones.
+
+Los datos de mercado se proporcionan únicamente con fines informativos y no constituyen asesoramiento financiero. Investiga siempre por tu cuenta antes de tomar decisiones de inversión.

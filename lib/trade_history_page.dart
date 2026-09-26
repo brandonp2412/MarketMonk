@@ -5,6 +5,7 @@ import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/holdings_page.dart';
+import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
@@ -59,12 +60,16 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text('${widget.summary.symbol} — History'),
+            title: Text(
+              context.l10n.text('{symbol} — History', {
+                'symbol': widget.summary.symbol,
+              }),
+            ),
             actions: [
               if (!ibkrManaged)
                 IconButton(
                   icon: const Icon(Icons.add),
-                  tooltip: 'Add trade',
+                  tooltip: context.l10n.text('Add trade'),
                   onPressed: () => Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -95,11 +100,11 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                         const SizedBox(height: 12),
                         if (position != null) ...[
                           _SummaryRow(
-                            label: 'Shares held',
+                            label: context.l10n.text('Shares held'),
                             value: position.netShares.toStringAsFixed(4),
                           ),
                           _SummaryRow(
-                            label: 'Avg cost',
+                            label: context.l10n.text('Avg cost'),
                             // avgCost is in native currency — show without conversion.
                             value: fmtNativeCurrency(
                               position.avgCost,
@@ -107,12 +112,12 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                             ),
                           ),
                           _SummaryRow(
-                            label: 'Current value',
+                            label: context.l10n.text('Current value'),
                             // currentValue is already in USD (Position converts).
                             value: fmtCurrency(position.currentValue),
                           ),
                           _SummaryRow(
-                            label: 'Unrealized P/L',
+                            label: context.l10n.text('Unrealized P/L'),
                             value:
                                 '${unrealizedPL >= 0 ? '+' : ''}${fmtCurrency(unrealizedPL)}'
                                 ' (${position.change.toStringAsFixed(2)}%)',
@@ -123,7 +128,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                         ],
                         if (realizedToday != null)
                           _SummaryRow(
-                            label: 'Realized P/L today',
+                            label: context.l10n.text('Realized P/L today'),
                             value:
                                 '${realizedToday >= 0 ? '+' : ''}${fmtCurrency(realizedToday)}',
                             color: realizedToday >= 0
@@ -132,7 +137,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                           ),
                         if (trades.any((t) => t.realizedPL != 0)) ...[
                           _SummaryRow(
-                            label: 'Imported realized P/L',
+                            label: context.l10n.text('Imported realized P/L'),
                             value:
                                 '${totalRealized >= 0 ? '+' : ''}${fmtNativeCurrency(totalRealized / centDiv, nativeCurr)}',
                             color: totalRealized >= 0
@@ -142,7 +147,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                         ],
                         if (position != null || trades.isNotEmpty)
                           _SummaryRow(
-                            label: 'Total gain',
+                            label: context.l10n.text('Total gain'),
                             // totalGain is in USD (both components converted above).
                             value:
                                 '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}',
@@ -157,7 +162,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                 const SizedBox(height: 16),
                 if (trades.isNotEmpty) ...[
                   Text(
-                    'Trade History',
+                    context.l10n.text('Trade History'),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),
@@ -174,11 +179,16 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                     height: 300,
                     child: AppEmptyState(
                       icon: Icons.history_rounded,
-                      title: 'No trade history yet',
+                      title: context.l10n.text('No trade history yet'),
                       message: ibkrManaged
-                          ? 'No completed trades were returned by Interactive Brokers.'
-                          : 'Add a trade to start building this ticker’s history.',
-                      actionLabel: ibkrManaged ? null : 'Add trade',
+                          ? context.l10n.text(
+                              'No completed trades were returned by Interactive Brokers.',
+                            )
+                          : context.l10n.text(
+                              'Add a trade to start building this ticker’s history.',
+                            ),
+                      actionLabel:
+                          ibkrManaged ? null : context.l10n.text('Add trade'),
                       actionIcon: Icons.add_rounded,
                       onAction: ibkrManaged
                           ? null
@@ -209,7 +219,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
           children: [
             ListTile(
               leading: const Icon(Icons.edit),
-              title: const Text('Edit trade'),
+              title: Text(context.l10n.text('Edit trade')),
               onTap: () {
                 Navigator.pop(ctx);
                 _editTrade(trade);
@@ -217,7 +227,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
             ),
             ListTile(
               leading: const Icon(Icons.delete),
-              title: const Text('Delete trade'),
+              title: Text(context.l10n.text('Delete trade')),
               onTap: () {
                 Navigator.pop(ctx);
                 _confirmDeleteTrade(trade);
@@ -240,16 +250,18 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Trade'),
-        content: const Text('Delete this trade? This cannot be undone.'),
+        title: Text(context.l10n.text('Delete trade')),
+        content: Text(
+          context.l10n.text('Delete this trade? This cannot be undone.'),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.text('Cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
+            child: Text(context.l10n.text('Delete')),
           ),
         ],
       ),
@@ -317,7 +329,7 @@ class _TradeTile extends StatelessWidget {
           ),
         ),
         title: Text(
-          isBuy ? 'BUY' : 'SELL',
+          isBuy ? context.l10n.text('BUY') : context.l10n.text('SELL'),
           style: TextStyle(
             fontWeight: FontWeight.bold,
             color: isBuy ? Colors.green : Colors.redAccent,
@@ -421,15 +433,21 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
     final dateStr = DateFormat('dd MMM yyyy').format(_tradeDate);
 
     return AlertDialog(
-      title: const Text('Edit Trade'),
+      title: Text(context.l10n.text('Edit trade')),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             SegmentedButton<bool>(
-              segments: const [
-                ButtonSegment(value: true, label: Text('Buy')),
-                ButtonSegment(value: false, label: Text('Sell')),
+              segments: [
+                ButtonSegment(
+                  value: true,
+                  label: Text(context.l10n.text('Buy')),
+                ),
+                ButtonSegment(
+                  value: false,
+                  label: Text(context.l10n.text('Sell')),
+                ),
               ],
               selected: {_isBuy},
               onSelectionChanged: (s) => setState(() => _isBuy = s.first),
@@ -440,9 +458,9 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
-              decoration: const InputDecoration(
-                labelText: 'Quantity',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: context.l10n.text('Quantity'),
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 12),
@@ -452,7 +470,7 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
                 decimal: true,
               ),
               decoration: InputDecoration(
-                labelText: 'Price',
+                labelText: context.l10n.text('Price'),
                 border: const OutlineInputBorder(),
                 prefixText: symbolPriceUnit(widget.trade.symbol),
               ),
@@ -466,7 +484,7 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
                   signed: true,
                 ),
                 decoration: InputDecoration(
-                  labelText: 'Realized P/L',
+                  labelText: context.l10n.text('Realized P/L'),
                   border: const OutlineInputBorder(),
                   prefixText: symbolPriceUnit(widget.trade.symbol),
                 ),
@@ -475,7 +493,7 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
             const SizedBox(height: 12),
             ListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Trade date'),
+              title: Text(context.l10n.text('Trade date')),
               subtitle: Text(dateStr),
               trailing: const Icon(Icons.calendar_today),
               onTap: _pickDate,
@@ -486,9 +504,9 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.text('Cancel')),
         ),
-        FilledButton(onPressed: _save, child: const Text('Save')),
+        FilledButton(onPressed: _save, child: Text(context.l10n.text('Save'))),
       ],
     );
   }

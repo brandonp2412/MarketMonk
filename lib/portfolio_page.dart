@@ -8,6 +8,7 @@ import 'package:market_monk/database.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
@@ -310,13 +311,13 @@ class PortfolioPageState extends State<PortfolioPage>
                       FilledButton.icon(
                         onPressed: _retryPortfolio,
                         icon: const Icon(Icons.refresh),
-                        label: const Text('Try again'),
+                        label: Text(context.l10n.text('Try again')),
                       ),
                       if (ibkrEnabled)
                         OutlinedButton.icon(
                           onPressed: _openSettings,
                           icon: const Icon(Icons.settings_outlined),
-                          label: const Text('IBKR settings'),
+                          label: Text(context.l10n.text('IBKR settings')),
                         ),
                     ],
                   ),
@@ -350,7 +351,7 @@ class PortfolioPageState extends State<PortfolioPage>
             ),
             TextButton(
               onPressed: _retryPortfolio,
-              child: const Text('Try again'),
+              child: Text(context.l10n.text('Try again')),
             ),
           ],
         ),
@@ -370,7 +371,7 @@ class PortfolioPageState extends State<PortfolioPage>
     if (positions.isEmpty && !snap.hasData && !_hasCachedPortfolio) {
       return Center(
         child: Semantics(
-          label: 'Loading portfolio',
+          label: context.l10n.text('Loading portfolio'),
           child: const CircularProgressIndicator(),
         ),
       );
@@ -395,11 +396,17 @@ class PortfolioPageState extends State<PortfolioPage>
         icon: ibkrEnabled
             ? Icons.account_balance_rounded
             : Icons.pie_chart_outline_rounded,
-        title: ibkrEnabled ? 'No IBKR stock positions' : 'No holdings yet',
+        title: ibkrEnabled
+            ? context.l10n.text('No IBKR stock positions')
+            : context.l10n.text('No holdings yet'),
         message: ibkrEnabled
-            ? 'Check your Interactive Brokers connection or refresh your account.'
-            : 'Import your trades to build your portfolio.',
-        actionLabel: ibkrEnabled ? 'IBKR settings' : 'Import CSV',
+            ? context.l10n.text(
+                'Check your Interactive Brokers connection or refresh your account.',
+              )
+            : context.l10n.text('Import your trades to build your portfolio.'),
+        actionLabel: ibkrEnabled
+            ? context.l10n.text('IBKR settings')
+            : context.l10n.text('Import CSV'),
         actionIcon:
             ibkrEnabled ? Icons.settings_rounded : Icons.upload_file_rounded,
         onAction: () => Navigator.push(
@@ -706,13 +713,13 @@ class _SummaryCard extends StatelessWidget {
                   ),
                 ],
                 const PopupMenuDivider(),
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: '__export__',
                   child: Row(
                     children: [
-                      Icon(Icons.download, size: 20),
-                      SizedBox(width: 8),
-                      Text('Export CSV'),
+                      const Icon(Icons.download, size: 20),
+                      const SizedBox(width: 8),
+                      Text(context.l10n.text('Export CSV')),
                     ],
                   ),
                 ),
@@ -754,7 +761,7 @@ class _FilterRow extends StatelessWidget {
             controller: controller,
             onChanged: onChanged,
             decoration: InputDecoration(
-              hintText: 'Filter holdings...',
+              hintText: context.l10n.text('Filter holdings...'),
               prefixIcon: const Icon(Icons.search),
               isDense: true,
               border: OutlineInputBorder(

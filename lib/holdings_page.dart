@@ -6,6 +6,7 @@ import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/trade_history_page.dart';
 import 'package:market_monk/utils.dart';
@@ -228,7 +229,12 @@ class HoldingsPageState extends State<HoldingsPage>
     final confirmed = await showDialog<bool>(
       context: ctx,
       builder: (ctx) => AlertDialog(
-        title: Text('Delete $count holding${count == 1 ? '' : 's'}?'),
+        title: Text(
+          context.l10n.text(
+            count == 1 ? 'Delete {count} holding?' : 'Delete {count} holdings?',
+            {'count': count},
+          ),
+        ),
         content: Text(
           'All trades for the selected symbol${count == 1 ? '' : 's'} will '
           'be permanently deleted. This cannot be undone.',
@@ -236,11 +242,11 @@ class HoldingsPageState extends State<HoldingsPage>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.text('Cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
+            child: Text(context.l10n.text('Delete')),
           ),
         ],
       ),
@@ -253,7 +259,13 @@ class HoldingsPageState extends State<HoldingsPage>
     }
     _exitSelecting();
     if (ctx.mounted)
-      toast(ctx, 'Deleted $count holding${count == 1 ? '' : 's'}');
+      toast(
+        ctx,
+        context.l10n.text(
+          count == 1 ? 'Deleted {count} holding' : 'Deleted {count} holdings',
+          {'count': count},
+        ),
+      );
   }
 
   @override
@@ -266,35 +278,39 @@ class HoldingsPageState extends State<HoldingsPage>
 
     final menuButton = PopupMenuButton(
       icon: const Icon(Icons.more_vert),
-      tooltip: 'Show menu',
+      tooltip: context.l10n.text('Show menu'),
       itemBuilder: (context) => [
         if (_selecting) ...[
           PopupMenuItem(
             onTap: _toggleSelectAll,
             child: ListTile(
               leading: Icon(allSelected ? Icons.deselect : Icons.select_all),
-              title: Text(allSelected ? 'Deselect all' : 'Select all'),
+              title: Text(
+                allSelected
+                    ? context.l10n.text('Deselect all')
+                    : context.l10n.text('Select all'),
+              ),
             ),
           ),
           PopupMenuItem(
             onTap: () => _deleteSelected(context),
-            child: const ListTile(
-              leading: Icon(Icons.delete),
-              title: Text('Delete selected'),
+            child: ListTile(
+              leading: const Icon(Icons.delete),
+              title: Text(context.l10n.text('Delete selected')),
             ),
           ),
           PopupMenuItem(
             onTap: _exitSelecting,
-            child: const ListTile(
-              leading: Icon(Icons.close),
-              title: Text('Cancel selection'),
+            child: ListTile(
+              leading: const Icon(Icons.close),
+              title: Text(context.l10n.text('Cancel selection')),
             ),
           ),
         ] else ...[
           PopupMenuItem(
             child: ListTile(
               leading: const Icon(Icons.settings),
-              title: const Text('Settings'),
+              title: Text(context.l10n.text('Settings')),
               onTap: () async {
                 Navigator.pop(context);
                 await Navigator.push(
@@ -334,8 +350,11 @@ class HoldingsPageState extends State<HoldingsPage>
               child: SearchBar(
                 controller: _search,
                 hintText: _selecting
-                    ? '${_selectedSymbols.length} selected'
-                    : 'Search...',
+                    ? context.l10n.text(
+                        '{count} selected',
+                        {'count': _selectedSymbols.length},
+                      )
+                    : context.l10n.text('Search...'),
                 padding: WidgetStateProperty.all(
                   const EdgeInsets.only(right: 8),
                 ),
@@ -364,7 +383,11 @@ class HoldingsPageState extends State<HoldingsPage>
           : _selecting
               ? FloatingActionButton.extended(
                   onPressed: () => _deleteSelected(context),
-                  label: Text('Delete (${_selectedSymbols.length})'),
+                  label: Text(
+                    context.l10n.text('Delete ({count})', {
+                      'count': _selectedSymbols.length,
+                    }),
+                  ),
                   icon: const Icon(Icons.delete),
                 )
               : Padding(
@@ -374,9 +397,9 @@ class HoldingsPageState extends State<HoldingsPage>
                       context,
                       MaterialPageRoute(builder: (_) => const EditTickerPage()),
                     ),
-                    label: const Text('Add'),
+                    label: Text(context.l10n.text('Add')),
                     icon: const Icon(Icons.add),
-                    tooltip: 'Add trade',
+                    tooltip: context.l10n.text('Add trade'),
                   ),
                 ),
     );
@@ -410,20 +433,27 @@ class HoldingsPageState extends State<HoldingsPage>
                 ? Icons.candlestick_chart_rounded
                 : Icons.search_off_rounded,
         title: ibkrManaged
-            ? 'No IBKR stocks found'
+            ? context.l10n.text('No IBKR stocks found')
             : query.isEmpty
-                ? 'No stocks yet'
-                : 'No matching stocks',
+                ? context.l10n.text('No stocks yet')
+                : context.l10n.text('No matching stocks'),
         message: ibkrManaged
-            ? 'Refresh your portfolio or check your Interactive Brokers connection.'
+            ? context.l10n.text(
+                'Refresh your portfolio or check your Interactive Brokers connection.',
+              )
             : query.isEmpty
-                ? 'Import a CSV or add your first trade manually.'
-                : 'Nothing matches “$query”. You can add that ticker now.',
+                ? context.l10n
+                    .text('Import a CSV or add your first trade manually.')
+                : context.l10n.text(
+                    'Nothing matches “{query}”. You can add that ticker now.',
+                    {'query': query},
+                  ),
         actionLabel: ibkrManaged
-            ? 'IBKR settings'
+            ? context.l10n.text('IBKR settings')
             : query.isEmpty
-                ? 'Import CSV'
-                : 'Add ${query.toUpperCase()}',
+                ? context.l10n.text('Import CSV')
+                : context.l10n
+                    .text('Add {symbol}', {'symbol': query.toUpperCase()}),
         actionIcon: ibkrManaged
             ? Icons.settings_rounded
             : query.isEmpty
@@ -548,9 +578,8 @@ class _SymbolTile extends StatelessWidget {
 
     return ListTile(
       selected: isSelected,
-      selectedTileColor: Theme.of(
-        context,
-      ).colorScheme.primaryContainer.withValues(alpha: 0.3),
+      selectedTileColor:
+          Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
       leading: leadingWidget,
       title: Text(summary.symbol),
       subtitle: position != null

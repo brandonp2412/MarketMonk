@@ -9,6 +9,7 @@ import 'package:market_monk/candle_ticker.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
@@ -115,9 +116,9 @@ class _EditTickerPageState extends State<EditTickerPage> {
     if (snapshot.data!.isEmpty && !loading)
       return AppEmptyState(
         icon: Icons.search_off_rounded,
-        title: 'No market data found',
-        message: 'Check the ticker symbol and try again.',
-        actionLabel: 'Try another ticker',
+        title: context.l10n.text('No market data found'),
+        message: context.l10n.text('Check the ticker symbol and try again.'),
+        actionLabel: context.l10n.text('Try another ticker'),
         actionIcon: Icons.edit_rounded,
         onAction: () {
           symbol.clear();
@@ -166,7 +167,9 @@ class _EditTickerPageState extends State<EditTickerPage> {
     for (final option in yearOptions) {
       yearButtons.add(
         Tooltip(
-          message: 'Show the $option last years of prices',
+          message: context.l10n.text('Show the last {count} years of prices', {
+            'count': option,
+          }),
           child: OutlinedButton(
             onPressed: () {
               setState(() {
@@ -194,7 +197,9 @@ class _EditTickerPageState extends State<EditTickerPage> {
     for (final option in monthOptions) {
       monthButtons.add(
         Tooltip(
-          message: "Show the last $option months of prices",
+          message: context.l10n.text('Show the last {count} months of prices', {
+            'count': option,
+          }),
           child: OutlinedButton(
             onPressed: () {
               setState(() {
@@ -218,7 +223,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Add trade")),
+      appBar: AppBar(title: Text(context.l10n.text('Add trade'))),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: material.Column(
@@ -277,7 +282,10 @@ class _EditTickerPageState extends State<EditTickerPage> {
                         FocusNode fieldFocusNode,
                         VoidCallback onFieldSubmitted,
                       ) {
-                        if (!identical(symbol, fieldTextEditingController)) {
+                        if (!identical(
+                          symbol,
+                          fieldTextEditingController,
+                        )) {
                           if (_ownsSymbolController) symbol.dispose();
                           symbol = fieldTextEditingController;
                           _ownsSymbolController = false;
@@ -301,7 +309,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                           controller: fieldTextEditingController,
                           leading: leading,
                           focusNode: fieldFocusNode,
-                          hintText: 'Search...',
+                          hintText: context.l10n.text('Search...'),
                           onTap: () => selectAll(symbol),
                           textInputAction: TextInputAction.next,
                           onSubmitted: (text) async {
@@ -343,15 +351,15 @@ class _EditTickerPageState extends State<EditTickerPage> {
                   ),
                   const SizedBox(height: 12),
                   SegmentedButton<bool>(
-                    segments: const [
+                    segments: [
                       ButtonSegment(
                         value: false,
-                        label: Text('Buy'),
+                        label: Text(context.l10n.text('Buy')),
                         icon: Icon(Icons.arrow_downward),
                       ),
                       ButtonSegment(
                         value: true,
-                        label: Text('Sell'),
+                        label: Text(context.l10n.text('Sell')),
                         icon: Icon(Icons.arrow_upward),
                       ),
                     ],
@@ -362,7 +370,9 @@ class _EditTickerPageState extends State<EditTickerPage> {
                   const SizedBox(height: 8),
                   TextField(
                     controller: amount,
-                    decoration: const InputDecoration(labelText: 'Amount'),
+                    decoration: InputDecoration(
+                      labelText: context.l10n.text('Amount'),
+                    ),
                     onTap: () => selectAll(amount),
                     onSubmitted: (value) => selectAll(price),
                     keyboardType: TextInputType.number,
@@ -372,7 +382,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
                   TextField(
                     controller: price,
                     decoration: InputDecoration(
-                      labelText: 'Price',
+                      labelText: context.l10n.text('Price'),
                       prefix: Text(
                         symbolPriceUnit(symbol.text.split(' ').first),
                       ),
@@ -404,9 +414,9 @@ class _EditTickerPageState extends State<EditTickerPage> {
                   const SizedBox(height: 8),
                   TextField(
                     controller: purchasedAt,
-                    decoration: const InputDecoration(
-                      labelText: 'Purchased at',
-                      suffixIcon: Icon(Icons.today),
+                    decoration: InputDecoration(
+                      labelText: context.l10n.text('Purchased at'),
+                      suffixIcon: const Icon(Icons.today),
                     ),
                     readOnly: true,
                     onTap: () async {
@@ -441,7 +451,9 @@ class _EditTickerPageState extends State<EditTickerPage> {
                   Wrap(
                     children: [
                       Tooltip(
-                        message: 'Show the last 5 days of prices',
+                        message: context.l10n.text(
+                          'Show the last 5 days of prices',
+                        ),
                         child: OutlinedButton(
                           onPressed: () {
                             setState(() {
@@ -479,17 +491,23 @@ class _EditTickerPageState extends State<EditTickerPage> {
           final qty = double.tryParse(amount.text.trim());
           final enteredPrice = double.tryParse(price.text.trim());
           if (tickerSymbol.isEmpty) {
-            toast(context, 'Enter a ticker symbol.');
+            toast(context, context.l10n.text('Enter a ticker symbol.'));
             return;
           }
           if (qty == null || !qty.isFinite || qty <= 0) {
-            toast(context, 'Enter a valid amount greater than zero.');
+            toast(
+              context,
+              context.l10n.text('Enter a valid amount greater than zero.'),
+            );
             return;
           }
           if (enteredPrice == null ||
               !enteredPrice.isFinite ||
               enteredPrice <= 0) {
-            toast(context, 'Enter a valid price greater than zero.');
+            toast(
+              context,
+              context.l10n.text('Enter a valid price greater than zero.'),
+            );
             return;
           }
 
@@ -521,7 +539,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
             }),
           );
         },
-        label: const Text('Save'),
+        label: Text(context.l10n.text('Save')),
         icon: const Icon(Icons.save),
       ),
     );

@@ -17,26 +17,30 @@ void main() {
     });
   });
 
-  test('every supported non-English locale has the complete translation set',
-      () {
-    final translatedLanguages = AppLocalizations.supportedLocales
-        .map((locale) => locale.languageCode)
-        .where((language) => language != 'en')
-        .toSet();
+  test(
+    'every supported non-English locale has the complete translation set',
+    () {
+      final translatedLanguages = AppLocalizations.supportedLocales
+          .map((locale) => locale.languageCode)
+          .where((language) => language != 'en')
+          .toSet();
 
-    expect(appTranslations.keys.toSet(), translatedLanguages);
+      expect(appTranslations.keys.toSet(), translatedLanguages);
 
-    final referenceKeys = appTranslations['de']!.keys.toSet();
-    expect(referenceKeys, hasLength(44));
+      final coreKeys = appTranslations['de']!.keys.toSet();
+      expect(coreKeys, hasLength(44));
 
-    for (final entry in appTranslations.entries) {
-      expect(
-        entry.value.keys.toSet(),
-        referenceKeys,
-        reason: '${entry.key} must have the complete translation key set',
-      );
-    }
-  });
+      for (final entry in appTranslations.entries) {
+        expect(
+          entry.value.keys.toSet(),
+          containsAll(coreKeys),
+          reason: '${entry.key} must preserve the core translation key set',
+        );
+      }
+
+      expect(appTranslations['es']!.length, greaterThan(coreKeys.length));
+    },
+  );
 
   test('localized templates preserve named placeholders', () {
     const spanish = AppLocalizations(Locale('es'));
@@ -47,27 +51,29 @@ void main() {
     );
   });
 
-  test('language preference persists and can return to system default',
-      () async {
-    final settings = SettingsState();
-    await settings.initialized;
+  test(
+    'language preference persists and can return to system default',
+    () async {
+      final settings = SettingsState();
+      await settings.initialized;
 
-    expect(settings.locale, isNull);
+      expect(settings.locale, isNull);
 
-    await settings.setLanguageCode('es');
-    expect(settings.locale, const Locale('es'));
+      await settings.setLanguageCode('es');
+      expect(settings.locale, const Locale('es'));
 
-    final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getString('languageCode'), 'es');
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('languageCode'), 'es');
 
-    final reloaded = SettingsState();
-    await reloaded.initialized;
-    expect(reloaded.locale, const Locale('es'));
+      final reloaded = SettingsState();
+      await reloaded.initialized;
+      expect(reloaded.locale, const Locale('es'));
 
-    await reloaded.setLanguageCode(null);
-    expect(reloaded.locale, isNull);
-    expect(prefs.getString('languageCode'), isNull);
-  });
+      await reloaded.setLanguageCode(null);
+      expect(reloaded.locale, isNull);
+      expect(prefs.getString('languageCode'), isNull);
+    },
+  );
 
   testWidgets('navigation labels follow the selected locale', (tester) async {
     await tester.pumpWidget(

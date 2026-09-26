@@ -11,6 +11,7 @@ import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
@@ -162,8 +163,10 @@ class ChartsPageState extends State<ChartsPage>
           final snapshot = await (widget._ibkrLoader?.call(ibkrConfig) ??
               IbkrApiClient(ibkrConfig).fetchPortfolio());
           cacheIbkrAccountExchangeRate(snapshot);
-          final positions =
-              await computeIbkrPositions(snapshot.positions, trades);
+          final positions = await computeIbkrPositions(
+            snapshot.positions,
+            trades,
+          );
           final currentValue = snapshot.netLiquidation;
           final currentValueUsd = snapshot.netLiquidationUsd?.value;
           await accountManager.cachePortfolio(
@@ -413,7 +416,7 @@ class ChartsPageState extends State<ChartsPage>
     await prefs.setStringList('favoriteStocks', _favoriteStocks);
     if (!ctx.mounted) return;
     if (isFavorite) {
-      toast(ctx, 'Removed as favorite');
+      toast(ctx, ctx.l10n.text('Removed as favorite'));
       return;
     }
     final accountManager = ctx.read<AccountManager>();
@@ -424,7 +427,7 @@ class ChartsPageState extends State<ChartsPage>
         syncNamespace: accountManager.activeAccount,
       ),
     );
-    toast(ctx, 'Set as favorite');
+    toast(ctx, ctx.l10n.text('Set as favorite'));
   }
 
   Future<void> _loadAllPortfolios() async {
@@ -461,11 +464,9 @@ class ChartsPageState extends State<ChartsPage>
             years <= 1 &&
             !_performanceUnsupported.contains(ibkrConfig.baseUrl)) {
           try {
-            final performance = await (widget._ibkrPerformanceLoader?.call(
-                  ibkrConfig,
-                  '12M',
-                ) ??
-                IbkrApiClient(ibkrConfig).fetchPerformance('12M'));
+            final performance =
+                await (widget._ibkrPerformanceLoader?.call(ibkrConfig, '12M') ??
+                    IbkrApiClient(ibkrConfig).fetchPerformance('12M'));
             final brokerSeries = _buildBrokerPerformanceSeries(
               performance,
               loaded,
@@ -630,10 +631,7 @@ class ChartsPageState extends State<ChartsPage>
       series = byWeek.values.toList()..sort((a, b) => a.date.compareTo(b.date));
     }
 
-    return (
-      series: series,
-      currentHoldingsReplay: currentHoldingsReplay,
-    );
+    return (series: series, currentHoldingsReplay: currentHoldingsReplay);
   }
 
   ({List<_DateValue> series, double twrPercent}) _buildBrokerPerformanceSeries(
@@ -958,7 +956,7 @@ class ChartsPageState extends State<ChartsPage>
     final leading = hasText
         ? IconButton(
             icon: const Icon(Icons.arrow_back),
-            tooltip: 'Back',
+            tooltip: context.l10n.text('Back'),
             padding: const EdgeInsets.only(left: 16, right: 8),
             onPressed: _clearSearch,
           )
@@ -972,7 +970,7 @@ class ChartsPageState extends State<ChartsPage>
       child: SearchBar(
         controller: _searchController,
         focusNode: _searchFocus,
-        hintText: 'Search stocks...',
+        hintText: context.l10n.text('Search stocks...'),
         leading: leading,
         onChanged: _onSearchChanged,
         onTap: () => _searchController.selection = TextSelection(
@@ -988,7 +986,7 @@ class ChartsPageState extends State<ChartsPage>
               context,
               MaterialPageRoute(builder: (_) => const SettingsPage()),
             ),
-            tooltip: 'Settings',
+            tooltip: context.l10n.text('Settings'),
             icon: const Icon(Icons.settings),
           ),
         ],
@@ -1003,8 +1001,8 @@ class ChartsPageState extends State<ChartsPage>
     // while Yahoo search is slow or unavailable (e.g. GLD).
     final useAnywayTile = ListTile(
       leading: const Icon(Icons.open_in_new),
-      title: Text('Use "$query" anyway'),
-      subtitle: const Text('Load chart for this exact ticker'),
+      title: Text(context.l10n.text('Use "{query}" anyway', {'query': query})),
+      subtitle: Text(context.l10n.text('Load chart for this exact ticker')),
       onTap: () => _selectSymbol(query),
     );
 
@@ -1044,7 +1042,7 @@ class ChartsPageState extends State<ChartsPage>
           context,
           'Market closed indicator hidden',
           SnackBarAction(
-            label: 'Undo',
+            label: context.l10n.text('Undo'),
             onPressed: () => settings.setShowMarketClosed(true),
           ),
         );
@@ -1225,9 +1223,10 @@ class ChartsPageState extends State<ChartsPage>
                   ),
                   Text(
                     '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleLarge!.copyWith(color: color),
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge!
+                        .copyWith(color: color),
                   ),
                 ],
               ),
@@ -1242,7 +1241,13 @@ class ChartsPageState extends State<ChartsPage>
           ),
           const SizedBox(height: 4),
           Text(
-            '${dollarChange >= 0 ? '+' : ''}${fmtNativeCurrency(dollarChange, _nativeCurrency)} period change',
+            context.l10n.text(
+              '{value} period change',
+              {
+                'value':
+                    '${dollarChange >= 0 ? '+' : ''}${fmtNativeCurrency(dollarChange, _nativeCurrency)}',
+              },
+            ),
             style: TextStyle(color: color, fontSize: 13),
           ),
           const SizedBox(height: 12),
@@ -1252,7 +1257,7 @@ class ChartsPageState extends State<ChartsPage>
             children: [
               _ActionChip(
                 icon: Icons.add,
-                label: 'Add trade',
+                label: context.l10n.text('Add trade'),
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -1264,7 +1269,7 @@ class ChartsPageState extends State<ChartsPage>
                 icon: _favoriteStocks.contains(symbol)
                     ? Icons.favorite
                     : Icons.favorite_border,
-                label: 'Favorite',
+                label: context.l10n.text('Favorite'),
                 onTap: () => _toggleFavorite(symbol),
               ),
             ],
@@ -1345,11 +1350,18 @@ class ChartsPageState extends State<ChartsPage>
           icon: allEmpty
               ? Icons.candlestick_chart_rounded
               : Icons.visibility_off_rounded,
-          title: allEmpty ? 'No trades yet' : 'All portfolios are hidden',
+          title: allEmpty
+              ? context.l10n.text('No trades yet')
+              : context.l10n.text('All portfolios are hidden'),
           message: allEmpty
-              ? 'Search for a stock to start building your portfolio history.'
-              : 'Show your portfolios again to restore the chart.',
-          actionLabel: allEmpty ? 'Search stocks' : 'Show all',
+              ? context.l10n.text(
+                  'Search for a stock to start building your portfolio history.',
+                )
+              : context.l10n
+                  .text('Show your portfolios again to restore the chart.'),
+          actionLabel: allEmpty
+              ? context.l10n.text('Search stocks')
+              : context.l10n.text('Show all'),
           actionIcon:
               allEmpty ? Icons.search_rounded : Icons.visibility_rounded,
           onAction: () {
@@ -1473,9 +1485,10 @@ class ChartsPageState extends State<ChartsPage>
               touchTooltipData: LineTouchTooltipData(
                 fitInsideHorizontally: true,
                 fitInsideVertically: true,
-                getTooltipColor: (_) => Theme.of(
-                  context,
-                ).colorScheme.surface.withValues(alpha: 0.9),
+                getTooltipColor: (_) => Theme.of(context)
+                    .colorScheme
+                    .surface
+                    .withValues(alpha: 0.9),
                 getTooltipItems: (touchedSpots) {
                   return touchedSpots.map((spot) {
                     final i = spot.x.toInt();
@@ -1494,9 +1507,10 @@ class ChartsPageState extends State<ChartsPage>
                         visibleKeys.length > 1 ? '$accountName\n' : '';
                     return LineTooltipItem(
                       '$label${fmtCurrency(spot.y)}\n$date',
-                      Theme.of(
-                        context,
-                      ).textTheme.bodySmall!.copyWith(color: spotColor),
+                      Theme.of(context)
+                          .textTheme
+                          .bodySmall!
+                          .copyWith(color: spotColor),
                     );
                   }).toList();
                 },
@@ -1566,8 +1580,9 @@ class ChartsPageState extends State<ChartsPage>
     final idx = accounts.indexOf(accountName);
     final dotColor = accountColors[idx.clamp(0, accountColors.length - 1)];
     final brokerReturn = _portfolioReturnsByAccount[accountName];
-    final currentHoldingsReplay =
-        _currentHoldingsReplayAccounts.contains(accountName);
+    final currentHoldingsReplay = _currentHoldingsReplayAccounts.contains(
+      accountName,
+    );
     final hasHistory = brokerReturn != null || series.length > 1;
     final pct = brokerReturn ??
         (hasHistory
@@ -1635,10 +1650,11 @@ class ChartsPageState extends State<ChartsPage>
                       Text(
                         hasHistory
                             ? '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%$returnKind'
-                            : 'History unavailable',
-                        style: Theme.of(
-                          context,
-                        ).textTheme.titleMedium!.copyWith(color: returnColor),
+                            : context.l10n.text('History unavailable'),
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium!
+                            .copyWith(color: returnColor),
                       ),
                     ],
                   ),
@@ -1656,7 +1672,7 @@ class ChartsPageState extends State<ChartsPage>
                   child: Text(
                     hasHistory
                         ? '${change >= 0 ? '+' : ''}${fmtCurrency(change)} $changeKind'
-                        : 'Historical prices unavailable',
+                        : context.l10n.text('Historical prices unavailable'),
                     style: TextStyle(color: returnColor, fontSize: 13),
                   ),
                 ),
