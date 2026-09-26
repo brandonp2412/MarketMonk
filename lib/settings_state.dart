@@ -74,7 +74,13 @@ class SettingsState extends ChangeNotifier {
   }
 
   /// Locale selected by the user, or null to follow the device locale.
-  Locale? get locale => languageCode == null ? null : Locale(languageCode!);
+  Locale? get locale {
+    final selectedLanguageCode = languageCode;
+    if (selectedLanguageCode == null) return null;
+    return AppLocalizations.supportedLocales.firstWhere(
+      (locale) => locale.languageCode == selectedLanguageCode,
+    );
+  }
 
   /// Returns the supported ISO 4217 currency for [locale], falling back to USD.
   static String currencyForLocale(Locale locale) {

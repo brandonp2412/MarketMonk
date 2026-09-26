@@ -39,16 +39,35 @@ void main() {
       }
 
       expect(appTranslations['es']!.length, greaterThan(coreKeys.length));
+      expect(
+        appTranslations['pt']!.keys.toSet(),
+        appTranslations['es']!.keys.toSet(),
+        reason: 'Brazilian Portuguese must cover the complete localized UI',
+      );
     },
   );
 
   test('localized templates preserve named placeholders', () {
     const spanish = AppLocalizations(Locale('es'));
+    const brazilianPortuguese = AppLocalizations(Locale('pt', 'BR'));
 
     expect(
       spanish.text('Date format ({example})', {'example': '24/09/26'}),
       'Formato de fecha (24/09/26)',
     );
+    expect(
+      brazilianPortuguese.text('Delete {count} holdings?', {'count': 3}),
+      'Excluir 3 posições?',
+    );
+  });
+
+  test('Brazilian Portuguese selection resolves to pt-BR', () async {
+    final settings = SettingsState();
+    await settings.initialized;
+
+    await settings.setLanguageCode('pt');
+
+    expect(settings.locale, const Locale('pt', 'BR'));
   });
 
   test(
