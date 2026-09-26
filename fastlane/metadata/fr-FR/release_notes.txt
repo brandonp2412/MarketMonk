@@ -1,0 +1,1 @@
+- Corrige la barre d’état sur Android 15

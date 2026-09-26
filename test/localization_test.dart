@@ -44,12 +44,18 @@ void main() {
         appTranslations['es']!.keys.toSet(),
         reason: 'Brazilian Portuguese must cover the complete localized UI',
       );
+      expect(
+        appTranslations['fr']!.keys.toSet(),
+        appTranslations['es']!.keys.toSet(),
+        reason: 'French must cover the complete localized UI',
+      );
     },
   );
 
   test('localized templates preserve named placeholders', () {
     const spanish = AppLocalizations(Locale('es'));
     const brazilianPortuguese = AppLocalizations(Locale('pt', 'BR'));
+    const french = AppLocalizations(Locale('fr'));
 
     expect(
       spanish.text('Date format ({example})', {'example': '24/09/26'}),
@@ -58,6 +64,10 @@ void main() {
     expect(
       brazilianPortuguese.text('Delete {count} holdings?', {'count': 3}),
       'Excluir 3 posições?',
+    );
+    expect(
+      french.text('Delete {count} holdings?', {'count': 3}),
+      'Supprimer 3 positions ?',
     );
   });
 
