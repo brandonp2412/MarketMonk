@@ -65,6 +65,11 @@ void main() {
         completeKeys,
         reason: 'Korean must cover the complete localized UI',
       );
+      expect(
+        appTranslations['zh']!.keys.toSet(),
+        completeKeys,
+        reason: 'Simplified Chinese must cover the complete localized UI',
+      );
     },
   );
 
@@ -75,6 +80,9 @@ void main() {
     const french = AppLocalizations(Locale('fr'));
     const japanese = AppLocalizations(Locale('ja'));
     const korean = AppLocalizations(Locale('ko'));
+    const simplifiedChinese = AppLocalizations(
+      Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'),
+    );
 
     expect(
       german.text('Delete {count} holdings?', {'count': 3}),
@@ -99,6 +107,10 @@ void main() {
     expect(
       korean.text('Delete {count} holdings?', {'count': 3}),
       '보유 종목 3개를 삭제할까요?',
+    );
+    expect(
+      simplifiedChinese.text('Delete {count} holdings?', {'count': 3}),
+      '删除 3 个持仓？',
     );
   });
 

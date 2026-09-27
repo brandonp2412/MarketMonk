@@ -19,7 +19,7 @@ class AppLocalizations {
     Locale('hi'),
     Locale('ja'),
     Locale('ko'),
-    Locale('zh'),
+    Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'),
   ];
 
   static const LocalizationsDelegate<AppLocalizations> delegate =
