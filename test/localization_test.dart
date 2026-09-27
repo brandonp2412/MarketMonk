@@ -27,7 +27,7 @@ void main() {
 
       expect(appTranslations.keys.toSet(), translatedLanguages);
 
-      final coreKeys = appTranslations['de']!.keys.toSet();
+      final coreKeys = appTranslations['hi']!.keys.toSet();
       expect(coreKeys, hasLength(44));
 
       for (final entry in appTranslations.entries) {
@@ -38,25 +38,36 @@ void main() {
         );
       }
 
-      expect(appTranslations['es']!.length, greaterThan(coreKeys.length));
+      final completeKeys = appTranslations['es']!.keys.toSet();
+      expect(completeKeys, hasLength(185));
+      expect(
+        appTranslations['de']!.keys.toSet(),
+        completeKeys,
+        reason: 'German must cover the complete localized UI',
+      );
       expect(
         appTranslations['pt']!.keys.toSet(),
-        appTranslations['es']!.keys.toSet(),
+        completeKeys,
         reason: 'Brazilian Portuguese must cover the complete localized UI',
       );
       expect(
         appTranslations['fr']!.keys.toSet(),
-        appTranslations['es']!.keys.toSet(),
+        completeKeys,
         reason: 'French must cover the complete localized UI',
       );
     },
   );
 
   test('localized templates preserve named placeholders', () {
+    const german = AppLocalizations(Locale('de'));
     const spanish = AppLocalizations(Locale('es'));
     const brazilianPortuguese = AppLocalizations(Locale('pt', 'BR'));
     const french = AppLocalizations(Locale('fr'));
 
+    expect(
+      german.text('Delete {count} holdings?', {'count': 3}),
+      '3 Positionen löschen?',
+    );
     expect(
       spanish.text('Date format ({example})', {'example': '24/09/26'}),
       'Formato de fecha (24/09/26)',

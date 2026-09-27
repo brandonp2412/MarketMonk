@@ -1,0 +1,15 @@
+Verfolge Aktien und behalte dein Portfolio auf einen Blick im Blick.
+
+MarketMonk ist ein Aktien-Tracker und Portfoliomonitor für Anleger, die Marktpreise, Positionen und Performance übersichtlich sehen möchten. Füge Aktien hinzu, die du beobachtest, baue dein Portfolio auf und erkunde Kursdiagramme in einem übersichtlichen Dashboard.
+
+FUNKTIONEN
+
+• Aktienkurse und Marktentwicklung verfolgen
+• Ein persönliches Anlageportfolio aufbauen und überwachen
+• Liniendiagramme zur Analyse von Kursbewegungen und Gewinnen ansehen
+• Die für dich wichtigen Informationen organisieren
+• Einstellungen an deine bevorzugte Portfolioansicht anpassen
+
+MarketMonk macht die Portfolioverfolgung leichter lesbar – egal, ob du eine Watchlist prüfst oder deine Anlagen auswertest.
+
+Marktdaten dienen ausschließlich Informationszwecken und stellen keine Finanzberatung dar. Recherchiere immer selbst, bevor du Anlageentscheidungen triffst.
