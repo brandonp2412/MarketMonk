@@ -27,19 +27,13 @@ void main() {
 
       expect(appTranslations.keys.toSet(), translatedLanguages);
 
-      final coreKeys = appTranslations['hi']!.keys.toSet();
-      expect(coreKeys, hasLength(44));
-
-      for (final entry in appTranslations.entries) {
-        expect(
-          entry.value.keys.toSet(),
-          containsAll(coreKeys),
-          reason: '${entry.key} must preserve the core translation key set',
-        );
-      }
-
       final completeKeys = appTranslations['es']!.keys.toSet();
       expect(completeKeys, hasLength(185));
+      expect(
+        appTranslations['hi']!.keys.toSet(),
+        completeKeys,
+        reason: 'Hindi must cover the complete localized UI',
+      );
       expect(
         appTranslations['de']!.keys.toSet(),
         completeKeys,

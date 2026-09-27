@@ -925,6 +925,181 @@ const appTranslations = <String, Map<String, String>>{
     "Permanently delete all holdings, trades, and candles":
         "सभी होल्डिंग्स, ट्रेड और कैंडल डेटा स्थायी रूप से हटाएँ",
     "Import a .sqlite database": ".sqlite डेटाबेस आयात करें",
+    "Active": "सक्रिय",
+    "Rename account": "खाते का नाम बदलें",
+    "Delete account": "खाता हटाएँ",
+    "New account": "नया खाता",
+    "Add account": "खाता जोड़ें",
+    "Delete \"{name}\"?": "\"{name}\" को हटाएँ?",
+    "All trades and data for this account will be permanently deleted. This cannot be undone.":
+        "इस खाते के सभी ट्रेड और डेटा स्थायी रूप से हट जाएँगे। इसे पूर्ववत नहीं किया जा सकता।",
+    "Cancel": "रद्द करें",
+    "Delete": "हटाएँ",
+    "Account name": "खाते का नाम",
+    "Rename": "नाम बदलें",
+    "e.g. Retirement, ISA, Trading": "जैसे रिटायरमेंट, ISA, ट्रेडिंग",
+    "Add": "जोड़ें",
+    "Unable to load release notes.": "रिलीज़ नोट्स लोड नहीं हो सके।",
+    "No release notes available": "कोई रिलीज़ नोट उपलब्ध नहीं है",
+    "There is nothing new to show yet.": "अभी दिखाने के लिए कुछ नया नहीं है।",
+    "{symbol} — History": "{symbol} — इतिहास",
+    "Add trade": "ट्रेड जोड़ें",
+    "Shares held": "रखे गए शेयर",
+    "Avg cost": "औसत लागत",
+    "Current value": "वर्तमान मूल्य",
+    "Unrealized P/L": "अवास्तविक लाभ/हानि",
+    "Realized P/L today": "आज का वास्तविक लाभ/हानि",
+    "Imported realized P/L": "आयातित वास्तविक लाभ/हानि",
+    "Total gain": "कुल लाभ",
+    "Trade History": "ट्रेड इतिहास",
+    "No trade history yet": "अभी कोई ट्रेड इतिहास नहीं है",
+    "No completed trades were returned by Interactive Brokers.":
+        "Interactive Brokers से कोई पूरा हुआ ट्रेड प्राप्त नहीं हुआ।",
+    "Add a trade to start building this ticker’s history.":
+        "इस टिकर का इतिहास बनाना शुरू करने के लिए एक ट्रेड जोड़ें।",
+    "Edit trade": "ट्रेड संपादित करें",
+    "Delete trade": "ट्रेड हटाएँ",
+    "Delete this trade? This cannot be undone.":
+        "यह ट्रेड हटाएँ? इसे पूर्ववत नहीं किया जा सकता।",
+    "BUY": "खरीदें",
+    "SELL": "बेचें",
+    "Buy": "खरीद",
+    "Sell": "बिक्री",
+    "Quantity": "मात्रा",
+    "Price": "मूल्य",
+    "Realized P/L": "वास्तविक लाभ/हानि",
+    "Trade date": "ट्रेड की तारीख",
+    "Save": "सहेजें",
+    "Removed as favorite": "पसंदीदा से हटाया गया",
+    "Set as favorite": "पसंदीदा बनाएँ",
+    "Back": "वापस",
+    "Search stocks...": "शेयर खोजें...",
+    "Use \"{query}\" anyway": "फिर भी \"{query}\" का उपयोग करें",
+    "Load chart for this exact ticker": "इसी टिकर का चार्ट लोड करें",
+    "No market data found": "कोई बाज़ार डेटा नहीं मिला",
+    "Check the ticker symbol and try again.":
+        "टिकर प्रतीक जाँचें और फिर कोशिश करें।",
+    "Show the last {count} years of prices":
+        "पिछले {count} वर्षों के मूल्य दिखाएँ",
+    "Show the last {count} months of prices":
+        "पिछले {count} महीनों के मूल्य दिखाएँ",
+    "Search...": "खोजें...",
+    "Amount": "राशि",
+    "Purchased at": "खरीद मूल्य",
+    "Show the last 5 days of prices": "पिछले 5 दिनों के मूल्य दिखाएँ",
+    "Enter a ticker symbol.": "एक टिकर प्रतीक दर्ज करें।",
+    "Enter a valid amount greater than zero.":
+        "शून्य से अधिक वैध राशि दर्ज करें।",
+    "Enter a valid price greater than zero.":
+        "शून्य से अधिक वैध मूल्य दर्ज करें।",
+    "Delete {count} holding?": "{count} होल्डिंग हटाएँ?",
+    "Delete {count} holdings?": "{count} होल्डिंग्स हटाएँ?",
+    "Deleted {count} holding": "{count} होल्डिंग हटाई गई",
+    "Deleted {count} holdings": "{count} होल्डिंग्स हटाई गईं",
+    "Show menu": "मेनू दिखाएँ",
+    "Delete selected": "चुने हुए हटाएँ",
+    "Cancel selection": "चयन रद्द करें",
+    "Delete ({count})": "हटाएँ ({count})",
+    "Try again": "फिर कोशिश करें",
+    "IBKR settings": "IBKR सेटिंग्स",
+    "Export CSV": "CSV निर्यात करें",
+    "Filter holdings...": "होल्डिंग्स फ़िल्टर करें...",
+    "Select broker": "ब्रोकर चुनें",
+    "Continue": "जारी रखें",
+    "Failed to parse CSV: {error}": "CSV पढ़ने में विफल: {error}",
+    "No trades found in the selected files":
+        "चुनी गई फ़ाइलों में कोई ट्रेड नहीं मिला",
+    "Import {count} trades": "{count} ट्रेड आयात करें",
+    "Import": "आयात करें",
+    "Imported {count} trades": "{count} ट्रेड आयात किए गए",
+    "Could not access the selected database":
+        "चुने गए डेटाबेस तक पहुँच नहीं हो सकी",
+    "Selected file is not a valid database":
+        "चुनी गई फ़ाइल वैध डेटाबेस नहीं है",
+    "Database import failed": "डेटाबेस आयात विफल रहा",
+    "Database imported": "डेटाबेस आयात किया गया",
+    "Display currencies": "दिखाई जाने वाली मुद्राएँ",
+    "Delete all data?": "सारा डेटा हटाएँ?",
+    "This will permanently delete all holdings, trades, and chart data. This cannot be undone.":
+        "यह सभी होल्डिंग्स, ट्रेड और चार्ट डेटा स्थायी रूप से हटा देगा। इसे पूर्ववत नहीं किया जा सकता।",
+    "All data deleted": "सारा डेटा हटा दिया गया",
+    "Check it out on GitHub": "GitHub पर देखें",
+    "Help support this project": "इस प्रोजेक्ट का समर्थन करें",
+    "Interactive Brokers — {account}": "Interactive Brokers — {account}",
+    "Use IBKR portfolio data": "IBKR पोर्टफोलियो डेटा का उपयोग करें",
+    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
+        "पोज़िशन, वर्तमान मूल्यांकन और रखे गए शेयरों के इतिहास के लिए आपके स्वयं-होस्ट किए गए IBKR API को प्राथमिकता दी जाती है। उपलब्ध न होने वाले इतिहास और अन्य प्रतीकों के लिए Yahoo बैकअप के रूप में रहता है।",
+    "API URL": "API URL",
+    "Bearer token": "Bearer टोकन",
+    "Test": "जाँचें",
+    "Connected to IBKR": "IBKR से जुड़ा",
+    "IBKR portfolio source • {url}": "IBKR पोर्टफोलियो स्रोत • {url}",
+    "Use a self-hosted IBKR portfolio API":
+        "स्वयं-होस्ट किया गया IBKR पोर्टफोलियो API उपयोग करें",
+    "Syncing {symbol} ": "{symbol} सिंक हो रहा है ",
+    "No sync running": "कोई सिंक नहीं चल रहा",
+    "Last sync completed ": "पिछला सिंक पूरा हुआ ",
+    "Last sync completed with ": "पिछला सिंक पूरा हुआ, ",
+    "Syncing {symbol} ({completed}/{total})":
+        "{symbol} सिंक हो रहा है ({completed}/{total})",
+    "Last sync completed {completed}/{total}":
+        "पिछला सिंक पूरा हुआ {completed}/{total}",
+    "Last sync completed with {failed} failed":
+        "पिछला सिंक पूरा हुआ, {failed} विफल",
+    "Undo": "पूर्ववत करें",
+    "Favorite": "पसंदीदा",
+    "No trades yet": "अभी कोई ट्रेड नहीं है",
+    "All portfolios are hidden": "सभी पोर्टफोलियो छिपे हुए हैं",
+    "Search for a stock to start building your portfolio history.":
+        "अपने पोर्टफोलियो का इतिहास बनाना शुरू करने के लिए कोई शेयर खोजें।",
+    "Show your portfolios again to restore the chart.":
+        "चार्ट वापस लाने के लिए अपने पोर्टफोलियो फिर से दिखाएँ।",
+    "Search stocks": "शेयर खोजें",
+    "Show all": "सभी दिखाएँ",
+    "History unavailable": "इतिहास उपलब्ध नहीं है",
+    "Historical prices unavailable": "ऐतिहासिक मूल्य उपलब्ध नहीं हैं",
+    "{value} period change": "अवधि में बदलाव {value}",
+    "Loading portfolio": "पोर्टफोलियो लोड हो रहा है",
+    "No IBKR stock positions": "कोई IBKR शेयर पोज़िशन नहीं",
+    "No holdings yet": "अभी कोई होल्डिंग नहीं है",
+    "Check your Interactive Brokers connection or refresh your account.":
+        "अपने Interactive Brokers कनेक्शन की जाँच करें या खाता रीफ़्रेश करें।",
+    "Import your trades to build your portfolio.":
+        "अपना पोर्टफोलियो बनाने के लिए ट्रेड आयात करें।",
+    "Deselect all": "सभी का चयन हटाएँ",
+    "Select all": "सभी चुनें",
+    "{count} selected": "{count} चुने गए",
+    "No IBKR stocks found": "कोई IBKR शेयर नहीं मिला",
+    "No stocks yet": "अभी कोई शेयर नहीं है",
+    "No matching stocks": "कोई मेल खाता शेयर नहीं मिला",
+    "Refresh your portfolio or check your Interactive Brokers connection.":
+        "अपना पोर्टफोलियो रीफ़्रेश करें या Interactive Brokers कनेक्शन की जाँच करें।",
+    "Import a CSV or add your first trade manually.":
+        "CSV आयात करें या अपना पहला ट्रेड मैन्युअल रूप से जोड़ें।",
+    "Nothing matches “{query}”. You can add that ticker now.":
+        "“{query}” से कुछ मेल नहीं खाता। आप वह टिकर अभी जोड़ सकते हैं।",
+    "Add {symbol}": "{symbol} जोड़ें",
+    "Try another ticker": "कोई दूसरा टिकर आज़माएँ",
+    "How to get this CSV from {broker}:":
+        "{broker} से यह CSV कैसे प्राप्त करें:",
+    "Log into Tiger Trade (app or web).":
+        "Tiger Trade (ऐप या वेब) में लॉग इन करें।",
+    "Go to Account (Me) → Statements.": "Account (Me) → Statements पर जाएँ।",
+    "Pick a date range covering the trades to import.":
+        "आयात किए जाने वाले ट्रेडों को कवर करने वाली तारीख सीमा चुनें।",
+    "Enable \"Display Detailed Trading Records\" so individual fills are included, not just summary totals.":
+        "\"Display Detailed Trading Records\" चालू करें ताकि केवल सारांश कुल के बजाय अलग-अलग fills शामिल हों।",
+    "Set the export format to CSV and download the statement.":
+        "निर्यात प्रारूप CSV पर सेट करें और स्टेटमेंट डाउनलोड करें।",
+    "Log into IBKR Client Portal.": "IBKR Client Portal में लॉग इन करें।",
+    "Go to Reports → Flex Queries, then click \"+\" next to Activity Flex Query.":
+        "Reports → Flex Queries पर जाएँ, फिर Activity Flex Query के पास \"+\" पर क्लिक करें।",
+    "Under Sections, add Trades, set Options to Execution (one row per fill), and click Select All for the fields.":
+        "Sections में Trades जोड़ें, Options को Execution पर सेट करें (हर fill के लिए एक पंक्ति), और फ़ील्ड के लिए Select All पर क्लिक करें।",
+    "Save the query, then set Period to a custom date range covering your trades (IBKR limits each run to 1 year).":
+        "क्वेरी सहेजें, फिर Period को अपने ट्रेडों को कवर करने वाली कस्टम तारीख सीमा पर सेट करें (IBKR हर रन को 1 वर्ष तक सीमित करता है)।",
+    "Set Format to CSV, then Run the query and download the file.":
+        "Format को CSV पर सेट करें, फिर क्वेरी Run करें और फ़ाइल डाउनलोड करें।",
   },
   "ja": {
     "Charts": "チャート",
