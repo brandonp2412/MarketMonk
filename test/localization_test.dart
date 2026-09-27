@@ -60,6 +60,11 @@ void main() {
         completeKeys,
         reason: 'Japanese must cover the complete localized UI',
       );
+      expect(
+        appTranslations['ko']!.keys.toSet(),
+        completeKeys,
+        reason: 'Korean must cover the complete localized UI',
+      );
     },
   );
 
@@ -69,6 +74,7 @@ void main() {
     const brazilianPortuguese = AppLocalizations(Locale('pt', 'BR'));
     const french = AppLocalizations(Locale('fr'));
     const japanese = AppLocalizations(Locale('ja'));
+    const korean = AppLocalizations(Locale('ko'));
 
     expect(
       german.text('Delete {count} holdings?', {'count': 3}),
@@ -89,6 +95,10 @@ void main() {
     expect(
       japanese.text('Delete {count} holdings?', {'count': 3}),
       '3件の保有銘柄を削除しますか？',
+    );
+    expect(
+      korean.text('Delete {count} holdings?', {'count': 3}),
+      '보유 종목 3개를 삭제할까요?',
     );
   });
 
