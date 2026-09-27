@@ -20,6 +20,7 @@ class AppLocalizations {
     Locale('ja'),
     Locale('ko'),
     Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'),
+    Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
   ];
 
   static const LocalizationsDelegate<AppLocalizations> delegate =
@@ -38,12 +39,38 @@ class AppLocalizations {
         const AppLocalizations(Locale('en'));
   }
 
+  /// Stable identifier used for translation tables and persisted selection.
+  static String localeKey(Locale locale) {
+    if (locale.languageCode != 'zh') return locale.languageCode;
+    final scriptCode = locale.scriptCode;
+    if (scriptCode == 'Hant') return 'zh-Hant';
+    if (scriptCode == 'Hans') return 'zh-Hans';
+    if (const {'TW', 'HK', 'MO'}.contains(locale.countryCode)) return 'zh-Hant';
+    return 'zh-Hans';
+  }
+
+  /// Resolves locale variants that Flutter cannot distinguish by language alone.
+  static Locale resolveLocale(
+    Locale? locale,
+    Iterable<Locale> supportedLocales,
+  ) {
+    if (locale == null) return supportedLocales.first;
+    final key = localeKey(locale);
+    for (final supported in supportedLocales) {
+      if (localeKey(supported) == key) return supported;
+    }
+    for (final supported in supportedLocales) {
+      if (supported.languageCode == locale.languageCode) return supported;
+    }
+    return supportedLocales.first;
+  }
+
   /// Translates [source] and substitutes named brace placeholders.
   String text(
     String source, [
     Map<String, Object?> values = const <String, Object?>{},
   ]) {
-    var result = appTranslations[locale.languageCode]?[source] ?? source;
+    var result = appTranslations[localeKey(locale)]?[source] ?? source;
     for (final entry in values.entries) {
       result = result.replaceAll('{${entry.key}}', entry.value.toString());
     }

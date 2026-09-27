@@ -30,7 +30,8 @@ const _languageNames = <String, String>{
   'hi': 'हिन्दी',
   'ja': '日本語',
   'ko': '한국어',
-  'zh': '简体中文',
+  'zh-Hans': '简体中文',
+  'zh-Hant': '繁體中文',
 };
 
 class SettingsPage extends StatefulWidget {

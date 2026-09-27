@@ -21,7 +21,7 @@ void main() {
     'every supported non-English locale has the complete translation set',
     () {
       final translatedLanguages = AppLocalizations.supportedLocales
-          .map((locale) => locale.languageCode)
+          .map(AppLocalizations.localeKey)
           .where((language) => language != 'en')
           .toSet();
 
@@ -66,9 +66,14 @@ void main() {
         reason: 'Korean must cover the complete localized UI',
       );
       expect(
-        appTranslations['zh']!.keys.toSet(),
+        appTranslations['zh-Hans']!.keys.toSet(),
         completeKeys,
         reason: 'Simplified Chinese must cover the complete localized UI',
+      );
+      expect(
+        appTranslations['zh-Hant']!.keys.toSet(),
+        completeKeys,
+        reason: 'Traditional Chinese must cover the complete localized UI',
       );
     },
   );
@@ -82,6 +87,9 @@ void main() {
     const korean = AppLocalizations(Locale('ko'));
     const simplifiedChinese = AppLocalizations(
       Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'),
+    );
+    const traditionalChinese = AppLocalizations(
+      Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
     );
 
     expect(
@@ -112,6 +120,70 @@ void main() {
       simplifiedChinese.text('Delete {count} holdings?', {'count': 3}),
       '删除 3 个持仓？',
     );
+    expect(
+      traditionalChinese.text('Delete {count} holdings?', {'count': 3}),
+      '刪除 3 筆持倉？',
+    );
+  });
+
+  test('Chinese script selections resolve and persist independently', () async {
+    final settings = SettingsState();
+    await settings.initialized;
+
+    await settings.setLanguageCode('zh-Hant');
+    expect(
+      settings.locale,
+      const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
+    );
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('languageCode'), 'zh-Hant');
+
+    final reloaded = SettingsState();
+    await reloaded.initialized;
+    expect(
+      reloaded.locale,
+      const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
+    );
+
+    expect(
+      const AppLocalizations(Locale('zh', 'TW')).text('Settings'),
+      '設定',
+    );
+    expect(
+      AppLocalizations.resolveLocale(
+        const Locale('zh', 'TW'),
+        AppLocalizations.supportedLocales,
+      ),
+      const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
+    );
+    expect(
+      AppLocalizations.resolveLocale(
+        const Locale('zh', 'CN'),
+        AppLocalizations.supportedLocales,
+      ),
+      const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'),
+    );
+  });
+
+  test('legacy Chinese language preference migrates to Simplified Chinese', () async {
+    SharedPreferences.setMockInitialValues({
+      'languageCode': 'zh',
+      'visibleCurrencies': ['USD'],
+      'displayCurrency': 'USD',
+      'exchangeRate_USD': 1.0,
+    });
+
+    final settings = SettingsState();
+    await settings.initialized;
+
+    expect(settings.languageCode, 'zh-Hans');
+    expect(
+      settings.locale,
+      const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'),
+    );
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('languageCode'), 'zh-Hans');
   });
 
   test('Brazilian Portuguese selection resolves to pt-BR', () async {

@@ -428,6 +428,7 @@ class MyApp extends StatelessWidget {
         ),
         themeMode: settings.theme,
         locale: settings.locale,
+        localeResolutionCallback: AppLocalizations.resolveLocale,
         supportedLocales: AppLocalizations.supportedLocales,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         home: const MyHomePage(),

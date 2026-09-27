@@ -78,7 +78,7 @@ class SettingsState extends ChangeNotifier {
     final selectedLanguageCode = languageCode;
     if (selectedLanguageCode == null) return null;
     return AppLocalizations.supportedLocales.firstWhere(
-      (locale) => locale.languageCode == selectedLanguageCode,
+      (locale) => AppLocalizations.localeKey(locale) == selectedLanguageCode,
     );
   }
 
@@ -122,12 +122,18 @@ class SettingsState extends ChangeNotifier {
     }
 
     final savedLanguageCode = prefs.getString('languageCode');
+    final migratedLanguageCode = savedLanguageCode == 'zh'
+        ? 'zh-Hans'
+        : savedLanguageCode;
     final supportedLanguageCodes = AppLocalizations.supportedLocales
-        .map((locale) => locale.languageCode)
+        .map(AppLocalizations.localeKey)
         .toSet();
-    languageCode = supportedLanguageCodes.contains(savedLanguageCode)
-        ? savedLanguageCode
+    languageCode = supportedLanguageCodes.contains(migratedLanguageCode)
+        ? migratedLanguageCode
         : null;
+    if (savedLanguageCode == 'zh') {
+      await prefs.setString('languageCode', 'zh-Hans');
+    }
 
     systemColors = prefs.getBool('systemColors') ?? false;
     curveLines = prefs.getBool('curveLines') ?? false;
@@ -251,7 +257,7 @@ class SettingsState extends ChangeNotifier {
   Future<void> setLanguageCode(String? value) async {
     final isSupported = value == null ||
         AppLocalizations.supportedLocales.any(
-          (locale) => locale.languageCode == value,
+          (locale) => AppLocalizations.localeKey(locale) == value,
         );
     if (!isSupported) return;
 
