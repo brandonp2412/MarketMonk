@@ -66,13 +66,16 @@ void main() {
     },
   );
 
-  testWidgets('cached IBKR portfolio period changes never refetch IBKR', (
+  testWidgets('cached IBKR portfolio uses broker NAV without refetching', (
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues({
       'ibkrAccountConfigs':
           '{"Default":{"enabled":true,"baseUrl":"https://ibkr.example.test","token":"secret-token"}}',
       'ibkrHistorySeeded:https://ibkr.example.test:Default:VOO': true,
+      'displayCurrency': 'NZD',
+      'visibleCurrencies': ['NZD'],
+      'exchangeRate_NZD': 1.7,
     });
     db = Database.connect(
       DatabaseConnection(
@@ -103,8 +106,8 @@ void main() {
     await accounts.cachePortfolio(
       'Default',
       [cachedPosition],
-      const IbkrAccountValue(value: 5500, currency: 'USD'),
-      netLiquidationUsd: 5500,
+      const IbkrAccountValue(value: 10000, currency: 'NZD'),
+      netLiquidationUsd: 5750,
     );
     final now = DateTime.now();
     await db.into(db.candles).insert(
@@ -142,8 +145,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(ibkrLoads, 0);
-    expect(find.textContaining('5,500'), findsWidgets);
-    expect(find.textContaining('+10.00% holdings'), findsOneWidget);
+    expect(find.textContaining('10,000'), findsWidgets);
+    expect(allRatesFromUsd['NZD'], closeTo(10000 / 5750, 1e-9));
+    expect(find.text('History unavailable'), findsOneWidget);
+    expect(find.textContaining('% holdings'), findsNothing);
 
     await tester.tap(find.text('5d'));
     await tester.pumpAndSettle();
@@ -211,7 +216,7 @@ void main() {
       String period,
     ) async {
       performanceLoads++;
-      expect(period, '12M');
+      expect(period, '1Y');
       return IbkrPerformanceSeries(
         period: period,
         measure: 'TWR',

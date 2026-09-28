@@ -318,7 +318,7 @@ class IbkrApiClient {
 
   /// Fetches IBKR PortfolioAnalyst NAV and TWR history for [period].
   Future<IbkrPerformanceSeries> fetchPerformance(String period) async {
-    const validPeriods = {'1D', '7D', 'MTD', '1M', '3M', '6M', '12M', 'YTD'};
+    const validPeriods = {'1D', '7D', 'MTD', '1M', 'YTD', '1Y'};
     final normalized = period.trim().toUpperCase();
     if (!validPeriods.contains(normalized)) {
       throw ArgumentError.value(period, 'period', 'Unsupported IBKR period');

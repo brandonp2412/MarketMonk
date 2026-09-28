@@ -106,11 +106,11 @@ void main() {
       },
     );
 
-    final performance = await client.fetchPerformance('1m');
+    final performance = await client.fetchPerformance('1y');
 
     expect(
       requestedUri.toString(),
-      'https://ibkr.example.test/base/v1/performance?period=1M',
+      'https://ibkr.example.test/base/v1/performance?period=1Y',
     );
     expect(performance.measure, 'TWR');
     expect(performance.currency, 'NZD');

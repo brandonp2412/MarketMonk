@@ -414,12 +414,13 @@ class ProxyTests(unittest.TestCase):
 
         connection.request(
             "GET",
-            "/v1/performance?period=1M",
+            "/v1/performance?period=12M",
             headers={"Authorization": f"Bearer {'x' * 32}"},
         )
         performance = connection.getresponse()
         self.assertEqual(performance.status, 200)
         performance_body = json.loads(performance.read())
+        self.assertEqual(performance_body["period"], "1Y")
         self.assertEqual(performance_body["measure"], "TWR")
         self.assertEqual(performance_body["returns"][-1], 0.0549)
         connection.close()

@@ -147,10 +147,20 @@ class ChartsPageState extends State<ChartsPage>
     if (ibkrConfig.enabled) {
       final cached = accountManager.portfolioCacheFor(accountName);
       if (cached != null && (!refreshIbkr || !ibkrConfig.isConfigured)) {
+        final currentValue = cached.netLiquidation;
+        final currentValueUsd = cached.netLiquidationUsd;
+        if (currentValue != null &&
+            currentValueUsd != null &&
+            currentValueUsd != 0 &&
+            currentValue.currency.isNotEmpty &&
+            currentValue.currency != 'USD') {
+          allRatesFromUsd[currentValue.currency] =
+              currentValue.value / currentValueUsd;
+        }
         return _LoadedChartPortfolio(
           positions: cached.positions,
-          currentValue: cached.netLiquidation,
-          currentValueUsd: cached.netLiquidationUsd,
+          currentValue: currentValue,
+          currentValueUsd: currentValueUsd,
         );
       }
       if (!ibkrConfig.isConfigured) {
@@ -465,8 +475,8 @@ class ChartsPageState extends State<ChartsPage>
             !_performanceUnsupported.contains(ibkrConfig.baseUrl)) {
           try {
             final performance =
-                await (widget._ibkrPerformanceLoader?.call(ibkrConfig, '12M') ??
-                    IbkrApiClient(ibkrConfig).fetchPerformance('12M'));
+                await (widget._ibkrPerformanceLoader?.call(ibkrConfig, '1Y') ??
+                    IbkrApiClient(ibkrConfig).fetchPerformance('1Y'));
             final brokerSeries = _buildBrokerPerformanceSeries(
               performance,
               loaded,
@@ -479,10 +489,27 @@ class ChartsPageState extends State<ChartsPage>
           } catch (error) {
             _performanceUnsupported.add(ibkrConfig.baseUrl);
             talker.warning(
-              'IBKR performance history unavailable; using holdings history: $error',
+              'IBKR performance history unavailable; showing current broker value only: $error',
             );
           }
         }
+        if (ibkrConfig.enabled) {
+          final currentValueUsd = loaded.currentValueUsd;
+          if (currentValueUsd != null && currentValueUsd.isFinite) {
+            final now = DateTime.now();
+            newSeries[accountName] = [
+              _DateValue(
+                DateTime(now.year, now.month, now.day),
+                currentValueUsd,
+              ),
+            ];
+          } else {
+            newSeries[accountName] = [];
+          }
+          newCurrentHoldingsReplayAccounts.add(accountName);
+          continue;
+        }
+
         final fallback = await _buildPortfolioSeries(
           loaded.positions,
           accountDb,
@@ -1584,7 +1611,8 @@ class ChartsPageState extends State<ChartsPage>
     final currentHoldingsReplay = _currentHoldingsReplayAccounts.contains(
       accountName,
     );
-    final hasHistory = brokerReturn != null || series.length > 1;
+    final hasHistory =
+        brokerReturn != null || (!currentHoldingsReplay && series.length > 1);
     final pct = brokerReturn ??
         (hasHistory
             ? safePercentChange(series.first.value, series.last.value)

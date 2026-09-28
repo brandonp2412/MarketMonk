@@ -406,7 +406,9 @@ def make_handler(client: Any, token: str) -> type[BaseHTTPRequestHandler]:
                 elif parsed.path == "/v1/performance":
                     query = parse_qs(parsed.query)
                     period = (query.get("period") or ["1M"])[0].strip().upper()
-                    if period not in {"1D", "7D", "MTD", "1M", "3M", "6M", "12M", "YTD"}:
+                    if period == "12M":
+                        period = "1Y"
+                    if period not in {"1D", "7D", "MTD", "1M", "YTD", "1Y"}:
                         self._json(400, {"error": "invalid performance period"})
                         return
                     self._json(200, client.performance(period))
