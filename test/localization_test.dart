@@ -55,6 +55,11 @@ void main() {
         reason: 'Turkish must cover the complete localized UI',
       );
       expect(
+        appTranslations['th']!.keys.toSet(),
+        completeKeys,
+        reason: 'Thai must cover the complete localized UI',
+      );
+      expect(
         appTranslations['vi']!.keys.toSet(),
         completeKeys,
         reason: 'Vietnamese must cover the complete localized UI',
@@ -155,6 +160,11 @@ void main() {
     expect(
       turkish.text('Delete {count} holdings?', {'count': 3}),
       '3 varlık silinsin mi?',
+    );
+    const thai = AppLocalizations(Locale('th'));
+    expect(
+      thai.text('Delete {count} holdings?', {'count': 3}),
+      'ลบการถือครอง 3 รายการหรือไม่?',
     );
     expect(
       vietnamese.text('Delete {count} holdings?', {'count': 3}),
