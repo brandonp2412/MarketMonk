@@ -50,6 +50,11 @@ void main() {
         reason: 'Indonesian must cover the complete localized UI',
       );
       expect(
+        appTranslations['tr']!.keys.toSet(),
+        completeKeys,
+        reason: 'Turkish must cover the complete localized UI',
+      );
+      expect(
         appTranslations['de']!.keys.toSet(),
         completeKeys,
         reason: 'German must cover the complete localized UI',
@@ -97,6 +102,7 @@ void main() {
     const arabic = AppLocalizations(Locale('ar'));
     const russian = AppLocalizations(Locale('ru'));
     const indonesian = AppLocalizations(Locale('id'));
+    const turkish = AppLocalizations(Locale('tr'));
     const simplifiedChinese = AppLocalizations(
       Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'),
     );
@@ -139,6 +145,10 @@ void main() {
     expect(
       indonesian.text('Delete {count} holdings?', {'count': 3}),
       'Hapus 3 kepemilikan?',
+    );
+    expect(
+      turkish.text('Delete {count} holdings?', {'count': 3}),
+      '3 varlık silinsin mi?',
     );
     expect(
       simplifiedChinese.text('Delete {count} holdings?', {'count': 3}),
