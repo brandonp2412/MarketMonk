@@ -2103,4 +2103,235 @@ const appTranslations = <String, Map<String, String>>{
     "Save the query, then set Period to a custom date range covering your trades (IBKR limits each run to 1 year).": "احفظ الاستعلام، ثم اضبط Period على نطاق زمني مخصص يغطي صفقاتك (تحد IBKR كل تشغيل بسنة واحدة).",
     "Set Format to CSV, then Run the query and download the file.": "اضبط Format على CSV، ثم شغّل الاستعلام ونزّل الملف.",
   },
+  "ru": {
+    "Charts": "Графики",
+    "Portfolio": "Портфель",
+    "Holdings": "Позиции",
+    "Error": "Ошибка",
+    "Settings": "Настройки",
+    "Appearance": "Оформление",
+    "System": "Системная",
+    "Dark": "Тёмная",
+    "Light": "Светлая",
+    "Language": "Язык",
+    "System default": "Системный язык",
+    "Use the primary color of your device for the app":
+        "Использовать основной цвет устройства в приложении",
+    "System color scheme": "Системная цветовая схема",
+    "Pure black (AMOLED)": "Чистый чёрный (AMOLED)",
+    "Use pure black for AMOLED displays":
+        "Использовать чистый чёрный цвет для AMOLED-дисплеев",
+    "App color": "Цвет приложения",
+    "How dates are displayed below graphs":
+        "Как отображаются даты под графиками",
+    "Date format ({example})": "Формат даты ({example})",
+    "Show a badge on the chart when the market is closed (weekends)":
+        "Показывать значок на графике, когда рынок закрыт (выходные)",
+    "Market closed indicator": "Индикатор закрытого рынка",
+    "Use wavy curves in the graphs page":
+        "Использовать плавные кривые на странице графиков",
+    "Curve line graphs": "Кривые линии графиков",
+    "Curve smoothness": "Плавность кривых",
+    "Accounts": "Счета",
+    "Manage accounts": "Управление счетами",
+    "Currencies": "Валюты",
+    "Interactive Brokers": "Interactive Brokers",
+    "Data": "Данные",
+    "Export database": "Экспорт базы данных",
+    "Import CSV": "Импорт CSV",
+    "Sync": "Синхронизация",
+    "Delete all data": "Удалить все данные",
+    "Import database": "Импорт базы данных",
+    "About": "О приложении",
+    "What's New": "Что нового",
+    "Version": "Версия",
+    "Author": "Автор",
+    "License": "Лицензия",
+    "Source code": "Исходный код",
+    "Donate": "Поддержать",
+    "Download the database file for the entire app":
+        "Скачать файл базы данных всего приложения",
+    "Import holdings from a broker CSV export":
+        "Импортировать позиции из CSV-экспорта брокера",
+    "Permanently delete all holdings, trades, and candles":
+        "Безвозвратно удалить все позиции, сделки и свечи",
+    "Import a .sqlite database": "Импортировать базу данных .sqlite",
+    "Active": "Активный",
+    "Rename account": "Переименовать счёт",
+    "Delete account": "Удалить счёт",
+    "New account": "Новый счёт",
+    "Add account": "Добавить счёт",
+    "Delete \"{name}\"?": "Удалить «{name}»?",
+    "All trades and data for this account will be permanently deleted. This cannot be undone.":
+        "Все сделки и данные этого счёта будут безвозвратно удалены. Это действие нельзя отменить.",
+    "Cancel": "Отмена",
+    "Delete": "Удалить",
+    "Account name": "Название счёта",
+    "Rename": "Переименовать",
+    "e.g. Retirement, ISA, Trading": "например, Пенсия, ИИС, Торговля",
+    "Add": "Добавить",
+    "Unable to load release notes.":
+        "Не удалось загрузить примечания к выпуску.",
+    "No release notes available": "Примечания к выпуску недоступны",
+    "There is nothing new to show yet.": "Пока нет ничего нового.",
+    "{symbol} — History": "{symbol} — История",
+    "Add trade": "Добавить сделку",
+    "Shares held": "Количество акций",
+    "Avg cost": "Средняя цена",
+    "Current value": "Текущая стоимость",
+    "Unrealized P/L": "Нереализованная прибыль/убыток",
+    "Realized P/L today": "Реализованная прибыль/убыток сегодня",
+    "Imported realized P/L": "Импортированная реализованная прибыль/убыток",
+    "Total gain": "Общая прибыль",
+    "Trade History": "История сделок",
+    "No trade history yet": "Истории сделок пока нет",
+    "No completed trades were returned by Interactive Brokers.":
+        "Interactive Brokers не вернул завершённых сделок.",
+    "Add a trade to start building this ticker’s history.":
+        "Добавьте сделку, чтобы начать формировать историю этого тикера.",
+    "Edit trade": "Изменить сделку",
+    "Delete trade": "Удалить сделку",
+    "Delete this trade? This cannot be undone.":
+        "Удалить эту сделку? Это действие нельзя отменить.",
+    "BUY": "ПОКУПКА",
+    "SELL": "ПРОДАЖА",
+    "Buy": "Купить",
+    "Sell": "Продать",
+    "Quantity": "Количество",
+    "Price": "Цена",
+    "Realized P/L": "Реализованная прибыль/убыток",
+    "Trade date": "Дата сделки",
+    "Save": "Сохранить",
+    "Removed as favorite": "Удалено из избранного",
+    "Set as favorite": "Добавлено в избранное",
+    "Back": "Назад",
+    "Search stocks...": "Поиск акций...",
+    "Use \"{query}\" anyway": "Всё равно использовать «{query}»",
+    "Load chart for this exact ticker":
+        "Загрузить график именно для этого тикера",
+    "No market data found": "Рыночные данные не найдены",
+    "Check the ticker symbol and try again.":
+        "Проверьте тикер и повторите попытку.",
+    "Show the last {count} years of prices":
+        "Показать цены за последние {count} лет",
+    "Show the last {count} months of prices":
+        "Показать цены за последние {count} месяцев",
+    "Search...": "Поиск...",
+    "Amount": "Сумма",
+    "Purchased at": "Цена покупки",
+    "Show the last 5 days of prices": "Показать цены за последние 5 дней",
+    "Enter a ticker symbol.": "Введите тикер.",
+    "Enter a valid amount greater than zero.":
+        "Введите корректную сумму больше нуля.",
+    "Enter a valid price greater than zero.":
+        "Введите корректную цену больше нуля.",
+    "Delete {count} holding?": "Удалить {count} позицию?",
+    "Delete {count} holdings?": "Удалить позиции ({count})?",
+    "Deleted {count} holding": "Удалена {count} позиция",
+    "Deleted {count} holdings": "Удалено позиций: {count}",
+    "Show menu": "Показать меню",
+    "Delete selected": "Удалить выбранные",
+    "Cancel selection": "Отменить выбор",
+    "Delete ({count})": "Удалить ({count})",
+    "Try again": "Повторить",
+    "IBKR settings": "Настройки IBKR",
+    "Export CSV": "Экспорт CSV",
+    "Filter holdings...": "Фильтр позиций...",
+    "Select broker": "Выберите брокера",
+    "Continue": "Продолжить",
+    "Failed to parse CSV: {error}": "Не удалось обработать CSV: {error}",
+    "No trades found in the selected files":
+        "В выбранных файлах сделки не найдены",
+    "Import {count} trades": "Импортировать сделки: {count}",
+    "Import": "Импортировать",
+    "Imported {count} trades": "Импортировано сделок: {count}",
+    "Could not access the selected database":
+        "Не удалось получить доступ к выбранной базе данных",
+    "Selected file is not a valid database":
+        "Выбранный файл не является допустимой базой данных",
+    "Database import failed": "Не удалось импортировать базу данных",
+    "Database imported": "База данных импортирована",
+    "Display currencies": "Отображаемые валюты",
+    "Delete all data?": "Удалить все данные?",
+    "This will permanently delete all holdings, trades, and chart data. This cannot be undone.":
+        "Все позиции, сделки и данные графиков будут безвозвратно удалены. Это действие нельзя отменить.",
+    "All data deleted": "Все данные удалены",
+    "Check it out on GitHub": "Посмотреть на GitHub",
+    "Help support this project": "Поддержать этот проект",
+    "Interactive Brokers — {account}": "Interactive Brokers — {account}",
+    "Use IBKR portfolio data": "Использовать данные портфеля IBKR",
+    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
+        "Для позиций, текущей стоимости и истории удерживаемых акций предпочтительно используется ваш самостоятельно размещённый API IBKR. Yahoo остаётся резервным источником для недоступной истории и других символов.",
+    "API URL": "URL API",
+    "Bearer token": "Bearer-токен",
+    "Test": "Проверить",
+    "Connected to IBKR": "Подключено к IBKR",
+    "IBKR portfolio source • {url}": "Источник портфеля IBKR • {url}",
+    "Use a self-hosted IBKR portfolio API":
+        "Использовать самостоятельно размещённый API портфеля IBKR",
+    "Syncing {symbol} ": "Синхронизация {symbol} ",
+    "No sync running": "Синхронизация не выполняется",
+    "Last sync completed ": "Последняя синхронизация завершена ",
+    "Last sync completed with ": "Последняя синхронизация завершена с ",
+    "Syncing {symbol} ({completed}/{total})":
+        "Синхронизация {symbol} ({completed}/{total})",
+    "Last sync completed {completed}/{total}":
+        "Последняя синхронизация завершена: {completed}/{total}",
+    "Last sync completed with {failed} failed":
+        "Последняя синхронизация завершена, ошибок: {failed}",
+    "Undo": "Отменить",
+    "Favorite": "Избранное",
+    "No trades yet": "Сделок пока нет",
+    "All portfolios are hidden": "Все портфели скрыты",
+    "Search for a stock to start building your portfolio history.":
+        "Найдите акцию, чтобы начать формировать историю портфеля.",
+    "Show your portfolios again to restore the chart.":
+        "Снова покажите портфели, чтобы восстановить график.",
+    "Search stocks": "Поиск акций",
+    "Show all": "Показать все",
+    "History unavailable": "История недоступна",
+    "Historical prices unavailable": "Исторические цены недоступны",
+    "{value} period change": "Изменение за период: {value}",
+    "Loading portfolio": "Загрузка портфеля",
+    "No IBKR stock positions": "В IBKR нет позиций по акциям",
+    "No holdings yet": "Позиций пока нет",
+    "Check your Interactive Brokers connection or refresh your account.":
+        "Проверьте подключение к Interactive Brokers или обновите счёт.",
+    "Import your trades to build your portfolio.":
+        "Импортируйте сделки, чтобы сформировать портфель.",
+    "Deselect all": "Снять выбор со всех",
+    "Select all": "Выбрать все",
+    "{count} selected": "Выбрано: {count}",
+    "No IBKR stocks found": "Акции IBKR не найдены",
+    "No stocks yet": "Акций пока нет",
+    "No matching stocks": "Подходящие акции не найдены",
+    "Refresh your portfolio or check your Interactive Brokers connection.":
+        "Обновите портфель или проверьте подключение к Interactive Brokers.",
+    "Import a CSV or add your first trade manually.":
+        "Импортируйте CSV или добавьте первую сделку вручную.",
+    "Nothing matches “{query}”. You can add that ticker now.":
+        "По запросу «{query}» ничего не найдено. Этот тикер можно добавить сейчас.",
+    "Add {symbol}": "Добавить {symbol}",
+    "Try another ticker": "Попробовать другой тикер",
+    "How to get this CSV from {broker}:": "Как получить этот CSV из {broker}:",
+    "Log into Tiger Trade (app or web).":
+        "Войдите в Tiger Trade (в приложении или браузере).",
+    "Go to Account (Me) → Statements.":
+        "Перейдите в Account (Me) → Statements.",
+    "Pick a date range covering the trades to import.":
+        "Выберите диапазон дат, охватывающий импортируемые сделки.",
+    "Enable \"Display Detailed Trading Records\" so individual fills are included, not just summary totals.":
+        "Включите «Display Detailed Trading Records», чтобы в экспорт попали отдельные исполнения, а не только итоговые суммы.",
+    "Set the export format to CSV and download the statement.":
+        "Выберите формат экспорта CSV и скачайте отчёт.",
+    "Log into IBKR Client Portal.": "Войдите в IBKR Client Portal.",
+    "Go to Reports → Flex Queries, then click \"+\" next to Activity Flex Query.":
+        "Перейдите в Reports → Flex Queries, затем нажмите «+» рядом с Activity Flex Query.",
+    "Under Sections, add Trades, set Options to Execution (one row per fill), and click Select All for the fields.":
+        "В разделе Sections добавьте Trades, установите Options в Execution (одна строка на каждое исполнение) и нажмите Select All для полей.",
+    "Save the query, then set Period to a custom date range covering your trades (IBKR limits each run to 1 year).":
+        "Сохраните запрос, затем задайте в Period собственный диапазон дат, охватывающий ваши сделки (IBKR ограничивает каждый запуск одним годом).",
+    "Set Format to CSV, then Run the query and download the file.":
+        "Установите Format в CSV, затем запустите запрос и скачайте файл.",
+  },
 };

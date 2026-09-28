@@ -18,6 +18,7 @@ class AppLocalizations {
     Locale('pt', 'BR'),
     Locale('hi'),
     Locale('ar'),
+    Locale('ru'),
     Locale('ja'),
     Locale('ko'),
     Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'),
