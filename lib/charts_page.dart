@@ -101,7 +101,7 @@ class ChartsPageState extends State<ChartsPage>
     super.initState();
     _loadFavorites();
     _loadPeriodThenPortfolios();
-    _syncCandlesInBackground();
+    _syncCandlesInBackground(refreshIbkr: true);
     _setColors();
     WidgetsBinding.instance.addPostFrameCallback((_) => _measureOverlay());
   }

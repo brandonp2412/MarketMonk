@@ -66,7 +66,7 @@ void main() {
     },
   );
 
-  testWidgets('cached IBKR portfolio uses broker NAV without refetching', (
+  testWidgets('IBKR chart refreshes broker NAV once then reuses it', (
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues({
@@ -128,7 +128,15 @@ void main() {
     var ibkrLoads = 0;
     Future<IbkrPortfolioSnapshot> loader(IbkrAccountConfig _) async {
       ibkrLoads++;
-      throw StateError('IBKR should not be fetched for cached period changes');
+      return const IbkrPortfolioSnapshot(
+        account: '****6552',
+        positions: [],
+        summary: {
+          'netliquidation': {'value': 10100, 'currency': 'NZD'},
+          'netliquidationbycurrency:usd': {'value': 5800, 'currency': 'USD'},
+        },
+        ledger: {},
+      );
     }
 
     await tester.pumpWidget(
@@ -144,9 +152,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(ibkrLoads, 0);
-    expect(find.textContaining('10,000'), findsWidgets);
-    expect(allRatesFromUsd['NZD'], closeTo(10000 / 5750, 1e-9));
+    expect(ibkrLoads, 1);
+    expect(find.textContaining('10,100'), findsWidgets);
+    expect(allRatesFromUsd['NZD'], closeTo(10100 / 5800, 1e-9));
     expect(find.text('History unavailable'), findsOneWidget);
     expect(find.textContaining('% holdings'), findsNothing);
 
@@ -155,7 +163,7 @@ void main() {
     await tester.tap(find.text('10y'));
     await tester.pumpAndSettle();
 
-    expect(ibkrLoads, 0);
+    expect(ibkrLoads, 1);
   });
 
   testWidgets('IBKR portfolio summary uses broker TWR when available', (
