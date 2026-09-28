@@ -35,6 +35,11 @@ void main() {
         reason: 'Hindi must cover the complete localized UI',
       );
       expect(
+        appTranslations['ar']!.keys.toSet(),
+        completeKeys,
+        reason: 'Arabic must cover the complete localized UI',
+      );
+      expect(
         appTranslations['de']!.keys.toSet(),
         completeKeys,
         reason: 'German must cover the complete localized UI',
@@ -79,6 +84,7 @@ void main() {
     const french = AppLocalizations(Locale('fr'));
     const japanese = AppLocalizations(Locale('ja'));
     const korean = AppLocalizations(Locale('ko'));
+    const arabic = AppLocalizations(Locale('ar'));
     const simplifiedChinese = AppLocalizations(
       Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'),
     );
@@ -109,6 +115,10 @@ void main() {
     expect(
       korean.text('Delete {count} holdings?', {'count': 3}),
       '보유 종목 3개를 삭제할까요?',
+    );
+    expect(
+      arabic.text('Delete {count} holdings?', {'count': 3}),
+      'حذف 3 مقتنيات؟',
     );
     expect(
       simplifiedChinese.text('Delete {count} holdings?', {'count': 3}),
