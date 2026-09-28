@@ -1,0 +1,15 @@
+Lacak saham dan pantau portofolio Anda secara sekilas.
+
+MarketMonk adalah pelacak saham dan portofolio untuk investor yang menginginkan tampilan sederhana tentang harga pasar, kepemilikan, dan kinerja. Tambahkan saham yang Anda minati, bangun portofolio, dan jelajahi grafik harga dalam dasbor yang bersih dan mudah digunakan.
+
+FITUR
+
+• Lacak harga saham dan pergerakan pasar
+• Bangun dan pantau portofolio investasi pribadi
+• Gunakan grafik garis untuk memahami pergerakan harga dan kinerja
+• Atur informasi yang paling penting bagi Anda
+• Sesuaikan tampilan agar sesuai dengan cara Anda berinvestasi
+
+MarketMonk membantu Anda meninjau dan memantau portofolio dengan lebih cepat, baik saat memeriksa daftar pantauan maupun meninjau investasi.
+
+Data pasar disediakan hanya untuk tujuan informasi dan bukan merupakan nasihat keuangan. Selalu lakukan riset Anda sendiri sebelum membuat keputusan investasi.

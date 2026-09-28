@@ -30,6 +30,7 @@ const _languageNames = <String, String>{
   'hi': 'हिन्दी',
   'ar': 'العربية',
   'ru': 'Русский',
+  'id': 'Bahasa Indonesia',
   'ja': '日本語',
   'ko': '한국어',
   'zh-Hans': '简体中文',

@@ -2334,4 +2334,234 @@ const appTranslations = <String, Map<String, String>>{
     "Set Format to CSV, then Run the query and download the file.":
         "Установите Format в CSV, затем запустите запрос и скачайте файл.",
   },
+  "id": {
+    "Charts": "Grafik",
+    "Portfolio": "Portofolio",
+    "Holdings": "Kepemilikan",
+    "Error": "Kesalahan",
+    "Settings": "Pengaturan",
+    "Appearance": "Tampilan",
+    "System": "Sistem",
+    "Dark": "Gelap",
+    "Light": "Terang",
+    "Language": "Bahasa",
+    "System default": "Default sistem",
+    "Use the primary color of your device for the app":
+        "Gunakan warna utama perangkat untuk aplikasi",
+    "System color scheme": "Skema warna sistem",
+    "Pure black (AMOLED)": "Hitam pekat (AMOLED)",
+    "Use pure black for AMOLED displays":
+        "Gunakan hitam pekat untuk layar AMOLED",
+    "App color": "Warna aplikasi",
+    "How dates are displayed below graphs":
+        "Cara tanggal ditampilkan di bawah grafik",
+    "Date format ({example})": "Format tanggal ({example})",
+    "Show a badge on the chart when the market is closed (weekends)":
+        "Tampilkan lencana pada grafik saat pasar tutup (akhir pekan)",
+    "Market closed indicator": "Indikator pasar tutup",
+    "Use wavy curves in the graphs page":
+        "Gunakan kurva halus di halaman grafik",
+    "Curve line graphs": "Grafik garis melengkung",
+    "Curve smoothness": "Kehalusan kurva",
+    "Accounts": "Akun",
+    "Manage accounts": "Kelola akun",
+    "Currencies": "Mata uang",
+    "Interactive Brokers": "Interactive Brokers",
+    "Data": "Data",
+    "Export database": "Ekspor basis data",
+    "Import CSV": "Impor CSV",
+    "Sync": "Sinkronkan",
+    "Delete all data": "Hapus semua data",
+    "Import database": "Impor basis data",
+    "About": "Tentang",
+    "What's New": "Yang Baru",
+    "Version": "Versi",
+    "Author": "Penulis",
+    "License": "Lisensi",
+    "Source code": "Kode sumber",
+    "Donate": "Donasi",
+    "Download the database file for the entire app":
+        "Unduh file basis data untuk seluruh aplikasi",
+    "Import holdings from a broker CSV export":
+        "Impor kepemilikan dari ekspor CSV broker",
+    "Permanently delete all holdings, trades, and candles":
+        "Hapus permanen semua kepemilikan, transaksi, dan candle",
+    "Import a .sqlite database": "Impor basis data .sqlite",
+    "Active": "Aktif",
+    "Rename account": "Ganti nama akun",
+    "Delete account": "Hapus akun",
+    "New account": "Akun baru",
+    "Add account": "Tambah akun",
+    "Delete \"{name}\"?": "Hapus \"{name}\"?",
+    "All trades and data for this account will be permanently deleted. This cannot be undone.":
+        "Semua transaksi dan data untuk akun ini akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.",
+    "Cancel": "Batal",
+    "Delete": "Hapus",
+    "Account name": "Nama akun",
+    "Rename": "Ganti nama",
+    "e.g. Retirement, ISA, Trading": "mis. Pensiun, ISA, Trading",
+    "Add": "Tambah",
+    "Unable to load release notes.": "Tidak dapat memuat catatan rilis.",
+    "No release notes available": "Tidak ada catatan rilis",
+    "There is nothing new to show yet.":
+        "Belum ada hal baru untuk ditampilkan.",
+    "{symbol} — History": "{symbol} — Riwayat",
+    "Add trade": "Tambah transaksi",
+    "Shares held": "Saham dimiliki",
+    "Avg cost": "Biaya rata-rata",
+    "Current value": "Nilai saat ini",
+    "Unrealized P/L": "Laba/Rugi belum terealisasi",
+    "Realized P/L today": "Laba/Rugi terealisasi hari ini",
+    "Imported realized P/L": "Laba/Rugi terealisasi yang diimpor",
+    "Total gain": "Total keuntungan",
+    "Trade History": "Riwayat Transaksi",
+    "No trade history yet": "Belum ada riwayat transaksi",
+    "No completed trades were returned by Interactive Brokers.":
+        "Interactive Brokers tidak mengembalikan transaksi yang telah selesai.",
+    "Add a trade to start building this ticker’s history.":
+        "Tambahkan transaksi untuk mulai membangun riwayat ticker ini.",
+    "Edit trade": "Edit transaksi",
+    "Delete trade": "Hapus transaksi",
+    "Delete this trade? This cannot be undone.":
+        "Hapus transaksi ini? Tindakan ini tidak dapat dibatalkan.",
+    "BUY": "BELI",
+    "SELL": "JUAL",
+    "Buy": "Beli",
+    "Sell": "Jual",
+    "Quantity": "Jumlah",
+    "Price": "Harga",
+    "Realized P/L": "Laba/Rugi terealisasi",
+    "Trade date": "Tanggal transaksi",
+    "Save": "Simpan",
+    "Removed as favorite": "Dihapus dari favorit",
+    "Set as favorite": "Ditambahkan ke favorit",
+    "Back": "Kembali",
+    "Search stocks...": "Cari saham...",
+    "Use \"{query}\" anyway": "Tetap gunakan \"{query}\"",
+    "Load chart for this exact ticker": "Muat grafik untuk ticker ini",
+    "No market data found": "Data pasar tidak ditemukan",
+    "Check the ticker symbol and try again.":
+        "Periksa simbol ticker lalu coba lagi.",
+    "Show the last {count} years of prices":
+        "Tampilkan harga {count} tahun terakhir",
+    "Show the last {count} months of prices":
+        "Tampilkan harga {count} bulan terakhir",
+    "Search...": "Cari...",
+    "Amount": "Jumlah",
+    "Purchased at": "Dibeli pada",
+    "Show the last 5 days of prices": "Tampilkan harga 5 hari terakhir",
+    "Enter a ticker symbol.": "Masukkan simbol ticker.",
+    "Enter a valid amount greater than zero.":
+        "Masukkan jumlah valid yang lebih besar dari nol.",
+    "Enter a valid price greater than zero.":
+        "Masukkan harga valid yang lebih besar dari nol.",
+    "Delete {count} holding?": "Hapus {count} kepemilikan?",
+    "Delete {count} holdings?": "Hapus {count} kepemilikan?",
+    "Deleted {count} holding": "{count} kepemilikan dihapus",
+    "Deleted {count} holdings": "{count} kepemilikan dihapus",
+    "Show menu": "Tampilkan menu",
+    "Delete selected": "Hapus yang dipilih",
+    "Cancel selection": "Batalkan pilihan",
+    "Delete ({count})": "Hapus ({count})",
+    "Try again": "Coba lagi",
+    "IBKR settings": "Pengaturan IBKR",
+    "Export CSV": "Ekspor CSV",
+    "Filter holdings...": "Filter kepemilikan...",
+    "Select broker": "Pilih broker",
+    "Continue": "Lanjutkan",
+    "Failed to parse CSV: {error}": "Gagal memproses CSV: {error}",
+    "No trades found in the selected files":
+        "Tidak ada transaksi dalam file yang dipilih",
+    "Import {count} trades": "Impor {count} transaksi",
+    "Import": "Impor",
+    "Imported {count} trades": "{count} transaksi diimpor",
+    "Could not access the selected database":
+        "Tidak dapat mengakses basis data yang dipilih",
+    "Selected file is not a valid database":
+        "File yang dipilih bukan basis data yang valid",
+    "Database import failed": "Impor basis data gagal",
+    "Database imported": "Basis data diimpor",
+    "Display currencies": "Mata uang tampilan",
+    "Delete all data?": "Hapus semua data?",
+    "This will permanently delete all holdings, trades, and chart data. This cannot be undone.":
+        "Ini akan menghapus permanen semua kepemilikan, transaksi, dan data grafik. Tindakan ini tidak dapat dibatalkan.",
+    "All data deleted": "Semua data dihapus",
+    "Check it out on GitHub": "Lihat di GitHub",
+    "Help support this project": "Bantu dukung proyek ini",
+    "Interactive Brokers — {account}": "Interactive Brokers — {account}",
+    "Use IBKR portfolio data": "Gunakan data portofolio IBKR",
+    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
+        "Posisi, valuasi saat ini, dan riwayat saham yang dimiliki akan mengutamakan API IBKR yang Anda host sendiri. Yahoo tetap menjadi cadangan untuk riwayat yang tidak tersedia dan simbol lainnya.",
+    "API URL": "URL API",
+    "Bearer token": "Token bearer",
+    "Test": "Uji",
+    "Connected to IBKR": "Terhubung ke IBKR",
+    "IBKR portfolio source • {url}": "Sumber portofolio IBKR • {url}",
+    "Use a self-hosted IBKR portfolio API":
+        "Gunakan API portofolio IBKR yang di-host sendiri",
+    "Syncing {symbol} ": "Menyinkronkan {symbol} ",
+    "No sync running": "Tidak ada sinkronisasi berjalan",
+    "Last sync completed ": "Sinkronisasi terakhir selesai ",
+    "Last sync completed with ": "Sinkronisasi terakhir selesai dengan ",
+    "Syncing {symbol} ({completed}/{total})":
+        "Menyinkronkan {symbol} ({completed}/{total})",
+    "Last sync completed {completed}/{total}":
+        "Sinkronisasi terakhir selesai {completed}/{total}",
+    "Last sync completed with {failed} failed":
+        "Sinkronisasi terakhir selesai dengan {failed} gagal",
+    "Undo": "Urungkan",
+    "Favorite": "Favorit",
+    "No trades yet": "Belum ada transaksi",
+    "All portfolios are hidden": "Semua portofolio disembunyikan",
+    "Search for a stock to start building your portfolio history.":
+        "Cari saham untuk mulai membangun riwayat portofolio Anda.",
+    "Show your portfolios again to restore the chart.":
+        "Tampilkan kembali portofolio Anda untuk memulihkan grafik.",
+    "Search stocks": "Cari saham",
+    "Show all": "Tampilkan semua",
+    "History unavailable": "Riwayat tidak tersedia",
+    "Historical prices unavailable": "Harga historis tidak tersedia",
+    "{value} period change": "Perubahan periode {value}",
+    "Loading portfolio": "Memuat portofolio",
+    "No IBKR stock positions": "Tidak ada posisi saham IBKR",
+    "No holdings yet": "Belum ada kepemilikan",
+    "Check your Interactive Brokers connection or refresh your account.":
+        "Periksa koneksi Interactive Brokers Anda atau segarkan akun.",
+    "Import your trades to build your portfolio.":
+        "Impor transaksi Anda untuk membangun portofolio.",
+    "Deselect all": "Batalkan semua pilihan",
+    "Select all": "Pilih semua",
+    "{count} selected": "{count} dipilih",
+    "No IBKR stocks found": "Tidak ada saham IBKR ditemukan",
+    "No stocks yet": "Belum ada saham",
+    "No matching stocks": "Tidak ada saham yang cocok",
+    "Refresh your portfolio or check your Interactive Brokers connection.":
+        "Segarkan portofolio Anda atau periksa koneksi Interactive Brokers.",
+    "Import a CSV or add your first trade manually.":
+        "Impor CSV atau tambahkan transaksi pertama secara manual.",
+    "Nothing matches “{query}”. You can add that ticker now.":
+        "Tidak ada yang cocok dengan “{query}”. Anda dapat menambahkan ticker tersebut sekarang.",
+    "Add {symbol}": "Tambah {symbol}",
+    "Try another ticker": "Coba ticker lain",
+    "How to get this CSV from {broker}:":
+        "Cara mendapatkan CSV ini dari {broker}:",
+    "Log into Tiger Trade (app or web).":
+        "Masuk ke Tiger Trade (aplikasi atau web).",
+    "Go to Account (Me) → Statements.": "Buka Account (Me) → Statements.",
+    "Pick a date range covering the trades to import.":
+        "Pilih rentang tanggal yang mencakup transaksi yang akan diimpor.",
+    "Enable \"Display Detailed Trading Records\" so individual fills are included, not just summary totals.":
+        "Aktifkan \"Display Detailed Trading Records\" agar setiap eksekusi disertakan, bukan hanya total ringkasan.",
+    "Set the export format to CSV and download the statement.":
+        "Atur format ekspor ke CSV lalu unduh laporan.",
+    "Log into IBKR Client Portal.": "Masuk ke IBKR Client Portal.",
+    "Go to Reports → Flex Queries, then click \"+\" next to Activity Flex Query.":
+        "Buka Reports → Flex Queries, lalu klik \"+\" di sebelah Activity Flex Query.",
+    "Under Sections, add Trades, set Options to Execution (one row per fill), and click Select All for the fields.":
+        "Di bagian Sections, tambahkan Trades, atur Options ke Execution (satu baris per eksekusi), lalu klik Select All untuk semua bidang.",
+    "Save the query, then set Period to a custom date range covering your trades (IBKR limits each run to 1 year).":
+        "Simpan kueri, lalu atur Period ke rentang tanggal khusus yang mencakup transaksi Anda (IBKR membatasi setiap proses hingga 1 tahun).",
+    "Set Format to CSV, then Run the query and download the file.":
+        "Atur Format ke CSV, lalu jalankan kueri dan unduh file.",
+  },
 };
