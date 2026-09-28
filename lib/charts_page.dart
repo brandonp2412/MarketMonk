@@ -996,6 +996,7 @@ class ChartsPageState extends State<ChartsPage>
 
   Widget _buildSearchResults() {
     final query = _searchController.text.trim().toUpperCase();
+    if (query.isEmpty) return const SizedBox.shrink();
 
     // "Use anyway" tile — always shown so a known symbol remains usable even
     // while Yahoo search is slow or unavailable (e.g. GLD).

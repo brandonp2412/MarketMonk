@@ -284,4 +284,34 @@ void main() {
 
     await db.close();
   });
+
+  testWidgets('empty ticker fallback stays hidden before typing', (
+    WidgetTester tester,
+  ) async {
+    db = Database.connect(
+      DatabaseConnection(
+        NativeDatabase.memory(),
+        closeStreamsSynchronously: true,
+      ),
+    );
+    final accounts = AccountManager();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: const MyApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Search stocks'));
+    await tester.pump();
+
+    expect(find.text('Use "" anyway'), findsNothing);
+
+    await db.close();
+  });
 }
