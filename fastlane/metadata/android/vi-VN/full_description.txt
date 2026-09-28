@@ -1,0 +1,15 @@
+Theo dõi cổ phiếu và nắm bắt danh mục của bạn chỉ trong nháy mắt.
+
+MarketMonk là ứng dụng theo dõi cổ phiếu và danh mục đầu tư dành cho nhà đầu tư muốn có cái nhìn rõ ràng về giá thị trường, các khoản nắm giữ và hiệu suất. Thêm những cổ phiếu bạn quan tâm, xây dựng danh mục và khám phá biểu đồ giá từ một bảng điều khiển đơn giản.
+
+TÍNH NĂNG
+
+• Theo dõi giá cổ phiếu và diễn biến thị trường
+• Xây dựng và theo dõi danh mục đầu tư cá nhân
+• Xem biểu đồ đường để tìm hiểu biến động giá và lợi nhuận
+• Sắp xếp những thông tin quan trọng với bạn
+• Điều chỉnh cài đặt theo cách bạn muốn theo dõi đầu tư
+
+MarketMonk giúp việc theo dõi danh mục dễ đọc hơn, dù bạn đang kiểm tra danh sách theo dõi hay xem lại các khoản đầu tư.
+
+Dữ liệu thị trường chỉ nhằm mục đích cung cấp thông tin và không phải là lời khuyên tài chính. Hãy luôn tự nghiên cứu trước khi đưa ra quyết định đầu tư.

@@ -55,6 +55,11 @@ void main() {
         reason: 'Turkish must cover the complete localized UI',
       );
       expect(
+        appTranslations['vi']!.keys.toSet(),
+        completeKeys,
+        reason: 'Vietnamese must cover the complete localized UI',
+      );
+      expect(
         appTranslations['de']!.keys.toSet(),
         completeKeys,
         reason: 'German must cover the complete localized UI',
@@ -103,6 +108,7 @@ void main() {
     const russian = AppLocalizations(Locale('ru'));
     const indonesian = AppLocalizations(Locale('id'));
     const turkish = AppLocalizations(Locale('tr'));
+    const vietnamese = AppLocalizations(Locale('vi'));
     const simplifiedChinese = AppLocalizations(
       Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'),
     );
@@ -149,6 +155,10 @@ void main() {
     expect(
       turkish.text('Delete {count} holdings?', {'count': 3}),
       '3 varlık silinsin mi?',
+    );
+    expect(
+      vietnamese.text('Delete {count} holdings?', {'count': 3}),
+      'Xóa 3 khoản nắm giữ?',
     );
     expect(
       simplifiedChinese.text('Delete {count} holdings?', {'count': 3}),
