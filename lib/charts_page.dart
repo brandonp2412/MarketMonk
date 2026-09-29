@@ -85,7 +85,6 @@ class ChartsPageState extends State<ChartsPage>
   String? _portfolioError;
   bool _portfolioLoading = false;
   final Set<String> _hiddenAccounts = {};
-  final Set<String> _performanceUnsupported = {};
   final Map<String, Future<_LoadedChartPortfolio>> _ibkrLoads = {};
 
   final _yahooApi = YahooFinanceApi();
@@ -472,9 +471,7 @@ class ChartsPageState extends State<ChartsPage>
           ibkrConfig,
           accountManager,
         );
-        if (ibkrConfig.isConfigured &&
-            years <= 1 &&
-            !_performanceUnsupported.contains(ibkrConfig.baseUrl)) {
+        if (ibkrConfig.isConfigured && years <= 1) {
           try {
             final performance =
                 await (widget._ibkrPerformanceLoader?.call(ibkrConfig, '1Y') ??
@@ -489,24 +486,12 @@ class ChartsPageState extends State<ChartsPage>
               continue;
             }
           } catch (error) {
-            _performanceUnsupported.add(ibkrConfig.baseUrl);
             talker.warning(
-              'IBKR performance history unavailable; using held-position price history: $error',
+              'IBKR performance history unavailable; showing current broker value only: $error',
             );
           }
         }
-        final fallback = await _buildPortfolioSeries(
-          loaded.positions,
-          accountDb,
-          currentPortfolioValueUsd:
-              ibkrConfig.enabled ? loaded.currentValueUsd : null,
-        );
-        newSeries[accountName] = fallback.series;
-        if (fallback.currentHoldingsReplay) {
-          newCurrentHoldingsReplayAccounts.add(accountName);
-        }
-
-        if (ibkrConfig.enabled && fallback.series.isEmpty) {
+        if (ibkrConfig.enabled) {
           final currentValueUsd = loaded.currentValueUsd;
           if (currentValueUsd != null && currentValueUsd.isFinite) {
             final now = DateTime.now();
@@ -516,7 +501,19 @@ class ChartsPageState extends State<ChartsPage>
                 currentValueUsd,
               ),
             ];
+          } else {
+            newSeries[accountName] = [];
           }
+          continue;
+        }
+
+        final fallback = await _buildPortfolioSeries(
+          loaded.positions,
+          accountDb,
+        );
+        newSeries[accountName] = fallback.series;
+        if (fallback.currentHoldingsReplay) {
+          newCurrentHoldingsReplayAccounts.add(accountName);
         }
       } catch (e) {
         newSeries[accountName] = [];

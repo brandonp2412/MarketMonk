@@ -66,7 +66,7 @@ void main() {
     },
   );
 
-  testWidgets('IBKR chart refreshes broker NAV once then reuses it', (
+  testWidgets('IBKR chart retries broker history without synthetic fallback', (
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues({
@@ -153,6 +153,30 @@ void main() {
       );
     }
 
+    var performanceLoads = 0;
+    var performanceAvailable = false;
+    Future<IbkrPerformanceSeries> performanceLoader(
+      IbkrAccountConfig _,
+      String period,
+    ) async {
+      performanceLoads++;
+      expect(period, '1Y');
+      if (!performanceAvailable) {
+        throw StateError('reporting temporarily unavailable');
+      }
+      return IbkrPerformanceSeries(
+        period: period,
+        measure: 'TWR',
+        currency: 'NZD',
+        startDate: DateTime(2025, 9, 30),
+        startNav: 300000,
+        dates: [DateTime(2026, 9, 29)],
+        nav: const [333989.91],
+        returnDates: [DateTime(2025, 9, 30), DateTime(2026, 9, 29)],
+        returns: const [0, 0.1169],
+      );
+    }
+
     await tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -160,7 +184,12 @@ void main() {
           ChangeNotifierProvider.value(value: accounts),
         ],
         child: MaterialApp(
-          home: Scaffold(body: ChartsPage(ibkrLoader: loader)),
+          home: Scaffold(
+            body: ChartsPage(
+              ibkrLoader: loader,
+              ibkrPerformanceLoader: performanceLoader,
+            ),
+          ),
         ),
       ),
     );
@@ -169,15 +198,25 @@ void main() {
     expect(ibkrLoads, 1);
     expect(find.textContaining('10,100'), findsWidgets);
     expect(allRatesFromUsd['NZD'], closeTo(10100 / 5800, 1e-9));
-    expect(find.text('History unavailable'), findsNothing);
-    expect(find.textContaining('% holdings'), findsOneWidget);
+    final failedPerformanceLoads = performanceLoads;
+    expect(failedPerformanceLoads, greaterThan(0));
+    expect(find.text('History unavailable'), findsOneWidget);
+    expect(find.textContaining('% holdings'), findsNothing);
 
+    performanceAvailable = true;
     await tester.tap(find.text('5d'));
     await tester.pumpAndSettle();
+
+    expect(performanceLoads, greaterThan(failedPerformanceLoads));
+    expect(find.textContaining('+11.69% TWR'), findsOneWidget);
+    expect(find.text('History unavailable'), findsNothing);
+
+    final successfulPerformanceLoads = performanceLoads;
     await tester.tap(find.text('10y'));
     await tester.pumpAndSettle();
 
     expect(ibkrLoads, 1);
+    expect(performanceLoads, successfulPerformanceLoads);
   });
 
   testWidgets('IBKR portfolio summary uses broker TWR when available', (
