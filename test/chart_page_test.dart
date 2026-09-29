@@ -130,7 +130,21 @@ void main() {
       ibkrLoads++;
       return const IbkrPortfolioSnapshot(
         account: '****6552',
-        positions: [],
+        positions: [
+          IbkrPosition(
+            symbol: 'VOO',
+            securityType: 'STK',
+            currency: 'USD',
+            exchange: 'ARCA',
+            conid: 1,
+            quantity: 10,
+            marketPrice: 550,
+            marketValue: 5500,
+            averageCost: 500,
+            unrealizedPnl: 500,
+            realizedPnl: 0,
+          ),
+        ],
         summary: {
           'netliquidation': {'value': 10100, 'currency': 'NZD'},
           'netliquidationbycurrency:usd': {'value': 5800, 'currency': 'USD'},
@@ -155,8 +169,8 @@ void main() {
     expect(ibkrLoads, 1);
     expect(find.textContaining('10,100'), findsWidgets);
     expect(allRatesFromUsd['NZD'], closeTo(10100 / 5800, 1e-9));
-    expect(find.text('History unavailable'), findsOneWidget);
-    expect(find.textContaining('% holdings'), findsNothing);
+    expect(find.text('History unavailable'), findsNothing);
+    expect(find.textContaining('% holdings'), findsOneWidget);
 
     await tester.tap(find.text('5d'));
     await tester.pumpAndSettle();

@@ -95,6 +95,7 @@ class ChartsPageState extends State<ChartsPage>
   int _lastTradesVersion = 0;
   String _lastAccountsKey = '';
   int _lastIbkrRefreshVersion = 0;
+  int _portfolioLoadGeneration = 0;
 
   @override
   void initState() {
@@ -442,6 +443,7 @@ class ChartsPageState extends State<ChartsPage>
 
   Future<void> _loadAllPortfolios() async {
     if (!mounted) return;
+    final generation = ++_portfolioLoadGeneration;
     final accountManager = context.read<AccountManager>();
     final accounts = accountManager.accounts;
 
@@ -489,11 +491,22 @@ class ChartsPageState extends State<ChartsPage>
           } catch (error) {
             _performanceUnsupported.add(ibkrConfig.baseUrl);
             talker.warning(
-              'IBKR performance history unavailable; showing current broker value only: $error',
+              'IBKR performance history unavailable; using held-position price history: $error',
             );
           }
         }
-        if (ibkrConfig.enabled) {
+        final fallback = await _buildPortfolioSeries(
+          loaded.positions,
+          accountDb,
+          currentPortfolioValueUsd:
+              ibkrConfig.enabled ? loaded.currentValueUsd : null,
+        );
+        newSeries[accountName] = fallback.series;
+        if (fallback.currentHoldingsReplay) {
+          newCurrentHoldingsReplayAccounts.add(accountName);
+        }
+
+        if (ibkrConfig.enabled && fallback.series.isEmpty) {
           final currentValueUsd = loaded.currentValueUsd;
           if (currentValueUsd != null && currentValueUsd.isFinite) {
             final now = DateTime.now();
@@ -503,20 +516,7 @@ class ChartsPageState extends State<ChartsPage>
                 currentValueUsd,
               ),
             ];
-          } else {
-            newSeries[accountName] = [];
           }
-          newCurrentHoldingsReplayAccounts.add(accountName);
-          continue;
-        }
-
-        final fallback = await _buildPortfolioSeries(
-          loaded.positions,
-          accountDb,
-        );
-        newSeries[accountName] = fallback.series;
-        if (fallback.currentHoldingsReplay) {
-          newCurrentHoldingsReplayAccounts.add(accountName);
         }
       } catch (e) {
         newSeries[accountName] = [];
@@ -526,7 +526,7 @@ class ChartsPageState extends State<ChartsPage>
       }
     }
 
-    if (!mounted) return;
+    if (!mounted || generation != _portfolioLoadGeneration) return;
     setState(() {
       _portfolioSeriesByAccount = newSeries;
       _portfolioReturnsByAccount = newReturns;
@@ -539,8 +539,9 @@ class ChartsPageState extends State<ChartsPage>
   Future<({List<_DateValue> series, bool currentHoldingsReplay})>
       _buildPortfolioSeries(
     List<Position> positions,
-    Database accountDb,
-  ) async {
+    Database accountDb, {
+    double? currentPortfolioValueUsd,
+  }) async {
     if (positions.isEmpty) {
       return (series: const <_DateValue>[], currentHoldingsReplay: false);
     }
@@ -558,6 +559,15 @@ class ChartsPageState extends State<ChartsPage>
           ]))
         .get();
     final currentHoldingsReplay = trades.isEmpty;
+    final currentHoldingsValueUsd = positions.fold<double>(
+      0,
+      (sum, position) => sum + position.currentValue,
+    );
+    final replayResidualUsd = currentHoldingsReplay &&
+            currentPortfolioValueUsd != null &&
+            currentPortfolioValueUsd.isFinite
+        ? currentPortfolioValueUsd - currentHoldingsValueUsd
+        : 0.0;
     final symbols = {
       ...positions.map((position) => position.symbol),
       ...trades.map((trade) => trade.symbol),
@@ -627,16 +637,14 @@ class ChartsPageState extends State<ChartsPage>
         }
         total += entry.value * price;
       }
-      if (hasHoldings && complete) valueByDate[date] = total;
+      if (hasHoldings && complete) {
+        valueByDate[date] = total + replayResidualUsd;
+      }
     }
 
-    final currentHoldingsValueUsd = positions.fold<double>(
-      0,
-      (sum, position) => sum + position.currentValue,
-    );
-    if (currentHoldingsValueUsd.isFinite && currentHoldingsValueUsd > 0) {
-      valueByDate[DateTime(now.year, now.month, now.day)] =
-          currentHoldingsValueUsd;
+    final currentValueUsd = currentPortfolioValueUsd ?? currentHoldingsValueUsd;
+    if (currentValueUsd.isFinite && currentValueUsd > 0) {
+      valueByDate[DateTime(now.year, now.month, now.day)] = currentValueUsd;
     }
 
     var series = valueByDate.entries
@@ -1269,13 +1277,10 @@ class ChartsPageState extends State<ChartsPage>
           ),
           const SizedBox(height: 4),
           Text(
-            context.l10n.text(
-              '{value} period change',
-              {
-                'value':
-                    '${dollarChange >= 0 ? '+' : ''}${fmtNativeCurrency(dollarChange, _nativeCurrency)}',
-              },
-            ),
+            context.l10n.text('{value} period change', {
+              'value':
+                  '${dollarChange >= 0 ? '+' : ''}${fmtNativeCurrency(dollarChange, _nativeCurrency)}',
+            }),
             style: TextStyle(color: color, fontSize: 13),
           ),
           const SizedBox(height: 12),
@@ -1385,8 +1390,9 @@ class ChartsPageState extends State<ChartsPage>
               ? context.l10n.text(
                   'Search for a stock to start building your portfolio history.',
                 )
-              : context.l10n
-                  .text('Show your portfolios again to restore the chart.'),
+              : context.l10n.text(
+                  'Show your portfolios again to restore the chart.',
+                ),
           actionLabel: allEmpty
               ? context.l10n.text('Search stocks')
               : context.l10n.text('Show all'),
@@ -1611,8 +1617,7 @@ class ChartsPageState extends State<ChartsPage>
     final currentHoldingsReplay = _currentHoldingsReplayAccounts.contains(
       accountName,
     );
-    final hasHistory =
-        brokerReturn != null || (!currentHoldingsReplay && series.length > 1);
+    final hasHistory = brokerReturn != null || series.length > 1;
     final pct = brokerReturn ??
         (hasHistory
             ? safePercentChange(series.first.value, series.last.value)
