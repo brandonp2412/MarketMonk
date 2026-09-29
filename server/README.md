@@ -19,7 +19,7 @@ MarketMonk uses `ib_async` only as the transport implementation for IBKR's docum
 
 IBKR documents `updatePortfolio` as providing position size, market price, market value, average cost, daily unrealized P/L, and daily realized P/L. Those values are normalized into MarketMonk's existing `/v1/portfolio` response.
 
-The native backend can also request daily `TRADES` historical bars for current stock positions. MarketMonk requests between one and ten years, uses regular trading hours, and routes through `SMART` when a portfolio contract does not include an API routing exchange. Historical availability follows the market-data permissions on the IBKR username. MarketMonk falls back to Yahoo for unheld symbols or when IBKR historical data is unavailable. PortfolioAnalyst performance history is not exposed by the native TWS socket API, so `/v1/performance` is available only with the Client Portal backend.
+The native backend can also request daily `TRADES` historical bars for current stock positions. MarketMonk requests between one and ten years, uses regular trading hours, and routes through `SMART` when a portfolio contract does not include an API routing exchange. Historical availability follows the market-data permissions on the IBKR username. MarketMonk falls back to Yahoo for unheld symbols or when IBKR historical data is unavailable. PortfolioAnalyst performance history is not exposed by the native TWS socket API, so the native backend keeps current portfolio/history reads on TWS but delegates `/v1/performance` to the configured Client Portal Gateway. This keeps live NAV/positions on TWS while using IBKR's broker-calculated NAV and TWR for performance.
 
 Official IBKR documentation:
 
@@ -93,7 +93,7 @@ The default listener is `127.0.0.1:8091`. Put HTTPS or a private VPN in front of
 
 `GET /v1/historical?symbol=AAPL&years=10` is available for a current stock position visible to the selected backend. `years` must be from 1 through 10. It returns daily OHLCV bars and the contract currency. The endpoint remains read-only and the service still exposes no order route.
 
-`GET /v1/performance?period=1M` is available with the Client Portal backend and returns PortfolioAnalyst NAV plus cumulative TWR data. Supported periods are `1D`, `7D`, `MTD`, `1M`, `3M`, `6M`, `12M`, and `YTD`.
+`GET /v1/performance?period=1Y` returns PortfolioAnalyst NAV plus cumulative TWR data through the Client Portal Gateway, including when the main portfolio backend is native TWS. The proxy accepts `12M` as a compatibility alias for `1Y`.
 
 ## systemd
 

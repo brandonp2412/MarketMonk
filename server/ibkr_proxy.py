@@ -237,8 +237,10 @@ class NativeIbkrClient:
         self,
         config: Config,
         ib_factory: Callable[[], Any] | None = None,
+        performance_client: Any | None = None,
     ):
         self._config = config
+        self._performance_client = performance_client or ClientPortalIbkrClient(config)
         if ib_factory is None:
             try:
                 from ib_async import IB
@@ -334,7 +336,7 @@ class NativeIbkrClient:
             ib.disconnect()
 
     def performance(self, period: str) -> dict[str, Any]:
-        raise IbkrError("IBKR performance requires the Client Portal backend")
+        return self._performance_client.performance(period)
 
     def _connect(self) -> Any:
         ib = self._ib_factory()

@@ -343,6 +343,22 @@ class ProxyTests(unittest.TestCase):
         self.assertEqual(kwargs["account"], "U1234567")
         self.assertEqual(kwargs["fetchFields"], 9)
 
+    def test_native_backend_delegates_performance_to_client_portal(self):
+        fake = FakeNativeIb()
+        performance_client = FakeClient()
+        client = NativeIbkrClient(
+            config(backend="native", tws_port=4003),
+            ib_factory=lambda: fake,
+            performance_client=performance_client,
+        )
+
+        performance = client.performance("1Y")
+
+        self.assertEqual(performance["source"], "client_portal")
+        self.assertEqual(performance["period"], "1Y")
+        self.assertEqual(performance["returns"][-1], 0.0549)
+        self.assertFalse(fake.connected)
+
     def test_native_backend_reads_historical_candles_for_held_stock(self):
         fake = FakeNativeIb()
         client = NativeIbkrClient(
