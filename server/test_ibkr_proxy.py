@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 from ibkr_proxy import (
     ClientPortalIbkrClient,
+    CommandPerformanceClient,
     Config,
     IbkrError,
     NativeIbkrClient,
@@ -29,9 +30,37 @@ def config(**overrides):
         "tws_host": "127.0.0.1",
         "tws_port": 4001,
         "tws_client_id": 97,
+        "performance_command": None,
     }
     values.update(overrides)
     return Config(**values)
+
+
+def raw_performance(account_id="U1234567"):
+    return {
+        "nav": {
+            "dates": ["20260818", "20260916"],
+            "data": [
+                {
+                    "id": account_id,
+                    "navs": [321000, 333000],
+                    "startNAV": {"date": "20260817", "val": 320000},
+                    "baseCurrency": "NZD",
+                }
+            ],
+        },
+        "cps": {
+            "dates": ["20260818", "20260916"],
+            "data": [
+                {
+                    "id": account_id,
+                    "returns": [0.001, 0.0549],
+                    "baseCurrency": "NZD",
+                }
+            ],
+        },
+        "pm": "TWR",
+    }
 
 
 class FakeClient:
@@ -317,6 +346,73 @@ class ProxyTests(unittest.TestCase):
             client.posts,
             [("pa/performance", {"acctIds": ["U1234567"], "period": "1M"})],
         )
+
+    def test_command_performance_client_normalizes_helper_output(self):
+        calls = []
+
+        def runner(command, **kwargs):
+            calls.append((command, kwargs))
+            return SimpleNamespace(
+                returncode=0,
+                stdout=json.dumps(raw_performance()),
+                stderr="",
+            )
+
+        client = CommandPerformanceClient(
+            config(
+                backend="native",
+                performance_command=("/opt/ibkrbot/app/bin/ibkr-daily-bot", "web-performance"),
+            ),
+            runner=runner,
+        )
+
+        performance = client.performance("1Y")
+
+        self.assertEqual(performance["currency"], "NZD")
+        self.assertEqual(performance["nav"][-1], 333000)
+        self.assertEqual(performance["returns"][-1], 0.0549)
+        self.assertEqual(
+            calls[0][0],
+            [
+                "/opt/ibkrbot/app/bin/ibkr-daily-bot",
+                "web-performance",
+                "--period",
+                "1Y",
+            ],
+        )
+        self.assertEqual(calls[0][1]["timeout"], 90)
+        client.performance("1Y")
+        self.assertEqual(len(calls), 1)
+
+    def test_command_performance_client_rejects_wrong_account_output(self):
+        client = CommandPerformanceClient(
+            config(
+                backend="native",
+                performance_command=("ibkr-daily-bot", "web-performance"),
+            ),
+            runner=lambda *args, **kwargs: SimpleNamespace(
+                returncode=0,
+                stdout=json.dumps(raw_performance("U7654321")),
+                stderr="",
+            ),
+        )
+
+        with self.assertRaisesRegex(
+            IbkrError,
+            "no performance data for the configured account",
+        ):
+            client.performance("1Y")
+
+    def test_native_backend_prefers_configured_performance_command(self):
+        client = NativeIbkrClient(
+            config(
+                backend="native",
+                performance_command=("ibkr-daily-bot", "web-performance"),
+            ),
+            ib_factory=FakeNativeIb,
+        )
+
+        self.assertIsInstance(client._performance_client, CommandPerformanceClient)
 
     def test_native_backend_reads_portfolio_without_order_calls(self):
         fake = FakeNativeIb()

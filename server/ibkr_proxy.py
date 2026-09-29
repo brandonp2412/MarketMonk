@@ -9,7 +9,9 @@ import ipaddress
 import json
 import math
 import os
+import shlex
 import ssl
+import subprocess
 import time
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -32,6 +34,7 @@ class Config:
     tws_host: str
     tws_port: int
     tws_client_id: int
+    performance_command: tuple[str, ...] | None
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -49,6 +52,14 @@ class Config:
         tws_host = os.getenv("IBKR_TWS_HOST", "127.0.0.1").strip()
         tws_port = int(os.getenv("IBKR_TWS_PORT", "4001"))
         tws_client_id = int(os.getenv("IBKR_TWS_CLIENT_ID", "97"))
+        performance_command_raw = os.getenv(
+            "MARKET_MONK_IBKR_PERFORMANCE_COMMAND", ""
+        ).strip()
+        performance_command = (
+            tuple(shlex.split(performance_command_raw))
+            if performance_command_raw
+            else None
+        )
 
         if len(token) < 32:
             raise ValueError("MARKET_MONK_IBKR_TOKEN must be at least 32 characters")
@@ -60,6 +71,10 @@ class Config:
             raise ValueError("IBKR_TWS_HOST must not be empty")
         if tws_client_id < 0:
             raise ValueError("IBKR_TWS_CLIENT_ID must be non-negative")
+        if performance_command == ():
+            raise ValueError(
+                "MARKET_MONK_IBKR_PERFORMANCE_COMMAND must contain an executable"
+            )
 
         parsed = urlparse(gateway_url)
         if backend == "client_portal" and (
@@ -86,6 +101,7 @@ class Config:
             tws_host=tws_host,
             tws_port=tws_port,
             tws_client_id=tws_client_id,
+            performance_command=performance_command,
         )
 
 
@@ -232,6 +248,60 @@ class ClientPortalIbkrClient:
             raise IbkrError("IBKR Gateway returned invalid JSON") from error
 
 
+class CommandPerformanceClient:
+    def __init__(
+        self,
+        config: Config,
+        runner: Callable[..., Any] = subprocess.run,
+    ):
+        if not config.performance_command:
+            raise ValueError(
+                "MARKET_MONK_IBKR_PERFORMANCE_COMMAND is not configured"
+            )
+        if not config.account_id:
+            raise ValueError(
+                "IBKR_ACCOUNT_ID is required for command-backed performance"
+            )
+        self._config = config
+        self._runner = runner
+        self._performance_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+
+    def performance(self, period: str) -> dict[str, Any]:
+        cached = self._performance_cache.get(period)
+        now = time.monotonic()
+        if cached is not None and now - cached[0] < 14 * 60:
+            return cached[1]
+
+        command = [*self._config.performance_command, "--period", period]
+        try:
+            completed = self._runner(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=90,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise IbkrError("Cannot run IBKR PortfolioAnalyst helper") from error
+        if completed.returncode != 0:
+            raise IbkrError(
+                "IBKR PortfolioAnalyst helper failed "
+                f"with exit status {completed.returncode}"
+            )
+        try:
+            raw = json.loads(completed.stdout)
+        except (json.JSONDecodeError, TypeError) as error:
+            raise IbkrError("IBKR PortfolioAnalyst helper returned invalid JSON") from error
+
+        result = _normalize_web_performance(
+            raw,
+            period,
+            self._config.account_id,
+        )
+        self._performance_cache[period] = (now, result)
+        return result
+
+
 class NativeIbkrClient:
     def __init__(
         self,
@@ -240,7 +310,12 @@ class NativeIbkrClient:
         performance_client: Any | None = None,
     ):
         self._config = config
-        self._performance_client = performance_client or ClientPortalIbkrClient(config)
+        if performance_client is not None:
+            self._performance_client = performance_client
+        elif config.performance_command:
+            self._performance_client = CommandPerformanceClient(config)
+        else:
+            self._performance_client = ClientPortalIbkrClient(config)
         if ib_factory is None:
             try:
                 from ib_async import IB
@@ -511,10 +586,14 @@ def _normalize_web_performance(
         raise IbkrError("IBKR returned incomplete performance data")
 
     def matching(entries: list[Any]) -> dict[str, Any] | None:
-        for entry in entries:
-            if isinstance(entry, dict) and entry.get("id") == account:
-                return entry
-        return next((entry for entry in entries if isinstance(entry, dict)), None)
+        return next(
+            (
+                entry
+                for entry in entries
+                if isinstance(entry, dict) and entry.get("id") == account
+            ),
+            None,
+        )
 
     nav_entry = matching(nav_entries)
     return_entry = matching(return_entries)
