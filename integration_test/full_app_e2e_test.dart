@@ -277,16 +277,16 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Edit trade'));
     await tester.pumpAndSettle();
-    expect(find.text('Edit Trade'), findsOneWidget);
+    expect(find.text('Edit trade'), findsOneWidget);
     final editFields = find.descendant(
-      of: find.widgetWithText(AlertDialog, 'Edit Trade'),
+      of: find.widgetWithText(AlertDialog, 'Edit trade'),
       matching: find.byType(TextField),
     );
     expect(editFields, findsNWidgets(2));
     await tester.enterText(editFields.at(0), '3');
     await tester.enterText(editFields.at(1), '110');
     await tester.tap(find.widgetWithText(FilledButton, 'Save'));
-    await _pumpUntilGone(tester, find.text('Edit Trade'));
+    await _pumpUntilGone(tester, find.text('Edit trade'));
 
     var storedTrade = (await app.db.select(app.db.trades).get()).single;
     expect(storedTrade.quantity, 3);
