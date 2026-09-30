@@ -1487,7 +1487,8 @@ class ChartsPageState extends State<ChartsPage>
       );
     }
 
-    final accounts = context.read<AccountManager>().accounts;
+    final accountManager = context.read<AccountManager>();
+    final accounts = accountManager.accounts;
     final visibleSeries = {
       for (final entry in _portfolioSeriesByAccount.entries)
         if (!_hiddenAccounts.contains(entry.key) && entry.value.isNotEmpty)
@@ -1680,11 +1681,15 @@ class ChartsPageState extends State<ChartsPage>
                       }
                     }
                     final valueLabel = fmtCurrency(actualValue ?? spot.y);
+                    final ibkrManaged =
+                        accountManager.ibkrConfigFor(accountName).enabled;
                     final comparisonLabel = scaleForComparison
                         ? ' · ${spot.y >= 0 ? '+' : ''}${spot.y.toStringAsFixed(2)}%'
                         : '';
                     return LineTooltipItem(
-                      '$label$valueLabel$comparisonLabel\n$date',
+                      ibkrManaged
+                          ? valueLabel
+                          : '$label$valueLabel$comparisonLabel\n$date',
                       Theme.of(
                         context,
                       ).textTheme.bodySmall!.copyWith(color: spotColor),
