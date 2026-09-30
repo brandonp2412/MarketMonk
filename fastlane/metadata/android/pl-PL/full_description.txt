@@ -1,0 +1,15 @@
+Śledź akcje i miej swój portfel pod kontrolą na pierwszy rzut oka.
+
+MarketMonk to aplikacja do śledzenia akcji i monitorowania portfela dla inwestorów, którzy chcą mieć czytelny obraz cen rynkowych, posiadanych pozycji i wyników. Dodawaj obserwowane akcje, buduj portfel i przeglądaj wykresy cen w jednym prostym panelu.
+
+FUNKCJE
+
+• Śledzenie cen akcji i wyników rynkowych
+• Tworzenie i monitorowanie osobistego portfela inwestycyjnego
+• Wykresy liniowe pokazujące zmiany cen i zyski
+• Porządkowanie najważniejszych dla Ciebie informacji
+• Ustawienia dopasowane do preferowanego sposobu przeglądania inwestycji
+
+MarketMonk ułatwia czytelne monitorowanie portfela — zarówno podczas sprawdzania listy obserwowanych akcji, jak i przeglądania własnych inwestycji.
+
+Dane rynkowe służą wyłącznie celom informacyjnym i nie stanowią porady finansowej. Przed podjęciem decyzji inwestycyjnej zawsze przeprowadź własną analizę.
