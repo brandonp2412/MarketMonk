@@ -11,6 +11,7 @@ import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/portfolio_chart_scale.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/settings_page.dart';
@@ -96,6 +97,7 @@ class ChartsPageState extends State<ChartsPage>
   String _lastAccountsKey = '';
   int _lastIbkrRefreshVersion = 0;
   int _portfolioLoadGeneration = 0;
+  AccountManager? _accountManager;
 
   @override
   void initState() {
@@ -246,33 +248,47 @@ class ChartsPageState extends State<ChartsPage>
     if (mounted) _loadAllPortfolios();
   }
 
+  void _handleAccountManagerChanged() {
+    final accountManager = _accountManager;
+    if (!mounted || accountManager == null) return;
+
+    final accountsKey =
+        '${accountManager.activeAccount}|${accountManager.accounts.join(',')}';
+    final ibkrRefreshVersion = accountManager.ibkrRefreshVersion;
+    final ibkrChanged = ibkrRefreshVersion != _lastIbkrRefreshVersion;
+    if (accountsKey == _lastAccountsKey && !ibkrChanged) return;
+
+    _lastAccountsKey = accountsKey;
+    _lastIbkrRefreshVersion = ibkrRefreshVersion;
+    if (ibkrChanged) {
+      clearAllSyncCache();
+      unawaited(_syncCandlesInBackground(refreshIbkr: true));
+    }
+    unawaited(_loadAllPortfolios());
+    if (_selectedSymbol != null) _setStockStream(_selectedSymbol!);
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final version = context.watch<SettingsState>().tradesVersion;
     if (version != _lastTradesVersion) {
       _lastTradesVersion = version;
-      if (version > 0) _loadAllPortfolios();
+      if (version > 0) unawaited(_loadAllPortfolios());
     }
-    final accountManager = context.watch<AccountManager>();
-    final accountsKey =
-        '${accountManager.activeAccount}|${accountManager.accounts.join(',')}';
-    final ibkrRefreshVersion = accountManager.ibkrRefreshVersion;
-    final ibkrChanged = ibkrRefreshVersion != _lastIbkrRefreshVersion;
-    if (accountsKey != _lastAccountsKey || ibkrChanged) {
-      _lastAccountsKey = accountsKey;
-      _lastIbkrRefreshVersion = ibkrRefreshVersion;
-      if (ibkrChanged) {
-        clearAllSyncCache();
-        unawaited(_syncCandlesInBackground(refreshIbkr: true));
-      }
-      _loadAllPortfolios();
-      if (_selectedSymbol != null) _setStockStream(_selectedSymbol!);
+
+    final accountManager = context.read<AccountManager>();
+    if (!identical(_accountManager, accountManager)) {
+      _accountManager?.removeListener(_handleAccountManagerChanged);
+      _accountManager = accountManager;
+      accountManager.addListener(_handleAccountManagerChanged);
     }
+    _handleAccountManagerChanged();
   }
 
   @override
   void dispose() {
+    _accountManager?.removeListener(_handleAccountManagerChanged);
     _searchController.dispose();
     _searchFocus.dispose();
     _yahooApi.dispose();
@@ -769,11 +785,7 @@ class ChartsPageState extends State<ChartsPage>
     }
     final denominator = 1 + startReturn;
     final twr = denominator == 0 ? 0.0 : ((1 + endReturn) / denominator) - 1;
-    return (
-      series: series,
-      twrPercent: twr * 100,
-      returnAmount: returnAmount,
-    );
+    return (series: series, twrPercent: twr * 100, returnAmount: returnAmount);
   }
 
   static int _isoWeek(DateTime date) {
@@ -1144,7 +1156,7 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   Widget _buildChartContent(SettingsState settings, List<Color> accountColors) {
-    return RefreshIndicator(
+    return RefreshIndicator.noSpinner(
       onRefresh: _refreshCurrentChart,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -1286,10 +1298,9 @@ class ChartsPageState extends State<ChartsPage>
                   ),
                   Text(
                     '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge!
-                        .copyWith(color: color),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleLarge!.copyWith(color: color),
                   ),
                 ],
               ),
@@ -1447,13 +1458,23 @@ class ChartsPageState extends State<ChartsPage>
     };
 
     final singleLine = visibleSeries.length == 1;
+    final scaleForComparison = !singleLine;
     final lineBarsData = <LineChartBarData>[];
     for (final entry in visibleSeries.entries) {
       final idx = accounts.indexOf(entry.key);
       final color = accountColors[idx.clamp(0, accountColors.length - 1)];
-      final spots = entry.value
-          .map((dv) => FlSpot(dateIndex[dv.date]!.toDouble(), dv.value))
-          .toList();
+      final displayValues = scaleForComparison
+          ? scalePortfolioSeriesForComparison(
+              entry.value.map((point) => point.value),
+            )
+          : entry.value.map((point) => point.value).toList(growable: false);
+      final spots = [
+        for (var i = 0; i < entry.value.length; i++)
+          FlSpot(
+            dateIndex[entry.value[i].date]!.toDouble(),
+            displayValues[i],
+          ),
+      ];
       lineBarsData.add(
         LineChartBarData(
           spots: spots,
@@ -1505,7 +1526,9 @@ class ChartsPageState extends State<ChartsPage>
                   getTitlesWidget: (value, meta) => SideTitleWidget(
                     meta: meta,
                     child: Text(
-                      fmtCompactCurrency(value),
+                      scaleForComparison
+                          ? '${value >= 0 ? '+' : ''}${value.toStringAsFixed(1)}%'
+                          : fmtCompactCurrency(value),
                       style: const TextStyle(fontSize: 12),
                     ),
                   ),
@@ -1546,10 +1569,9 @@ class ChartsPageState extends State<ChartsPage>
               touchTooltipData: LineTouchTooltipData(
                 fitInsideHorizontally: true,
                 fitInsideVertically: true,
-                getTooltipColor: (_) => Theme.of(context)
-                    .colorScheme
-                    .surface
-                    .withValues(alpha: 0.9),
+                getTooltipColor: (_) => Theme.of(
+                  context,
+                ).colorScheme.surface.withValues(alpha: 0.9),
                 getTooltipItems: (touchedSpots) {
                   return touchedSpots.map((spot) {
                     final i = spot.x.toInt();
@@ -1566,12 +1588,25 @@ class ChartsPageState extends State<ChartsPage>
                     )];
                     final label =
                         visibleKeys.length > 1 ? '$accountName\n' : '';
+                    double? actualValue;
+                    if (i >= 0 && i < sortedDates.length) {
+                      for (final point in visibleSeries[accountName] ??
+                          const <_DateValue>[]) {
+                        if (point.date == sortedDates[i]) {
+                          actualValue = point.value;
+                          break;
+                        }
+                      }
+                    }
+                    final valueLabel = fmtCurrency(actualValue ?? spot.y);
+                    final comparisonLabel = scaleForComparison
+                        ? ' · ${spot.y >= 0 ? '+' : ''}${spot.y.toStringAsFixed(2)}%'
+                        : '';
                     return LineTooltipItem(
-                      '$label${fmtCurrency(spot.y)}\n$date',
-                      Theme.of(context)
-                          .textTheme
-                          .bodySmall!
-                          .copyWith(color: spotColor),
+                      '$label$valueLabel$comparisonLabel\n$date',
+                      Theme.of(
+                        context,
+                      ).textTheme.bodySmall!.copyWith(color: spotColor),
                     );
                   }).toList();
                 },
@@ -1714,10 +1749,9 @@ class ChartsPageState extends State<ChartsPage>
                         hasHistory
                             ? '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%$returnKind'
                             : context.l10n.text('History unavailable'),
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium!
-                            .copyWith(color: returnColor),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleMedium!.copyWith(color: returnColor),
                       ),
                     ],
                   ),

@@ -6,12 +6,23 @@ import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/portfolio_chart_scale.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  test('portfolio comparison scaling normalizes different account sizes', () {
+    final large = scalePortfolioSeriesForComparison([100000, 110000]);
+    final small = scalePortfolioSeriesForComparison([1000, 1200]);
+
+    expect(large[0], closeTo(0, 1e-9));
+    expect(large[1], closeTo(10, 1e-9));
+    expect(small[0], closeTo(0, 1e-9));
+    expect(small[1], closeTo(20, 1e-9));
+  });
+
   // Regression test for issue #35: the chart page's first frame can be laid
   // out with degenerate constraints (e.g. before the Linux window reaches its
   // real size). The search-bar overlay height must be re-measured once the
@@ -63,6 +74,11 @@ void main() {
       final padding = listView.padding! as EdgeInsets;
       expect(padding.bottom, greaterThan(92));
       expect(find.text('Refresh'), findsNothing);
+
+      await tester.drag(find.byType(ListView).first, const Offset(0, 240));
+      await tester.pump();
+      expect(find.byType(RefreshProgressIndicator), findsNothing);
+      await tester.pumpAndSettle();
     },
   );
 
@@ -160,7 +176,7 @@ void main() {
       String period,
     ) async {
       performanceLoads++;
-      expect(period, '1Y');
+      expectSync(period, '1Y');
       if (!performanceAvailable) {
         throw StateError('reporting temporarily unavailable');
       }
@@ -204,18 +220,25 @@ void main() {
     expect(find.textContaining('% holdings'), findsNothing);
 
     performanceAvailable = true;
-    await tester.tap(find.text('5d'));
+    accounts.requestIbkrRefresh();
     await tester.pumpAndSettle();
 
     expect(performanceLoads, greaterThan(failedPerformanceLoads));
+    expect(ibkrLoads, greaterThan(1));
     expect(find.textContaining('+11.69% TWR'), findsOneWidget);
     expect(find.text('History unavailable'), findsNothing);
+
+    final refreshedIbkrLoads = ibkrLoads;
+    final refreshedPerformanceLoads = performanceLoads;
+    await tester.tap(find.text('5d'));
+    await tester.pumpAndSettle();
+    expect(performanceLoads, greaterThan(refreshedPerformanceLoads));
 
     final successfulPerformanceLoads = performanceLoads;
     await tester.tap(find.text('10y'));
     await tester.pumpAndSettle();
 
-    expect(ibkrLoads, 1);
+    expect(ibkrLoads, refreshedIbkrLoads);
     expect(performanceLoads, successfulPerformanceLoads);
   });
 
@@ -312,11 +335,9 @@ void main() {
 
     expect(performanceLoads, greaterThan(0));
     expect(find.textContaining('+5.49% TWR'), findsOneWidget);
-    final adjustedReturnFinder =
-        find.textContaining('return excl. transfers');
+    final adjustedReturnFinder = find.textContaining('return excl. transfers');
     expect(adjustedReturnFinder, findsOneWidget);
-    final adjustedReturnText =
-        tester.widget<Text>(adjustedReturnFinder).data!;
+    final adjustedReturnText = tester.widget<Text>(adjustedReturnFinder).data!;
     expect(adjustedReturnText, startsWith('-'));
     expect(find.textContaining('value change'), findsNothing);
   });
