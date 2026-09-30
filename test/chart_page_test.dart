@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/charts_page.dart';
@@ -78,6 +79,90 @@ void main() {
       await tester.drag(find.byType(ListView).first, const Offset(0, 240));
       await tester.pump();
       expect(find.byType(RefreshProgressIndicator), findsNothing);
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'cached IBKR chart renders on the first frame',
+    (WidgetTester tester) async {
+      SharedPreferences.setMockInitialValues({
+        'ibkrAccountConfigs':
+            '{"Default":{"enabled":true,"baseUrl":"https://ibkr.example.test","token":"secret-token"}}',
+        'ibkrHistorySeeded:https://ibkr.example.test:Default:VOO': true,
+      });
+      db = Database.connect(
+        DatabaseConnection(
+          NativeDatabase.memory(),
+          closeStreamsSynchronously: true,
+        ),
+      );
+      addTearDown(() => db.close());
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = const Size(1200, 1000);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final accounts = AccountManager();
+      await accounts.init();
+      await accounts.cachePortfolio(
+        'Default',
+        [
+          Position(
+            symbol: 'VOO',
+            name: 'VANGUARD S&P 500 ETF',
+            nativeCurrency: 'USD',
+            netShares: 10,
+            avgCost: 500,
+            currentPrice: 550,
+            firstBuyDate: DateTime(2025),
+            lastBuyDate: DateTime(2026),
+          ),
+        ],
+        const IbkrAccountValue(value: 10000, currency: 'NZD'),
+        netLiquidationUsd: 5750,
+      );
+      await accounts.cacheIbkrPerformance(
+        'Default',
+        IbkrPerformanceSeries(
+          period: '1Y',
+          measure: 'TWR',
+          currency: 'NZD',
+          startDate: DateTime(2025, 10, 1),
+          startNav: 9000,
+          dates: [DateTime(2026, 9, 30)],
+          nav: const [10000],
+          returnDates: [DateTime(2025, 10, 1), DateTime(2026, 9, 30)],
+          returns: const [0, 0.1111],
+        ),
+      );
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => SettingsState()),
+            ChangeNotifierProvider.value(value: accounts),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              body: ChartsPage(
+                ibkrLoader: (_) async =>
+                    throw StateError('fresh portfolio fetch should not block'),
+                ibkrPerformanceLoader: (config, period) async =>
+                    throw StateError(
+                  'fresh performance fetch should not block',
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(LineChart), findsOneWidget);
+      expect(find.bySemanticsLabel('Loading portfolio'), findsNothing);
+
       await tester.pumpAndSettle();
     },
   );

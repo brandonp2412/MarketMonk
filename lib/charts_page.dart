@@ -141,6 +141,67 @@ class ChartsPageState extends State<ChartsPage>
     await prefs.setInt('chartPeriodDays', days);
   }
 
+  void _hydratePortfolioSeriesFromCache(AccountManager accountManager) {
+    if (_portfolioSeriesByAccount.isNotEmpty) return;
+
+    final cachedSeries = <String, List<_DateValue>>{};
+    final cachedReturns = <String, double>{};
+    final cachedReturnAmounts = <String, double>{};
+
+    for (final accountName in accountManager.accounts) {
+      final config = accountManager.ibkrConfigFor(accountName);
+      if (!config.enabled) continue;
+
+      final cachedPortfolio = accountManager.portfolioCacheFor(accountName);
+      if (cachedPortfolio == null) continue;
+
+      final currentValue = cachedPortfolio.netLiquidation;
+      final currentValueUsd = cachedPortfolio.netLiquidationUsd;
+      if (currentValue != null &&
+          currentValueUsd != null &&
+          currentValueUsd != 0 &&
+          currentValue.currency.isNotEmpty &&
+          currentValue.currency != 'USD') {
+        allRatesFromUsd[currentValue.currency] =
+            currentValue.value / currentValueUsd;
+      }
+
+      final loaded = _LoadedChartPortfolio(
+        positions: cachedPortfolio.positions,
+        currentValue: currentValue,
+        currentValueUsd: currentValueUsd,
+      );
+      final performance = years <= 1
+          ? accountManager.ibkrPerformanceCacheFor(accountName, '1Y')
+          : null;
+      if (performance != null) {
+        final brokerSeries = _buildBrokerPerformanceSeries(performance, loaded);
+        if (brokerSeries.series.isNotEmpty) {
+          cachedSeries[accountName] = brokerSeries.series;
+          cachedReturns[accountName] = brokerSeries.twrPercent;
+          cachedReturnAmounts[accountName] = brokerSeries.returnAmount;
+          continue;
+        }
+      }
+
+      if (currentValueUsd != null && currentValueUsd.isFinite) {
+        final now = DateTime.now();
+        cachedSeries[accountName] = [
+          _DateValue(
+            DateTime(now.year, now.month, now.day),
+            currentValueUsd,
+          ),
+        ];
+      }
+    }
+
+    if (cachedSeries.isEmpty) return;
+    _portfolioSeriesByAccount = cachedSeries;
+    _portfolioReturnsByAccount = cachedReturns;
+    _portfolioReturnAmountsByAccount = cachedReturnAmounts;
+    _portfolioLoading = false;
+  }
+
   Future<_LoadedChartPortfolio> _portfolioForAccount(
     String accountName,
     Database accountDb,
@@ -317,6 +378,7 @@ class ChartsPageState extends State<ChartsPage>
       _accountManager = accountManager;
       accountManager.addListener(_handleAccountManagerChanged);
     }
+    _hydratePortfolioSeriesFromCache(accountManager);
     _handleAccountManagerChanged();
   }
 
@@ -1478,7 +1540,15 @@ class ChartsPageState extends State<ChartsPage>
     final height = MediaQuery.of(context).size.height * 0.38;
 
     if (_portfolioLoading) {
-      return SizedBox(height: height, child: const Center());
+      return SizedBox(
+        height: height,
+        child: Center(
+          child: Semantics(
+            label: context.l10n.text('Loading portfolio'),
+            child: const CircularProgressIndicator(),
+          ),
+        ),
+      );
     }
     if (_portfolioError != null && _portfolioSeriesByAccount.isEmpty) {
       return SizedBox(
