@@ -31,6 +31,7 @@ void main() {
   testWidgets(
     'time chips stay below the search bar after a degenerate first frame',
     (WidgetTester tester) async {
+      SharedPreferences.setMockInitialValues({});
       db = Database.connect(
         DatabaseConnection(
           NativeDatabase.memory(),
@@ -84,12 +85,15 @@ void main() {
   );
 
   testWidgets(
-    'cached IBKR chart renders on the first frame',
+    'cached IBKR chart waits for the saved period before rendering',
     (WidgetTester tester) async {
       SharedPreferences.setMockInitialValues({
         'ibkrAccountConfigs':
             '{"Default":{"enabled":true,"baseUrl":"https://ibkr.example.test","token":"secret-token"}}',
         'ibkrHistorySeeded:https://ibkr.example.test:Default:VOO': true,
+        'chartPeriodYears': 0,
+        'chartPeriodMonths': 0,
+        'chartPeriodDays': 5,
       });
       db = Database.connect(
         DatabaseConnection(
@@ -132,9 +136,34 @@ void main() {
           currency: 'NZD',
           startDate: DateTime(2025, 10, 1),
           startNav: 9000,
-          dates: [DateTime(2026, 9, 30)],
-          nav: const [10000],
-          returnDates: [DateTime(2025, 10, 1), DateTime(2026, 9, 30)],
+          dates: [
+            DateTime(2026, 9, 21),
+            DateTime(2026, 9, 22),
+            DateTime(2026, 9, 23),
+            DateTime(2026, 9, 24),
+            DateTime(2026, 9, 25),
+            DateTime(2026, 9, 26),
+            DateTime(2026, 9, 27),
+            DateTime(2026, 9, 28),
+            DateTime(2026, 9, 29),
+            DateTime(2026, 9, 30),
+          ],
+          nav: const [
+            9100,
+            9200,
+            9300,
+            9400,
+            9500,
+            9600,
+            9700,
+            9800,
+            9900,
+            10000,
+          ],
+          returnDates: [
+            DateTime(2025, 10, 1),
+            DateTime(2026, 9, 30),
+          ],
           returns: const [0, 0.1111],
         ),
       );
@@ -160,7 +189,13 @@ void main() {
         ),
       );
 
-      expect(find.byType(LineChart), findsOneWidget);
+      expect(find.byType(LineChart), findsNothing);
+      expect(find.bySemanticsLabel('Loading portfolio'), findsOneWidget);
+
+      await tester.pump();
+
+      final chart = tester.widget<LineChart>(find.byType(LineChart));
+      expect(chart.data.lineBarsData.single.spots, hasLength(6));
       expect(find.bySemanticsLabel('Loading portfolio'), findsNothing);
 
       await tester.pumpAndSettle();

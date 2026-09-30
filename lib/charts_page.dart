@@ -85,7 +85,8 @@ class ChartsPageState extends State<ChartsPage>
   Map<String, double> _portfolioReturnAmountsByAccount = {};
   Set<String> _currentHoldingsReplayAccounts = {};
   String? _portfolioError;
-  bool _portfolioLoading = false;
+  bool _portfolioLoading = true;
+  bool _chartPeriodLoaded = false;
   final Set<String> _hiddenAccounts = {};
   final Map<String, Future<_LoadedChartPortfolio>> _ibkrLoads = {};
   final Map<String, Future<IbkrPerformanceSeries>> _ibkrPerformanceLoads = {};
@@ -105,7 +106,6 @@ class ChartsPageState extends State<ChartsPage>
     super.initState();
     _loadFavorites();
     _loadPeriodThenPortfolios();
-    _syncCandlesInBackground(refreshIbkr: true);
     _setColors();
     WidgetsBinding.instance.addPostFrameCallback((_) => _measureOverlay());
   }
@@ -129,8 +129,12 @@ class ChartsPageState extends State<ChartsPage>
         years = y;
         months = m;
         days = d;
+        _chartPeriodLoaded = true;
       });
-      _loadAllPortfolios(refreshIbkrPerformance: true);
+      final accountManager = context.read<AccountManager>();
+      _hydratePortfolioSeriesFromCache(accountManager);
+      unawaited(_loadAllPortfolios(refreshIbkrPerformance: true));
+      unawaited(_syncCandlesInBackground(refreshIbkr: true));
     }
   }
 
@@ -142,7 +146,12 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   void _hydratePortfolioSeriesFromCache(AccountManager accountManager) {
-    if (_portfolioSeriesByAccount.isNotEmpty) return;
+    if (!_chartPeriodLoaded || _portfolioSeriesByAccount.isNotEmpty) return;
+
+    // The persisted IBKR performance cache is one year of history. It can
+    // faithfully satisfy any selected period up to one year, but must never be
+    // flashed for a longer saved period while the real series is rebuilding.
+    if (years > 1 || (years == 1 && (months > 0 || days > 0))) return;
 
     final cachedSeries = <String, List<_DateValue>>{};
     final cachedReturns = <String, double>{};
@@ -150,10 +159,12 @@ class ChartsPageState extends State<ChartsPage>
 
     for (final accountName in accountManager.accounts) {
       final config = accountManager.ibkrConfigFor(accountName);
-      if (!config.enabled) continue;
+      if (!config.enabled) return;
 
       final cachedPortfolio = accountManager.portfolioCacheFor(accountName);
-      if (cachedPortfolio == null) continue;
+      final performance =
+          accountManager.ibkrPerformanceCacheFor(accountName, '1Y');
+      if (cachedPortfolio == null || performance == null) return;
 
       final currentValue = cachedPortfolio.netLiquidation;
       final currentValueUsd = cachedPortfolio.netLiquidationUsd;
@@ -166,36 +177,22 @@ class ChartsPageState extends State<ChartsPage>
             currentValue.value / currentValueUsd;
       }
 
-      final loaded = _LoadedChartPortfolio(
-        positions: cachedPortfolio.positions,
-        currentValue: currentValue,
-        currentValueUsd: currentValueUsd,
+      final brokerSeries = _buildBrokerPerformanceSeries(
+        performance,
+        _LoadedChartPortfolio(
+          positions: cachedPortfolio.positions,
+          currentValue: currentValue,
+          currentValueUsd: currentValueUsd,
+        ),
       );
-      final performance = years <= 1
-          ? accountManager.ibkrPerformanceCacheFor(accountName, '1Y')
-          : null;
-      if (performance != null) {
-        final brokerSeries = _buildBrokerPerformanceSeries(performance, loaded);
-        if (brokerSeries.series.isNotEmpty) {
-          cachedSeries[accountName] = brokerSeries.series;
-          cachedReturns[accountName] = brokerSeries.twrPercent;
-          cachedReturnAmounts[accountName] = brokerSeries.returnAmount;
-          continue;
-        }
-      }
+      if (brokerSeries.series.isEmpty) return;
 
-      if (currentValueUsd != null && currentValueUsd.isFinite) {
-        final now = DateTime.now();
-        cachedSeries[accountName] = [
-          _DateValue(
-            DateTime(now.year, now.month, now.day),
-            currentValueUsd,
-          ),
-        ];
-      }
+      cachedSeries[accountName] = brokerSeries.series;
+      cachedReturns[accountName] = brokerSeries.twrPercent;
+      cachedReturnAmounts[accountName] = brokerSeries.returnAmount;
     }
 
-    if (cachedSeries.isEmpty) return;
+    if (cachedSeries.length != accountManager.accounts.length) return;
     _portfolioSeriesByAccount = cachedSeries;
     _portfolioReturnsByAccount = cachedReturns;
     _portfolioReturnAmountsByAccount = cachedReturnAmounts;
@@ -334,7 +331,7 @@ class ChartsPageState extends State<ChartsPage>
 
   void _handleAccountManagerChanged() {
     final accountManager = _accountManager;
-    if (!mounted || accountManager == null) return;
+    if (!mounted || accountManager == null || !_chartPeriodLoaded) return;
 
     final accountsKey =
         '${accountManager.activeAccount}|${accountManager.accounts.join(',')}';
@@ -378,8 +375,10 @@ class ChartsPageState extends State<ChartsPage>
       _accountManager = accountManager;
       accountManager.addListener(_handleAccountManagerChanged);
     }
-    _hydratePortfolioSeriesFromCache(accountManager);
-    _handleAccountManagerChanged();
+    if (_chartPeriodLoaded) {
+      _hydratePortfolioSeriesFromCache(accountManager);
+      _handleAccountManagerChanged();
+    }
   }
 
   @override
@@ -596,7 +595,7 @@ class ChartsPageState extends State<ChartsPage>
     bool refreshIbkrPerformance = false,
     bool forceIbkrPerformanceRefresh = false,
   }) async {
-    if (!mounted) return;
+    if (!mounted || !_chartPeriodLoaded) return;
     final generation = ++_portfolioLoadGeneration;
     final accountManager = context.read<AccountManager>();
     final accounts = accountManager.accounts;
