@@ -67,16 +67,17 @@ List<CandlesCompanion> _mockCandlesFor(
   String symbol,
   double basePrice,
   List<double> movement,
-) => [
-  for (var index = 0; index < movement.length; index++)
-    CandlesCompanion.insert(
-      symbol: symbol,
-      date: _mockToday.subtract(
-        Duration(days: (movement.length - 1 - index) * 14),
-      ),
-      close: Value(basePrice + movement[index]),
-    ),
-];
+) =>
+    [
+      for (var index = 0; index < movement.length; index++)
+        CandlesCompanion.insert(
+          symbol: symbol,
+          date: _mockToday.subtract(
+            Duration(days: (movement.length - 1 - index) * 14),
+          ),
+          close: Value(basePrice + movement[index]),
+        ),
+    ];
 
 List<CandlesCompanion> mockCandles = [
   ..._mockCandlesFor('GME', 30.0, [

@@ -122,9 +122,8 @@ class SettingsState extends ChangeNotifier {
     }
 
     final savedLanguageCode = prefs.getString('languageCode');
-    final migratedLanguageCode = savedLanguageCode == 'zh'
-        ? 'zh-Hans'
-        : savedLanguageCode;
+    final migratedLanguageCode =
+        savedLanguageCode == 'zh' ? 'zh-Hans' : savedLanguageCode;
     final supportedLanguageCodes = AppLocalizations.supportedLocales
         .map(AppLocalizations.localeKey)
         .toSet();

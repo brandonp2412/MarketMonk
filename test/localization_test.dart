@@ -250,7 +250,8 @@ void main() {
     );
   });
 
-  test('legacy Chinese language preference migrates to Simplified Chinese', () async {
+  test('legacy Chinese language preference migrates to Simplified Chinese',
+      () async {
     SharedPreferences.setMockInitialValues({
       'languageCode': 'zh',
       'visibleCurrencies': ['USD'],
