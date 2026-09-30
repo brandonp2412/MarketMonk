@@ -81,6 +81,7 @@ class ChartsPageState extends State<ChartsPage>
 
   Map<String, List<_DateValue>> _portfolioSeriesByAccount = {};
   Map<String, double> _portfolioReturnsByAccount = {};
+  Map<String, double> _portfolioReturnAmountsByAccount = {};
   Set<String> _currentHoldingsReplayAccounts = {};
   String? _portfolioError;
   bool _portfolioLoading = false;
@@ -453,6 +454,7 @@ class ChartsPageState extends State<ChartsPage>
 
     final newSeries = <String, List<_DateValue>>{};
     final newReturns = <String, double>{};
+    final newReturnAmounts = <String, double>{};
     final newCurrentHoldingsReplayAccounts = <String>{};
     String? firstError;
 
@@ -483,6 +485,7 @@ class ChartsPageState extends State<ChartsPage>
             if (brokerSeries.series.isNotEmpty) {
               newSeries[accountName] = brokerSeries.series;
               newReturns[accountName] = brokerSeries.twrPercent;
+              newReturnAmounts[accountName] = brokerSeries.returnAmount;
               continue;
             }
           } catch (error) {
@@ -527,6 +530,7 @@ class ChartsPageState extends State<ChartsPage>
     setState(() {
       _portfolioSeriesByAccount = newSeries;
       _portfolioReturnsByAccount = newReturns;
+      _portfolioReturnAmountsByAccount = newReturnAmounts;
       _currentHoldingsReplayAccounts = newCurrentHoldingsReplayAccounts;
       _portfolioError = firstError;
       _portfolioLoading = false;
@@ -666,12 +670,13 @@ class ChartsPageState extends State<ChartsPage>
     return (series: series, currentHoldingsReplay: currentHoldingsReplay);
   }
 
-  ({List<_DateValue> series, double twrPercent}) _buildBrokerPerformanceSeries(
+  ({List<_DateValue> series, double twrPercent, double returnAmount})
+      _buildBrokerPerformanceSeries(
     IbkrPerformanceSeries performance,
     _LoadedChartPortfolio loaded,
   ) {
     if (performance.nav.isEmpty || performance.dates.isEmpty) {
-      return (series: const [], twrPercent: 0);
+      return (series: const [], twrPercent: 0, returnAmount: 0);
     }
 
     var basePerUsd = allRatesFromUsd[performance.currency] ?? 1.0;
@@ -686,7 +691,10 @@ class ChartsPageState extends State<ChartsPage>
     if (!basePerUsd.isFinite || basePerUsd <= 0) basePerUsd = 1.0;
 
     final points = <_DateValue>[];
-    if (performance.startDate != null && performance.startNav != null) {
+    final fundedFirstNav = performance.nav.first != 0;
+    if (performance.startDate != null &&
+        performance.startNav != null &&
+        !(performance.startNav == 0 && fundedFirstNav)) {
       points.add(
         _DateValue(performance.startDate!, performance.startNav! / basePerUsd),
       );
@@ -700,7 +708,9 @@ class ChartsPageState extends State<ChartsPage>
       );
     }
     points.sort((a, b) => a.date.compareTo(b.date));
-    if (points.isEmpty) return (series: const [], twrPercent: 0);
+    if (points.isEmpty) {
+      return (series: const [], twrPercent: 0, returnAmount: 0);
+    }
 
     final anchor = points.last.date;
     int baselineIndex;
@@ -718,8 +728,25 @@ class ChartsPageState extends State<ChartsPage>
         if (!points[index].date.isAfter(cutoff)) baselineIndex = index;
       }
     }
-    var series = points.sublist(baselineIndex);
 
+    final historicalSeries = points.sublist(baselineIndex);
+    final baselineDate = historicalSeries.first.date;
+    final historicalEndDate = historicalSeries.last.date;
+    final cashFlows = performance.cashFlows.length == performance.dates.length
+        ? performance.cashFlows
+        : List<double>.filled(performance.dates.length, 0);
+    var externalFlowsUsd = 0.0;
+    for (var index = 0; index < performance.dates.length; index++) {
+      final date = performance.dates[index];
+      if (date.isAfter(baselineDate) && !date.isAfter(historicalEndDate)) {
+        externalFlowsUsd += cashFlows[index] / basePerUsd;
+      }
+    }
+    final returnAmount = historicalSeries.last.value -
+        historicalSeries.first.value -
+        externalFlowsUsd;
+
+    var series = historicalSeries;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     if (currentValueUsd != null && currentValueUsd.isFinite) {
@@ -731,7 +758,6 @@ class ChartsPageState extends State<ChartsPage>
       }
     }
 
-    final baselineDate = points[baselineIndex].date;
     var startReturn = 0.0;
     var endReturn = 0.0;
     for (var index = 0; index < performance.returnDates.length; index++) {
@@ -743,7 +769,11 @@ class ChartsPageState extends State<ChartsPage>
     }
     final denominator = 1 + startReturn;
     final twr = denominator == 0 ? 0.0 : ((1 + endReturn) / denominator) - 1;
-    return (series: series, twrPercent: twr * 100);
+    return (
+      series: series,
+      twrPercent: twr * 100,
+      returnAmount: returnAmount,
+    );
   }
 
   static int _isoWeek(DateTime date) {
@@ -1611,6 +1641,7 @@ class ChartsPageState extends State<ChartsPage>
     final idx = accounts.indexOf(accountName);
     final dotColor = accountColors[idx.clamp(0, accountColors.length - 1)];
     final brokerReturn = _portfolioReturnsByAccount[accountName];
+    final brokerReturnAmount = _portfolioReturnAmountsByAccount[accountName];
     final currentHoldingsReplay = _currentHoldingsReplayAccounts.contains(
       accountName,
     );
@@ -1628,11 +1659,12 @@ class ChartsPageState extends State<ChartsPage>
             ? ' holdings'
             : ' value';
     final changeKind = brokerReturn != null
-        ? 'value change'
+        ? 'return excl. transfers'
         : currentHoldingsReplay
             ? 'current holdings change'
             : 'holdings change';
-    final change = series.last.value - series.first.value;
+    final change =
+        brokerReturnAmount ?? (series.last.value - series.first.value);
     final isHidden = _hiddenAccounts.contains(accountName);
 
     return GestureDetector(

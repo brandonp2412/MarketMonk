@@ -603,8 +603,13 @@ def _normalize_web_performance(
     navs = nav_entry.get("navs")
     return_dates = cps.get("dates")
     returns = return_entry.get("returns")
+    cash_flows = nav_entry.get("cashFlows")
     if not isinstance(dates, list) or not isinstance(navs, list) or len(dates) != len(navs):
         raise IbkrError("IBKR returned invalid NAV history")
+    if cash_flows is None:
+        cash_flows = [0.0] * len(dates)
+    if not isinstance(cash_flows, list) or len(cash_flows) != len(dates):
+        raise IbkrError("IBKR returned invalid cash-flow history")
     if (
         not isinstance(return_dates, list)
         or not isinstance(returns, list)
@@ -622,6 +627,7 @@ def _normalize_web_performance(
         "start_nav": _number(start_nav.get("val")) if isinstance(start_nav, dict) else None,
         "dates": [str(value) for value in dates],
         "nav": [_required_number(value) for value in navs],
+        "cash_flows": [_required_number(value) for value in cash_flows],
         "return_dates": [str(value) for value in return_dates],
         "returns": [_required_number(value) for value in returns],
     }

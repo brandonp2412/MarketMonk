@@ -156,6 +156,7 @@ class IbkrPerformanceSeries {
   final double? startNav;
   final List<DateTime> dates;
   final List<double> nav;
+  final List<double> cashFlows;
   final List<DateTime> returnDates;
   final List<double> returns;
 
@@ -167,6 +168,7 @@ class IbkrPerformanceSeries {
     required this.startNav,
     required this.dates,
     required this.nav,
+    this.cashFlows = const [],
     required this.returnDates,
     required this.returns,
   });
@@ -178,13 +180,21 @@ class IbkrPerformanceSeries {
     final nav = (json['nav'] as List<dynamic>? ?? const [])
         .map((value) => (value as num).toDouble())
         .toList();
+    final rawCashFlows = json['cash_flows'] as List<dynamic>?;
+    final cashFlows = rawCashFlows == null
+        ? List<double>.filled(dates.length, 0)
+        : rawCashFlows
+            .map((value) => (value as num).toDouble())
+            .toList();
     final returnDates = (json['return_dates'] as List<dynamic>? ?? const [])
         .map((value) => _parseIbkrDate(value.toString()))
         .toList();
     final returns = (json['returns'] as List<dynamic>? ?? const [])
         .map((value) => (value as num).toDouble())
         .toList();
-    if (dates.length != nav.length || returnDates.length != returns.length) {
+    if (dates.length != nav.length ||
+        dates.length != cashFlows.length ||
+        returnDates.length != returns.length) {
       throw const FormatException(
         'IBKR performance series lengths do not match',
       );
@@ -200,6 +210,7 @@ class IbkrPerformanceSeries {
       startNav: (json['start_nav'] as num?)?.toDouble(),
       dates: dates,
       nav: nav,
+      cashFlows: cashFlows,
       returnDates: returnDates,
       returns: returns,
     );

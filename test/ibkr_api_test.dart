@@ -100,7 +100,7 @@ void main() {
       get: (uri, {headers}) async {
         requestedUri = uri;
         return http.Response(
-          '''{"read_only":true,"source":"client_portal","period":"1M","measure":"TWR","currency":"NZD","start_date":"20260817","start_nav":336605.45,"dates":["20260818","20260916"],"nav":[335900.0,333989.91],"return_dates":["20260818","20260916"],"returns":[-0.0021,0.0549]}''',
+          '''{"read_only":true,"source":"client_portal","period":"1M","measure":"TWR","currency":"NZD","start_date":"20260817","start_nav":336605.45,"dates":["20260818","20260916"],"nav":[335900.0,333989.91],"cash_flows":[0,10000],"return_dates":["20260818","20260916"],"returns":[-0.0021,0.0549]}''',
           200,
         );
       },
@@ -118,6 +118,7 @@ void main() {
     expect(performance.startNav, 336605.45);
     expect(performance.dates.last, DateTime(2026, 9, 16));
     expect(performance.nav.last, 333989.91);
+    expect(performance.cashFlows, const [0, 10000]);
     expect(performance.returns.last, 0.0549);
   });
 

@@ -44,6 +44,7 @@ def raw_performance(account_id="U1234567"):
                 {
                     "id": account_id,
                     "navs": [321000, 333000],
+                    "cashFlows": [0, 10000],
                     "startNAV": {"date": "20260817", "val": 320000},
                     "baseCurrency": "NZD",
                 }
@@ -179,6 +180,7 @@ class RecordingIbkrClient(ClientPortalIbkrClient):
                     {
                         "id": "U1234567",
                         "navs": [321000, 333000],
+                        "cashFlows": [0, 10000],
                         "startNAV": {"date": "20260817", "val": 320000},
                         "baseCurrency": "NZD",
                     }
@@ -341,6 +343,7 @@ class ProxyTests(unittest.TestCase):
         self.assertEqual(performance["currency"], "NZD")
         self.assertEqual(performance["start_nav"], 320000)
         self.assertEqual(performance["nav"][-1], 333000)
+        self.assertEqual(performance["cash_flows"], [0, 10000])
         self.assertEqual(performance["returns"][-1], 0.0549)
         self.assertEqual(
             client.posts,
@@ -370,6 +373,7 @@ class ProxyTests(unittest.TestCase):
 
         self.assertEqual(performance["currency"], "NZD")
         self.assertEqual(performance["nav"][-1], 333000)
+        self.assertEqual(performance["cash_flows"], [0, 10000])
         self.assertEqual(performance["returns"][-1], 0.0549)
         self.assertEqual(
             calls[0][0],

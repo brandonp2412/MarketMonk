@@ -283,9 +283,10 @@ void main() {
         measure: 'TWR',
         currency: 'NZD',
         startDate: DateTime(2026, 8, 17),
-        startNav: 336605.45,
+        startNav: 300000,
         dates: [DateTime(2026, 8, 18), DateTime(2026, 9, 16)],
-        nav: const [335900, 333989.91],
+        nav: const [300000, 340000],
+        cashFlows: const [0, 100000],
         returnDates: [DateTime(2026, 8, 18), DateTime(2026, 9, 16)],
         returns: const [0, 0.0549],
       );
@@ -311,6 +312,13 @@ void main() {
 
     expect(performanceLoads, greaterThan(0));
     expect(find.textContaining('+5.49% TWR'), findsOneWidget);
+    final adjustedReturnFinder =
+        find.textContaining('return excl. transfers');
+    expect(adjustedReturnFinder, findsOneWidget);
+    final adjustedReturnText =
+        tester.widget<Text>(adjustedReturnFinder).data!;
+    expect(adjustedReturnText, startsWith('-'));
+    expect(find.textContaining('value change'), findsNothing);
   });
 
   testWidgets('exact ticker fallback is available while search is loading', (
