@@ -13,6 +13,64 @@ import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+IbkrPortfolioSnapshot snapshotFor(String account, String symbol) =>
+    IbkrPortfolioSnapshot(
+      account: account,
+      positions: [
+        IbkrPosition(
+          symbol: symbol,
+          securityType: 'STK',
+          currency: 'USD',
+          exchange: 'NASDAQ',
+          conid: 1,
+          quantity: 1,
+          marketPrice: 100,
+          marketValue: 100,
+          averageCost: 90,
+          unrealizedPnl: 10,
+          realizedPnl: 0,
+        ),
+      ],
+      summary: const {
+        'netliquidation': {'value': 100.0, 'currency': 'USD'},
+      },
+      ledger: const {},
+    );
+
+Future<AccountManager> configuredTwoAccounts() async {
+  final accounts = AccountManager();
+  await accounts.init();
+  accounts.accounts = ['Default', 'IBKR Bot'];
+  await accounts.setIbkrConfig(
+    'Default',
+    const IbkrAccountConfig(
+      enabled: true,
+      baseUrl: 'https://default.example.test',
+      token: 'secret-token',
+    ),
+  );
+  await accounts.setIbkrConfig(
+    'IBKR Bot',
+    const IbkrAccountConfig(
+      enabled: true,
+      baseUrl: 'https://bot.example.test',
+      token: 'secret-token',
+    ),
+  );
+  return accounts;
+}
+
+Future<void> seedCurrentCandle(String symbol) async {
+  final now = DateTime.now();
+  await db.into(db.candles).insert(
+        CandlesCompanion.insert(
+          symbol: symbol,
+          date: DateTime(now.year, now.month, now.day),
+          close: const Value(100),
+        ),
+      );
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -62,12 +120,22 @@ void main() {
     addTearDown(() => db.close());
     final accounts = await configuredAccounts();
     final pending = Completer<IbkrPortfolioSnapshot>();
+    var loads = 0;
 
     await tester.pumpWidget(
-      app(accounts, PortfolioPage(ibkrLoader: (_) => pending.future)),
+      app(
+        accounts,
+        PortfolioPage(
+          ibkrLoader: (_) {
+            loads++;
+            return pending.future;
+          },
+        ),
+      ),
     );
     await tester.pump();
 
+    expect(loads, 1);
     expect(find.bySemanticsLabel('Loading portfolio'), findsOneWidget);
   });
 
@@ -123,6 +191,89 @@ void main() {
     expect(cached.netLiquidation?.value, 5500);
     expect(cached.netLiquidationUsd, 5500);
   });
+
+  testWidgets(
+    'switching IBKR accounts never keeps the previous stream snapshot',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'ibkrHistorySeeded:https://default.example.test:Default:VOO': true,
+      });
+      db = Database.connect(
+        DatabaseConnection(
+          NativeDatabase.memory(),
+          closeStreamsSynchronously: true,
+        ),
+      );
+      addTearDown(() => db.close());
+      await seedCurrentCandle('VOO');
+
+      final accounts = await configuredTwoAccounts();
+      final botPending = Completer<IbkrPortfolioSnapshot>();
+      Future<IbkrPortfolioSnapshot> loader(IbkrAccountConfig config) {
+        if (config.baseUrl.contains('bot.example.test')) {
+          return botPending.future;
+        }
+        return Future.value(snapshotFor('*****6552', 'VOO'));
+      }
+
+      await tester.pumpWidget(app(accounts, PortfolioPage(ibkrLoader: loader)));
+      await tester.pumpAndSettle();
+
+      expect(find.text('VOO'), findsWidgets);
+
+      accounts.activeAccount = 'IBKR Bot';
+      accounts.requestIbkrRefresh();
+      await tester.pump();
+
+      expect(find.text('VOO'), findsNothing);
+      expect(find.bySemanticsLabel('Loading portfolio'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'an old IBKR request cannot overwrite the newly selected account cache',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'ibkrHistorySeeded:https://default.example.test:Default:VOO': true,
+      });
+      db = Database.connect(
+        DatabaseConnection(
+          NativeDatabase.memory(),
+          closeStreamsSynchronously: true,
+        ),
+      );
+      addTearDown(() => db.close());
+      await seedCurrentCandle('VOO');
+
+      final accounts = await configuredTwoAccounts();
+      final defaultPending = Completer<IbkrPortfolioSnapshot>();
+      final botPending = Completer<IbkrPortfolioSnapshot>();
+      Future<IbkrPortfolioSnapshot> loader(IbkrAccountConfig config) {
+        if (config.baseUrl.contains('bot.example.test')) {
+          return botPending.future;
+        }
+        return defaultPending.future;
+      }
+
+      await tester.pumpWidget(app(accounts, PortfolioPage(ibkrLoader: loader)));
+      await tester.pump();
+
+      accounts.activeAccount = 'IBKR Bot';
+      accounts.requestIbkrRefresh();
+      await tester.pump();
+
+      defaultPending.complete(snapshotFor('*****6552', 'VOO'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(accounts.portfolioCacheFor('IBKR Bot') == null, isTrue);
+      expect(
+        accounts.portfolioCacheFor('Default')?.positions.single.symbol,
+        'VOO',
+      );
+      expect(find.text('VOO'), findsNothing);
+    },
+  );
 
   testWidgets(
     'portfolio shows a friendly IBKR error instead of exception text',

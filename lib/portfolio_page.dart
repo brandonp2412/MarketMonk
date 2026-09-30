@@ -56,6 +56,8 @@ class PortfolioPageState extends State<PortfolioPage>
   String _lastAccount = '';
   int _lastIbkrRefreshVersion = -1;
   IbkrAccountConfig _lastIbkrConfig = const IbkrAccountConfig();
+  final Map<(String, IbkrAccountConfig), Future<IbkrPortfolioSnapshot>>
+      _ibkrSnapshotLoads = {};
 
   @override
   void initState() {
@@ -106,8 +108,11 @@ class PortfolioPageState extends State<PortfolioPage>
     super.dispose();
   }
 
-  Future<_LoadedPortfolio> _loadPortfolio(List<Trade> trades) async {
-    final config = context.read<AccountManager>().ibkrConfigFor();
+  Future<_LoadedPortfolio> _loadPortfolio(
+    String accountName,
+    List<Trade> trades,
+    IbkrAccountConfig config,
+  ) async {
     if (!config.enabled) {
       final symbols = trades.map((t) => t.symbol).toSet().toList();
       final prices = await fetchLatestPrices(symbols);
@@ -122,8 +127,15 @@ class PortfolioPageState extends State<PortfolioPage>
       throw StateError('IBKR portfolio source is not fully configured');
     }
 
-    final snapshot = await (widget._ibkrLoader?.call(config) ??
-        IbkrApiClient(config).fetchPortfolio());
+    final loadKey = (accountName, config);
+    final snapshot = await _ibkrSnapshotLoads.putIfAbsent(loadKey, () async {
+      try {
+        return await (widget._ibkrLoader?.call(config) ??
+            IbkrApiClient(config).fetchPortfolio());
+      } finally {
+        _ibkrSnapshotLoads.remove(loadKey);
+      }
+    });
     cacheIbkrAccountExchangeRate(snapshot);
     return _LoadedPortfolio(
       positions: await computeIbkrPositions(snapshot.positions, trades),
@@ -133,33 +145,39 @@ class PortfolioPageState extends State<PortfolioPage>
   }
 
   Future<void> _preload() async {
+    final accounts = context.read<AccountManager>();
+    final accountName = accounts.activeAccount;
+    final config = accounts.ibkrConfigFor(accountName);
+    final accountDb = db;
     try {
-      final trades = await db.trades.select().get();
-      final loaded = await _loadPortfolio(trades);
-      if (mounted) {
-        setState(() {
-          _positions = loaded.positions;
-          _netLiquidation = loaded.netLiquidation;
-          _hasCachedPortfolio = true;
-        });
-        await context.read<AccountManager>().cachePortfolio(
-              context.read<AccountManager>().activeAccount,
-              loaded.positions,
-              loaded.netLiquidation,
-              netLiquidationUsd: loaded.netLiquidationUsd,
-            );
-      }
+      final trades = await accountDb.trades.select().get();
+      final loaded = await _loadPortfolio(accountName, trades, config);
+      await accounts.cachePortfolio(
+        accountName,
+        loaded.positions,
+        loaded.netLiquidation,
+        netLiquidationUsd: loaded.netLiquidationUsd,
+      );
+      if (!mounted || accounts.activeAccount != accountName) return;
+      setState(() {
+        _positions = loaded.positions;
+        _netLiquidation = loaded.netLiquidation;
+        _hasCachedPortfolio = true;
+      });
     } catch (error, stackTrace) {
       talker.handle(error, stackTrace, 'Failed to preload portfolio positions');
     }
   }
 
   Future<void> _syncAllInBackground() async {
-    final accountName = context.read<AccountManager>().activeAccount;
+    final accounts = context.read<AccountManager>();
+    final accountName = accounts.activeAccount;
+    final config = accounts.ibkrConfigFor(accountName);
+    final accountDb = db;
     try {
-      final useIbkr = _lastIbkrConfig.enabled;
-      final trades = await db.trades.select().get();
-      final loaded = await _loadPortfolio(trades);
+      final useIbkr = config.enabled;
+      final trades = await accountDb.trades.select().get();
+      final loaded = await _loadPortfolio(accountName, trades, config);
       final positions = loaded.positions;
       final symbols = useIbkr
           ? positions.map((position) => position.symbol).toSet()
@@ -167,31 +185,40 @@ class PortfolioPageState extends State<PortfolioPage>
       for (final symbol in symbols) {
         await syncCandles(
           symbol,
-          ibkrConfig: _lastIbkrConfig,
+          ibkrConfig: config,
           syncNamespace: accountName,
         );
       }
-      if (mounted) {
-        setState(() {
-          _positions = positions;
-          _netLiquidation = loaded.netLiquidation;
-          _hasCachedPortfolio = true;
-        });
-        await context.read<AccountManager>().cachePortfolio(
-              accountName,
-              positions,
-              loaded.netLiquidation,
-              netLiquidationUsd: loaded.netLiquidationUsd,
-            );
-      }
+      await accounts.cachePortfolio(
+        accountName,
+        positions,
+        loaded.netLiquidation,
+        netLiquidationUsd: loaded.netLiquidationUsd,
+      );
+      if (!mounted || accounts.activeAccount != accountName) return;
+      setState(() {
+        _positions = positions;
+        _netLiquidation = loaded.netLiquidation;
+        _hasCachedPortfolio = true;
+      });
     } catch (error, stackTrace) {
       talker.handle(error, stackTrace, 'Background portfolio sync failed');
     }
-    if (mounted) setState(() => _stream = _buildStream());
+    if (mounted && accounts.activeAccount == accountName) {
+      setState(() => _stream = _buildStream());
+    }
   }
 
-  Stream<_LoadedPortfolio> _buildStream() =>
-      db.trades.select().watch().asyncMap(_loadPortfolio);
+  Stream<_LoadedPortfolio> _buildStream() {
+    final accounts = context.read<AccountManager>();
+    final accountName = accounts.activeAccount;
+    final config = accounts.ibkrConfigFor(accountName);
+    final accountDb = db;
+    return accountDb.trades
+        .select()
+        .watch()
+        .asyncMap((trades) => _loadPortfolio(accountName, trades, config));
+  }
 
   Future<void> _updateCandles() async {
     clearAllSyncCache();
@@ -245,6 +272,7 @@ class PortfolioPageState extends State<PortfolioPage>
     return Scaffold(
       body: SafeArea(
         child: StreamBuilder<_LoadedPortfolio>(
+          key: ValueKey(_lastAccount),
           stream: _stream,
           builder: _buildBody,
         ),
