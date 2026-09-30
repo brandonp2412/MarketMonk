@@ -1,6 +1,5 @@
 plugins {
     id "com.android.application"
-    id "org.jetbrains.kotlin.android"
     id "dev.flutter.flutter-gradle-plugin"
 }
 
@@ -49,17 +48,17 @@ android {
    buildTypes {
        profile {
            if (keystorePropertiesFile.exists()) {
-               signingConfig signingConfigs.release
+               signingConfig = signingConfigs.release
            }
        }
        debug {
            if (keystorePropertiesFile.exists()) {
-               signingConfig signingConfigs.release
+               signingConfig = signingConfigs.release
            }
        }
        release {
            if (keystorePropertiesFile.exists()) {
-               signingConfig signingConfigs.release
+               signingConfig = signingConfigs.release
            }
        }
    }
