@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/drift.dart' hide Column, Table;
@@ -64,7 +65,6 @@ class PortfolioPageState extends State<PortfolioPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _stream = _buildStream();
-    _preload();
   }
 
   @override
@@ -75,6 +75,9 @@ class PortfolioPageState extends State<PortfolioPage>
     final ibkrConfig = accounts.ibkrConfigFor(account);
     final refreshVersion = accounts.ibkrRefreshVersion;
     final cached = accounts.portfolioCacheFor(account);
+    final hadAccount = _lastAccount.isNotEmpty;
+    final refreshRequested =
+        hadAccount && refreshVersion != _lastIbkrRefreshVersion;
     if (account != _lastAccount ||
         ibkrConfig != _lastIbkrConfig ||
         refreshVersion != _lastIbkrRefreshVersion) {
@@ -88,16 +91,14 @@ class PortfolioPageState extends State<PortfolioPage>
         _hasCachedPortfolio = cached != null;
         touchedIndex = null;
       });
-      _preload();
-      _syncAllInBackground();
+      unawaited(_preload(forceRefresh: refreshRequested));
     }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _preload();
-      _syncAllInBackground();
+      unawaited(_preload());
     }
   }
 
@@ -111,8 +112,10 @@ class PortfolioPageState extends State<PortfolioPage>
   Future<_LoadedPortfolio> _loadPortfolio(
     String accountName,
     List<Trade> trades,
-    IbkrAccountConfig config,
-  ) async {
+    IbkrAccountConfig config, {
+    bool refreshIfStale = false,
+    bool forceRefresh = false,
+  }) async {
     if (!config.enabled) {
       final symbols = trades.map((t) => t.symbol).toSet().toList();
       final prices = await fetchLatestPrices(symbols);
@@ -123,7 +126,28 @@ class PortfolioPageState extends State<PortfolioPage>
       );
     }
 
+    final accounts = context.read<AccountManager>();
+    final cached = accounts.portfolioCacheFor(accountName);
+    final cacheFresh = accounts.isPortfolioCacheFresh(accountName);
+    final shouldUseCache = cached != null &&
+        !forceRefresh &&
+        (!refreshIfStale || cacheFresh || !config.isConfigured);
+    if (shouldUseCache) {
+      return _LoadedPortfolio(
+        positions: cached.positions,
+        netLiquidation: cached.netLiquidation,
+        netLiquidationUsd: cached.netLiquidationUsd,
+      );
+    }
+
     if (!config.isConfigured) {
+      if (cached != null) {
+        return _LoadedPortfolio(
+          positions: cached.positions,
+          netLiquidation: cached.netLiquidation,
+          netLiquidationUsd: cached.netLiquidationUsd,
+        );
+      }
       throw StateError('IBKR portfolio source is not fully configured');
     }
 
@@ -144,25 +168,39 @@ class PortfolioPageState extends State<PortfolioPage>
     );
   }
 
-  Future<void> _preload() async {
+  Future<void> _preload({bool forceRefresh = false}) async {
     final accounts = context.read<AccountManager>();
     final accountName = accounts.activeAccount;
     final config = accounts.ibkrConfigFor(accountName);
     final accountDb = db;
+    final cachedBefore = accounts.portfolioCacheFor(accountName);
+    final cacheWasFresh = accounts.isPortfolioCacheFresh(accountName);
+    final willFetchIbkr = config.enabled &&
+        config.isConfigured &&
+        (forceRefresh || cachedBefore == null || !cacheWasFresh);
     try {
       final trades = await accountDb.trades.select().get();
-      final loaded = await _loadPortfolio(accountName, trades, config);
-      await accounts.cachePortfolio(
+      final loaded = await _loadPortfolio(
         accountName,
-        loaded.positions,
-        loaded.netLiquidation,
-        netLiquidationUsd: loaded.netLiquidationUsd,
+        trades,
+        config,
+        refreshIfStale: true,
+        forceRefresh: forceRefresh,
       );
+      if (!config.enabled || willFetchIbkr) {
+        await accounts.cachePortfolio(
+          accountName,
+          loaded.positions,
+          loaded.netLiquidation,
+          netLiquidationUsd: loaded.netLiquidationUsd,
+        );
+      }
       if (!mounted || accounts.activeAccount != accountName) return;
       setState(() {
         _positions = loaded.positions;
         _netLiquidation = loaded.netLiquidation;
         _hasCachedPortfolio = true;
+        _stream = _buildStream();
       });
     } catch (error, stackTrace) {
       talker.handle(error, stackTrace, 'Failed to preload portfolio positions');
@@ -189,12 +227,6 @@ class PortfolioPageState extends State<PortfolioPage>
           syncNamespace: accountName,
         );
       }
-      await accounts.cachePortfolio(
-        accountName,
-        positions,
-        loaded.netLiquidation,
-        netLiquidationUsd: loaded.netLiquidationUsd,
-      );
       if (!mounted || accounts.activeAccount != accountName) return;
       setState(() {
         _positions = positions;
@@ -214,15 +246,14 @@ class PortfolioPageState extends State<PortfolioPage>
     final accountName = accounts.activeAccount;
     final config = accounts.ibkrConfigFor(accountName);
     final accountDb = db;
-    return accountDb.trades
-        .select()
-        .watch()
-        .asyncMap((trades) => _loadPortfolio(accountName, trades, config));
+    return accountDb.trades.select().watch().asyncMap(
+          (trades) => _loadPortfolio(accountName, trades, config),
+        );
   }
 
   Future<void> _updateCandles() async {
     clearAllSyncCache();
-    await _preload();
+    await _preload(forceRefresh: true);
     await _syncAllInBackground();
   }
 
@@ -282,6 +313,7 @@ class PortfolioPageState extends State<PortfolioPage>
 
   void _retryPortfolio() {
     setState(() => _stream = _buildStream());
+    unawaited(_preload(forceRefresh: true));
   }
 
   void _openSettings() {

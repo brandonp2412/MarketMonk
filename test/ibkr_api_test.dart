@@ -257,4 +257,36 @@ void main() {
     expect(reloaded.ibkrConfigFor('Default'), config);
     expect(reloaded.ibkrConfigFor('Other'), const IbkrAccountConfig());
   });
+
+  test('IBKR performance cache survives AccountManager reinitialization',
+      () async {
+    final accounts = AccountManager();
+    await accounts.init();
+    final series = IbkrPerformanceSeries(
+      period: '1Y',
+      measure: 'TWR',
+      currency: 'NZD',
+      startDate: DateTime(2025, 10, 1),
+      startNav: 300000,
+      dates: [DateTime(2026, 9, 30)],
+      nav: const [333989.91],
+      cashFlows: const [0],
+      returnDates: [DateTime(2025, 10, 1), DateTime(2026, 9, 30)],
+      returns: const [0, 0.1169],
+    );
+
+    await accounts.cacheIbkrPerformance('Default', series);
+    expect(accounts.isIbkrPerformanceCacheFresh('Default', '1Y'), isTrue);
+
+    final reloaded = AccountManager();
+    await reloaded.init();
+    final cached = reloaded.ibkrPerformanceCacheFor('Default', '1Y');
+
+    expect(cached, isNotNull);
+    expect(cached!.period, '1Y');
+    expect(cached.currency, 'NZD');
+    expect(cached.nav.single, 333989.91);
+    expect(cached.returns.last, 0.1169);
+    expect(reloaded.isIbkrPerformanceCacheFresh('Default', '1Y'), isTrue);
+  });
 }

@@ -173,6 +173,28 @@ class IbkrPerformanceSeries {
     required this.returns,
   });
 
+  Map<String, dynamic> toJson() {
+    String encodeDate(DateTime date) =>
+        '${date.year.toString().padLeft(4, '0')}'
+        '${date.month.toString().padLeft(2, '0')}'
+        '${date.day.toString().padLeft(2, '0')}';
+    final encodedCashFlows = cashFlows.length == dates.length
+        ? cashFlows
+        : List<double>.filled(dates.length, 0);
+    return {
+      'period': period,
+      'measure': measure,
+      'currency': currency,
+      'start_date': startDate == null ? null : encodeDate(startDate!),
+      'start_nav': startNav,
+      'dates': dates.map(encodeDate).toList(),
+      'nav': nav,
+      'cash_flows': encodedCashFlows,
+      'return_dates': returnDates.map(encodeDate).toList(),
+      'returns': returns,
+    };
+  }
+
   factory IbkrPerformanceSeries.fromJson(Map<String, dynamic> json) {
     final dates = (json['dates'] as List<dynamic>? ?? const [])
         .map((value) => _parseIbkrDate(value.toString()))

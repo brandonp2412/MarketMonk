@@ -88,6 +88,7 @@ class ChartsPageState extends State<ChartsPage>
   bool _portfolioLoading = false;
   final Set<String> _hiddenAccounts = {};
   final Map<String, Future<_LoadedChartPortfolio>> _ibkrLoads = {};
+  final Map<String, Future<IbkrPerformanceSeries>> _ibkrPerformanceLoads = {};
 
   final _yahooApi = YahooFinanceApi();
   List<StockResult> _searchResults = [];
@@ -123,13 +124,14 @@ class ChartsPageState extends State<ChartsPage>
     final y = prefs.getInt('chartPeriodYears') ?? 1;
     final m = prefs.getInt('chartPeriodMonths') ?? 0;
     final d = prefs.getInt('chartPeriodDays') ?? 0;
-    if (mounted)
+    if (mounted) {
       setState(() {
         years = y;
         months = m;
         days = d;
       });
-    _loadAllPortfolios();
+      _loadAllPortfolios(refreshIbkrPerformance: true);
+    }
   }
 
   Future<void> _savePeriod() async {
@@ -145,11 +147,16 @@ class ChartsPageState extends State<ChartsPage>
     IbkrAccountConfig ibkrConfig,
     AccountManager accountManager, {
     bool refreshIbkr = false,
+    bool forceIbkrRefresh = false,
   }) async {
     final trades = await accountDb.trades.select().get();
     if (ibkrConfig.enabled) {
       final cached = accountManager.portfolioCacheFor(accountName);
-      if (cached != null && (!refreshIbkr || !ibkrConfig.isConfigured)) {
+      final cacheFresh = accountManager.isPortfolioCacheFresh(accountName);
+      final shouldUseCache = cached != null &&
+          !forceIbkrRefresh &&
+          (!refreshIbkr || cacheFresh || !ibkrConfig.isConfigured);
+      if (shouldUseCache) {
         final currentValue = cached.netLiquidation;
         final currentValueUsd = cached.netLiquidationUsd;
         if (currentValue != null &&
@@ -167,10 +174,17 @@ class ChartsPageState extends State<ChartsPage>
         );
       }
       if (!ibkrConfig.isConfigured) {
+        if (cached != null) {
+          return _LoadedChartPortfolio(
+            positions: cached.positions,
+            currentValue: cached.netLiquidation,
+            currentValueUsd: cached.netLiquidationUsd,
+          );
+        }
         throw StateError('IBKR portfolio source is not fully configured');
       }
 
-      final loadKey = '$accountName|${ibkrConfig.hashCode}';
+      final loadKey = '$accountName|\${ibkrConfig.hashCode}';
       return _ibkrLoads.putIfAbsent(loadKey, () async {
         try {
           final snapshot = await (widget._ibkrLoader?.call(ibkrConfig) ??
@@ -207,7 +221,10 @@ class ChartsPageState extends State<ChartsPage>
     );
   }
 
-  Future<void> _syncCandlesInBackground({bool refreshIbkr = false}) async {
+  Future<void> _syncCandlesInBackground({
+    bool refreshIbkr = false,
+    bool forceIbkrRefresh = false,
+  }) async {
     if (!mounted) return;
     final accountManager = context.read<AccountManager>();
     try {
@@ -226,6 +243,7 @@ class ChartsPageState extends State<ChartsPage>
             ibkrConfig,
             accountManager,
             refreshIbkr: refreshIbkr,
+            forceIbkrRefresh: forceIbkrRefresh,
           );
           final trades = await accountDb.trades.select().get();
           final symbols = {
@@ -245,7 +263,12 @@ class ChartsPageState extends State<ChartsPage>
         }
       }
     } catch (_) {}
-    if (mounted) _loadAllPortfolios();
+    if (mounted) {
+      _loadAllPortfolios(
+        refreshIbkrPerformance: refreshIbkr,
+        forceIbkrPerformanceRefresh: forceIbkrRefresh,
+      );
+    }
   }
 
   void _handleAccountManagerChanged() {
@@ -255,16 +278,27 @@ class ChartsPageState extends State<ChartsPage>
     final accountsKey =
         '${accountManager.activeAccount}|${accountManager.accounts.join(',')}';
     final ibkrRefreshVersion = accountManager.ibkrRefreshVersion;
+    final accountsChanged = accountsKey != _lastAccountsKey;
     final ibkrChanged = ibkrRefreshVersion != _lastIbkrRefreshVersion;
-    if (accountsKey == _lastAccountsKey && !ibkrChanged) return;
+    if (!accountsChanged && !ibkrChanged) return;
 
     _lastAccountsKey = accountsKey;
     _lastIbkrRefreshVersion = ibkrRefreshVersion;
-    if (ibkrChanged) {
-      clearAllSyncCache();
-      unawaited(_syncCandlesInBackground(refreshIbkr: true));
+    if (accountsChanged || ibkrChanged) {
+      if (ibkrChanged) clearAllSyncCache();
+      unawaited(
+        _syncCandlesInBackground(
+          refreshIbkr: true,
+          forceIbkrRefresh: ibkrChanged,
+        ),
+      );
     }
-    unawaited(_loadAllPortfolios());
+    unawaited(
+      _loadAllPortfolios(
+        refreshIbkrPerformance: true,
+        forceIbkrPerformanceRefresh: ibkrChanged,
+      ),
+    );
     if (_selectedSymbol != null) _setStockStream(_selectedSymbol!);
   }
 
@@ -322,6 +356,7 @@ class ChartsPageState extends State<ChartsPage>
           ibkrConfig,
           accountManager,
           refreshIbkr: true,
+          forceIbkrRefresh: true,
         );
         final trades = await accountDb.trades.select().get();
         final task = (
@@ -389,7 +424,10 @@ class ChartsPageState extends State<ChartsPage>
         if (mounted) _setStockStream(_selectedSymbol!);
       } else {
         await _refreshAllPortfolioCandles();
-        await _loadAllPortfolios();
+        await _loadAllPortfolios(
+          refreshIbkrPerformance: true,
+          forceIbkrPerformanceRefresh: true,
+        );
       }
     } catch (error, stackTrace) {
       talker.handle(error, stackTrace, 'Chart refresh failed');
@@ -457,7 +495,45 @@ class ChartsPageState extends State<ChartsPage>
     toast(ctx, ctx.l10n.text('Set as favorite'));
   }
 
-  Future<void> _loadAllPortfolios() async {
+  Future<IbkrPerformanceSeries> _performanceForAccount(
+    String accountName,
+    IbkrAccountConfig config,
+    AccountManager accountManager,
+    String period, {
+    bool refreshIfStale = false,
+    bool forceRefresh = false,
+  }) async {
+    final cached = accountManager.ibkrPerformanceCacheFor(accountName, period);
+    final cacheFresh =
+        accountManager.isIbkrPerformanceCacheFresh(accountName, period);
+    if (cached != null &&
+        !forceRefresh &&
+        (!refreshIfStale || cacheFresh || !config.isConfigured)) {
+      return cached;
+    }
+    if (!config.isConfigured) {
+      if (cached != null) return cached;
+      throw StateError('IBKR performance source is not fully configured');
+    }
+
+    final loadKey = '$accountName|$period|\${config.hashCode}';
+    return _ibkrPerformanceLoads.putIfAbsent(loadKey, () async {
+      try {
+        final performance =
+            await (widget._ibkrPerformanceLoader?.call(config, period) ??
+                IbkrApiClient(config).fetchPerformance(period));
+        await accountManager.cacheIbkrPerformance(accountName, performance);
+        return performance;
+      } finally {
+        _ibkrPerformanceLoads.remove(loadKey);
+      }
+    });
+  }
+
+  Future<void> _loadAllPortfolios({
+    bool refreshIbkrPerformance = false,
+    bool forceIbkrPerformanceRefresh = false,
+  }) async {
     if (!mounted) return;
     final generation = ++_portfolioLoadGeneration;
     final accountManager = context.read<AccountManager>();
@@ -491,9 +567,14 @@ class ChartsPageState extends State<ChartsPage>
         );
         if (ibkrConfig.isConfigured && years <= 1) {
           try {
-            final performance =
-                await (widget._ibkrPerformanceLoader?.call(ibkrConfig, '1Y') ??
-                    IbkrApiClient(ibkrConfig).fetchPerformance('1Y'));
+            final performance = await _performanceForAccount(
+              accountName,
+              ibkrConfig,
+              accountManager,
+              '1Y',
+              refreshIfStale: refreshIbkrPerformance,
+              forceRefresh: forceIbkrPerformanceRefresh,
+            );
             final brokerSeries = _buildBrokerPerformanceSeries(
               performance,
               loaded,

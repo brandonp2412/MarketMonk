@@ -57,11 +57,13 @@ class CachedPortfolioData {
   final List<Position> positions;
   final IbkrAccountValue? netLiquidation;
   final double? netLiquidationUsd;
+  final DateTime cachedAt;
 
   const CachedPortfolioData({
     required this.positions,
     required this.netLiquidation,
     this.netLiquidationUsd,
+    required this.cachedAt,
   });
 
   Map<String, dynamic> toJson() => {
@@ -89,6 +91,7 @@ class CachedPortfolioData {
                 'currency': netLiquidation!.currency,
               },
         'netLiquidationUsd': netLiquidationUsd,
+        'cachedAt': cachedAt.toIso8601String(),
       };
 
   factory CachedPortfolioData.fromJson(Map<String, dynamic> json) {
@@ -108,10 +111,9 @@ class CachedPortfolioData {
                     position['firstBuyDate'] as String? ?? '',
                   ) ??
                   DateTime.fromMillisecondsSinceEpoch(0),
-              lastBuyDate: DateTime.tryParse(
-                    position['lastBuyDate'] as String? ?? '',
-                  ) ??
-                  DateTime.fromMillisecondsSinceEpoch(0),
+              lastBuyDate:
+                  DateTime.tryParse(position['lastBuyDate'] as String? ?? '') ??
+                      DateTime.fromMillisecondsSinceEpoch(0),
               brokerMarketValue:
                   (position['brokerMarketValue'] as num?)?.toDouble(),
               brokerUnrealizedPL:
@@ -129,8 +131,34 @@ class CachedPortfolioData {
             )
           : null,
       netLiquidationUsd: (json['netLiquidationUsd'] as num?)?.toDouble(),
+      cachedAt: DateTime.tryParse(json['cachedAt'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0),
     );
   }
+}
+
+class CachedIbkrPerformanceData {
+  final IbkrPerformanceSeries series;
+  final DateTime cachedAt;
+
+  const CachedIbkrPerformanceData({
+    required this.series,
+    required this.cachedAt,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'series': series.toJson(),
+        'cachedAt': cachedAt.toIso8601String(),
+      };
+
+  factory CachedIbkrPerformanceData.fromJson(Map<String, dynamic> json) =>
+      CachedIbkrPerformanceData(
+        series: IbkrPerformanceSeries.fromJson(
+          json['series'] as Map<String, dynamic>,
+        ),
+        cachedAt: DateTime.tryParse(json['cachedAt'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+      );
 }
 
 /// Manages named portfolio accounts backed by separate SQLite files.
@@ -140,7 +168,12 @@ class AccountManager extends ChangeNotifier {
   String activeAccount = 'Default';
   int ibkrRefreshVersion = 0;
   final Map<String, IbkrAccountConfig> _ibkrConfigs = {};
+  static const ibkrPortfolioCacheMaxAge = Duration(minutes: 5);
+  static const ibkrPerformanceCacheMaxAge = Duration(minutes: 30);
+
   final Map<String, CachedPortfolioData> _portfolioCache = {};
+  final Map<String, Map<String, CachedIbkrPerformanceData>>
+      _ibkrPerformanceCache = {};
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
@@ -170,6 +203,35 @@ class AccountManager extends ChangeNotifier {
         }
       } catch (error, stackTrace) {
         talker.handle(error, stackTrace, 'Failed to load portfolio cache');
+      }
+    }
+    final savedPerformanceCache = prefs.getString('ibkrPerformanceCacheV1');
+    if (savedPerformanceCache != null) {
+      try {
+        final decoded =
+            json.decode(savedPerformanceCache) as Map<String, dynamic>;
+        for (final accountEntry in decoded.entries) {
+          final rawPeriods = accountEntry.value;
+          if (rawPeriods is! Map<String, dynamic>) continue;
+          final periods = <String, CachedIbkrPerformanceData>{};
+          for (final periodEntry in rawPeriods.entries) {
+            final rawValue = periodEntry.value;
+            if (rawValue is Map<String, dynamic>) {
+              periods[periodEntry.key] = CachedIbkrPerformanceData.fromJson(
+                rawValue,
+              );
+            }
+          }
+          if (periods.isNotEmpty) {
+            _ibkrPerformanceCache[accountEntry.key] = periods;
+          }
+        }
+      } catch (error, stackTrace) {
+        talker.handle(
+          error,
+          stackTrace,
+          'Failed to load IBKR performance cache',
+        );
       }
     }
     final savedIbkrConfigs = prefs.getString('ibkrAccountConfigs');
@@ -203,6 +265,41 @@ class AccountManager extends ChangeNotifier {
   CachedPortfolioData? portfolioCacheFor([String? name]) =>
       _portfolioCache[name ?? activeAccount];
 
+  bool isPortfolioCacheFresh(
+    String name, {
+    Duration maxAge = ibkrPortfolioCacheMaxAge,
+  }) {
+    final cached = _portfolioCache[name];
+    return cached != null &&
+        DateTime.now().difference(cached.cachedAt) <= maxAge;
+  }
+
+  IbkrPerformanceSeries? ibkrPerformanceCacheFor(String name, String period) =>
+      _ibkrPerformanceCache[name]?[period]?.series;
+
+  bool isIbkrPerformanceCacheFresh(
+    String name,
+    String period, {
+    Duration maxAge = ibkrPerformanceCacheMaxAge,
+  }) {
+    final cached = _ibkrPerformanceCache[name]?[period];
+    return cached != null &&
+        DateTime.now().difference(cached.cachedAt) <= maxAge;
+  }
+
+  Future<void> cacheIbkrPerformance(
+    String name,
+    IbkrPerformanceSeries series,
+  ) async {
+    final periods = _ibkrPerformanceCache.putIfAbsent(name, () => {});
+    periods[series.period] = CachedIbkrPerformanceData(
+      series: series,
+      cachedAt: DateTime.now(),
+    );
+    final prefs = await SharedPreferences.getInstance();
+    await _saveIbkrPerformanceCache(prefs);
+  }
+
   Future<void> cachePortfolio(
     String name,
     List<Position> positions,
@@ -213,6 +310,7 @@ class AccountManager extends ChangeNotifier {
       positions: List.unmodifiable(positions),
       netLiquidation: netLiquidation,
       netLiquidationUsd: netLiquidationUsd,
+      cachedAt: DateTime.now(),
     );
     final prefs = await SharedPreferences.getInstance();
     await _savePortfolioCache(prefs);
@@ -226,11 +324,32 @@ class AccountManager extends ChangeNotifier {
         }),
       );
 
+  Future<void> _saveIbkrPerformanceCache(SharedPreferences prefs) =>
+      prefs.setString(
+        'ibkrPerformanceCacheV1',
+        json.encode({
+          for (final accountEntry in _ibkrPerformanceCache.entries)
+            accountEntry.key: {
+              for (final periodEntry in accountEntry.value.entries)
+                periodEntry.key: periodEntry.value.toJson(),
+            },
+        }),
+      );
+
   /// Saves the read-only IBKR connection for one MarketMonk account.
   Future<void> setIbkrConfig(String name, IbkrAccountConfig config) async {
+    final changed = _ibkrConfigs[name] != config;
     _ibkrConfigs[name] = config;
+    if (changed) {
+      _portfolioCache.remove(name);
+      _ibkrPerformanceCache.remove(name);
+    }
     final prefs = await SharedPreferences.getInstance();
     await _saveIbkrConfigs(prefs);
+    if (changed) {
+      await _savePortfolioCache(prefs);
+      await _saveIbkrPerformanceCache(prefs);
+    }
     ibkrRefreshVersion++;
     notifyListeners();
   }
@@ -360,6 +479,10 @@ class AccountManager extends ChangeNotifier {
     if (ibkrConfig != null) _ibkrConfigs[newName] = ibkrConfig;
     final cachedPortfolio = _portfolioCache.remove(oldName);
     if (cachedPortfolio != null) _portfolioCache[newName] = cachedPortfolio;
+    final cachedPerformance = _ibkrPerformanceCache.remove(oldName);
+    if (cachedPerformance != null) {
+      _ibkrPerformanceCache[newName] = cachedPerformance;
+    }
     if (isActive) {
       activeAccount = newName;
       db = Database('market-monk-$newName');
@@ -369,6 +492,7 @@ class AccountManager extends ChangeNotifier {
     await prefs.setStringList('accounts', accounts);
     await _saveIbkrConfigs(prefs);
     await _savePortfolioCache(prefs);
+    await _saveIbkrPerformanceCache(prefs);
     if (isActive) await prefs.setString('activeAccount', newName);
     WidgetsBinding.instance.addPostFrameCallback((_) => notifyListeners());
     talker.info('Renamed portfolio account');
@@ -380,10 +504,12 @@ class AccountManager extends ChangeNotifier {
     accounts = accounts.where((a) => a != name).toList();
     _ibkrConfigs.remove(name);
     _portfolioCache.remove(name);
+    _ibkrPerformanceCache.remove(name);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('accounts', accounts);
     await _saveIbkrConfigs(prefs);
     await _savePortfolioCache(prefs);
+    await _saveIbkrPerformanceCache(prefs);
     try {
       final dir = await getApplicationSupportDirectory();
       final file = File(p.join(dir.path, 'market-monk-$name.sqlite'));

@@ -211,9 +211,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(ibkrLoads, 1);
-    expect(find.textContaining('10,100'), findsWidgets);
-    expect(allRatesFromUsd['NZD'], closeTo(10100 / 5800, 1e-9));
+    expect(ibkrLoads, 0);
+    expect(find.textContaining('10,000'), findsWidgets);
+    expect(allRatesFromUsd['NZD'], closeTo(10000 / 5750, 1e-9));
     final failedPerformanceLoads = performanceLoads;
     expect(failedPerformanceLoads, greaterThan(0));
     expect(find.text('History unavailable'), findsOneWidget);
@@ -224,7 +224,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(performanceLoads, greaterThan(failedPerformanceLoads));
-    expect(ibkrLoads, greaterThan(1));
+    expect(ibkrLoads, 1);
+    expect(find.textContaining('10,100'), findsWidgets);
+    expect(allRatesFromUsd['NZD'], closeTo(10100 / 5800, 1e-9));
     expect(find.textContaining('+11.69% TWR'), findsOneWidget);
     expect(find.text('History unavailable'), findsNothing);
 
@@ -232,7 +234,7 @@ void main() {
     final refreshedPerformanceLoads = performanceLoads;
     await tester.tap(find.text('5d'));
     await tester.pumpAndSettle();
-    expect(performanceLoads, greaterThan(refreshedPerformanceLoads));
+    expect(performanceLoads, refreshedPerformanceLoads);
 
     final successfulPerformanceLoads = performanceLoads;
     await tester.tap(find.text('10y'));
