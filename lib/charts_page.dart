@@ -1567,7 +1567,7 @@ class ChartsPageState extends State<ChartsPage>
           barWidth: 2.5,
           dotData: const FlDotData(show: false),
           belowBarData: BarAreaData(
-            show: singleLine,
+            show: true,
             gradient: LinearGradient(
               colors: [
                 color.withValues(alpha: 0.3),
@@ -1602,7 +1602,7 @@ class ChartsPageState extends State<ChartsPage>
               leftTitles: AxisTitles(
                 sideTitles: SideTitles(
                   showTitles: true,
-                  reservedSize: 50,
+                  reservedSize: scaleForComparison ? 64 : 50,
                   minIncluded: false,
                   maxIncluded: false,
                   getTitlesWidget: (value, meta) => SideTitleWidget(
@@ -1611,6 +1611,8 @@ class ChartsPageState extends State<ChartsPage>
                       scaleForComparison
                           ? '${value >= 0 ? '+' : ''}${value.toStringAsFixed(1)}%'
                           : fmtCompactCurrency(value),
+                      maxLines: 1,
+                      softWrap: false,
                       style: const TextStyle(fontSize: 12),
                     ),
                   ),
