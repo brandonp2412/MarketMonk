@@ -55,6 +55,56 @@ void main() {
     expect(prefs.getString('activeAccount'), 'Default');
   });
 
+  test('switchAccount publishes the new account before async cleanup',
+      () async {
+    final tempDir =
+        await Directory.systemTemp.createTemp('market-monk-switch-');
+    const pathProviderChannel =
+        MethodChannel('plugins.flutter.io/path_provider');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(pathProviderChannel, (call) async {
+      if (call.method == 'getApplicationSupportDirectory' ||
+          call.method == 'getTemporaryDirectory') {
+        return tempDir.path;
+      }
+      return null;
+    });
+
+    try {
+      SharedPreferences.setMockInitialValues({
+        'accounts': ['Default', 'Brokerage'],
+        'activeAccount': 'Default',
+      });
+
+      final manager = AccountManager();
+      await manager.init();
+      var notifications = 0;
+      manager.addListener(() => notifications++);
+
+      final switchFuture = manager.switchAccount('Brokerage');
+
+      expect(manager.activeAccount, 'Brokerage');
+      expect(notifications, 1);
+
+      await switchFuture;
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('activeAccount'), 'Brokerage');
+    } finally {
+      await db.close();
+      db = Database.connect(
+        DatabaseConnection(
+          NativeDatabase.memory(),
+          closeStreamsSynchronously: true,
+        ),
+      );
+      messenger.setMockMethodCallHandler(pathProviderChannel, null);
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    }
+  });
+
   test('importDatabase replaces the active database and notifies listeners',
       () async {
     final tempDir =

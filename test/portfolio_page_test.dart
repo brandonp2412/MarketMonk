@@ -167,6 +167,17 @@ void main() {
 
       expect(find.text('VOO'), findsOneWidget);
       expect(find.text('VANGUARD S&P 500 ETF'), findsOneWidget);
+
+      accounts.requestIbkrRefresh();
+      await tester.pump();
+
+      expect(find.text('VOO'), findsOneWidget);
+      expect(find.bySemanticsLabel('Loading portfolio'), findsOneWidget);
+
+      pending.complete(snapshotFor('*****6552', 'VOO'));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel('Loading portfolio'), findsNothing);
     },
   );
 

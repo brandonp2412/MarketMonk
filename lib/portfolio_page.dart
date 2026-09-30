@@ -51,6 +51,7 @@ class PortfolioPageState extends State<PortfolioPage>
   List<Position> _positions = [];
   IbkrAccountValue? _netLiquidation;
   bool _hasCachedPortfolio = false;
+  bool _isLoadingPortfolio = false;
   int? touchedIndex;
   final _filterController = TextEditingController();
   String _filterText = '';
@@ -75,9 +76,14 @@ class PortfolioPageState extends State<PortfolioPage>
     final ibkrConfig = accounts.ibkrConfigFor(account);
     final refreshVersion = accounts.ibkrRefreshVersion;
     final cached = accounts.portfolioCacheFor(account);
+    final cacheFresh = accounts.isPortfolioCacheFresh(account);
     final hadAccount = _lastAccount.isNotEmpty;
     final refreshRequested =
         hadAccount && refreshVersion != _lastIbkrRefreshVersion;
+    final willLoadPortfolio = ibkrConfig.enabled
+        ? ibkrConfig.isConfigured &&
+            (refreshRequested || cached == null || !cacheFresh)
+        : true;
     if (account != _lastAccount ||
         ibkrConfig != _lastIbkrConfig ||
         refreshVersion != _lastIbkrRefreshVersion) {
@@ -89,6 +95,7 @@ class PortfolioPageState extends State<PortfolioPage>
         _positions = cached?.positions ?? [];
         _netLiquidation = cached?.netLiquidation;
         _hasCachedPortfolio = cached != null;
+        _isLoadingPortfolio = willLoadPortfolio;
         touchedIndex = null;
       });
       unawaited(_preload(forceRefresh: refreshRequested));
@@ -178,6 +185,13 @@ class PortfolioPageState extends State<PortfolioPage>
     final willFetchIbkr = config.enabled &&
         config.isConfigured &&
         (forceRefresh || cachedBefore == null || !cacheWasFresh);
+    final willLoadPortfolio = !config.enabled || willFetchIbkr;
+    if (willLoadPortfolio &&
+        mounted &&
+        accounts.activeAccount == accountName &&
+        !_isLoadingPortfolio) {
+      setState(() => _isLoadingPortfolio = true);
+    }
     try {
       final trades = await accountDb.trades.select().get();
       final loaded = await _loadPortfolio(
@@ -204,6 +218,12 @@ class PortfolioPageState extends State<PortfolioPage>
       });
     } catch (error, stackTrace) {
       talker.handle(error, stackTrace, 'Failed to preload portfolio positions');
+    } finally {
+      if (mounted &&
+          accounts.activeAccount == accountName &&
+          _isLoadingPortfolio) {
+        setState(() => _isLoadingPortfolio = false);
+      }
     }
   }
 
@@ -305,7 +325,28 @@ class PortfolioPageState extends State<PortfolioPage>
         child: StreamBuilder<_LoadedPortfolio>(
           key: ValueKey(_lastAccount),
           stream: _stream,
-          builder: _buildBody,
+          builder: (context, snapshot) {
+            final body = _buildBody(context, snapshot);
+            if (!_isLoadingPortfolio || !_hasCachedPortfolio) return body;
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                body,
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: Semantics(
+                    label: context.l10n.text('Loading portfolio'),
+                    child: const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

@@ -374,14 +374,20 @@ class AccountManager extends ChangeNotifier {
       talker.warning('Ignored switch to an unknown portfolio account');
       return;
     }
-    await db.close();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('activeAccount', name);
+
+    final previousDb = db;
     activeAccount = name;
     db = name == 'Default' ? Database() : Database('market-monk-$name');
     clearAllSyncCache();
     notifyListeners();
     talker.info('Switched active portfolio account');
+
+    final persistFuture = SharedPreferences.getInstance().then((prefs) async {
+      if (activeAccount == name) {
+        await prefs.setString('activeAccount', name);
+      }
+    });
+    await Future.wait([previousDb.close(), persistFuture]);
   }
 
   Future<void> importDatabase(File sourceFile) async {
