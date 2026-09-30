@@ -183,9 +183,7 @@ class IbkrPerformanceSeries {
     final rawCashFlows = json['cash_flows'] as List<dynamic>?;
     final cashFlows = rawCashFlows == null
         ? List<double>.filled(dates.length, 0)
-        : rawCashFlows
-            .map((value) => (value as num).toDouble())
-            .toList();
+        : rawCashFlows.map((value) => (value as num).toDouble()).toList();
     final returnDates = (json['return_dates'] as List<dynamic>? ?? const [])
         .map((value) => _parseIbkrDate(value.toString()))
         .toList();
