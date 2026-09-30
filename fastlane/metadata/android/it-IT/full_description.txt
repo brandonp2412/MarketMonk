@@ -1,0 +1,15 @@
+Monitora le azioni e tieni sotto controllo il tuo portafoglio a colpo d'occhio.
+
+MarketMonk è un'app per monitorare le azioni e gestire il portafoglio, pensata per gli investitori che vogliono una visione chiara di prezzi di mercato, posizioni e performance. Aggiungi le azioni che vuoi seguire, costruisci il tuo portafoglio e consulta i grafici dei prezzi in un'unica app intuitiva.
+
+FUNZIONALITÀ
+
+• Monitora i prezzi delle azioni e l'andamento del mercato
+• Crea e gestisci il tuo portafoglio di investimenti
+• Visualizza grafici a linee delle variazioni di prezzo e dei rendimenti
+• Tieni in evidenza le informazioni più importanti per te
+• Personalizza le impostazioni in base a come preferisci seguire i tuoi investimenti
+
+MarketMonk semplifica il monitoraggio del portafoglio, sia che tu stia controllando la tua lista di titoli sia che tu stia esaminando i tuoi investimenti.
+
+I dati di mercato sono forniti esclusivamente a scopo informativo e non costituiscono consulenza finanziaria. Fai sempre le tue ricerche prima di prendere una decisione di investimento.

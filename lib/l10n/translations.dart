@@ -1284,6 +1284,237 @@ const appTranslations = <String, Map<String, String>>{
     "Save the query, then set Period to a custom date range covering your trades (IBKR limits each run to 1 year).": "Zapisz zapytanie, a następnie ustaw Period na niestandardowy zakres dat obejmujący transakcje (IBKR ogranicza pojedyncze uruchomienie do 1 roku).",
     "Set Format to CSV, then Run the query and download the file.": "Ustaw Format na CSV, uruchom zapytanie przyciskiem Run i pobierz plik.",
   },
+  "it": {
+    "Charts": "Grafici",
+    "Portfolio": "Portafoglio",
+    "Holdings": "Posizioni",
+    "Error": "Errore",
+    "Settings": "Impostazioni",
+    "Appearance": "Aspetto",
+    "System": "Sistema",
+    "Dark": "Scuro",
+    "Light": "Chiaro",
+    "Language": "Lingua",
+    "System default": "Predefinito di sistema",
+    "Use the primary color of your device for the app":
+        "Usa il colore principale del dispositivo per l'app",
+    "System color scheme": "Schema colori di sistema",
+    "Pure black (AMOLED)": "Nero assoluto (AMOLED)",
+    "Use pure black for AMOLED displays":
+        "Usa il nero assoluto per i display AMOLED",
+    "App color": "Colore dell'app",
+    "How dates are displayed below graphs":
+        "Come vengono visualizzate le date sotto i grafici",
+    "Date format ({example})": "Formato data ({example})",
+    "Show a badge on the chart when the market is closed (weekends)":
+        "Mostra un indicatore sul grafico quando il mercato è chiuso (fine settimana)",
+    "Market closed indicator": "Indicatore di mercato chiuso",
+    "Use wavy curves in the graphs page":
+        "Usa curve morbide nella pagina dei grafici",
+    "Curve line graphs": "Grafici a linee curve",
+    "Curve smoothness": "Uniformità delle curve",
+    "Accounts": "Account",
+    "Manage accounts": "Gestisci account",
+    "Currencies": "Valute",
+    "Interactive Brokers": "Interactive Brokers",
+    "Data": "Dati",
+    "Export database": "Esporta database",
+    "Import CSV": "Importa CSV",
+    "Sync": "Sincronizza",
+    "Delete all data": "Elimina tutti i dati",
+    "Import database": "Importa database",
+    "About": "Informazioni",
+    "What's New": "Novità",
+    "Version": "Versione",
+    "Author": "Autore",
+    "License": "Licenza",
+    "Source code": "Codice sorgente",
+    "Donate": "Dona",
+    "Download the database file for the entire app":
+        "Scarica il file del database dell'intera app",
+    "Import holdings from a broker CSV export":
+        "Importa le posizioni da un'esportazione CSV del broker",
+    "Permanently delete all holdings, trades, and candles":
+        "Elimina definitivamente tutte le posizioni, le operazioni e le candele",
+    "Import a .sqlite database": "Importa un database .sqlite",
+    "Active": "Attivo",
+    "Rename account": "Rinomina account",
+    "Delete account": "Elimina account",
+    "New account": "Nuovo account",
+    "Add account": "Aggiungi account",
+    "Delete \"{name}\"?": "Eliminare \"{name}\"?",
+    "All trades and data for this account will be permanently deleted. This cannot be undone.":
+        "Tutte le operazioni e i dati di questo account verranno eliminati definitivamente. Questa azione non può essere annullata.",
+    "Cancel": "Annulla",
+    "Delete": "Elimina",
+    "Account name": "Nome account",
+    "Rename": "Rinomina",
+    "e.g. Retirement, ISA, Trading": "es. Pensione, ISA, Trading",
+    "Add": "Aggiungi",
+    "Unable to load release notes.":
+        "Impossibile caricare le note di rilascio.",
+    "No release notes available": "Nessuna nota di rilascio disponibile",
+    "There is nothing new to show yet.":
+        "Non c'è ancora nulla di nuovo da mostrare.",
+    "{symbol} — History": "{symbol} — Cronologia",
+    "Add trade": "Aggiungi operazione",
+    "Shares held": "Azioni detenute",
+    "Avg cost": "Costo medio",
+    "Current value": "Valore attuale",
+    "Unrealized P/L": "P/L non realizzato",
+    "Realized P/L today": "P/L realizzato oggi",
+    "Imported realized P/L": "P/L realizzato importato",
+    "Total gain": "Guadagno totale",
+    "Trade History": "Cronologia operazioni",
+    "No trade history yet": "Nessuna cronologia delle operazioni",
+    "No completed trades were returned by Interactive Brokers.":
+        "Interactive Brokers non ha restituito operazioni completate.",
+    "Add a trade to start building this ticker’s history.":
+        "Aggiungi un'operazione per iniziare a creare la cronologia di questo ticker.",
+    "Edit trade": "Modifica operazione",
+    "Delete trade": "Elimina operazione",
+    "Delete this trade? This cannot be undone.":
+        "Eliminare questa operazione? Questa azione non può essere annullata.",
+    "BUY": "ACQUISTA",
+    "SELL": "VENDI",
+    "Buy": "Acquista",
+    "Sell": "Vendi",
+    "Quantity": "Quantità",
+    "Price": "Prezzo",
+    "Realized P/L": "P/L realizzato",
+    "Trade date": "Data operazione",
+    "Save": "Salva",
+    "Removed as favorite": "Rimosso dai preferiti",
+    "Set as favorite": "Imposta come preferito",
+    "Back": "Indietro",
+    "Search stocks...": "Cerca azioni...",
+    "Use \"{query}\" anyway": "Usa comunque \"{query}\"",
+    "Load chart for this exact ticker":
+        "Carica il grafico per questo ticker esatto",
+    "No market data found": "Nessun dato di mercato trovato",
+    "Check the ticker symbol and try again.":
+        "Controlla il simbolo del ticker e riprova.",
+    "Show the last {count} years of prices":
+        "Mostra i prezzi degli ultimi {count} anni",
+    "Show the last {count} months of prices":
+        "Mostra i prezzi degli ultimi {count} mesi",
+    "Search...": "Cerca...",
+    "Amount": "Importo",
+    "Purchased at": "Acquistato a",
+    "Show the last 5 days of prices": "Mostra i prezzi degli ultimi 5 giorni",
+    "Enter a ticker symbol.": "Inserisci un simbolo ticker.",
+    "Enter a valid amount greater than zero.":
+        "Inserisci un importo valido maggiore di zero.",
+    "Enter a valid price greater than zero.":
+        "Inserisci un prezzo valido maggiore di zero.",
+    "Delete {count} holding?": "Eliminare {count} posizione?",
+    "Delete {count} holdings?": "Eliminare {count} posizioni?",
+    "Deleted {count} holding": "Eliminata {count} posizione",
+    "Deleted {count} holdings": "Eliminate {count} posizioni",
+    "Show menu": "Mostra menu",
+    "Delete selected": "Elimina selezionati",
+    "Cancel selection": "Annulla selezione",
+    "Delete ({count})": "Elimina ({count})",
+    "Try again": "Riprova",
+    "IBKR settings": "Impostazioni IBKR",
+    "Export CSV": "Esporta CSV",
+    "Filter holdings...": "Filtra posizioni...",
+    "Select broker": "Seleziona broker",
+    "Continue": "Continua",
+    "Failed to parse CSV: {error}": "Impossibile analizzare il CSV: {error}",
+    "No trades found in the selected files":
+        "Nessuna operazione trovata nei file selezionati",
+    "Import {count} trades": "Importa {count} operazioni",
+    "Import": "Importa",
+    "Imported {count} trades": "Importate {count} operazioni",
+    "Could not access the selected database":
+        "Impossibile accedere al database selezionato",
+    "Selected file is not a valid database":
+        "Il file selezionato non è un database valido",
+    "Database import failed": "Importazione del database non riuscita",
+    "Database imported": "Database importato",
+    "Display currencies": "Valute visualizzate",
+    "Delete all data?": "Eliminare tutti i dati?",
+    "This will permanently delete all holdings, trades, and chart data. This cannot be undone.":
+        "Questa operazione eliminerà definitivamente tutte le posizioni, le operazioni e i dati dei grafici. Non può essere annullata.",
+    "All data deleted": "Tutti i dati eliminati",
+    "Check it out on GitHub": "Scoprilo su GitHub",
+    "Help support this project": "Aiuta a sostenere questo progetto",
+    "Interactive Brokers — {account}": "Interactive Brokers — {account}",
+    "Use IBKR portfolio data": "Usa i dati del portafoglio IBKR",
+    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
+        "Per posizioni, valutazioni correnti e cronologia dei titoli detenuti viene preferita la tua API IBKR self-hosted. Yahoo resta l'alternativa per la cronologia non disponibile e gli altri simboli.",
+    "API URL": "URL API",
+    "Bearer token": "Token bearer",
+    "Test": "Test",
+    "Connected to IBKR": "Connesso a IBKR",
+    "IBKR portfolio source • {url}": "Fonte del portafoglio IBKR • {url}",
+    "Use a self-hosted IBKR portfolio API":
+        "Usa un'API del portafoglio IBKR self-hosted",
+    "Syncing {symbol} ": "Sincronizzazione di {symbol} ",
+    "No sync running": "Nessuna sincronizzazione in corso",
+    "Last sync completed ": "Ultima sincronizzazione completata ",
+    "Last sync completed with ": "Ultima sincronizzazione completata con ",
+    "Syncing {symbol} ({completed}/{total})":
+        "Sincronizzazione di {symbol} ({completed}/{total})",
+    "Last sync completed {completed}/{total}":
+        "Ultima sincronizzazione completata {completed}/{total}",
+    "Last sync completed with {failed} failed":
+        "Ultima sincronizzazione completata con {failed} errori",
+    "Undo": "Annulla",
+    "Favorite": "Preferito",
+    "No trades yet": "Nessuna operazione",
+    "All portfolios are hidden": "Tutti i portafogli sono nascosti",
+    "Search for a stock to start building your portfolio history.":
+        "Cerca un'azione per iniziare a creare la cronologia del tuo portafoglio.",
+    "Show your portfolios again to restore the chart.":
+        "Mostra di nuovo i portafogli per ripristinare il grafico.",
+    "Search stocks": "Cerca azioni",
+    "Show all": "Mostra tutto",
+    "History unavailable": "Cronologia non disponibile",
+    "Historical prices unavailable": "Prezzi storici non disponibili",
+    "{value} period change": "Variazione del periodo: {value}",
+    "Loading portfolio": "Caricamento portafoglio",
+    "No IBKR stock positions": "Nessuna posizione azionaria IBKR",
+    "No holdings yet": "Nessuna posizione",
+    "Check your Interactive Brokers connection or refresh your account.":
+        "Controlla la connessione a Interactive Brokers o aggiorna il tuo account.",
+    "Import your trades to build your portfolio.":
+        "Importa le operazioni per creare il tuo portafoglio.",
+    "Deselect all": "Deseleziona tutto",
+    "Select all": "Seleziona tutto",
+    "{count} selected": "{count} selezionati",
+    "No IBKR stocks found": "Nessuna azione IBKR trovata",
+    "No stocks yet": "Nessuna azione",
+    "No matching stocks": "Nessuna azione corrispondente",
+    "Refresh your portfolio or check your Interactive Brokers connection.":
+        "Aggiorna il portafoglio o controlla la connessione a Interactive Brokers.",
+    "Import a CSV or add your first trade manually.":
+        "Importa un CSV o aggiungi manualmente la tua prima operazione.",
+    "Nothing matches “{query}”. You can add that ticker now.":
+        "Nessun risultato per “{query}”. Puoi aggiungere subito questo ticker.",
+    "Add {symbol}": "Aggiungi {symbol}",
+    "Try another ticker": "Prova un altro ticker",
+    "How to get this CSV from {broker}:":
+        "Come ottenere questo CSV da {broker}:",
+    "Log into Tiger Trade (app or web).": "Accedi a Tiger Trade (app o web).",
+    "Go to Account (Me) → Statements.": "Vai a Account (Me) → Statements.",
+    "Pick a date range covering the trades to import.":
+        "Scegli un intervallo di date che includa le operazioni da importare.",
+    "Enable \"Display Detailed Trading Records\" so individual fills are included, not just summary totals.":
+        "Attiva \"Display Detailed Trading Records\" per includere le singole esecuzioni e non solo i totali riepilogativi.",
+    "Set the export format to CSV and download the statement.":
+        "Imposta il formato di esportazione su CSV e scarica l'estratto conto.",
+    "Log into IBKR Client Portal.": "Accedi a IBKR Client Portal.",
+    "Go to Reports → Flex Queries, then click \"+\" next to Activity Flex Query.":
+        "Vai a Reports → Flex Queries, quindi fai clic su \"+\" accanto ad Activity Flex Query.",
+    "Under Sections, add Trades, set Options to Execution (one row per fill), and click Select All for the fields.":
+        "In Sections, aggiungi Trades, imposta Options su Execution (una riga per esecuzione) e fai clic su Select All per i campi.",
+    "Save the query, then set Period to a custom date range covering your trades (IBKR limits each run to 1 year).":
+        "Salva la query, quindi imposta Period su un intervallo di date personalizzato che includa le tue operazioni (IBKR limita ogni esecuzione a 1 anno).",
+    "Set Format to CSV, then Run the query and download the file.":
+        "Imposta Format su CSV, quindi fai clic su Run e scarica il file.",
+  },
   "nl": {
     "Charts": "Grafieken",
     "Portfolio": "Portefeuille",

@@ -29,6 +29,7 @@ const _languageNames = <String, String>{
   'pt': 'Português (Brasil)',
   'pl': 'Polski',
   'nl': 'Nederlands',
+  'it': 'Italiano',
   'hi': 'हिन्दी',
   'ar': 'العربية',
   'ru': 'Русский',
