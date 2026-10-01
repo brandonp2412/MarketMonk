@@ -3,6 +3,7 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/accounts_page.dart';
+import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_state.dart';
@@ -90,4 +91,39 @@ void main() {
       expect(accounts.accounts, contains('Test Account'));
     },
   );
+
+  testWidgets('desktop width uses persistent side navigation', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    db = Database.connect(
+      DatabaseConnection(
+        NativeDatabase.memory(),
+        closeStreamsSynchronously: true,
+      ),
+    );
+    addTearDown(() => db.close());
+
+    final accounts = AccountManager();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: const MyApp(),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(DesktopNav), findsOneWidget);
+    expect(find.byType(BottomNav), findsNothing);
+    expect(find.text('Market Monk'), findsOneWidget);
+
+    await tester.binding.setSurfaceSize(const Size(900, 900));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byType(DesktopNav), findsNothing);
+    expect(find.byType(BottomNav), findsOneWidget);
+  });
 }

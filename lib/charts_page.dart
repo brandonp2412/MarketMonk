@@ -5,6 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/candle_ticker.dart';
+import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
@@ -162,8 +163,10 @@ class ChartsPageState extends State<ChartsPage>
       if (!config.enabled) return;
 
       final cachedPortfolio = accountManager.portfolioCacheFor(accountName);
-      final performance =
-          accountManager.ibkrPerformanceCacheFor(accountName, '1Y');
+      final performance = accountManager.ibkrPerformanceCacheFor(
+        accountName,
+        '1Y',
+      );
       if (cachedPortfolio == null || performance == null) return;
 
       final currentValue = cachedPortfolio.netLiquidation;
@@ -565,8 +568,10 @@ class ChartsPageState extends State<ChartsPage>
     bool forceRefresh = false,
   }) async {
     final cached = accountManager.ibkrPerformanceCacheFor(accountName, period);
-    final cacheFresh =
-        accountManager.isIbkrPerformanceCacheFresh(accountName, period);
+    final cacheFresh = accountManager.isIbkrPerformanceCacheFresh(
+      accountName,
+      period,
+    );
     if (cached != null &&
         !forceRefresh &&
         (!refreshIfStale || cacheFresh || !config.isConfigured)) {
@@ -1169,6 +1174,7 @@ class ChartsPageState extends State<ChartsPage>
 
   Widget _buildSearchBar() {
     final hasText = _searchController.text.isNotEmpty;
+    final desktop = isDesktopLayout(context);
     final leading = hasText
         ? IconButton(
             icon: const Icon(Icons.arrow_back),
@@ -1181,31 +1187,43 @@ class ChartsPageState extends State<ChartsPage>
             child: Icon(Icons.search),
           );
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-      child: SearchBar(
-        controller: _searchController,
-        focusNode: _searchFocus,
-        hintText: context.l10n.text('Search stocks...'),
-        leading: leading,
-        onChanged: _onSearchChanged,
-        onTap: () => _searchController.selection = TextSelection(
-          baseOffset: 0,
-          extentOffset: _searchController.text.length,
-        ),
-        onSubmitted: (text) {
-          if (text.isNotEmpty) _onSearchChanged(text);
-        },
-        trailing: [
-          IconButton(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SettingsPage()),
-            ),
-            tooltip: context.l10n.text('Settings'),
-            icon: const Icon(Icons.settings),
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: desktop ? 760 : double.infinity),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            desktop ? 24 : 8,
+            8,
+            desktop ? 24 : 8,
+            4,
           ),
-        ],
+          child: SearchBar(
+            controller: _searchController,
+            focusNode: _searchFocus,
+            hintText: context.l10n.text('Search stocks...'),
+            leading: leading,
+            onChanged: _onSearchChanged,
+            onTap: () => _searchController.selection = TextSelection(
+              baseOffset: 0,
+              extentOffset: _searchController.text.length,
+            ),
+            onSubmitted: (text) {
+              if (text.isNotEmpty) _onSearchChanged(text);
+            },
+            trailing: [
+              if (!desktop)
+                IconButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsPage()),
+                  ),
+                  tooltip: context.l10n.text('Settings'),
+                  icon: const Icon(Icons.settings),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1298,15 +1316,16 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   Widget _buildChartContent(SettingsState settings, List<Color> accountColors) {
+    final desktop = isDesktopLayout(context);
     return RefreshIndicator.noSpinner(
       onRefresh: _refreshCurrentChart,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.only(
-          top: _overlayHeight + 8,
-          // Keep the summary and controls clear of the floating navigation
-          // dock, including when Android's system navigation is visible.
-          bottom: bottomNavHeight + 24,
+        padding: EdgeInsets.fromLTRB(
+          desktop ? 24 : 0,
+          _overlayHeight + 8,
+          desktop ? 24 : 0,
+          desktop ? 24 : bottomNavHeight + 24,
         ),
         children: [
           _buildTimeChips(),
@@ -1621,10 +1640,7 @@ class ChartsPageState extends State<ChartsPage>
           : entry.value.map((point) => point.value).toList(growable: false);
       final spots = [
         for (var i = 0; i < entry.value.length; i++)
-          FlSpot(
-            dateIndex[entry.value[i].date]!.toDouble(),
-            displayValues[i],
-          ),
+          FlSpot(dateIndex[entry.value[i].date]!.toDouble(), displayValues[i]),
       ];
       lineBarsData.add(
         LineChartBarData(

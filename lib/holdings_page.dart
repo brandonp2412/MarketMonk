@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart' hide Column, Table;
 import 'package:flutter/material.dart';
+import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
@@ -272,6 +273,7 @@ class HoldingsPageState extends State<HoldingsPage>
   Widget build(BuildContext context) {
     super.build(context);
 
+    final desktop = isDesktopLayout(context);
     final ibkrManaged = context.watch<AccountManager>().ibkrConfigFor().enabled;
     final allSelected =
         _summaries.isNotEmpty && _selectedSymbols.length == _summaries.length;
@@ -341,41 +343,52 @@ class HoldingsPageState extends State<HoldingsPage>
           );
 
     return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(left: 16, right: 16, top: 16),
-              child: SearchBar(
-                controller: _search,
-                hintText: _selecting
-                    ? context.l10n.text(
-                        '{count} selected',
-                        {'count': _selectedSymbols.length},
-                      )
-                    : context.l10n.text('Search...'),
-                padding: WidgetStateProperty.all(
-                  const EdgeInsets.only(right: 8),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: desktop ? 1120 : double.infinity,
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(desktop ? 24 : 8),
+            child: Column(
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    desktop ? 0 : 16,
+                    desktop ? 0 : 16,
+                    desktop ? 0 : 16,
+                    0,
+                  ),
+                  child: SearchBar(
+                    controller: _search,
+                    hintText: _selecting
+                        ? context.l10n.text('{count} selected', {
+                            'count': _selectedSymbols.length,
+                          })
+                        : context.l10n.text('Search...'),
+                    padding: WidgetStateProperty.all(
+                      const EdgeInsets.only(right: 8),
+                    ),
+                    leading: leading,
+                    onTap: () => _search.selection = TextSelection(
+                      baseOffset: 0,
+                      extentOffset: _search.text.length,
+                    ),
+                    onChanged: (_) => setState(() {
+                      _stream = _buildStream();
+                    }),
+                    trailing: [menuButton],
+                  ),
                 ),
-                leading: leading,
-                onTap: () => _search.selection = TextSelection(
-                  baseOffset: 0,
-                  extentOffset: _search.text.length,
+                Expanded(
+                  child: StreamBuilder<List<SymbolSummary>>(
+                    stream: _stream,
+                    builder: _buildList,
+                  ),
                 ),
-                onChanged: (_) => setState(() {
-                  _stream = _buildStream();
-                }),
-                trailing: [menuButton],
-              ),
+              ],
             ),
-            Expanded(
-              child: StreamBuilder<List<SymbolSummary>>(
-                stream: _stream,
-                builder: _buildList,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
       floatingActionButton: ibkrManaged
@@ -391,7 +404,8 @@ class HoldingsPageState extends State<HoldingsPage>
                   icon: const Icon(Icons.delete),
                 )
               : Padding(
-                  padding: const EdgeInsets.only(bottom: bottomNavHeight),
+                  padding:
+                      EdgeInsets.only(bottom: desktop ? 0 : bottomNavHeight),
                   child: FloatingActionButton.extended(
                     onPressed: () => Navigator.push(
                       context,
@@ -442,8 +456,9 @@ class HoldingsPageState extends State<HoldingsPage>
                 'Refresh your portfolio or check your Interactive Brokers connection.',
               )
             : query.isEmpty
-                ? context.l10n
-                    .text('Import a CSV or add your first trade manually.')
+                ? context.l10n.text(
+                    'Import a CSV or add your first trade manually.',
+                  )
                 : context.l10n.text(
                     'Nothing matches “{query}”. You can add that ticker now.',
                     {'query': query},
@@ -452,8 +467,9 @@ class HoldingsPageState extends State<HoldingsPage>
             ? context.l10n.text('IBKR settings')
             : query.isEmpty
                 ? context.l10n.text('Import CSV')
-                : context.l10n
-                    .text('Add {symbol}', {'symbol': query.toUpperCase()}),
+                : context.l10n.text('Add {symbol}', {
+                    'symbol': query.toUpperCase(),
+                  }),
         actionIcon: ibkrManaged
             ? Icons.settings_rounded
             : query.isEmpty
@@ -578,8 +594,9 @@ class _SymbolTile extends StatelessWidget {
 
     return ListTile(
       selected: isSelected,
-      selectedTileColor:
-          Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+      selectedTileColor: Theme.of(
+        context,
+      ).colorScheme.primaryContainer.withValues(alpha: 0.3),
       leading: leadingWidget,
       title: Text(summary.symbol),
       subtitle: position != null

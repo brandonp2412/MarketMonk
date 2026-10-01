@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/crash_logger.dart';
@@ -14,6 +15,7 @@ import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/portfolio_page.dart';
+import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
 import 'package:path/path.dart' as p;
@@ -588,6 +590,17 @@ class _MyHomePageState extends State<MyHomePage> {
     super.dispose();
   }
 
+  void _selectPage(int index) {
+    if (_pageController.hasClients) {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      );
+    }
+    setState(() => _currentIndex = index);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -597,34 +610,57 @@ class _MyHomePageState extends State<MyHomePage> {
         statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
       ),
     );
+
     return Scaffold(
       extendBody: true,
       body: SafeArea(
-        child: Stack(
-          children: [
-            PageView(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final desktop = constraints.maxWidth >= desktopLayoutBreakpoint;
+            final pages = PageView(
               controller: _pageController,
+              physics: desktop
+                  ? const NeverScrollableScrollPhysics()
+                  : const PageScrollPhysics(),
               onPageChanged: (i) => setState(() => _currentIndex = i),
               children: const [ChartsPage(), PortfolioPage(), HoldingsPage()],
-            ),
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: BottomNav(
-                tabs: _tabs,
-                currentIndex: _currentIndex,
-                onTap: (i) {
-                  _pageController.animateToPage(
-                    i,
-                    duration: const Duration(milliseconds: 350),
-                    curve: Curves.easeOutCubic,
-                  );
-                  setState(() => _currentIndex = i);
-                },
-              ),
-            ),
-          ],
+            );
+
+            final content = Stack(
+              children: [
+                pages,
+                if (!desktop)
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: BottomNav(
+                      tabs: _tabs,
+                      currentIndex: _currentIndex,
+                      onTap: _selectPage,
+                    ),
+                  ),
+              ],
+            );
+
+            if (!desktop) return content;
+
+            return Row(
+              children: [
+                DesktopNav(
+                  tabs: _tabs,
+                  currentIndex: _currentIndex,
+                  onTap: _selectPage,
+                  onSettings: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsPage()),
+                  ),
+                ),
+                const VerticalDivider(width: 1, thickness: 1),
+                Expanded(child: content),
+              ],
+            );
+          },
         ),
       ),
     );

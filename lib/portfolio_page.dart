@@ -5,6 +5,7 @@ import 'package:drift/drift.dart' hide Column, Table;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
@@ -563,6 +564,22 @@ class PortfolioPageState extends State<PortfolioPage>
       );
     });
 
+    if (isDesktopLayout(context)) {
+      return _buildDesktopPortfolio(
+        positions: positions,
+        sorted: sorted,
+        filtered: filtered,
+        colors: colors,
+        sections: sections,
+        selectedIndex: selectedIndex,
+        totalValue: totalValue,
+        netLiquidation: netLiquidation,
+        totalGain: totalGain,
+        totalGainPct: totalGainPct,
+        hasRefreshWarning: snap.hasError,
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: _updateCandles,
       child: CustomScrollView(
@@ -686,6 +703,196 @@ class PortfolioPageState extends State<PortfolioPage>
             ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopPortfolio({
+    required List<Position> positions,
+    required List<Position> sorted,
+    required List<Position> filtered,
+    required List<Color> colors,
+    required List<PieChartSectionData> sections,
+    required int? selectedIndex,
+    required double totalValue,
+    required IbkrAccountValue? netLiquidation,
+    required double totalGain,
+    required double totalGainPct,
+    required bool hasRefreshWarning,
+  }) {
+    final colorsScheme = Theme.of(context).colorScheme;
+
+    final allocationChart = Stack(
+      alignment: Alignment.center,
+      children: [
+        PieChart(
+          PieChartData(
+            sections: sections,
+            centerSpaceRadius: 58,
+            sectionsSpace: 2,
+            pieTouchData: PieTouchData(
+              touchCallback: (event, response) {
+                setState(() {
+                  if (!event.isInterestedForInteractions ||
+                      response == null ||
+                      response.touchedSection == null) {
+                    touchedIndex = null;
+                    return;
+                  }
+                  final index = response.touchedSection!.touchedSectionIndex;
+                  touchedIndex = index >= 0 ? index : null;
+                });
+              },
+            ),
+          ),
+        ),
+        if (selectedIndex != null)
+          IgnorePointer(
+            child: SizedBox(
+              width: 112,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    sorted[selectedIndex].symbol,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    sorted[selectedIndex].name,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.labelSmall,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          if (hasRefreshWarning) ...[
+            _buildRefreshWarning(context),
+            const SizedBox(height: 12),
+          ],
+          _SummaryCard(
+            totalValue: totalValue,
+            netLiquidation: netLiquidation,
+            totalGain: totalGain,
+            totalGainPct: totalGainPct,
+            onExport: () => _exportCsv(context, positions),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  flex: 4,
+                  child: Card(
+                    margin: EdgeInsets.zero,
+                    clipBehavior: Clip.antiAlias,
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Center(
+                        child: AspectRatio(
+                          aspectRatio: 1,
+                          child: allocationChart,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  flex: 7,
+                  child: Card(
+                    margin: EdgeInsets.zero,
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                          child: _FilterRow(
+                            controller: _filterController,
+                            filterText: _filterText,
+                            onChanged: (value) =>
+                                setState(() => _filterText = value.trim()),
+                            onClear: () => setState(() {
+                              _filterText = '';
+                              _filterController.clear();
+                            }),
+                          ),
+                        ),
+                        Divider(height: 1, color: colorsScheme.outlineVariant),
+                        Expanded(
+                          child: filtered.isEmpty
+                              ? Center(
+                                  child: Text(
+                                    context.l10n.text('No matching stocks'),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge
+                                        ?.copyWith(
+                                          color: colorsScheme.onSurfaceVariant,
+                                        ),
+                                  ),
+                                )
+                              : Scrollbar(
+                                  child: ListView.builder(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 8,
+                                    ),
+                                    itemCount: filtered.length,
+                                    itemBuilder: (context, index) {
+                                      final position = filtered[index];
+                                      final sortedIndex = sorted.indexOf(
+                                        position,
+                                      );
+                                      final value = position.currentValue;
+                                      final allocationPct = totalValue > 0
+                                          ? value / totalValue * 100
+                                          : 0.0;
+                                      return _LegendTile(
+                                        color: colors[sortedIndex >= 0
+                                            ? sortedIndex
+                                            : index],
+                                        symbol: position.symbol,
+                                        name: position.name,
+                                        value: value,
+                                        allocationPct: allocationPct,
+                                        changePct: position.change,
+                                        isHighlighted:
+                                            sortedIndex == selectedIndex,
+                                        onTap: () => setState(
+                                          () => touchedIndex =
+                                              touchedIndex == sortedIndex
+                                                  ? null
+                                                  : sortedIndex,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

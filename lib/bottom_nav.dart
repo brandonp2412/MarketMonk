@@ -138,3 +138,174 @@ class BottomNav extends StatelessWidget {
     }
   }
 }
+
+/// Persistent navigation used when the app has desktop-sized horizontal space.
+class DesktopNav extends StatelessWidget {
+  final List<String> tabs;
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+  final VoidCallback onSettings;
+
+  const DesktopNav({
+    super.key,
+    required this.tabs,
+    required this.currentIndex,
+    required this.onTap,
+    required this.onSettings,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Container(
+      width: 232,
+      color: colors.surfaceContainerLow,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: colors.primaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.candlestick_chart_rounded,
+                        color: colors.onPrimaryContainer,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Market Monk',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              ...tabs.asMap().entries.map(
+                    (entry) => Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: _DesktopNavItem(
+                        key: Key('desktop-${entry.value}'),
+                        icon: _iconForTab(entry.value),
+                        label: _labelForTab(context, entry.value),
+                        selected: entry.key == currentIndex,
+                        onTap: () => onTap(entry.key),
+                      ),
+                    ),
+                  ),
+              const Spacer(),
+              const Divider(),
+              const SizedBox(height: 8),
+              _DesktopNavItem(
+                icon: Icons.settings_rounded,
+                label: context.l10n.text('Settings'),
+                onTap: onSettings,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData _iconForTab(String tab) {
+    switch (tab) {
+      case 'ChartPage':
+        return Icons.insights;
+      case 'PortfolioPage':
+        return Icons.pie_chart;
+      case 'HoldingsPage':
+        return Icons.list_alt;
+      default:
+        return Icons.error_rounded;
+    }
+  }
+
+  String _labelForTab(BuildContext context, String tab) {
+    switch (tab) {
+      case 'ChartPage':
+        return context.l10n.text('Charts');
+      case 'PortfolioPage':
+        return context.l10n.text('Portfolio');
+      case 'HoldingsPage':
+        return context.l10n.text('Holdings');
+      default:
+        return context.l10n.text('Error');
+    }
+  }
+}
+
+class _DesktopNavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _DesktopNavItem({
+    super.key,
+    required this.icon,
+    required this.label,
+    this.selected = false,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final foreground =
+        selected ? colors.onSecondaryContainer : colors.onSurfaceVariant;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: Material(
+        color: selected ? colors.secondaryContainer : Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            child: Row(
+              children: [
+                Icon(icon, size: 22, color: foreground),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: foreground,
+                          fontWeight:
+                              selected ? FontWeight.w700 : FontWeight.w500,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

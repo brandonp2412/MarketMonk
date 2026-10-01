@@ -325,4 +325,40 @@ void main() {
       expect(find.textContaining('Bad state:'), findsNothing);
     },
   );
+
+  testWidgets('portfolio uses split desktop layout at wide widths',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1400, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    SharedPreferences.setMockInitialValues({});
+
+    db = Database.connect(
+      DatabaseConnection(
+        NativeDatabase.memory(),
+        closeStreamsSynchronously: true,
+      ),
+    );
+    addTearDown(() => db.close());
+
+    final accounts = await configuredAccounts();
+    await accounts.cachePortfolio(
+      'Default',
+      [cachedPosition()],
+      const IbkrAccountValue(value: 5500, currency: 'USD'),
+    );
+    final pending = Completer<IbkrPortfolioSnapshot>();
+
+    await tester.pumpWidget(
+      app(accounts, PortfolioPage(ibkrLoader: (_) => pending.future)),
+    );
+    await tester.pump();
+
+    expect(find.text('VOO'), findsOneWidget);
+    expect(find.byType(Card), findsAtLeastNWidgets(3));
+    expect(tester.takeException(), null);
+  });
 }
