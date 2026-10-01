@@ -4898,4 +4898,236 @@ const appTranslations = <String, Map<String, String>>{
     "Set Format to CSV, then Run the query and download the file.": "Format را روی CSV بگذارید، سپس کوئری را Run کنید و فایل را دانلود کنید.",
   },
 
+  "uk": {
+    "Charts": "Графіки",
+    "Portfolio": "Портфель",
+    "Holdings": "Позиції",
+    "Error": "Помилка",
+    "Settings": "Налаштування",
+    "Appearance": "Вигляд",
+    "System": "Система",
+    "Dark": "Темна",
+    "Light": "Світла",
+    "Language": "Мова",
+    "System default": "Як у системі",
+    "Use the primary color of your device for the app":
+        "Використовувати основний колір пристрою в застосунку",
+    "System color scheme": "Системна колірна схема",
+    "Pure black (AMOLED)": "Чистий чорний (AMOLED)",
+    "Use pure black for AMOLED displays":
+        "Використовувати чистий чорний для AMOLED-дисплеїв",
+    "App color": "Колір застосунку",
+    "How dates are displayed below graphs":
+        "Як дати відображаються під графіками",
+    "Date format ({example})": "Формат дати ({example})",
+    "Show a badge on the chart when the market is closed (weekends)":
+        "Показувати значок на графіку, коли ринок закритий (вихідні)",
+    "Market closed indicator": "Індикатор закритого ринку",
+    "Use wavy curves in the graphs page":
+        "Використовувати плавні криві на сторінці графіків",
+    "Curve line graphs": "Згладжувати лінії графіків",
+    "Curve smoothness": "Плавність кривих",
+    "Accounts": "Рахунки",
+    "Manage accounts": "Керування рахунками",
+    "Currencies": "Валюти",
+    "Interactive Brokers": "Interactive Brokers",
+    "Data": "Дані",
+    "Export database": "Експортувати базу даних",
+    "Import CSV": "Імпортувати CSV",
+    "Sync": "Синхронізувати",
+    "Delete all data": "Видалити всі дані",
+    "Import database": "Імпортувати базу даних",
+    "About": "Про застосунок",
+    "What's New": "Що нового",
+    "Version": "Версія",
+    "Author": "Автор",
+    "License": "Ліцензія",
+    "Source code": "Вихідний код",
+    "Donate": "Підтримати",
+    "Download the database file for the entire app":
+        "Завантажити файл бази даних усього застосунку",
+    "Import holdings from a broker CSV export":
+        "Імпортувати позиції з CSV-експорту брокера",
+    "Permanently delete all holdings, trades, and candles":
+        "Назавжди видалити всі позиції, угоди та свічки",
+    "Import a .sqlite database": "Імпортувати базу даних .sqlite",
+    "Active": "Активний",
+    "Rename account": "Перейменувати рахунок",
+    "Delete account": "Видалити рахунок",
+    "New account": "Новий рахунок",
+    "Add account": "Додати рахунок",
+    "Delete \"{name}\"?": "Видалити «{name}»?",
+    "All trades and data for this account will be permanently deleted. This cannot be undone.":
+        "Усі угоди та дані цього рахунку буде назавжди видалено. Цю дію не можна скасувати.",
+    "Cancel": "Скасувати",
+    "Delete": "Видалити",
+    "Account name": "Назва рахунку",
+    "Rename": "Перейменувати",
+    "e.g. Retirement, ISA, Trading": "напр. Пенсійний, ISA, Торговий",
+    "Add": "Додати",
+    "Unable to load release notes.":
+        "Не вдалося завантажити примітки до випуску.",
+    "No release notes available": "Немає приміток до випуску",
+    "There is nothing new to show yet.": "Поки що немає нічого нового.",
+    "{symbol} — History": "{symbol} — Історія",
+    "Add trade": "Додати угоду",
+    "Shares held": "Акцій у портфелі",
+    "Avg cost": "Середня вартість",
+    "Current value": "Поточна вартість",
+    "Unrealized P/L": "Нереалізований прибуток/збиток",
+    "Realized P/L today": "Реалізований прибуток/збиток сьогодні",
+    "Imported realized P/L": "Імпортований реалізований прибуток/збиток",
+    "Total gain": "Загальний прибуток",
+    "Trade History": "Історія угод",
+    "No trade history yet": "Історії угод ще немає",
+    "No completed trades were returned by Interactive Brokers.":
+        "Interactive Brokers не повернув завершених угод.",
+    "Add a trade to start building this ticker’s history.":
+        "Додайте угоду, щоб почати формувати історію цього тикера.",
+    "Edit trade": "Редагувати угоду",
+    "Delete trade": "Видалити угоду",
+    "Delete this trade? This cannot be undone.":
+        "Видалити цю угоду? Цю дію не можна скасувати.",
+    "BUY": "КУПІВЛЯ",
+    "SELL": "ПРОДАЖ",
+    "Buy": "Купити",
+    "Sell": "Продати",
+    "Quantity": "Кількість",
+    "Price": "Ціна",
+    "Realized P/L": "Реалізований прибуток/збиток",
+    "Trade date": "Дата угоди",
+    "Save": "Зберегти",
+    "Removed as favorite": "Видалено з обраного",
+    "Set as favorite": "Додано до обраного",
+    "Back": "Назад",
+    "Search stocks...": "Пошук акцій...",
+    "Use \"{query}\" anyway": "Усе одно використати «{query}»",
+    "Load chart for this exact ticker":
+        "Завантажити графік саме для цього тикера",
+    "No market data found": "Ринкових даних не знайдено",
+    "Check the ticker symbol and try again.":
+        "Перевірте символ тикера та спробуйте ще раз.",
+    "Show the last {count} years of prices":
+        "Показати ціни за останні {count} років",
+    "Show the last {count} months of prices":
+        "Показати ціни за останні {count} місяців",
+    "Search...": "Пошук...",
+    "Amount": "Сума",
+    "Purchased at": "Ціна купівлі",
+    "Show the last 5 days of prices": "Показати ціни за останні 5 днів",
+    "Enter a ticker symbol.": "Введіть символ тикера.",
+    "Enter a valid amount greater than zero.":
+        "Введіть коректну суму, більшу за нуль.",
+    "Enter a valid price greater than zero.":
+        "Введіть коректну ціну, більшу за нуль.",
+    "Delete {count} holding?": "Видалити {count} позицію?",
+    "Delete {count} holdings?": "Видалити {count} позиції?",
+    "Deleted {count} holding": "Видалено {count} позицію",
+    "Deleted {count} holdings": "Видалено {count} позицій",
+    "Show menu": "Показати меню",
+    "Delete selected": "Видалити вибране",
+    "Cancel selection": "Скасувати вибір",
+    "Delete ({count})": "Видалити ({count})",
+    "Try again": "Спробувати ще раз",
+    "IBKR settings": "Налаштування IBKR",
+    "Export CSV": "Експортувати CSV",
+    "Filter holdings...": "Фільтрувати позиції...",
+    "Select broker": "Виберіть брокера",
+    "Continue": "Продовжити",
+    "Failed to parse CSV: {error}": "Не вдалося обробити CSV: {error}",
+    "No trades found in the selected files":
+        "У вибраних файлах не знайдено угод",
+    "Import {count} trades": "Імпортувати {count} угод",
+    "Import": "Імпортувати",
+    "Imported {count} trades": "Імпортовано {count} угод",
+    "Could not access the selected database":
+        "Не вдалося отримати доступ до вибраної бази даних",
+    "Selected file is not a valid database":
+        "Вибраний файл не є коректною базою даних",
+    "Database import failed": "Не вдалося імпортувати базу даних",
+    "Database imported": "Базу даних імпортовано",
+    "Display currencies": "Валюти відображення",
+    "Delete all data?": "Видалити всі дані?",
+    "This will permanently delete all holdings, trades, and chart data. This cannot be undone.":
+        "Усі позиції, угоди та дані графіків буде назавжди видалено. Цю дію не можна скасувати.",
+    "All data deleted": "Усі дані видалено",
+    "Check it out on GitHub": "Переглянути на GitHub",
+    "Help support this project": "Підтримати цей проєкт",
+    "Interactive Brokers — {account}": "Interactive Brokers — {account}",
+    "Use IBKR portfolio data": "Використовувати дані портфеля IBKR",
+    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
+        "Для позицій, поточних оцінок та історії утримуваних акцій пріоритет надається вашому власному API IBKR. Yahoo використовується як резервне джерело для недоступної історії та інших символів.",
+    "API URL": "URL API",
+    "Bearer token": "Bearer-токен",
+    "Test": "Перевірити",
+    "Connected to IBKR": "Підключено до IBKR",
+    "IBKR portfolio source • {url}": "Джерело портфеля IBKR • {url}",
+    "Use a self-hosted IBKR portfolio API":
+        "Використовувати власний API портфеля IBKR",
+    "Syncing {symbol} ": "Синхронізація {symbol} ",
+    "No sync running": "Синхронізація не виконується",
+    "Last sync completed ": "Останню синхронізацію завершено ",
+    "Last sync completed with ": "Останню синхронізацію завершено з ",
+    "Syncing {symbol} ({completed}/{total})":
+        "Синхронізація {symbol} ({completed}/{total})",
+    "Last sync completed {completed}/{total}":
+        "Останню синхронізацію завершено {completed}/{total}",
+    "Last sync completed with {failed} failed":
+        "Останню синхронізацію завершено, помилок: {failed}",
+    "Undo": "Скасувати",
+    "Favorite": "Обране",
+    "No trades yet": "Угод ще немає",
+    "All portfolios are hidden": "Усі портфелі приховано",
+    "Search for a stock to start building your portfolio history.":
+        "Знайдіть акцію, щоб почати формувати історію портфеля.",
+    "Show your portfolios again to restore the chart.":
+        "Знову покажіть портфелі, щоб відновити графік.",
+    "Search stocks": "Пошук акцій",
+    "Show all": "Показати все",
+    "History unavailable": "Історія недоступна",
+    "Historical prices unavailable": "Історичні ціни недоступні",
+    "{value} period change": "Зміна за період: {value}",
+    "Loading portfolio": "Завантаження портфеля",
+    "No IBKR stock positions": "Немає позицій акцій IBKR",
+    "No holdings yet": "Позицій ще немає",
+    "Check your Interactive Brokers connection or refresh your account.":
+        "Перевірте підключення до Interactive Brokers або оновіть рахунок.",
+    "Import your trades to build your portfolio.":
+        "Імпортуйте угоди, щоб сформувати портфель.",
+    "Deselect all": "Зняти весь вибір",
+    "Select all": "Вибрати все",
+    "{count} selected": "Вибрано: {count}",
+    "No IBKR stocks found": "Акцій IBKR не знайдено",
+    "No stocks yet": "Акцій ще немає",
+    "No matching stocks": "Немає відповідних акцій",
+    "Refresh your portfolio or check your Interactive Brokers connection.":
+        "Оновіть портфель або перевірте підключення до Interactive Brokers.",
+    "Import a CSV or add your first trade manually.":
+        "Імпортуйте CSV або додайте першу угоду вручну.",
+    "Nothing matches “{query}”. You can add that ticker now.":
+        "Нічого не відповідає «{query}». Тепер можна додати цей тикер.",
+    "Add {symbol}": "Додати {symbol}",
+    "Try another ticker": "Спробувати інший тикер",
+    "How to get this CSV from {broker}:": "Як отримати цей CSV у {broker}:",
+    "Log into Tiger Trade (app or web).":
+        "Увійдіть у Tiger Trade (застосунок або вебверсія).",
+    "Go to Account (Me) → Statements.":
+        "Перейдіть до Account (Me) → Statements.",
+    "Pick a date range covering the trades to import.":
+        "Виберіть діапазон дат, що охоплює угоди для імпорту.",
+    "Enable \"Display Detailed Trading Records\" so individual fills are included, not just summary totals.":
+        "Увімкніть «Display Detailed Trading Records», щоб включити окремі виконання угод, а не лише підсумкові значення.",
+    "Set the export format to CSV and download the statement.":
+        "Встановіть формат експорту CSV і завантажте звіт.",
+    "Log into IBKR Client Portal.": "Увійдіть в IBKR Client Portal.",
+    "Go to Reports → Flex Queries, then click \"+\" next to Activity Flex Query.":
+        "Перейдіть до Reports → Flex Queries, а потім натисніть «+» біля Activity Flex Query.",
+    "Under Sections, add Trades, set Options to Execution (one row per fill), and click Select All for the fields.":
+        "У розділі Sections додайте Trades, встановіть Options на Execution (один рядок для кожного виконання) і натисніть Select All для полів.",
+    "Save the query, then set Period to a custom date range covering your trades (IBKR limits each run to 1 year).":
+        "Збережіть запит, потім у Period задайте власний діапазон дат, що охоплює ваші угоди (IBKR обмежує кожен запуск 1 роком).",
+    "Set Format to CSV, then Run the query and download the file.":
+        "Встановіть Format на CSV, потім запустіть запит через Run і завантажте файл.",
+  },
+
 };

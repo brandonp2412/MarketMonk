@@ -45,6 +45,11 @@ void main() {
         reason: 'Russian must cover the complete localized UI',
       );
       expect(
+        appTranslations['uk']!.keys.toSet(),
+        completeKeys,
+        reason: 'Ukrainian must cover the complete localized UI',
+      );
+      expect(
         appTranslations['id']!.keys.toSet(),
         completeKeys,
         reason: 'Indonesian must cover the complete localized UI',
@@ -146,6 +151,7 @@ void main() {
     const korean = AppLocalizations(Locale('ko'));
     const arabic = AppLocalizations(Locale('ar'));
     const russian = AppLocalizations(Locale('ru'));
+    const ukrainian = AppLocalizations(Locale('uk'));
     const indonesian = AppLocalizations(Locale('id'));
     const malay = AppLocalizations(Locale('ms'));
     const turkish = AppLocalizations(Locale('tr'));
@@ -194,6 +200,10 @@ void main() {
     expect(
       russian.text('Delete {count} holdings?', {'count': 3}),
       'Удалить позиции (3)?',
+    );
+    expect(
+      ukrainian.text('Delete {count} holdings?', {'count': 3}),
+      'Видалити 3 позиції?',
     );
     expect(
       indonesian.text('Delete {count} holdings?', {'count': 3}),
