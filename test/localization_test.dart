@@ -80,9 +80,14 @@ void main() {
         reason: 'German must cover the complete localized UI',
       );
       expect(
-        appTranslations['pt']!.keys.toSet(),
+        appTranslations['pt-BR']!.keys.toSet(),
         completeKeys,
         reason: 'Brazilian Portuguese must cover the complete localized UI',
+      );
+      expect(
+        appTranslations['pt-PT']!.keys.toSet(),
+        completeKeys,
+        reason: 'European Portuguese must cover the complete localized UI',
       );
       expect(
         appTranslations['pl']!.keys.toSet(),
@@ -146,6 +151,7 @@ void main() {
     const german = AppLocalizations(Locale('de'));
     const spanish = AppLocalizations(Locale('es'));
     const brazilianPortuguese = AppLocalizations(Locale('pt', 'BR'));
+    const europeanPortuguese = AppLocalizations(Locale('pt', 'PT'));
     const french = AppLocalizations(Locale('fr'));
     const japanese = AppLocalizations(Locale('ja'));
     const korean = AppLocalizations(Locale('ko'));
@@ -180,6 +186,10 @@ void main() {
     expect(
       brazilianPortuguese.text('Delete {count} holdings?', {'count': 3}),
       'Excluir 3 posições?',
+    );
+    expect(
+      europeanPortuguese.text('Delete {count} holdings?', {'count': 3}),
+      'Eliminar 3 posições?',
     );
     expect(
       french.text('Delete {count} holdings?', {'count': 3}),
@@ -321,13 +331,51 @@ void main() {
     expect(prefs.getString('languageCode'), 'zh-Hans');
   });
 
-  test('Brazilian Portuguese selection resolves to pt-BR', () async {
+  test('Portuguese variants resolve and persist independently', () async {
     final settings = SettingsState();
     await settings.initialized;
 
-    await settings.setLanguageCode('pt');
-
+    await settings.setLanguageCode('pt-BR');
     expect(settings.locale, const Locale('pt', 'BR'));
+
+    await settings.setLanguageCode('pt-PT');
+    expect(settings.locale, const Locale('pt', 'PT'));
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('languageCode'), 'pt-PT');
+
+    expect(
+      AppLocalizations.resolveLocale(
+        const Locale('pt', 'PT'),
+        AppLocalizations.supportedLocales,
+      ),
+      const Locale('pt', 'PT'),
+    );
+    expect(
+      AppLocalizations.resolveLocale(
+        const Locale('pt', 'BR'),
+        AppLocalizations.supportedLocales,
+      ),
+      const Locale('pt', 'BR'),
+    );
+  });
+
+  test('legacy Portuguese language preference migrates to Brazilian Portuguese',
+      () async {
+    SharedPreferences.setMockInitialValues({
+      'languageCode': 'pt',
+      'visibleCurrencies': ['USD'],
+      'displayCurrency': 'USD',
+      'exchangeRate_USD': 1.0,
+    });
+
+    final settings = SettingsState();
+    await settings.initialized;
+
+    expect(settings.languageCode, 'pt-BR');
+    expect(settings.locale, const Locale('pt', 'BR'));
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('languageCode'), 'pt-BR');
   });
 
   test(

@@ -1,0 +1,15 @@
+Acompanhe ações e compreenda o seu portefólio de investimentos rapidamente.
+
+O MarketMonk é uma aplicação de acompanhamento de ações e de portefólios para investidores que pretendem ter uma visão clara dos preços de mercado, das posições e do desempenho. Adicione as ações que acompanha, crie o seu portefólio e explore gráficos de preços num painel simples.
+
+FUNCIONALIDADES
+
+• Acompanhe preços de ações e o desempenho do mercado
+• Crie e acompanhe um portefólio de investimentos pessoal
+• Consulte gráficos de linhas para analisar movimentos de preços e ganhos
+• Organize a informação mais importante para si
+• Ajuste as definições à forma como prefere acompanhar os seus investimentos
+
+O MarketMonk foi concebido para tornar o acompanhamento do portefólio mais simples, quer esteja a consultar uma lista de ações, quer esteja a rever os seus investimentos.
+
+Os dados de mercado são fornecidos apenas para fins informativos e não constituem aconselhamento financeiro. Faça sempre a sua própria pesquisa antes de tomar decisões de investimento.

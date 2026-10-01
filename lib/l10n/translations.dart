@@ -1817,7 +1817,7 @@ const appTranslations = <String, Map<String, String>>{
     "Save the query, then set Period to a custom date range covering your trades (IBKR limits each run to 1 year).": "Sla de query op en stel Period vervolgens in op een aangepast datumbereik dat je transacties omvat (IBKR beperkt elke uitvoering tot 1 jaar).",
     "Set Format to CSV, then Run the query and download the file.": "Stel Format in op CSV, voer de query uit met Run en download het bestand.",
   },
-  "pt": {
+  "pt-BR": {
     "Charts": "Gráficos",
     "Portfolio": "Carteira",
     "Holdings": "Posições",
@@ -2044,6 +2044,234 @@ const appTranslations = <String, Map<String, String>>{
         "Salve a consulta e defina Period como um intervalo de datas personalizado que cubra suas operações (a IBKR limita cada execução a 1 ano).",
     "Set Format to CSV, then Run the query and download the file.":
         "Defina Format como CSV, execute a consulta e baixe o arquivo.",
+  },
+  "pt-PT": {
+    "Charts": "Gráficos",
+    "Portfolio": "Portefólio",
+    "Holdings": "Posições",
+    "Error": "Erro",
+    "Settings": "Definições",
+    "Appearance": "Aparência",
+    "System": "Sistema",
+    "Dark": "Escuro",
+    "Light": "Claro",
+    "Language": "Idioma",
+    "System default": "Predefinição do sistema",
+    "Use the primary color of your device for the app":
+        "Usar a cor principal do dispositivo no aplicação",
+    "System color scheme": "Esquema de cores do sistema",
+    "Pure black (AMOLED)": "Preto puro (AMOLED)",
+    "Use pure black for AMOLED displays": "Utilizar preto puro em ecrãs AMOLED",
+    "App color": "Cor do aplicação",
+    "How dates are displayed below graphs":
+        "Como as datas são apresentadas abaixo dos gráficos",
+    "Date format ({example})": "Formato de data ({example})",
+    "Show a badge on the chart when the market is closed (weekends)":
+        "Mostrar um indicador no gráfico quando o mercado estiver fechado (fins de semana)",
+    "Market closed indicator": "Indicador de mercado fechado",
+    "Use wavy curves in the graphs page":
+        "Utilizar curvas suaves na página de gráficos",
+    "Curve line graphs": "Linhas curvas nos gráficos",
+    "Curve smoothness": "Suavidade das curvas",
+    "Accounts": "Contas",
+    "Manage accounts": "Gerir contas",
+    "Currencies": "Moedas",
+    "Interactive Brokers": "Interactive Brokers",
+    "Data": "Dados",
+    "Export database": "Exportar base de dados",
+    "Import CSV": "Importar CSV",
+    "Sync": "Sincronizar",
+    "Delete all data": "Eliminar todos os dados",
+    "Import database": "Importar base de dados",
+    "About": "Sobre",
+    "What's New": "Novidades",
+    "Version": "Versão",
+    "Author": "Autor",
+    "License": "Licença",
+    "Source code": "Código-fonte",
+    "Donate": "Doar",
+    "Download the database file for the entire app":
+        "Transferir o ficheiro de base de dados de todo o aplicação",
+    "Import holdings from a broker CSV export":
+        "Importar posições de uma exportação CSV da corretora",
+    "Permanently delete all holdings, trades, and candles":
+        "Eliminar permanentemente todas as posições, transações e candles",
+    "Import a .sqlite database": "Importar um base de dados .sqlite",
+    "Active": "Ativa",
+    "Rename account": "Renomear conta",
+    "Delete account": "Eliminar conta",
+    "New account": "Nova conta",
+    "Add account": "Adicionar conta",
+    "Delete \"{name}\"?": "Eliminar \"{name}\"?",
+    "All trades and data for this account will be permanently deleted. This cannot be undone.":
+        "Todas as transações e os dados desta conta serão eliminados permanentemente. Esta ação não pode ser desfeita.",
+    "Cancel": "Cancelar",
+    "Delete": "Eliminar",
+    "Account name": "Nome da conta",
+    "Rename": "Renomear",
+    "e.g. Retirement, ISA, Trading": "por ex.: Reforma, ISA, Negociação",
+    "Add": "Adicionar",
+    "Unable to load release notes.":
+        "Não foi possível carregar as notas de versão.",
+    "No release notes available": "Nenhuma nota da versão disponível",
+    "There is nothing new to show yet.": "Ainda não há novidades para mostrar.",
+    "{symbol} — History": "{symbol} — Histórico",
+    "Add trade": "Adicionar transação",
+    "Shares held": "Ações detidas",
+    "Avg cost": "Custo médio",
+    "Current value": "Valor atual",
+    "Unrealized P/L": "Lucro/prejuízo não realizado",
+    "Realized P/L today": "Lucro/prejuízo realizado hoje",
+    "Imported realized P/L": "Lucro/prejuízo realizado importado",
+    "Total gain": "Ganho total",
+    "Trade History": "Histórico de transações",
+    "No trade history yet": "Ainda não há histórico de transações",
+    "No completed trades were returned by Interactive Brokers.":
+        "A Interactive Brokers não devolveu transações concluídas.",
+    "Add a trade to start building this ticker’s history.":
+        "Adicione uma transação para começar a criar o histórico deste título.",
+    "Edit trade": "Editar transação",
+    "Delete trade": "Eliminar transação",
+    "Delete this trade? This cannot be undone.":
+        "Eliminar esta transação? Esta ação não pode ser desfeita.",
+    "BUY": "COMPRA",
+    "SELL": "VENDA",
+    "Buy": "Comprar",
+    "Sell": "Vender",
+    "Quantity": "Quantidade",
+    "Price": "Preço",
+    "Realized P/L": "Lucro/prejuízo realizado",
+    "Trade date": "Data da transação",
+    "Save": "Guardar",
+    "Removed as favorite": "Removido dos favoritos",
+    "Set as favorite": "Adicionado aos favoritos",
+    "Back": "Voltar",
+    "Search stocks...": "Pesquisar ações…",
+    "Use \"{query}\" anyway": "Usar \"{query}\" mesmo assim",
+    "Load chart for this exact ticker":
+        "Carregar gráfico para este ticker exato",
+    "No market data found": "Nenhum dado de mercado encontrado",
+    "Check the ticker symbol and try again.":
+        "Verifique o ticker e tente novamente.",
+    "Show the last {count} years of prices":
+        "Mostrar os últimos {count} anos de preços",
+    "Show the last {count} months of prices":
+        "Mostrar os últimos {count} meses de preços",
+    "Search...": "Pesquisar…",
+    "Amount": "Quantidade",
+    "Purchased at": "Comprado por",
+    "Show the last 5 days of prices": "Mostrar os últimos 5 dias de preços",
+    "Enter a ticker symbol.": "Introduza um símbolo de ticker.",
+    "Enter a valid amount greater than zero.":
+        "Introduza uma quantidade válida maior que zero.",
+    "Enter a valid price greater than zero.":
+        "Introduza um preço válido maior que zero.",
+    "Delete {count} holding?": "Eliminar {count} posição?",
+    "Delete {count} holdings?": "Eliminar {count} posições?",
+    "Deleted {count} holding": "{count} posição eliminada",
+    "Deleted {count} holdings": "{count} posições eliminadas",
+    "Show menu": "Mostrar menu",
+    "Delete selected": "Eliminar selecionados",
+    "Cancel selection": "Cancelar seleção",
+    "Delete ({count})": "Eliminar ({count})",
+    "Try again": "Tentar novamente",
+    "IBKR settings": "Definições da IBKR",
+    "Export CSV": "Exportar CSV",
+    "Filter holdings...": "Filtrar posições...",
+    "Select broker": "Selecionar corretora",
+    "Continue": "Continuar",
+    "Failed to parse CSV: {error}": "Não foi possível processar o CSV: {error}",
+    "No trades found in the selected files":
+        "Nenhuma transação encontrada nos ficheiros selecionados",
+    "Import {count} trades": "Importar {count} transações",
+    "Import": "Importar",
+    "Imported {count} trades": "{count} transações importadas",
+    "Could not access the selected database":
+        "Não foi possível aceder à base de dados selecionada",
+    "Selected file is not a valid database":
+        "O ficheiro selecionado não é uma base de dados válida",
+    "Database import failed": "Falha ao importar a base de dados",
+    "Database imported": "Base de dados importada",
+    "Display currencies": "Moedas apresentadas",
+    "Delete all data?": "Eliminar todos os dados?",
+    "This will permanently delete all holdings, trades, and chart data. This cannot be undone.":
+        "Isto eliminará permanentemente todas as posições, transações e dados dos gráficos. Esta ação não pode ser desfeita.",
+    "All data deleted": "Todos os dados foram eliminados",
+    "Check it out on GitHub": "Ver no GitHub",
+    "Help support this project": "Ajude a apoiar este projeto",
+    "Interactive Brokers — {account}": "Interactive Brokers — {account}",
+    "Use IBKR portfolio data": "Usar dados de portefólio da IBKR",
+    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
+        "As posições, as avaliações atuais e o histórico das ações detidas utilizam preferencialmente a sua API da IBKR alojada localmente. O Yahoo continua a ser a alternativa para históricos indisponíveis e outros símbolos.",
+    "API URL": "URL da API",
+    "Bearer token": "Token Bearer",
+    "Test": "Testar",
+    "Connected to IBKR": "Ligado à IBKR",
+    "IBKR portfolio source • {url}": "Fonte da portefólio IBKR • {url}",
+    "Use a self-hosted IBKR portfolio API":
+        "Utilizar uma API de portefólio da IBKR alojada localmente",
+    "Syncing {symbol} ": "A sincronizar {symbol} ",
+    "No sync running": "Nenhuma sincronização em curso",
+    "Last sync completed ": "Última sincronização concluída ",
+    "Last sync completed with ": "Última sincronização concluída com ",
+    "Syncing {symbol} ({completed}/{total})":
+        "A sincronizar {symbol} ({completed}/{total})",
+    "Last sync completed {completed}/{total}":
+        "Última sincronização concluída {completed}/{total}",
+    "Last sync completed with {failed} failed":
+        "Última sincronização concluída com {failed} falhas",
+    "Undo": "Anular",
+    "Favorite": "Favorito",
+    "No trades yet": "Ainda não há transações",
+    "All portfolios are hidden": "Todos os portefólios estão ocultos",
+    "Search for a stock to start building your portfolio history.":
+        "Pesquise uma ação para começar a criar o histórico do seu portefólio.",
+    "Show your portfolios again to restore the chart.":
+        "Volte a mostrar os seus portefólios para restaurar o gráfico.",
+    "Search stocks": "Pesquisar ações",
+    "Show all": "Mostrar tudo",
+    "History unavailable": "Histórico indisponível",
+    "Historical prices unavailable": "Preços históricos indisponíveis",
+    "{value} period change": "Variação no período: {value}",
+    "Loading portfolio": "A carregar portefólio",
+    "No IBKR stock positions": "Nenhuma posição em ações da IBKR",
+    "No holdings yet": "Ainda não há posições",
+    "Check your Interactive Brokers connection or refresh your account.":
+        "Verifique a sua ligação à Interactive Brokers ou atualize a sua conta.",
+    "Import your trades to build your portfolio.":
+        "Importe as suas transações para criar o seu portefólio.",
+    "Deselect all": "Desmarcar tudo",
+    "Select all": "Selecionar tudo",
+    "{count} selected": "{count} selecionadas",
+    "No IBKR stocks found": "Nenhuma ação da IBKR encontrada",
+    "No stocks yet": "Ainda não há ações",
+    "No matching stocks": "Nenhuma ação correspondente",
+    "Refresh your portfolio or check your Interactive Brokers connection.":
+        "Atualize o seu portefólio ou verifique a sua ligação à Interactive Brokers.",
+    "Import a CSV or add your first trade manually.":
+        "Importe um CSV ou adicione a sua primeira transação manualmente.",
+    "Nothing matches “{query}”. You can add that ticker now.":
+        "Nada corresponde a “{query}”. Pode adicionar esse ticker agora.",
+    "Add {symbol}": "Adicionar {symbol}",
+    "Try another ticker": "Tentar outro ticker",
+    "How to get this CSV from {broker}:": "Como obter este CSV da {broker}:",
+    "Log into Tiger Trade (app or web).": "Inicie sessão no Tiger Trade (aplicação ou Web).",
+    "Go to Account (Me) → Statements.": "Aceda a Account (Me) → Statements.",
+    "Pick a date range covering the trades to import.":
+        "Escolha um intervalo de datas que inclua as transações a importar.",
+    "Enable \"Display Detailed Trading Records\" so individual fills are included, not just summary totals.":
+        "Ative \"Display Detailed Trading Records\" para incluir as execuções individuais, e não apenas os totais resumidos.",
+    "Set the export format to CSV and download the statement.":
+        "Defina o formato de exportação como CSV e transfira o extrato.",
+    "Log into IBKR Client Portal.": "Inicie sessão no Portal do Cliente da IBKR.",
+    "Go to Reports → Flex Queries, then click \"+\" next to Activity Flex Query.":
+        "Aceda a Reports → Flex Queries e clique em \"+\" ao lado de Activity Flex Query.",
+    "Under Sections, add Trades, set Options to Execution (one row per fill), and click Select All for the fields.":
+        "Em Sections, adicione Trades, defina Options como Execution (uma linha por execução) e clique em Select All para os campos.",
+    "Save the query, then set Period to a custom date range covering your trades (IBKR limits each run to 1 year).":
+        "Guarde a consulta e defina Period como um intervalo de datas personalizado que cubra suas transações (a IBKR limita cada execução a 1 ano).",
+    "Set Format to CSV, then Run the query and download the file.":
+        "Defina Format como CSV, execute a consulta e transfira o ficheiro.",
   },
   "hi": {
     "Charts": "चार्ट",

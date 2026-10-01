@@ -122,8 +122,11 @@ class SettingsState extends ChangeNotifier {
     }
 
     final savedLanguageCode = prefs.getString('languageCode');
-    final migratedLanguageCode =
-        savedLanguageCode == 'zh' ? 'zh-Hans' : savedLanguageCode;
+    final migratedLanguageCode = savedLanguageCode == 'zh'
+        ? 'zh-Hans'
+        : savedLanguageCode == 'pt'
+            ? 'pt-BR'
+            : savedLanguageCode;
     final supportedLanguageCodes = AppLocalizations.supportedLocales
         .map(AppLocalizations.localeKey)
         .toSet();
@@ -132,6 +135,8 @@ class SettingsState extends ChangeNotifier {
         : null;
     if (savedLanguageCode == 'zh') {
       await prefs.setString('languageCode', 'zh-Hans');
+    } else if (savedLanguageCode == 'pt') {
+      await prefs.setString('languageCode', 'pt-BR');
     }
 
     systemColors = prefs.getBool('systemColors') ?? false;

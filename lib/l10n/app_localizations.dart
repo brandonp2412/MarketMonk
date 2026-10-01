@@ -16,6 +16,7 @@ class AppLocalizations {
     Locale('es'),
     Locale('fr'),
     Locale('pt', 'BR'),
+    Locale('pt', 'PT'),
     Locale('pl'),
     Locale('nl'),
     Locale('it'),
@@ -55,6 +56,9 @@ class AppLocalizations {
 
   /// Stable identifier used for translation tables and persisted selection.
   static String localeKey(Locale locale) {
+    if (locale.languageCode == 'pt') {
+      return locale.countryCode == 'PT' ? 'pt-PT' : 'pt-BR';
+    }
     if (locale.languageCode != 'zh') return locale.languageCode;
     final scriptCode = locale.scriptCode;
     if (scriptCode == 'Hant') return 'zh-Hant';
