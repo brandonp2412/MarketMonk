@@ -211,12 +211,16 @@ Future<void> generateScreenshot({
   await appWrapper();
   await tester.pumpAndSettle();
 
-  final tabLabel = switch (tabBarState) {
-    TabBarState.chart => 'Charts',
-    TabBarState.portfolio => 'Portfolio',
-    TabBarState.holdings => 'Holdings',
+  final tabKey = switch (tabBarState) {
+    TabBarState.chart => 'ChartPage',
+    TabBarState.portfolio => 'PortfolioPage',
+    TabBarState.holdings => 'HoldingsPage',
   };
-  await tester.tap(find.bySemanticsLabel(tabLabel));
+  final desktopTab = find.byKey(Key('desktop-$tabKey'));
+  final tab =
+      desktopTab.evaluate().isNotEmpty ? desktopTab : find.byKey(Key(tabKey));
+  expect(tab, findsOneWidget);
+  await tester.tap(tab);
   await tester.pumpAndSettle();
 
   if (navigateToPage != null) {
