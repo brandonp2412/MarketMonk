@@ -32,6 +32,7 @@ const _languageNames = <String, String>{
   'it': 'Italiano',
   'bn': 'বাংলা',
   'ur': 'اردو',
+  'fa': 'فارسی',
   'hi': 'हिन्दी',
   'ar': 'العربية',
   'ru': 'Русский',

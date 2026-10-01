@@ -100,6 +100,11 @@ void main() {
         reason: 'Urdu must cover the complete localized UI',
       );
       expect(
+        appTranslations['fa']!.keys.toSet(),
+        completeKeys,
+        reason: 'Persian must cover the complete localized UI',
+      );
+      expect(
         appTranslations['fr']!.keys.toSet(),
         completeKeys,
         reason: 'French must cover the complete localized UI',
@@ -144,6 +149,7 @@ void main() {
     const italian = AppLocalizations(Locale('it'));
     const bengali = AppLocalizations(Locale('bn'));
     const urdu = AppLocalizations(Locale('ur'));
+    const persian = AppLocalizations(Locale('fa'));
     const simplifiedChinese = AppLocalizations(
       Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'),
     );
@@ -219,6 +225,10 @@ void main() {
     expect(
       urdu.text('Delete {count} holdings?', {'count': 3}),
       '3 ہولڈنگز حذف کریں؟',
+    );
+    expect(
+      persian.text('Delete {count} holdings?', {'count': 3}),
+      '3 دارایی حذف شوند؟',
     );
     expect(
       simplifiedChinese.text('Delete {count} holdings?', {'count': 3}),
