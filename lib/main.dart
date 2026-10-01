@@ -649,6 +649,7 @@ class _MyHomePageState extends State<MyHomePage> {
               children: [
                 DesktopNav(
                   tabs: _tabs,
+                  compact: constraints.maxWidth < compactDesktopNavBreakpoint,
                   currentIndex: _currentIndex,
                   onTap: _selectPage,
                   onSettings: () => Navigator.push(

@@ -119,8 +119,16 @@ void main() {
     expect(find.byType(DesktopNav), findsOneWidget);
     expect(find.byType(BottomNav), findsNothing);
     expect(find.text('Market Monk'), findsOneWidget);
+    expect(tester.widget<DesktopNav>(find.byType(DesktopNav)).compact, isFalse);
 
-    await tester.binding.setSurfaceSize(const Size(900, 900));
+    await tester.binding.setSurfaceSize(const Size(960, 900));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byType(DesktopNav), findsOneWidget);
+    expect(find.byType(BottomNav), findsNothing);
+    expect(tester.widget<DesktopNav>(find.byType(DesktopNav)).compact, isTrue);
+
+    await tester.binding.setSurfaceSize(const Size(760, 900));
     await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.byType(DesktopNav), findsNothing);

@@ -145,6 +145,7 @@ class DesktopNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
   final VoidCallback onSettings;
+  final bool compact;
 
   const DesktopNav({
     super.key,
@@ -152,6 +153,7 @@ class DesktopNav extends StatelessWidget {
     required this.currentIndex,
     required this.onTap,
     required this.onSettings,
+    this.compact = false,
   });
 
   @override
@@ -159,45 +161,66 @@ class DesktopNav extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
 
     return Container(
-      width: 232,
+      width: compact ? 80 : 232,
       color: colors.surfaceContainerLow,
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+          padding: EdgeInsets.fromLTRB(
+            compact ? 12 : 16,
+            20,
+            compact ? 12 : 16,
+            16,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: colors.primaryContainer,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        Icons.candlestick_chart_rounded,
-                        color: colors.onPrimaryContainer,
-                      ),
+              if (compact)
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: colors.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Market Monk',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w700),
-                      ),
+                    child: Icon(
+                      Icons.candlestick_chart_rounded,
+                      color: colors.onPrimaryContainer,
                     ),
-                  ],
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: colors.primaryContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.candlestick_chart_rounded,
+                          color: colors.onPrimaryContainer,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Market Monk',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
               const SizedBox(height: 24),
               ...tabs.asMap().entries.map(
                     (entry) => Padding(
@@ -207,6 +230,7 @@ class DesktopNav extends StatelessWidget {
                         icon: _iconForTab(entry.value),
                         label: _labelForTab(context, entry.value),
                         selected: entry.key == currentIndex,
+                        compact: compact,
                         onTap: () => onTap(entry.key),
                       ),
                     ),
@@ -217,6 +241,7 @@ class DesktopNav extends StatelessWidget {
               _DesktopNavItem(
                 icon: Icons.settings_rounded,
                 label: context.l10n.text('Settings'),
+                compact: compact,
                 onTap: onSettings,
               ),
             ],
@@ -257,6 +282,7 @@ class _DesktopNavItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool selected;
+  final bool compact;
   final VoidCallback onTap;
 
   const _DesktopNavItem({
@@ -264,6 +290,7 @@ class _DesktopNavItem extends StatelessWidget {
     required this.icon,
     required this.label,
     this.selected = false,
+    this.compact = false,
     required this.onTap,
   });
 
@@ -273,39 +300,47 @@ class _DesktopNavItem extends StatelessWidget {
     final foreground =
         selected ? colors.onSecondaryContainer : colors.onSurfaceVariant;
 
+    final child = Material(
+      color: selected ? colors.secondaryContainer : Colors.transparent,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: compact
+            ? SizedBox(
+                height: 48,
+                child: Center(child: Icon(icon, size: 22, color: foreground)),
+              )
+            : Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                child: Row(
+                  children: [
+                    Icon(icon, size: 22, color: foreground),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: foreground,
+                              fontWeight:
+                                  selected ? FontWeight.w700 : FontWeight.w500,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+      ),
+    );
+
     return Semantics(
       button: true,
       selected: selected,
       label: label,
-      child: Material(
-        color: selected ? colors.secondaryContainer : Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-            child: Row(
-              children: [
-                Icon(icon, size: 22, color: foreground),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          color: foreground,
-                          fontWeight:
-                              selected ? FontWeight.w700 : FontWeight.w500,
-                        ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+      child: compact ? Tooltip(message: label, child: child) : child,
     );
   }
 }

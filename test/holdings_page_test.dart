@@ -76,4 +76,65 @@ void main() {
 
     expect(tester.takeException(), null);
   });
+
+  testWidgets('compact desktop holdings fits half-width content',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(879, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    SharedPreferences.setMockInitialValues({});
+    db = Database.connect(
+      DatabaseConnection(
+        NativeDatabase.memory(),
+        closeStreamsSynchronously: true,
+      ),
+    );
+    addTearDown(() => db.close());
+
+    final accounts = AccountManager();
+    await accounts.init();
+    final position = Position(
+      symbol: 'VOO',
+      name: 'VANGUARD S&P 500 ETF',
+      nativeCurrency: 'USD',
+      netShares: 10,
+      avgCost: 500,
+      currentPrice: 550,
+      firstBuyDate: DateTime(2025),
+      lastBuyDate: DateTime(2026),
+    );
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: HoldingsPage(
+            positionsLoader: (_) async => [position],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byType(DataTable), findsOneWidget);
+    expect(find.text('Value'), findsOneWidget);
+    expect(find.text('Shares'), findsNothing);
+    expect(find.text('Avg cost'), findsNothing);
+    expect(find.text('Price'), findsNothing);
+    expect(find.text('P/L'), findsOneWidget);
+    expect(find.text('Return'), findsOneWidget);
+    expect(tester.takeException(), null);
+
+    await tester.tap(find.text('Return'));
+    await tester.pump();
+    expect(tester.takeException(), null);
+  });
 }

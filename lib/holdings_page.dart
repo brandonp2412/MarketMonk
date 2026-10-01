@@ -746,8 +746,20 @@ class HoldingsPageState extends State<HoldingsPage>
             clipBehavior: Clip.antiAlias,
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final tableWidth =
-                    constraints.maxWidth < 1080 ? 1080.0 : constraints.maxWidth;
+                final compactTable = constraints.maxWidth < 1000;
+                final effectiveSortColumnIndex = compactTable
+                    ? switch (_desktopSort) {
+                        _HoldingsSort.symbol => 0,
+                        _HoldingsSort.value => 1,
+                        _HoldingsSort.unrealized => 2,
+                        _HoldingsSort.returnPct => 3,
+                      }
+                    : sortColumnIndex;
+                final tableWidth = compactTable
+                    ? constraints.maxWidth
+                    : constraints.maxWidth < 1240
+                        ? 1240.0
+                        : constraints.maxWidth;
                 return Scrollbar(
                   child: SingleChildScrollView(
                     child: SingleChildScrollView(
@@ -756,7 +768,7 @@ class HoldingsPageState extends State<HoldingsPage>
                         width: tableWidth,
                         child: DataTable(
                           showCheckboxColumn: _selecting && !ibkrManaged,
-                          sortColumnIndex: sortColumnIndex,
+                          sortColumnIndex: effectiveSortColumnIndex,
                           sortAscending: _desktopSortAscending,
                           headingRowColor: WidgetStatePropertyAll(
                             theme.colorScheme.surfaceContainerLow,
@@ -776,21 +788,27 @@ class HoldingsPageState extends State<HoldingsPage>
                               onSort: (_, __) =>
                                   _setDesktopSort(_HoldingsSort.symbol),
                             ),
+                            if (!compactTable) ...[
+                              DataColumn(
+                                numeric: true,
+                                label: Text(context.l10n.text('Shares')),
+                              ),
+                              DataColumn(
+                                numeric: true,
+                                label: Text(context.l10n.text('Avg cost')),
+                              ),
+                              DataColumn(
+                                numeric: true,
+                                label: Text(context.l10n.text('Price')),
+                              ),
+                            ],
                             DataColumn(
                               numeric: true,
-                              label: Text(context.l10n.text('Shares')),
-                            ),
-                            DataColumn(
-                              numeric: true,
-                              label: Text(context.l10n.text('Avg cost')),
-                            ),
-                            DataColumn(
-                              numeric: true,
-                              label: Text(context.l10n.text('Price')),
-                            ),
-                            DataColumn(
-                              numeric: true,
-                              label: Text(context.l10n.text('Market value')),
+                              label: Text(
+                                context.l10n.text(
+                                  compactTable ? 'Value' : 'Market value',
+                                ),
+                              ),
                               onSort: (_, __) =>
                                   _setDesktopSort(_HoldingsSort.value),
                             ),
@@ -915,28 +933,30 @@ class HoldingsPageState extends State<HoldingsPage>
                                           ? null
                                           : () => _openDetail(summary),
                                     ),
-                                    textCell(
-                                      shares,
-                                      summary: summary,
-                                    ),
-                                    textCell(
-                                      position == null
-                                          ? '—'
-                                          : fmtNativeCurrency(
-                                              position.avgCost,
-                                              position.nativeCurrency,
-                                            ),
-                                      summary: summary,
-                                    ),
-                                    textCell(
-                                      position == null
-                                          ? '—'
-                                          : fmtNativeCurrency(
-                                              position.currentPrice,
-                                              position.nativeCurrency,
-                                            ),
-                                      summary: summary,
-                                    ),
+                                    if (!compactTable) ...[
+                                      textCell(
+                                        shares,
+                                        summary: summary,
+                                      ),
+                                      textCell(
+                                        position == null
+                                            ? '—'
+                                            : fmtNativeCurrency(
+                                                position.avgCost,
+                                                position.nativeCurrency,
+                                              ),
+                                        summary: summary,
+                                      ),
+                                      textCell(
+                                        position == null
+                                            ? '—'
+                                            : fmtNativeCurrency(
+                                                position.currentPrice,
+                                                position.nativeCurrency,
+                                              ),
+                                        summary: summary,
+                                      ),
+                                    ],
                                     textCell(
                                       position == null
                                           ? '—'
