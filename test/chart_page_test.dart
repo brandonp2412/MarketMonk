@@ -383,7 +383,7 @@ void main() {
     );
     addTearDown(() => db.close());
     tester.view.devicePixelRatio = 1.0;
-    tester.view.physicalSize = const Size(1200, 1000);
+    tester.view.physicalSize = const Size(879, 1000);
     addTearDown(() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
@@ -462,6 +462,7 @@ void main() {
     final adjustedReturnText = tester.widget<Text>(adjustedReturnFinder).data!;
     expect(adjustedReturnText, startsWith('-'));
     expect(find.textContaining('value change'), findsNothing);
+    expect(tester.takeException(), null);
   });
 
   testWidgets('exact ticker fallback is available while search is loading', (

@@ -1874,6 +1874,69 @@ class ChartsPageState extends State<ChartsPage>
     final change =
         brokerReturnAmount ?? (series.last.value - series.first.value);
     final isHidden = _hiddenAccounts.contains(accountName);
+    final theme = Theme.of(context);
+
+    Widget accountLabel() => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: dotColor,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                accountName,
+                style: theme.textTheme.bodyMedium,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        );
+
+    Widget returnLabel() => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (hasHistory)
+              Icon(
+                pct >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
+                color: returnColor,
+                size: 18,
+              ),
+            Flexible(
+              child: Text(
+                hasHistory
+                    ? '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%$returnKind'
+                    : context.l10n.text('History unavailable'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium!.copyWith(
+                  color: returnColor,
+                ),
+              ),
+            ),
+          ],
+        );
+
+    final valueText = Text(
+      fmtCurrency(series.last.value),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      textAlign: TextAlign.right,
+      style: theme.textTheme.titleMedium,
+    );
+    final changeText = Text(
+      hasHistory
+          ? '${change >= 0 ? '+' : ''}${fmtCurrency(change)} $changeKind'
+          : context.l10n.text('Historical prices unavailable'),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(color: returnColor, fontSize: 13),
+    );
 
     return GestureDetector(
       onTap: () => setState(() {
@@ -1888,66 +1951,58 @@ class ChartsPageState extends State<ChartsPage>
         duration: const Duration(milliseconds: 200),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: dotColor,
-                      shape: BoxShape.circle,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 900;
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: accountLabel()),
+                        const SizedBox(width: 12),
+                        Flexible(child: valueText),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      accountName,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (hasHistory)
-                        Icon(
-                          pct >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
-                          color: returnColor,
-                          size: 18,
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Flexible(child: returnLabel()),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: changeText,
+                          ),
                         ),
-                      Text(
-                        hasHistory
-                            ? '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%$returnKind'
-                            : context.l10n.text('History unavailable'),
-                        style: Theme.of(
-                          context,
-                        ).textTheme.titleMedium!.copyWith(color: returnColor),
-                      ),
+                      ],
+                    ),
+                  ],
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: accountLabel()),
+                      returnLabel(),
+                      const SizedBox(width: 12),
+                      valueText,
                     ],
                   ),
-                  const SizedBox(width: 12),
-                  Text(
-                    fmtCurrency(series.last.value),
-                    style: Theme.of(context).textTheme.titleMedium,
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: changeText,
+                    ),
                   ),
                 ],
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    hasHistory
-                        ? '${change >= 0 ? '+' : ''}${fmtCurrency(change)} $changeKind'
-                        : context.l10n.text('Historical prices unavailable'),
-                    style: TextStyle(color: returnColor, fontSize: 13),
-                  ),
-                ),
-              ),
-            ],
+              );
+            },
           ),
         ),
       ),
