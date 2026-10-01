@@ -13,6 +13,8 @@ import 'package:market_monk/trade_history_page.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 
+enum _HoldingsSort { symbol, value, returnPct, unrealized }
+
 /// A summary of a symbol: open position (if any) + full trade history.
 class SymbolSummary {
   final String symbol;
@@ -32,7 +34,11 @@ class SymbolSummary {
 }
 
 class HoldingsPage extends StatefulWidget {
-  const HoldingsPage({super.key});
+  final Future<List<Position>> Function(List<Trade>)? _positionsLoader;
+  const HoldingsPage({
+    super.key,
+    Future<List<Position>> Function(List<Trade>)? positionsLoader,
+  }) : _positionsLoader = positionsLoader;
 
   @override
   State<HoldingsPage> createState() => HoldingsPageState();
@@ -52,6 +58,8 @@ class HoldingsPageState extends State<HoldingsPage>
 
   bool _selecting = false;
   final Set<String> _selectedSymbols = {};
+  _HoldingsSort _desktopSort = _HoldingsSort.value;
+  bool _desktopSortAscending = false;
 
   @override
   void initState() {
@@ -100,6 +108,10 @@ class HoldingsPageState extends State<HoldingsPage>
   }
 
   Future<List<Position>> _loadPositions(List<Trade> trades) async {
+    if (widget._positionsLoader != null) {
+      return widget._positionsLoader!(trades);
+    }
+
     final accounts = context.read<AccountManager>();
     final config = accounts.ibkrConfigFor();
     final accountName = accounts.activeAccount;
@@ -342,53 +354,175 @@ class HoldingsPageState extends State<HoldingsPage>
             padding: const EdgeInsets.only(left: 16, right: 8),
           );
 
-    return Scaffold(
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: desktop ? 1120 : double.infinity,
-          ),
-          child: Padding(
-            padding: EdgeInsets.all(desktop ? 24 : 8),
-            child: Column(
-              children: [
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    desktop ? 0 : 16,
-                    desktop ? 0 : 16,
-                    desktop ? 0 : 16,
-                    0,
+    if (desktop) {
+      final openCount =
+          _summaries.where((summary) => summary.position != null).length;
+      return Scaffold(
+        body: Padding(
+          padding: const EdgeInsets.fromLTRB(32, 28, 32, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          context.l10n.text('Holdings'),
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineMedium
+                              ?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '$openCount open · ${_summaries.length} total symbols',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: SearchBar(
+                  if (_selecting) ...[
+                    TextButton.icon(
+                      onPressed: _toggleSelectAll,
+                      icon:
+                          Icon(allSelected ? Icons.deselect : Icons.select_all),
+                      label: Text(
+                        allSelected
+                            ? context.l10n.text('Deselect all')
+                            : context.l10n.text('Select all'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.tonalIcon(
+                      onPressed: () => _deleteSelected(context),
+                      icon: const Icon(Icons.delete_outline),
+                      label: Text(
+                        context.l10n.text(
+                          'Delete ({count})',
+                          {'count': _selectedSymbols.length},
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: _exitSelecting,
+                      tooltip: context.l10n.text('Cancel selection'),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ] else if (!ibkrManaged) ...[
+                    OutlinedButton.icon(
+                      onPressed: _summaries.isEmpty
+                          ? null
+                          : () => setState(() => _selecting = true),
+                      icon: const Icon(Icons.checklist_rounded),
+                      label: Text(context.l10n.text('Select')),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const EditTickerPage(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.add),
+                      label: Text(context.l10n.text('Add trade')),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 20),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: SizedBox(
+                  width: 460,
+                  child: TextField(
                     controller: _search,
-                    hintText: _selecting
-                        ? context.l10n.text('{count} selected', {
-                            'count': _selectedSymbols.length,
-                          })
-                        : context.l10n.text('Search...'),
-                    padding: WidgetStateProperty.all(
-                      const EdgeInsets.only(right: 8),
-                    ),
-                    leading: leading,
-                    onTap: () => _search.selection = TextSelection(
-                      baseOffset: 0,
-                      extentOffset: _search.text.length,
-                    ),
                     onChanged: (_) => setState(() {
                       _stream = _buildStream();
                     }),
-                    trailing: [menuButton],
+                    decoration: InputDecoration(
+                      hintText: context.l10n.text('Search...'),
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _search.text.isEmpty
+                          ? null
+                          : IconButton(
+                              onPressed: () {
+                                setState(() {
+                                  _search.clear();
+                                  _stream = _buildStream();
+                                });
+                              },
+                              icon: const Icon(Icons.close),
+                            ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      isDense: true,
+                    ),
                   ),
                 ),
-                Expanded(
-                  child: StreamBuilder<List<SymbolSummary>>(
-                    stream: _stream,
-                    builder: _buildList,
-                  ),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: StreamBuilder<List<SymbolSummary>>(
+                  stream: _stream,
+                  builder: _buildList,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      body: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 16, right: 16, top: 16),
+              child: SearchBar(
+                controller: _search,
+                hintText: _selecting
+                    ? context.l10n.text(
+                        '{count} selected',
+                        {'count': _selectedSymbols.length},
+                      )
+                    : context.l10n.text('Search...'),
+                padding: WidgetStateProperty.all(
+                  const EdgeInsets.only(right: 8),
+                ),
+                leading: leading,
+                onTap: () => _search.selection = TextSelection(
+                  baseOffset: 0,
+                  extentOffset: _search.text.length,
+                ),
+                onChanged: (_) => setState(() {
+                  _stream = _buildStream();
+                }),
+                trailing: [menuButton],
+              ),
+            ),
+            Expanded(
+              child: StreamBuilder<List<SymbolSummary>>(
+                stream: _stream,
+                builder: _buildList,
+              ),
+            ),
+          ],
         ),
       ),
       floatingActionButton: ibkrManaged
@@ -404,8 +538,7 @@ class HoldingsPageState extends State<HoldingsPage>
                   icon: const Icon(Icons.delete),
                 )
               : Padding(
-                  padding:
-                      EdgeInsets.only(bottom: desktop ? 0 : bottomNavHeight),
+                  padding: const EdgeInsets.only(bottom: bottomNavHeight),
                   child: FloatingActionButton.extended(
                     onPressed: () => Navigator.push(
                       context,
@@ -416,6 +549,429 @@ class HoldingsPageState extends State<HoldingsPage>
                     tooltip: context.l10n.text('Add trade'),
                   ),
                 ),
+    );
+  }
+
+  List<SymbolSummary> _sortDesktopSummaries(
+    List<SymbolSummary> summaries,
+  ) {
+    final sorted = [...summaries];
+    int compare(SymbolSummary a, SymbolSummary b) {
+      final multiplier = _desktopSortAscending ? 1 : -1;
+      switch (_desktopSort) {
+        case _HoldingsSort.symbol:
+          return multiplier * a.symbol.compareTo(b.symbol);
+        case _HoldingsSort.value:
+          return multiplier *
+              (a.position?.currentValue ?? 0)
+                  .compareTo(b.position?.currentValue ?? 0);
+        case _HoldingsSort.returnPct:
+          return multiplier *
+              (a.position?.change ?? double.negativeInfinity)
+                  .compareTo(b.position?.change ?? double.negativeInfinity);
+        case _HoldingsSort.unrealized:
+          return multiplier *
+              (a.position?.unrealizedPL ?? a.totalRealizedPL).compareTo(
+                b.position?.unrealizedPL ?? b.totalRealizedPL,
+              );
+      }
+    }
+
+    sorted.sort(compare);
+    return sorted;
+  }
+
+  void _setDesktopSort(_HoldingsSort sort) {
+    setState(() {
+      if (_desktopSort == sort) {
+        _desktopSortAscending = !_desktopSortAscending;
+      } else {
+        _desktopSort = sort;
+        _desktopSortAscending = sort == _HoldingsSort.symbol;
+      }
+    });
+  }
+
+  Widget _desktopMetric(
+    BuildContext context, {
+    required String label,
+    required String value,
+    String? detail,
+    Color? valueColor,
+  }) {
+    final theme = Theme.of(context);
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: theme.colorScheme.outlineVariant),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 7),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: valueColor,
+              ),
+            ),
+            if (detail != null) ...[
+              const SizedBox(height: 3),
+              Text(
+                detail,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopHoldings(
+    BuildContext context,
+    List<SymbolSummary> summaries,
+    bool ibkrManaged,
+  ) {
+    final theme = Theme.of(context);
+    final open = summaries
+        .where((summary) => summary.position != null)
+        .map((summary) => summary.position!)
+        .toList();
+    final totalValue =
+        open.fold(0.0, (sum, position) => sum + position.currentValue);
+    final totalCost =
+        open.fold(0.0, (sum, position) => sum + position.costBasis);
+    final totalUnrealized =
+        open.fold(0.0, (sum, position) => sum + position.unrealizedPL);
+    final winners = open.where((position) => position.change >= 0).length;
+    final sorted = _sortDesktopSummaries(summaries);
+
+    final sortColumnIndex = switch (_desktopSort) {
+      _HoldingsSort.symbol => 0,
+      _HoldingsSort.value => 4,
+      _HoldingsSort.unrealized => 5,
+      _HoldingsSort.returnPct => 6,
+    };
+
+    void toggleSelection(SymbolSummary summary) {
+      setState(() {
+        if (_selectedSymbols.contains(summary.symbol)) {
+          _selectedSymbols.remove(summary.symbol);
+          if (_selectedSymbols.isEmpty) _selecting = false;
+        } else {
+          _selectedSymbols.add(summary.symbol);
+        }
+      });
+    }
+
+    DataCell textCell(
+      String text, {
+      required SymbolSummary summary,
+      bool numeric = true,
+      Color? color,
+      FontWeight? fontWeight,
+    }) {
+      return DataCell(
+        Align(
+          alignment: numeric ? Alignment.centerRight : Alignment.centerLeft,
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: color,
+              fontWeight: fontWeight,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ),
+        onTap: _selecting ? null : () => _openDetail(summary),
+      );
+    }
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            _desktopMetric(
+              context,
+              label: context.l10n.text('Market value'),
+              value: fmtCurrency(totalValue),
+            ),
+            const SizedBox(width: 12),
+            _desktopMetric(
+              context,
+              label: context.l10n.text('Cost basis'),
+              value: fmtCurrency(totalCost),
+            ),
+            const SizedBox(width: 12),
+            _desktopMetric(
+              context,
+              label: context.l10n.text('Unrealized P/L'),
+              value:
+                  '${totalUnrealized >= 0 ? '+' : ''}${fmtCurrency(totalUnrealized)}',
+              valueColor:
+                  totalUnrealized >= 0 ? Colors.green : Colors.redAccent,
+            ),
+            const SizedBox(width: 12),
+            _desktopMetric(
+              context,
+              label: context.l10n.text('Open positions'),
+              value: open.length.toString(),
+              detail: '$winners positive · ${open.length - winners} negative',
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Expanded(
+          child: Card(
+            margin: EdgeInsets.zero,
+            clipBehavior: Clip.antiAlias,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final tableWidth =
+                    constraints.maxWidth < 1080 ? 1080.0 : constraints.maxWidth;
+                return Scrollbar(
+                  child: SingleChildScrollView(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SizedBox(
+                        width: tableWidth,
+                        child: DataTable(
+                          showCheckboxColumn: _selecting && !ibkrManaged,
+                          sortColumnIndex: sortColumnIndex,
+                          sortAscending: _desktopSortAscending,
+                          headingRowColor: WidgetStatePropertyAll(
+                            theme.colorScheme.surfaceContainerLow,
+                          ),
+                          headingTextStyle:
+                              theme.textTheme.labelMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          dataRowMinHeight: 62,
+                          dataRowMaxHeight: 70,
+                          horizontalMargin: 18,
+                          columnSpacing: 24,
+                          columns: [
+                            DataColumn(
+                              label: Text(context.l10n.text('Holding')),
+                              onSort: (_, __) =>
+                                  _setDesktopSort(_HoldingsSort.symbol),
+                            ),
+                            DataColumn(
+                              numeric: true,
+                              label: Text(context.l10n.text('Shares')),
+                            ),
+                            DataColumn(
+                              numeric: true,
+                              label: Text(context.l10n.text('Avg cost')),
+                            ),
+                            DataColumn(
+                              numeric: true,
+                              label: Text(context.l10n.text('Price')),
+                            ),
+                            DataColumn(
+                              numeric: true,
+                              label: Text(context.l10n.text('Market value')),
+                              onSort: (_, __) =>
+                                  _setDesktopSort(_HoldingsSort.value),
+                            ),
+                            DataColumn(
+                              numeric: true,
+                              label: Text(context.l10n.text('P/L')),
+                              onSort: (_, __) =>
+                                  _setDesktopSort(_HoldingsSort.unrealized),
+                            ),
+                            DataColumn(
+                              numeric: true,
+                              label: Text(context.l10n.text('Return')),
+                              onSort: (_, __) =>
+                                  _setDesktopSort(_HoldingsSort.returnPct),
+                            ),
+                          ],
+                          rows: [
+                            for (final summary in sorted)
+                              (() {
+                                final position = summary.position;
+                                final isClosed = position == null;
+                                final returnPct = position?.change ?? 0;
+                                final pnl = position?.unrealizedPL ??
+                                    summary.totalRealizedPL;
+                                final pnlText = isClosed
+                                    ? '${pnl >= 0 ? '+' : ''}${fmtNativeCurrency(pnl, symbolCurrency(summary.symbol))}'
+                                    : '${pnl >= 0 ? '+' : ''}${fmtCurrency(pnl)}';
+                                final shares = position == null
+                                    ? '—'
+                                    : position.netShares.toStringAsFixed(
+                                        position.netShares ==
+                                                position.netShares
+                                                    .roundToDouble()
+                                            ? 0
+                                            : 3,
+                                      );
+                                final changeColor = isClosed
+                                    ? theme.colorScheme.onSurfaceVariant
+                                    : returnPct >= 0
+                                        ? Colors.green
+                                        : Colors.redAccent;
+                                final pnlColor =
+                                    pnl >= 0 ? Colors.green : Colors.redAccent;
+
+                                return DataRow(
+                                  selected:
+                                      _selectedSymbols.contains(summary.symbol),
+                                  onSelectChanged: _selecting && !ibkrManaged
+                                      ? (_) => toggleSelection(summary)
+                                      : null,
+                                  cells: [
+                                    DataCell(
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            isClosed
+                                                ? Icons.history_rounded
+                                                : returnPct >= 0
+                                                    ? Icons.trending_up_rounded
+                                                    : Icons
+                                                        .trending_down_rounded,
+                                            size: 20,
+                                            color: changeColor,
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Flexible(
+                                                      child: Text(
+                                                        summary.symbol,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: theme.textTheme
+                                                            .titleSmall
+                                                            ?.copyWith(
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    if (isClosed) ...[
+                                                      const SizedBox(width: 8),
+                                                      Text(
+                                                        context.l10n
+                                                            .text('Closed'),
+                                                        style: theme.textTheme
+                                                            .labelSmall
+                                                            ?.copyWith(
+                                                          color: theme
+                                                              .colorScheme
+                                                              .onSurfaceVariant,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ],
+                                                ),
+                                                Text(
+                                                  summary.name,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: theme
+                                                      .textTheme.bodySmall
+                                                      ?.copyWith(
+                                                    color: theme.colorScheme
+                                                        .onSurfaceVariant,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      onTap: _selecting
+                                          ? null
+                                          : () => _openDetail(summary),
+                                    ),
+                                    textCell(
+                                      shares,
+                                      summary: summary,
+                                    ),
+                                    textCell(
+                                      position == null
+                                          ? '—'
+                                          : fmtNativeCurrency(
+                                              position.avgCost,
+                                              position.nativeCurrency,
+                                            ),
+                                      summary: summary,
+                                    ),
+                                    textCell(
+                                      position == null
+                                          ? '—'
+                                          : fmtNativeCurrency(
+                                              position.currentPrice,
+                                              position.nativeCurrency,
+                                            ),
+                                      summary: summary,
+                                    ),
+                                    textCell(
+                                      position == null
+                                          ? '—'
+                                          : fmtCurrency(position.currentValue),
+                                      summary: summary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    textCell(
+                                      pnlText,
+                                      summary: summary,
+                                      color: pnlColor,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    textCell(
+                                      position == null
+                                          ? '—'
+                                          : '${returnPct >= 0 ? '+' : ''}${returnPct.toStringAsFixed(2)}%',
+                                      summary: summary,
+                                      color: changeColor,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ],
+                                );
+                              })(),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -484,6 +1040,10 @@ class HoldingsPageState extends State<HoldingsPage>
           ),
         ),
       );
+    }
+
+    if (isDesktopLayout(context)) {
+      return _buildDesktopHoldings(context, summaries, ibkrManaged);
     }
 
     return RefreshIndicator(

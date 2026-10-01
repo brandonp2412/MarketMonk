@@ -126,4 +126,40 @@ void main() {
     expect(find.byType(DesktopNav), findsNothing);
     expect(find.byType(BottomNav), findsOneWidget);
   });
+  testWidgets(
+      'desktop holdings uses a desktop toolbar instead of mobile chrome',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1400, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    db = Database.connect(
+      DatabaseConnection(
+        NativeDatabase.memory(),
+        closeStreamsSynchronously: true,
+      ),
+    );
+    addTearDown(() => db.close());
+
+    final accounts = AccountManager();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: const MyApp(),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('desktop-HoldingsPage')));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.byType(FloatingActionButton), findsNothing);
+  });
 }

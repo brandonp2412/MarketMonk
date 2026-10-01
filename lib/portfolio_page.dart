@@ -568,14 +568,11 @@ class PortfolioPageState extends State<PortfolioPage>
       return _buildDesktopPortfolio(
         positions: positions,
         sorted: sorted,
-        filtered: filtered,
         colors: colors,
         sections: sections,
         selectedIndex: selectedIndex,
         totalValue: totalValue,
         netLiquidation: netLiquidation,
-        totalGain: totalGain,
-        totalGainPct: totalGainPct,
         hasRefreshWarning: snap.hasError,
       );
     }
@@ -711,17 +708,31 @@ class PortfolioPageState extends State<PortfolioPage>
   Widget _buildDesktopPortfolio({
     required List<Position> positions,
     required List<Position> sorted,
-    required List<Position> filtered,
     required List<Color> colors,
     required List<PieChartSectionData> sections,
     required int? selectedIndex,
     required double totalValue,
     required IbkrAccountValue? netLiquidation,
-    required double totalGain,
-    required double totalGainPct,
     required bool hasRefreshWarning,
   }) {
-    final colorsScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final settings = context.watch<SettingsState>();
+    final accounts = context.watch<AccountManager>();
+    final totalCost =
+        positions.fold(0.0, (sum, position) => sum + position.costBasis);
+    final totalUnrealized =
+        positions.fold(0.0, (sum, position) => sum + position.unrealizedPL);
+    final unrealizedPct =
+        totalCost > 0 ? totalUnrealized / totalCost * 100 : 0.0;
+    final byReturn = [...positions]
+      ..sort((a, b) => b.change.compareTo(a.change));
+    final accountValue = netLiquidation == null
+        ? fmtCurrency(totalValue)
+        : fmtNativeCurrency(
+            netLiquidation.value,
+            netLiquidation.currency,
+          );
 
     final allocationChart = Stack(
       alignment: Alignment.center,
@@ -729,8 +740,8 @@ class PortfolioPageState extends State<PortfolioPage>
         PieChart(
           PieChartData(
             sections: sections,
-            centerSpaceRadius: 58,
-            sectionsSpace: 2,
+            centerSpaceRadius: 72,
+            sectionsSpace: 2.5,
             pieTouchData: PieTouchData(
               touchCallback: (event, response) {
                 setState(() {
@@ -747,50 +758,170 @@ class PortfolioPageState extends State<PortfolioPage>
             ),
           ),
         ),
-        if (selectedIndex != null)
-          IgnorePointer(
-            child: SizedBox(
-              width: 112,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    sorted[selectedIndex].symbol,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
+        IgnorePointer(
+          child: SizedBox(
+            width: 132,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  selectedIndex == null
+                      ? context.l10n.text('Holdings')
+                      : sorted[selectedIndex].symbol,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    sorted[selectedIndex].name,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.labelSmall,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  selectedIndex == null
+                      ? '${positions.length} ${context.l10n.text('positions')}'
+                      : fmtCurrency(sorted[selectedIndex].currentValue),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
+        ),
       ],
     );
 
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.fromLTRB(32, 28, 32, 24),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.l10n.text('Portfolio'),
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      accounts.activeAccount,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == '__export__') {
+                    _exportCsv(context, positions);
+                  } else if (value.startsWith('cur:')) {
+                    settings.setDisplayCurrency(value.substring(4));
+                  } else if (value.startsWith('acc:')) {
+                    accounts.switchAccount(value.substring(4));
+                  }
+                },
+                itemBuilder: (popupContext) => [
+                  ...settings.visibleCurrencies.map(
+                    (currencyCode) => CheckedPopupMenuItem(
+                      value: 'cur:$currencyCode',
+                      checked: currencyCode == settings.displayCurrency,
+                      child: Text(currencyCode),
+                    ),
+                  ),
+                  if (accounts.accounts.length > 1) ...[
+                    const PopupMenuDivider(),
+                    ...accounts.accounts.map(
+                      (account) => CheckedPopupMenuItem(
+                        value: 'acc:$account',
+                        checked: account == accounts.activeAccount,
+                        child: Text(account),
+                      ),
+                    ),
+                  ],
+                  const PopupMenuDivider(),
+                  PopupMenuItem(
+                    value: '__export__',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.download_rounded, size: 20),
+                        const SizedBox(width: 8),
+                        Text(context.l10n.text('Export CSV')),
+                      ],
+                    ),
+                  ),
+                ],
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: colorScheme.outlineVariant),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        settings.displayCurrency,
+                        style: theme.textTheme.labelLarge,
+                      ),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.expand_more_rounded, size: 20),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
           if (hasRefreshWarning) ...[
+            const SizedBox(height: 16),
             _buildRefreshWarning(context),
-            const SizedBox(height: 12),
           ],
-          _SummaryCard(
-            totalValue: totalValue,
-            netLiquidation: netLiquidation,
-            totalGain: totalGain,
-            totalGainPct: totalGainPct,
-            onExport: () => _exportCsv(context, positions),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              _DesktopPortfolioMetric(
+                label: context.l10n.text('Account value'),
+                value: accountValue,
+                icon: Icons.account_balance_wallet_outlined,
+              ),
+              const SizedBox(width: 12),
+              _DesktopPortfolioMetric(
+                label: context.l10n.text('Market value'),
+                value: fmtCurrency(totalValue),
+                detail: context.l10n.text('Open stock positions'),
+                icon: Icons.show_chart_rounded,
+              ),
+              const SizedBox(width: 12),
+              _DesktopPortfolioMetric(
+                label: context.l10n.text('Unrealized P/L'),
+                value:
+                    '${totalUnrealized >= 0 ? '+' : ''}${fmtCurrency(totalUnrealized)}',
+                detail:
+                    '${unrealizedPct >= 0 ? '+' : ''}${unrealizedPct.toStringAsFixed(2)}%',
+                valueColor:
+                    totalUnrealized >= 0 ? Colors.green : Colors.redAccent,
+                icon: totalUnrealized >= 0
+                    ? Icons.trending_up_rounded
+                    : Icons.trending_down_rounded,
+              ),
+              const SizedBox(width: 12),
+              _DesktopPortfolioMetric(
+                label: context.l10n.text('Positions'),
+                value: positions.length.toString(),
+                detail: context.l10n.text('Currently open'),
+                icon: Icons.view_list_outlined,
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           Expanded(
@@ -798,95 +929,125 @@ class PortfolioPageState extends State<PortfolioPage>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(
-                  flex: 4,
+                  flex: 7,
                   child: Card(
                     margin: EdgeInsets.zero,
                     clipBehavior: Clip.antiAlias,
                     child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Center(
-                        child: AspectRatio(
-                          aspectRatio: 1,
-                          child: allocationChart,
-                        ),
+                      padding: const EdgeInsets.fromLTRB(24, 22, 24, 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            context.l10n.text('Allocation'),
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            context.l10n.text(
+                              'How your stock portfolio is distributed',
+                            ),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  flex: 5,
+                                  child: Center(
+                                    child: AspectRatio(
+                                      aspectRatio: 1,
+                                      child: allocationChart,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 28),
+                                Expanded(
+                                  flex: 6,
+                                  child: Scrollbar(
+                                    child: ListView.separated(
+                                      itemCount: sorted.length,
+                                      separatorBuilder: (_, __) =>
+                                          const SizedBox(height: 14),
+                                      itemBuilder: (context, index) {
+                                        final position = sorted[index];
+                                        final allocationPct = totalValue > 0
+                                            ? position.currentValue /
+                                                totalValue *
+                                                100
+                                            : 0.0;
+                                        return _DesktopAllocationRow(
+                                          color: colors[index],
+                                          symbol: position.symbol,
+                                          name: position.name,
+                                          value: position.currentValue,
+                                          allocationPct: allocationPct,
+                                          selected: selectedIndex == index,
+                                          onTap: () => setState(
+                                            () => touchedIndex =
+                                                touchedIndex == index
+                                                    ? null
+                                                    : index,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  flex: 7,
+                  flex: 5,
                   child: Card(
                     margin: EdgeInsets.zero,
                     clipBehavior: Clip.antiAlias,
-                    child: Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                          child: _FilterRow(
-                            controller: _filterController,
-                            filterText: _filterText,
-                            onChanged: (value) =>
-                                setState(() => _filterText = value.trim()),
-                            onClear: () => setState(() {
-                              _filterText = '';
-                              _filterController.clear();
-                            }),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            context.l10n.text('Return by holding'),
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                        ),
-                        Divider(height: 1, color: colorsScheme.outlineVariant),
-                        Expanded(
-                          child: filtered.isEmpty
-                              ? Center(
-                                  child: Text(
-                                    context.l10n.text('No matching stocks'),
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge
-                                        ?.copyWith(
-                                          color: colorsScheme.onSurfaceVariant,
-                                        ),
-                                  ),
-                                )
-                              : Scrollbar(
-                                  child: ListView.builder(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 8,
-                                    ),
-                                    itemCount: filtered.length,
-                                    itemBuilder: (context, index) {
-                                      final position = filtered[index];
-                                      final sortedIndex = sorted.indexOf(
-                                        position,
-                                      );
-                                      final value = position.currentValue;
-                                      final allocationPct = totalValue > 0
-                                          ? value / totalValue * 100
-                                          : 0.0;
-                                      return _LegendTile(
-                                        color: colors[sortedIndex >= 0
-                                            ? sortedIndex
-                                            : index],
-                                        symbol: position.symbol,
-                                        name: position.name,
-                                        value: value,
-                                        allocationPct: allocationPct,
-                                        changePct: position.change,
-                                        isHighlighted:
-                                            sortedIndex == selectedIndex,
-                                        onTap: () => setState(
-                                          () => touchedIndex =
-                                              touchedIndex == sortedIndex
-                                                  ? null
-                                                  : sortedIndex,
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                        ),
-                      ],
+                          const SizedBox(height: 3),
+                          Text(
+                            context.l10n.text('Since average cost'),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Expanded(
+                            child: ListView.separated(
+                              itemCount: byReturn.length,
+                              separatorBuilder: (_, __) => Divider(
+                                height: 1,
+                                color: colorScheme.outlineVariant
+                                    .withValues(alpha: 0.7),
+                              ),
+                              itemBuilder: (context, index) {
+                                final position = byReturn[index];
+                                return _DesktopReturnRow(position: position);
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -910,6 +1071,268 @@ class PortfolioPageState extends State<PortfolioPage>
         hsl.lightness.clamp(0.35, 0.65),
       ).toColor();
     });
+  }
+}
+
+class _DesktopPortfolioMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final String? detail;
+  final IconData icon;
+  final Color? valueColor;
+
+  const _DesktopPortfolioMetric({
+    required this.label,
+    required this.value,
+    required this.icon,
+    this.detail,
+    this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Expanded(
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 104),
+        padding: const EdgeInsets.all(17),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: theme.colorScheme.outlineVariant),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                size: 21,
+                color: theme.colorScheme.onPrimaryContainer,
+              ),
+            ),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: valueColor,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                  if (detail != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      detail!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: valueColor ?? theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DesktopAllocationRow extends StatelessWidget {
+  final Color color;
+  final String symbol;
+  final String name;
+  final double value;
+  final double allocationPct;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _DesktopAllocationRow({
+    required this.color,
+    required this.symbol,
+    required this.name,
+    required this.value,
+    required this.allocationPct,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: selected
+          ? theme.colorScheme.secondaryContainer.withValues(alpha: 0.45)
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          symbol,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        fmtCurrency(value),
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                      Text(
+                        '${allocationPct.toStringAsFixed(1)}%',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: (allocationPct / 100).clamp(0.0, 1.0),
+                  minHeight: 4,
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                  valueColor: AlwaysStoppedAnimation<Color>(color),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DesktopReturnRow extends StatelessWidget {
+  final Position position;
+
+  const _DesktopReturnRow({required this.position});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final positive = position.change >= 0;
+    final color = positive ? Colors.green : Colors.redAccent;
+    final pnl = position.unrealizedPL;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 13),
+      child: Row(
+        children: [
+          Icon(
+            positive ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+            size: 20,
+            color: color,
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  position.symbol,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  position.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                (pnl >= 0 ? '+' : '') + fmtCurrency(pnl),
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: pnl >= 0 ? Colors.green : Colors.redAccent,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              Text(
+                '${positive ? '+' : ''}${position.change.toStringAsFixed(2)}%',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 

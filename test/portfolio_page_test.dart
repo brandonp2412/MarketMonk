@@ -357,8 +357,12 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('VOO'), findsOneWidget);
-    expect(find.byType(Card), findsAtLeastNWidgets(3));
+    expect(find.text('VOO'), findsNWidgets(2));
+    expect(find.text('Account value'), findsOneWidget);
+    expect(find.text('Allocation'), findsOneWidget);
+    expect(find.text('Return by holding'), findsOneWidget);
+    expect(find.text('Filter holdings...'), findsNothing);
+    expect(find.byType(Card), findsNWidgets(2));
     expect(tester.takeException(), null);
   });
 }
