@@ -7,7 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/utils.dart';
 import 'package:market_monk/logging.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:market_monk/sqlite_settings.dart';
 
 const _defaultSeedColor = Color(0xFF2B7A78);
 
@@ -103,7 +103,7 @@ class SettingsState extends ChangeNotifier {
   }
 
   Future<void> init() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SqliteSettings.getInstance();
     final themeStr = prefs.getString('theme');
 
     switch (themeStr) {
@@ -176,7 +176,7 @@ class SettingsState extends ChangeNotifier {
   Future<void> _fetchAndApplyRate(String currencyCode) async {
     if (currencyCode == 'USD') {
       allRatesFromUsd['USD'] = 1.0;
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SqliteSettings.getInstance();
       await prefs.setDouble('exchangeRate_USD', 1.0);
       if (displayCurrency == currencyCode) {
         _applyRate('USD', 1.0);
@@ -194,7 +194,7 @@ class SettingsState extends ChangeNotifier {
         final rates = data['rates'] as Map<String, dynamic>;
         final rate = (rates[currencyCode] as num).toDouble();
         allRatesFromUsd[currencyCode] = rate;
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = await SqliteSettings.getInstance();
         await prefs.setDouble('exchangeRate_$currencyCode', rate);
         if (displayCurrency == currencyCode) {
           _applyRate(currencyCode, rate);
@@ -211,51 +211,60 @@ class SettingsState extends ChangeNotifier {
     }
   }
 
-  void setDateFormat(String value) async {
+  /// Persists the date pattern used throughout the interface.
+  Future<void> setDateFormat(String value) async {
     dateFormat = value;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    prefs.setString('dateFormat', value);
+    final prefs = await SqliteSettings.getInstance();
+    await prefs.setString('dateFormat', value);
   }
 
-  void setCurveLines(bool value) async {
+  /// Persists whether charts interpolate between data points.
+  Future<void> setCurveLines(bool value) async {
     curveLines = value;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    prefs.setBool('curveLines', value);
+    final prefs = await SqliteSettings.getInstance();
+    await prefs.setBool('curveLines', value);
   }
 
-  void setPureBlack(bool value) async {
+  /// Persists the dark-theme background preference.
+  Future<void> setPureBlack(bool value) async {
     pureBlack = value;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    prefs.setBool('pureBlack', value);
+    final prefs = await SqliteSettings.getInstance();
+    await prefs.setBool('pureBlack', value);
   }
 
-  void setShowMarketClosed(bool value) async {
+  /// Persists whether closed-market indicators are shown.
+  Future<void> setShowMarketClosed(bool value) async {
     showMarketClosed = value;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    prefs.setBool('showMarketClosed', value);
+    final prefs = await SqliteSettings.getInstance();
+    await prefs.setBool('showMarketClosed', value);
   }
 
-  void setCurveSmoothness(double value) async {
+  /// Persists the interpolation strength used by charts.
+  Future<void> setCurveSmoothness(double value) async {
     curveSmoothness = value;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    prefs.setDouble('curveSmoothness', value);
+    final prefs = await SqliteSettings.getInstance();
+    await prefs.setDouble('curveSmoothness', value);
   }
 
-  void setSystemColors(bool value) async {
+  /// Persists whether the theme follows system-provided colors.
+  Future<void> setSystemColors(bool value) async {
     systemColors = value;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    prefs.setBool('systemColors', value);
+    final prefs = await SqliteSettings.getInstance();
+    await prefs.setBool('systemColors', value);
   }
 
-  void setTheme(ThemeMode value) {
+  /// Persists the selected theme before reporting completion.
+  Future<void> setTheme(ThemeMode value) async {
     theme = value;
     notifyListeners();
+    await (await SqliteSettings.getInstance())
+        .setString('theme', value.toString());
   }
 
   Future<void> setLanguageCode(String? value) async {
@@ -267,7 +276,7 @@ class SettingsState extends ChangeNotifier {
 
     languageCode = value;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SqliteSettings.getInstance();
     if (value == null) {
       await prefs.remove('languageCode');
     } else {
@@ -275,17 +284,18 @@ class SettingsState extends ChangeNotifier {
     }
   }
 
-  void setSeedColor(Color value) async {
+  /// Persists the custom color used to generate the app theme.
+  Future<void> setSeedColor(Color value) async {
     seedColor = value;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    prefs.setInt('seedColor', _colorToInt(value));
+    final prefs = await SqliteSettings.getInstance();
+    await prefs.setInt('seedColor', _colorToInt(value));
   }
 
   Future<void> setVisibleCurrencies(List<String> currencies) async {
     assert(currencies.isNotEmpty);
     visibleCurrencies = List.from(currencies);
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SqliteSettings.getInstance();
     await prefs.setStringList('visibleCurrencies', currencies);
     if (!visibleCurrencies.contains(displayCurrency)) {
       await _setDisplayCurrency(visibleCurrencies.first, prefs);
@@ -295,13 +305,13 @@ class SettingsState extends ChangeNotifier {
   }
 
   Future<void> setDisplayCurrency(String code) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SqliteSettings.getInstance();
     await _setDisplayCurrency(code, prefs);
   }
 
   Future<void> _setDisplayCurrency(
     String code,
-    SharedPreferences prefs,
+    SqliteSettings prefs,
   ) async {
     displayCurrency = code;
     final cachedRate = prefs.getDouble('exchangeRate_$code');

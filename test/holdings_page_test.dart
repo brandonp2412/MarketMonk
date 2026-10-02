@@ -9,7 +9,7 @@ import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'sqlite_test_support.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -22,7 +22,7 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
 
-    SharedPreferences.setMockInitialValues({});
+    await seedTestSqlite({});
     db = Database.connect(
       DatabaseConnection(
         NativeDatabase.memory(),
@@ -31,7 +31,7 @@ void main() {
     );
     addTearDown(() => db.close());
 
-    final accounts = AccountManager();
+    final accounts = testAccountManager();
     await accounts.init();
     final position = Position(
       symbol: 'VOO',
@@ -95,7 +95,7 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
 
-    SharedPreferences.setMockInitialValues({});
+    await seedTestSqlite({});
     db = Database.connect(
       DatabaseConnection(
         NativeDatabase.memory(),
@@ -104,7 +104,7 @@ void main() {
     );
     addTearDown(() => db.close());
 
-    final accounts = AccountManager();
+    final accounts = testAccountManager();
     await accounts.init();
     final position = Position(
       symbol: 'VOO',
@@ -155,7 +155,7 @@ void main() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
     });
-    SharedPreferences.setMockInitialValues({});
+    await seedTestSqlite({});
     allRatesFromUsd
       ..clear()
       ..['USD'] = 1;
@@ -167,7 +167,7 @@ void main() {
     );
     addTearDown(() => db.close());
 
-    final accounts = AccountManager();
+    final accounts = testAccountManager();
     await accounts.init();
     final position = Position(
       symbol: 'VOO',
@@ -232,7 +232,7 @@ void main() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
     });
-    SharedPreferences.setMockInitialValues({
+    await seedTestSqlite({
       'accounts': ['Default', 'Brokerage'],
     });
     db = Database.connect(
@@ -243,7 +243,7 @@ void main() {
     );
     addTearDown(() => db.close());
 
-    final accounts = AccountManager();
+    final accounts = testAccountManager();
     await accounts.init();
     final position = Position(
       symbol: 'VOO',

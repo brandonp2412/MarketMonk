@@ -1,3 +1,4 @@
+import 'sqlite_test_support.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -10,14 +11,16 @@ import 'package:market_monk/settings_state.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   testWidgets('App renders tab navigation', (WidgetTester tester) async {
+    await seedTestSqlite({});
     db = Database.connect(
       DatabaseConnection(
         NativeDatabase.memory(),
         closeStreamsSynchronously: true,
       ),
     );
-    final accounts = AccountManager();
+    final accounts = testAccountManager();
     await tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -35,7 +38,8 @@ void main() {
   });
 
   testWidgets('default account cannot be renamed', (WidgetTester tester) async {
-    final accounts = AccountManager();
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
 
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
@@ -53,13 +57,14 @@ void main() {
   testWidgets(
     'adding account does not cause overlay assertion while MyApp rebuilds',
     (WidgetTester tester) async {
+      await seedTestSqlite({});
       db = Database.connect(
         DatabaseConnection(
           NativeDatabase.memory(),
           closeStreamsSynchronously: true,
         ),
       );
-      final accounts = AccountManager();
+      final accounts = testAccountManager();
 
       await tester.pumpWidget(
         MultiProvider(
@@ -93,6 +98,7 @@ void main() {
   );
 
   testWidgets('desktop width uses persistent side navigation', (tester) async {
+    await seedTestSqlite({});
     await tester.binding.setSurfaceSize(const Size(1400, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -104,7 +110,7 @@ void main() {
     );
     addTearDown(() => db.close());
 
-    final accounts = AccountManager();
+    final accounts = testAccountManager();
     await tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -137,6 +143,7 @@ void main() {
 
   testWidgets('desktop tab changes immediately without animation',
       (tester) async {
+    await seedTestSqlite({});
     await tester.binding.setSurfaceSize(const Size(1400, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -148,7 +155,7 @@ void main() {
     );
     addTearDown(() => db.close());
 
-    final accounts = AccountManager();
+    final accounts = testAccountManager();
     await tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -174,6 +181,7 @@ void main() {
   testWidgets(
       'desktop holdings uses a desktop toolbar instead of mobile chrome',
       (tester) async {
+    await seedTestSqlite({});
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1400, 900);
     addTearDown(() {
@@ -189,7 +197,7 @@ void main() {
     );
     addTearDown(() => db.close());
 
-    final accounts = AccountManager();
+    final accounts = testAccountManager();
     await tester.pumpWidget(
       MultiProvider(
         providers: [

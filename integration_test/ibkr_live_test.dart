@@ -10,7 +10,7 @@ import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart' as app;
 import 'package:market_monk/settings_state.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:market_monk/sqlite_settings.dart';
 
 Finder _navTab(String label) => find.descendant(
       of: find.byWidgetPredicate(
@@ -151,7 +151,7 @@ void main() {
     await _pumpUntilGone(tester, find.text('Interactive Brokers — Default'));
     expect(accounts.ibkrConfigFor().enabled, isTrue);
     expect(accounts.ibkrConfigFor().baseUrl, url);
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SqliteSettings.getInstance();
     await prefs.setStringList('favoriteStocks', [largest.symbol]);
     expect(find.text('Search stocks...'), findsOneWidget);
     await tester.pump();

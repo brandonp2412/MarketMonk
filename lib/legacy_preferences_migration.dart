@@ -2,11 +2,17 @@ import 'dart:convert';
 
 import 'package:market_monk/app_state_database.dart';
 import 'package:market_monk/database.dart';
+import 'package:market_monk/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Opens an independently owned connection for a named profile.
 typedef ProfileDatabaseFactory = Database Function(String profile);
 
-const _legacyProfilePreferenceKeys = {
+/// Marks a successful one-time import; deletions must never be reseeded.
+const sqliteMigrationCompleteKey = 'sqliteMigrationCompleteV1';
+
+/// Legacy values that belong in profile tables rather than global settings.
+const legacyProfilePreferenceKeys = {
   'accounts',
   'activeAccount',
   'ibkrAccountConfigs',
@@ -14,49 +20,61 @@ const _legacyProfilePreferenceKeys = {
   'ibkrPerformanceCacheV1',
 };
 
-/// Non-destructively seeds the SQLite persistence foundation from the current
-/// SharedPreferences layout.
-///
-/// This intentionally does not remove or rewrite any legacy preference. Callers
-/// can keep reading SharedPreferences until each state owner is cut over in a
-/// later slice. Existing SQLite values always win so rerunning this migration
-/// cannot replace newer state.
+/// Copies legacy preferences without modifying the upgrade source.
 Future<void> seedSqliteFromLegacyPreferences({
   required SharedPreferences preferences,
   required AppStateDatabase appState,
   ProfileDatabaseFactory? profileDatabaseFactory,
+}) =>
+    seedSqliteFromLegacyValues(
+      values: {
+        for (final key in preferences.getKeys()) key: preferences.get(key),
+      },
+      appState: appState,
+      profileDatabaseFactory: profileDatabaseFactory,
+    );
+
+/// Imports legacy app and profile values, also used for version-one backups.
+/// Existing SQLite rows win, making interrupted upgrades safe to retry.
+Future<void> seedSqliteFromLegacyValues({
+  required Map<String, Object?> values,
+  required AppStateDatabase appState,
+  ProfileDatabaseFactory? profileDatabaseFactory,
 }) async {
-  final storedAccounts = preferences.getStringList('accounts') ?? const [];
-  final accounts = <String>[
+  final storedAccounts =
+      (values['accounts'] as List?)?.cast<String>() ?? const [];
+  final accounts = <String>{
     'Default',
     for (final account in storedAccounts)
       if (account != 'Default') account,
-  ];
+  }.toList();
 
   await appState.seedProfilesIfEmpty(accounts);
   await appState.seedSettingIfMissing(
     AppStateDatabase.activeProfileSettingKey,
-    preferences.getString('activeAccount') ?? 'Default',
+    values['activeAccount'] as String? ?? 'Default',
   );
 
-  for (final key in preferences.getKeys()) {
-    if (_legacyProfilePreferenceKeys.contains(key)) continue;
-    await appState.seedSettingIfMissing(key, preferences.get(key));
+  for (final key in values.keys) {
+    if (legacyProfilePreferenceKeys.contains(key) ||
+        key == sqliteMigrationCompleteKey) continue;
+    await appState.seedSettingIfMissing(key, values[key]);
   }
 
-  final configs = _decodeMap(preferences.getString('ibkrAccountConfigs'));
-  final portfolioCache = _decodeMap(preferences.getString('portfolioCacheV1'));
-  final performanceCache =
-      _decodeMap(preferences.getString('ibkrPerformanceCacheV1'));
+  final configs = _decodeMap(values['ibkrAccountConfigs'] as String?);
+  final portfolioCache =
+      _decodeMap(values['portfolioCacheV1'] as String?, discardMalformed: true);
+  final performanceCache = _decodeMap(
+    values['ibkrPerformanceCacheV1'] as String?,
+    discardMalformed: true,
+  );
 
-  final profileNames = <String>{
-    ...accounts,
-    ...configs.keys,
-    ...portfolioCache.keys,
-    ...performanceCache.keys,
-  };
+  final profileNames = accounts;
 
   for (final profile in profileNames) {
+    if (profile.contains('/') || profile.contains(r'\') || profile.isEmpty) {
+      throw FormatException('Invalid legacy profile name');
+    }
     final database = (profileDatabaseFactory ?? _openProfileDatabase)(profile);
     try {
       await _seedIbkrConfig(database, configs[profile]);
@@ -71,10 +89,17 @@ Future<void> seedSqliteFromLegacyPreferences({
 Database _openProfileDatabase(String profile) =>
     Database(profile == 'Default' ? 'market-monk' : 'market-monk-$profile');
 
-Map<String, dynamic> _decodeMap(String? raw) {
+Map<String, dynamic> _decodeMap(String? raw, {bool discardMalformed = false}) {
   if (raw == null || raw.isEmpty) return const {};
-  final decoded = jsonDecode(raw);
-  return decoded is Map<String, dynamic> ? decoded : const {};
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is Map<String, dynamic>) return decoded;
+    throw const FormatException('Expected a legacy JSON object');
+  } on FormatException catch (error, stack) {
+    if (!discardMalformed) rethrow;
+    talker.handle(error, stack, 'Skipped malformed legacy cache');
+    return const {};
+  }
 }
 
 Future<void> _seedIbkrConfig(Database database, Object? raw) async {
@@ -92,7 +117,9 @@ Future<void> _seedPortfolioCache(Database database, Object? raw) async {
   if (raw is! Map<String, dynamic>) return;
   if (await database.readIbkrCache('portfolio', 'snapshot') != null) return;
 
-  final cachedAt = DateTime.tryParse(raw['cachedAt'] as String? ?? '');
+  final cachedAt = DateTime.tryParse(
+    raw['cachedAt'] is String ? raw['cachedAt'] as String : '',
+  );
   if (cachedAt == null) return;
 
   await database.writeIbkrCache(
@@ -111,7 +138,9 @@ Future<void> _seedPerformanceCache(Database database, Object? raw) async {
     if (await database.readIbkrCache('performance', entry.key) != null) {
       continue;
     }
-    final cachedAt = DateTime.tryParse(value['cachedAt'] as String? ?? '');
+    final cachedAt = DateTime.tryParse(
+      value['cachedAt'] is String ? value['cachedAt'] as String : '',
+    );
     if (cachedAt == null) continue;
 
     await database.writeIbkrCache(

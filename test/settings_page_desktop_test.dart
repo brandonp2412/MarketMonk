@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'sqlite_test_support.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -13,7 +12,7 @@ void main() {
   Future<void> pumpSettings(WidgetTester tester, Size size) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = size;
-    SharedPreferences.setMockInitialValues({
+    await seedTestSqlite({
       'systemColors': true,
     });
     PackageInfo.setMockInitialValues(
@@ -24,7 +23,7 @@ void main() {
       buildSignature: '',
     );
 
-    final accounts = AccountManager();
+    final accounts = testAccountManager();
     await accounts.init();
     final settings = SettingsState();
     await settings.initialized;

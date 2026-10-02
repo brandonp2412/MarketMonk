@@ -16,7 +16,7 @@ import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/trade_history_page.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../test/sqlite_test_support.dart';
 
 final DateTime _mockToday = DateTime.now();
 
@@ -161,7 +161,7 @@ enum TabBarState { chart, portfolio, holdings }
 
 Future<void> appWrapper() async {
   WidgetsFlutterBinding.ensureInitialized();
-  SharedPreferences.setMockInitialValues({
+  await seedTestSqlite({
     'theme': 'ThemeMode.dark',
     'systemColors': false,
     'curveLines': true,

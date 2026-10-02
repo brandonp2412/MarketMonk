@@ -6,13 +6,13 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'sqlite_test_support.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() {
-    SharedPreferences.setMockInitialValues({
+  setUp(() async {
+    await seedTestSqlite({
       'visibleCurrencies': ['GBP', 'NZD', 'USD'],
       'displayCurrency': 'GBP',
       'exchangeRate_GBP': 0.8,
@@ -32,7 +32,7 @@ void main() {
   });
 
   testWidgets('fresh install uses the Flutter device locale', (tester) async {
-    SharedPreferences.setMockInitialValues({});
+    await seedTestSqlite({});
     tester.binding.platformDispatcher.localeTestValue =
         const Locale('en', 'NZ');
     addTearDown(tester.binding.platformDispatcher.clearLocaleTestValue);
@@ -61,7 +61,7 @@ void main() {
     expect(currency.currencyName, 'NZD');
     expect(exchangeRate, 1.6);
 
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SqliteSettings.getInstance();
     expect(prefs.getString('displayCurrency'), 'NZD');
   });
 

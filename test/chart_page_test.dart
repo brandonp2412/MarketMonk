@@ -11,9 +11,10 @@ import 'package:market_monk/portfolio_chart_scale.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'sqlite_test_support.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   test('portfolio comparison scaling normalizes different account sizes', () {
     final large = scalePortfolioSeriesForComparison([100000, 110000]);
     final small = scalePortfolioSeriesForComparison([1000, 1200]);
@@ -31,14 +32,14 @@ void main() {
   testWidgets(
     'time chips stay below the search bar after a degenerate first frame',
     (WidgetTester tester) async {
-      SharedPreferences.setMockInitialValues({});
+      await seedTestSqlite({});
       db = Database.connect(
         DatabaseConnection(
           NativeDatabase.memory(),
           closeStreamsSynchronously: true,
         ),
       );
-      final accounts = AccountManager();
+      final accounts = testAccountManager();
 
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(400, 30);
@@ -87,7 +88,7 @@ void main() {
   testWidgets(
     'cached IBKR chart waits for the saved period before rendering',
     (WidgetTester tester) async {
-      SharedPreferences.setMockInitialValues({
+      await seedTestSqlite({
         'ibkrAccountConfigs':
             '{"Default":{"enabled":true,"baseUrl":"https://ibkr.example.test","token":"secret-token"}}',
         'ibkrHistorySeeded:https://ibkr.example.test:Default:VOO': true,
@@ -109,7 +110,7 @@ void main() {
         tester.view.resetDevicePixelRatio();
       });
 
-      final accounts = AccountManager();
+      final accounts = testAccountManager();
       await accounts.init();
       await accounts.cachePortfolio(
         'Default',
@@ -220,7 +221,7 @@ void main() {
   testWidgets('IBKR chart retries broker history without synthetic fallback', (
     WidgetTester tester,
   ) async {
-    SharedPreferences.setMockInitialValues({
+    await seedTestSqlite({
       'ibkrAccountConfigs':
           '{"Default":{"enabled":true,"baseUrl":"https://ibkr.example.test","token":"secret-token"}}',
       'ibkrHistorySeeded:https://ibkr.example.test:Default:VOO': true,
@@ -242,7 +243,7 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
 
-    final accounts = AccountManager();
+    final accounts = testAccountManager();
     await accounts.init();
     final cachedPosition = Position(
       symbol: 'VOO',
@@ -383,7 +384,7 @@ void main() {
   testWidgets('IBKR portfolio summary shows concise broker return', (
     WidgetTester tester,
   ) async {
-    SharedPreferences.setMockInitialValues({
+    await seedTestSqlite({
       'ibkrAccountConfigs':
           '{"Default":{"enabled":true,"baseUrl":"https://ibkr.example.test","token":"secret-token"}}',
       'ibkrHistorySeeded:https://ibkr.example.test:Default:VOO': true,
@@ -405,7 +406,7 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
 
-    final accounts = AccountManager();
+    final accounts = testAccountManager();
     await accounts.init();
     final cachedPosition = Position(
       symbol: 'VOO',
@@ -497,13 +498,14 @@ void main() {
   testWidgets('exact ticker fallback is available while search is loading', (
     WidgetTester tester,
   ) async {
+    await seedTestSqlite({});
     db = Database.connect(
       DatabaseConnection(
         NativeDatabase.memory(),
         closeStreamsSynchronously: true,
       ),
     );
-    final accounts = AccountManager();
+    final accounts = testAccountManager();
 
     await tester.pumpWidget(
       MultiProvider(
@@ -535,13 +537,14 @@ void main() {
   testWidgets('empty ticker fallback stays hidden before typing', (
     WidgetTester tester,
   ) async {
+    await seedTestSqlite({});
     db = Database.connect(
       DatabaseConnection(
         NativeDatabase.memory(),
         closeStreamsSynchronously: true,
       ),
     );
-    final accounts = AccountManager();
+    final accounts = testAccountManager();
 
     await tester.pumpWidget(
       MultiProvider(
@@ -577,7 +580,7 @@ void main() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
     });
-    SharedPreferences.setMockInitialValues({});
+    await seedTestSqlite({});
 
     db = Database.connect(
       DatabaseConnection(
@@ -587,7 +590,7 @@ void main() {
     );
     addTearDown(() => db.close());
 
-    final accounts = AccountManager();
+    final accounts = testAccountManager();
     await accounts.init();
 
     await tester.pumpWidget(

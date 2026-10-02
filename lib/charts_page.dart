@@ -20,7 +20,7 @@ import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:market_monk/sqlite_settings.dart';
 
 enum _ChartMode { portfolio, searching, stock }
 
@@ -119,7 +119,7 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   Future<void> _loadPeriodThenPortfolios() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SqliteSettings.getInstance();
     final y = prefs.getInt('chartPeriodYears') ?? 1;
     final m = prefs.getInt('chartPeriodMonths') ?? 0;
     final d = prefs.getInt('chartPeriodDays') ?? 0;
@@ -138,7 +138,7 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   Future<void> _savePeriod() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SqliteSettings.getInstance();
     await prefs.setInt('chartPeriodYears', years);
     await prefs.setInt('chartPeriodMonths', months);
     await prefs.setInt('chartPeriodDays', days);
@@ -493,7 +493,7 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   Future<void> _loadFavorites() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SqliteSettings.getInstance();
     var favorites = prefs.getStringList('favoriteStocks');
     if (favorites == null) {
       final legacy = prefs.getString('favoriteStock');
@@ -521,7 +521,7 @@ class ChartsPageState extends State<ChartsPage>
 
   Future<void> _toggleFavorite(String symbol) async {
     final ctx = context;
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SqliteSettings.getInstance();
     if (!ctx.mounted) return;
     final isFavorite = _favoriteStocks.contains(symbol);
     setState(() {

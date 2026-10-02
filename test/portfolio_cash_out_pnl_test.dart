@@ -9,7 +9,7 @@ import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'sqlite_test_support.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -23,7 +23,7 @@ void main() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
     });
-    SharedPreferences.setMockInitialValues({});
+    await seedTestSqlite({});
     allRatesFromUsd
       ..clear()
       ..['USD'] = 1;
@@ -36,7 +36,7 @@ void main() {
     );
     addTearDown(() => db.close());
 
-    final accounts = AccountManager();
+    final accounts = testAccountManager();
     await accounts.init();
     await accounts.setIbkrConfig(
       'Default',

@@ -20,7 +20,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
 const _languageNames = <String, String>{
@@ -510,9 +509,7 @@ class _SettingsPageState extends State<SettingsPage> {
           selected: {settings.theme},
           onSelectionChanged: (selection) async {
             final value = selection.first;
-            settings.setTheme(value);
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString('theme', value.toString());
+            await settings.setTheme(value);
           },
         ),
         const SizedBox(height: 8),
@@ -962,9 +959,7 @@ class _SettingsPageState extends State<SettingsPage> {
               onSelectionChanged: (selection) async {
                 final value = selection.first;
                 final settings = context.read<SettingsState>();
-                settings.setTheme(value);
-                final prefs = await SharedPreferences.getInstance();
-                prefs.setString('theme', value.toString());
+                await settings.setTheme(value);
               },
             ),
           ),

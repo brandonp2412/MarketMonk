@@ -16,7 +16,7 @@ import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/trade_history_page.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:market_monk/sqlite_settings.dart';
 
 Finder _navTab(String label) => find.descendant(
       of: find.byWidgetPredicate(
@@ -156,8 +156,8 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('whole app local-account workflow is functional', (tester) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    final prefs = await SqliteSettings.getInstance();
+    await prefs.restore({}, ['Default'], 'Default');
 
     try {
       await app.db.close();
@@ -350,7 +350,7 @@ void main() {
     await tester.tap(find.text('Favorite'));
     await tester.pump();
     expect(
-      (await SharedPreferences.getInstance()).getStringList('favoriteStocks'),
+      (await SqliteSettings.getInstance()).getStringList('favoriteStocks'),
       contains('MSFT'),
     );
 

@@ -2,15 +2,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
-import 'package:market_monk/main.dart';
 import 'package:market_monk/utils.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'sqlite_test_support.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() {
-    SharedPreferences.setMockInitialValues({});
+  setUp(() async {
+    await seedTestSqlite({});
     allRatesFromUsd
       ..clear()
       ..['USD'] = 1.0;
@@ -242,7 +241,7 @@ void main() {
   });
 
   test('IBKR settings persist independently per MarketMonk account', () async {
-    final accounts = AccountManager();
+    final accounts = testAccountManager();
     await accounts.init();
     const config = IbkrAccountConfig(
       enabled: true,
@@ -251,7 +250,7 @@ void main() {
     );
 
     await accounts.setIbkrConfig('Default', config);
-    final reloaded = AccountManager();
+    final reloaded = testAccountManager();
     await reloaded.init();
 
     expect(reloaded.ibkrConfigFor('Default'), config);
@@ -260,7 +259,7 @@ void main() {
 
   test('IBKR performance cache survives AccountManager reinitialization',
       () async {
-    final accounts = AccountManager();
+    final accounts = testAccountManager();
     await accounts.init();
     final series = IbkrPerformanceSeries(
       period: '1Y',
@@ -278,7 +277,7 @@ void main() {
     await accounts.cacheIbkrPerformance('Default', series);
     expect(accounts.isIbkrPerformanceCacheFresh('Default', '1Y'), isTrue);
 
-    final reloaded = AccountManager();
+    final reloaded = testAccountManager();
     await reloaded.init();
     final cached = reloaded.ibkrPerformanceCacheFor('Default', '1Y');
 

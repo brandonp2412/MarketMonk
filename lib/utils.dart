@@ -9,7 +9,7 @@ import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/logging.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:market_monk/sqlite_settings.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
 
 var currency = NumberFormat.simpleCurrency();
@@ -573,7 +573,7 @@ Future<void> syncCandles(
           : DateTime(latest.date.year, latest.date.month, latest.date.day);
 
       if (ibkrConfig?.isConfigured == true) {
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = await SqliteSettings.getInstance();
         final seedKey =
             'ibkrHistorySeeded:${ibkrConfig!.baseUrl}:$syncNamespace:$symbol';
         final seeded = prefs.getBool(seedKey) ?? false;
@@ -634,12 +634,12 @@ Future<void> syncCandles(
 /// then — only if that currency differs from USD — lazily fetches its USD-based
 /// exchange rate from Frankfurter and stores it in [allRatesFromUsd].
 ///
-/// Results are cached in-memory and in SharedPreferences, so repeat calls are
+/// Results are cached in-memory and in SqliteSettings, so repeat calls are
 /// free and cent-quoted stocks (GBp/ZAc) keep the right scale offline.
 Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
   if (_symbolCurrencies.containsKey(symbol)) return;
 
-  final prefs = await SharedPreferences.getInstance();
+  final prefs = await SqliteSettings.getInstance();
   final savedRaw = prefs.getString('symbolRawCurrency_$symbol');
   if (savedRaw != null) {
     final normalized = cacheSymbolMeta(symbol, savedRaw);
@@ -703,7 +703,7 @@ Future<void> _fetchAndCacheRate(String currencyCode) async {
         ?.toDouble();
     if (rate != null) {
       allRatesFromUsd[currencyCode] = rate;
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SqliteSettings.getInstance();
       await prefs.setDouble('exchangeRate_$currencyCode', rate);
     }
   } catch (error, stackTrace) {

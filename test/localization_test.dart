@@ -4,13 +4,13 @@ import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/l10n/translations.dart';
 import 'package:market_monk/settings_state.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'sqlite_test_support.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() {
-    SharedPreferences.setMockInitialValues({
+  setUp(() async {
+    await seedTestSqlite({
       'visibleCurrencies': ['USD'],
       'displayCurrency': 'USD',
       'exchangeRate_USD': 1.0,
@@ -280,7 +280,7 @@ void main() {
       const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
     );
 
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SqliteSettings.getInstance();
     expect(prefs.getString('languageCode'), 'zh-Hant');
 
     final reloaded = SettingsState();
@@ -312,7 +312,7 @@ void main() {
 
   test('legacy Chinese language preference migrates to Simplified Chinese',
       () async {
-    SharedPreferences.setMockInitialValues({
+    await seedTestSqlite({
       'languageCode': 'zh',
       'visibleCurrencies': ['USD'],
       'displayCurrency': 'USD',
@@ -327,7 +327,7 @@ void main() {
       settings.locale,
       const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'),
     );
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SqliteSettings.getInstance();
     expect(prefs.getString('languageCode'), 'zh-Hans');
   });
 
@@ -341,7 +341,7 @@ void main() {
     await settings.setLanguageCode('pt-PT');
     expect(settings.locale, const Locale('pt', 'PT'));
 
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SqliteSettings.getInstance();
     expect(prefs.getString('languageCode'), 'pt-PT');
 
     expect(
@@ -362,7 +362,7 @@ void main() {
 
   test('legacy Portuguese language preference migrates to Brazilian Portuguese',
       () async {
-    SharedPreferences.setMockInitialValues({
+    await seedTestSqlite({
       'languageCode': 'pt',
       'visibleCurrencies': ['USD'],
       'displayCurrency': 'USD',
@@ -374,7 +374,7 @@ void main() {
 
     expect(settings.languageCode, 'pt-BR');
     expect(settings.locale, const Locale('pt', 'BR'));
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SqliteSettings.getInstance();
     expect(prefs.getString('languageCode'), 'pt-BR');
   });
 
@@ -389,7 +389,7 @@ void main() {
       await settings.setLanguageCode('es');
       expect(settings.locale, const Locale('es'));
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SqliteSettings.getInstance();
       expect(prefs.getString('languageCode'), 'es');
 
       final reloaded = SettingsState();
@@ -424,7 +424,7 @@ void main() {
   });
 
   test('unsupported saved language falls back to the system locale', () async {
-    SharedPreferences.setMockInitialValues({
+    await seedTestSqlite({
       'languageCode': 'xx',
       'visibleCurrencies': ['USD'],
       'displayCurrency': 'USD',

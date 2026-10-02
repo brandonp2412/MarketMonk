@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
+import 'package:market_monk/app_state_database.steps.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -28,14 +29,19 @@ class AppStateDatabase extends _$AppStateDatabase {
   static const activeProfileSettingKey = 'activeProfile';
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onUpgrade: stepByStep(from1To2: (migrator, schema) async {}),
+      );
 
   AppStateDatabase() : super(_openConnection());
 
   AppStateDatabase.connect(super.executor);
 
   static QueryExecutor _openConnection() => driftDatabase(
-        name: 'market-monk-app-state',
+        name: 'market-monk.settings',
         native: const DriftNativeOptions(
           databaseDirectory: getApplicationSupportDirectory,
         ),

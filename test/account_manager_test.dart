@@ -6,12 +6,12 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'sqlite_test_support.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() {
+  setUp(() async {
     db = Database.connect(
       DatabaseConnection(
         NativeDatabase.memory(),
@@ -25,33 +25,33 @@ void main() {
   });
 
   test('repairs a persisted active account that no longer exists', () async {
-    SharedPreferences.setMockInitialValues({
+    await seedTestSqlite({
       'accounts': ['Default', 'Brokerage'],
       'activeAccount': 'Removed',
     });
 
-    final manager = AccountManager();
+    final manager = testAccountManager();
     await manager.init();
 
     expect(manager.accounts, ['Default', 'Brokerage']);
     expect(manager.activeAccount, 'Default');
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SqliteSettings.getInstance();
     expect(prefs.getString('activeAccount'), 'Default');
   });
 
   test('does not switch to an account outside the saved account list',
       () async {
-    SharedPreferences.setMockInitialValues({
+    await seedTestSqlite({
       'accounts': ['Default', 'Brokerage'],
       'activeAccount': 'Default',
     });
 
-    final manager = AccountManager();
+    final manager = testAccountManager();
     await manager.init();
     await manager.switchAccount('Removed');
 
     expect(manager.activeAccount, 'Default');
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SqliteSettings.getInstance();
     expect(prefs.getString('activeAccount'), 'Default');
   });
 
@@ -72,7 +72,7 @@ void main() {
     });
 
     try {
-      SharedPreferences.setMockInitialValues({
+      await seedTestSqlite({
         'accounts': ['Default', 'Brokerage'],
         'activeAccount': 'Default',
       });
@@ -88,7 +88,7 @@ void main() {
       expect(notifications, 1);
 
       await switchFuture;
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SqliteSettings.getInstance();
       expect(prefs.getString('activeAccount'), 'Brokerage');
     } finally {
       await db.close();
@@ -127,7 +127,7 @@ void main() {
       }
     });
 
-    SharedPreferences.setMockInitialValues({
+    await seedTestSqlite({
       'accounts': ['Default'],
       'activeAccount': 'Default',
     });
@@ -217,7 +217,7 @@ void main() {
 
     await createProfileDatabase('market-monk.sqlite', 'VTI', 10);
     await createProfileDatabase('market-monk-Brokerage.sqlite', 'VXUS', 20);
-    SharedPreferences.setMockInitialValues({
+    await seedTestSqlite({
       'accounts': ['Default', 'Brokerage'],
       'activeAccount': 'Brokerage',
       'displayCurrency': 'NZD',
@@ -243,7 +243,7 @@ void main() {
         tradeDate: DateTime(2026, 10, 2),
       ),
     );
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SqliteSettings.getInstance();
     await prefs.setString('displayCurrency', 'USD');
 
     await manager.importBackup(backup);

@@ -8,7 +8,7 @@ import 'package:path/path.dart' as p;
 const marketMonkBackupFileName = 'market-monk-backup.zip';
 const _manifestName = 'manifest.json';
 const _backupFormat = 'market-monk-backup';
-const _backupVersion = 1;
+const _backupVersion = 2;
 
 /// Returns the SQLite file name used by an account on disk.
 String databaseFileNameForAccount(String account) =>
@@ -19,7 +19,7 @@ class MarketMonkBackupContents {
   const MarketMonkBackupContents({
     required this.accounts,
     required this.activeAccount,
-    required this.preferences,
+    required this.settings,
     required this.databases,
   });
 
@@ -29,20 +29,20 @@ class MarketMonkBackupContents {
   /// Profile that should be active after restore.
   final String activeAccount;
 
-  /// Shared application preferences captured with the backup.
-  final Map<String, Object?> preferences;
+  /// Application settings read from SQLite, encoded for portable restore.
+  final Map<String, Object?> settings;
 
   /// Extracted profile databases keyed by profile name.
   final Map<String, File> databases;
 }
 
-/// Builds a ZIP containing all profile databases and app preferences.
+/// Builds a ZIP containing all profile databases and a portable snapshot of SQLite settings.
 Future<File> buildMarketMonkBackupArchive({
   required Directory databaseDirectory,
   required Directory workingDirectory,
   required List<String> accounts,
   required String activeAccount,
-  required Map<String, Object?> preferences,
+  required Map<String, Object?> settings,
 }) async {
   final profiles = <Map<String, Object?>>[];
   final archiveFile =
@@ -69,7 +69,7 @@ Future<File> buildMarketMonkBackupArchive({
         'version': _backupVersion,
         'activeAccount': activeAccount,
         'profiles': profiles,
-        'preferences': preferences,
+        'settings': settings,
       }),
     );
     final manifestFile = File(p.join(workingDirectory.path, _manifestName));
@@ -99,12 +99,13 @@ Future<MarketMonkBackupContents> extractMarketMonkBackupArchive({
     final decoded = json.decode(utf8.decode(manifestEntry.content));
     if (decoded is! Map<String, dynamic> ||
         decoded['format'] != _backupFormat ||
-        decoded['version'] != _backupVersion) {
+        ![1, _backupVersion].contains(decoded['version'])) {
       throw const FormatException('Unsupported Market Monk backup');
     }
 
     final rawProfiles = decoded['profiles'];
-    final rawPreferences = decoded['preferences'];
+    final rawPreferences =
+        decoded[decoded['version'] == 1 ? 'preferences' : 'settings'];
     final activeAccount = decoded['activeAccount'];
     if (rawProfiles is! List ||
         rawPreferences is! Map<String, dynamic> ||
@@ -153,7 +154,7 @@ Future<MarketMonkBackupContents> extractMarketMonkBackupArchive({
     return MarketMonkBackupContents(
       accounts: accounts,
       activeAccount: activeAccount,
-      preferences: Map<String, Object?>.from(rawPreferences),
+      settings: Map<String, Object?>.from(rawPreferences),
       databases: databases,
     );
   } finally {

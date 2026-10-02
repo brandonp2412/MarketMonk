@@ -12,7 +12,7 @@ import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'sqlite_test_support.dart';
 
 IbkrPortfolioSnapshot snapshotFor(String account, String symbol) =>
     IbkrPortfolioSnapshot(
@@ -39,7 +39,7 @@ IbkrPortfolioSnapshot snapshotFor(String account, String symbol) =>
     );
 
 Future<AccountManager> configuredTwoAccounts() async {
-  final accounts = AccountManager();
+  final accounts = testAccountManager();
   await accounts.init();
   accounts.accounts = ['Default', 'IBKR Bot'];
   await accounts.setIbkrConfig(
@@ -87,7 +87,7 @@ void main() {
       );
 
   Future<AccountManager> configuredAccounts() async {
-    final accounts = AccountManager();
+    final accounts = testAccountManager();
     await accounts.init();
     await accounts.setIbkrConfig(
       'Default',
@@ -111,7 +111,7 @@ void main() {
   testWidgets('portfolio exposes a loading state while uncached data loads', (
     tester,
   ) async {
-    SharedPreferences.setMockInitialValues({});
+    await seedTestSqlite({});
     db = Database.connect(
       DatabaseConnection(
         NativeDatabase.memory(),
@@ -143,7 +143,7 @@ void main() {
   testWidgets(
     'portfolio renders persistent cache without waiting for refresh',
     (tester) async {
-      SharedPreferences.setMockInitialValues({});
+      await seedTestSqlite({});
       db = Database.connect(
         DatabaseConnection(
           NativeDatabase.memory(),
@@ -183,8 +183,8 @@ void main() {
   );
 
   test('portfolio cache survives AccountManager reinitialization', () async {
-    SharedPreferences.setMockInitialValues({});
-    final accounts = AccountManager();
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
     await accounts.init();
     await accounts.cachePortfolio(
       'Default',
@@ -193,7 +193,7 @@ void main() {
       netLiquidationUsd: 5500,
     );
 
-    final reloaded = AccountManager();
+    final reloaded = testAccountManager();
     await reloaded.init();
     final cached = reloaded.portfolioCacheFor('Default');
 
@@ -207,7 +207,7 @@ void main() {
   testWidgets(
     'switching IBKR accounts never keeps the previous stream snapshot',
     (tester) async {
-      SharedPreferences.setMockInitialValues({
+      await seedTestSqlite({
         'ibkrHistorySeeded:https://default.example.test:Default:VOO': true,
       });
       db = Database.connect(
@@ -245,7 +245,7 @@ void main() {
   testWidgets(
     'an old IBKR request cannot overwrite the newly selected account cache',
     (tester) async {
-      SharedPreferences.setMockInitialValues({
+      await seedTestSqlite({
         'ibkrHistorySeeded:https://default.example.test:Default:VOO': true,
       });
       db = Database.connect(
@@ -290,7 +290,7 @@ void main() {
   testWidgets(
     'portfolio shows a friendly IBKR error instead of exception text',
     (tester) async {
-      SharedPreferences.setMockInitialValues({});
+      await seedTestSqlite({});
       db = Database.connect(
         DatabaseConnection(
           NativeDatabase.memory(),
@@ -335,7 +335,7 @@ void main() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
     });
-    SharedPreferences.setMockInitialValues({});
+    await seedTestSqlite({});
 
     db = Database.connect(
       DatabaseConnection(
@@ -395,7 +395,7 @@ void main() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
     });
-    SharedPreferences.setMockInitialValues({});
+    await seedTestSqlite({});
 
     db = Database.connect(
       DatabaseConnection(
@@ -446,7 +446,7 @@ void main() {
         tester.view.resetPhysicalSize();
         tester.view.resetDevicePixelRatio();
       });
-      SharedPreferences.setMockInitialValues({});
+      await seedTestSqlite({});
 
       db = Database.connect(
         DatabaseConnection(

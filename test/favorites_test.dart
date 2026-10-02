@@ -7,7 +7,7 @@ import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'sqlite_test_support.dart';
 
 Future<void> _pumpApp(WidgetTester tester, AccountManager accounts) async {
   await tester.pumpWidget(
@@ -27,7 +27,7 @@ void main() {
     'favorites row renders a seeded favorite, navigates to its chart, '
     'and persists un-favoriting',
     (WidgetTester tester) async {
-      SharedPreferences.setMockInitialValues({
+      await seedTestSqlite({
         'favoriteStocks': ['AAPL'],
       });
       // Pre-seed the currency cache so syncCandles doesn't fire a real
@@ -39,7 +39,7 @@ void main() {
           closeStreamsSynchronously: true,
         ),
       );
-      final accounts = AccountManager();
+      final accounts = testAccountManager();
 
       final today = DateTime.now();
       final yesterday = today.subtract(const Duration(days: 1));
@@ -87,7 +87,7 @@ void main() {
 
       // Re-mount the app (simulating a restart) to confirm the removal was
       // actually persisted, not just reflected in transient widget state.
-      await _pumpApp(tester, AccountManager());
+      await _pumpApp(tester, testAccountManager());
       expect(find.text('AAPL'), findsNothing);
 
       await db.close();
@@ -97,7 +97,7 @@ void main() {
   testWidgets(
     'legacy single favoriteStock is migrated into favoriteStocks on load',
     (WidgetTester tester) async {
-      SharedPreferences.setMockInitialValues({'favoriteStock': 'MSFT'});
+      await seedTestSqlite({'favoriteStock': 'MSFT'});
       cacheSymbolMeta('MSFT', 'USD');
       db = Database.connect(
         DatabaseConnection(
@@ -105,7 +105,7 @@ void main() {
           closeStreamsSynchronously: true,
         ),
       );
-      final accounts = AccountManager();
+      final accounts = testAccountManager();
 
       await db.candles.insertOne(
         CandlesCompanion.insert(
@@ -126,7 +126,7 @@ void main() {
 
       expect(find.text('MSFT'), findsOneWidget);
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SqliteSettings.getInstance();
       expect(prefs.getStringList('favoriteStocks'), ['MSFT']);
       expect(prefs.getString('favoriteStock'), null);
 

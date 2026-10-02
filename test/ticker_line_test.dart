@@ -1,3 +1,4 @@
+import 'sqlite_test_support.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,9 +8,11 @@ import 'package:market_monk/ticker_line.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   testWidgets('TickerLine shows currency labels on the Y axis', (
     WidgetTester tester,
   ) async {
+    await seedTestSqlite({});
     final dates = List.generate(10, (i) => DateTime(2026, 1, i + 1));
     final spots = [
       for (var i = 0; i < 10; i++) FlSpot(i.toDouble(), 100.0 + i * 10),
@@ -36,6 +39,7 @@ void main() {
   testWidgets('TickerLine tooltip shows price and date on the same line', (
     WidgetTester tester,
   ) async {
+    await seedTestSqlite({});
     final date = DateTime(2026, 1, 2);
     const spot = FlSpot(0, 123.45);
     final chart = TickerLine(dates: [date], spots: const [spot]);
