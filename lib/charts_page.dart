@@ -1432,7 +1432,7 @@ class ChartsPageState extends State<ChartsPage>
 
     return Padding(
       padding: EdgeInsets.symmetric(
-        horizontal: isDesktopLayout(context) ? 24 : 16,
+        horizontal: isDesktopLayout(context) ? 32 : 16,
         vertical: 8,
       ),
       child: Column(
@@ -1802,7 +1802,7 @@ class ChartsPageState extends State<ChartsPage>
     return Padding(
       key: const Key('portfolio-summary-content'),
       padding: EdgeInsets.symmetric(
-        horizontal: isDesktopLayout(context) ? 24 : 16,
+        horizontal: isDesktopLayout(context) ? 32 : 16,
         vertical: 8,
       ),
       child: Column(

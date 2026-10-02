@@ -714,302 +714,312 @@ class HoldingsPageState extends State<HoldingsPage>
       );
     }
 
-    return Column(
-      children: [
-        Row(
-          children: [
-            _desktopMetric(
-              context,
-              label: context.l10n.text('Market value'),
-              value: fmtCurrency(totalValue),
-            ),
-            const SizedBox(width: 12),
-            _desktopMetric(
-              context,
-              label: context.l10n.text('Cost basis'),
-              value: fmtCurrency(totalCost),
-            ),
-            const SizedBox(width: 12),
-            _desktopMetric(
-              context,
-              label: context.l10n.text('Unrealized P/L'),
-              value:
-                  '${totalUnrealized >= 0 ? '+' : ''}${fmtCurrency(totalUnrealized)}',
-              valueColor:
-                  totalUnrealized >= 0 ? Colors.green : Colors.redAccent,
-            ),
-            const SizedBox(width: 12),
-            _desktopMetric(
-              context,
-              label: context.l10n.text('Open positions'),
-              value: open.length.toString(),
-              detail: '$winners positive · ${open.length - winners} negative',
-            ),
-            const SizedBox(width: 4),
-            Tooltip(
-              message: context.l10n.text('Refresh'),
-              child: IconButton(
-                onPressed: _refreshCandles,
-                icon: const Icon(Icons.refresh_rounded),
+    return Padding(
+      key: const Key('desktop-holdings-content'),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              _desktopMetric(
+                context,
+                label: context.l10n.text('Market value'),
+                value: fmtCurrency(totalValue),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Expanded(
-          child: Card(
-            margin: EdgeInsets.zero,
-            clipBehavior: Clip.antiAlias,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final compactTable = constraints.maxWidth < 1000;
-                final effectiveSortColumnIndex = compactTable
-                    ? switch (_desktopSort) {
-                        _HoldingsSort.symbol => 0,
-                        _HoldingsSort.value => 1,
-                        _HoldingsSort.unrealized => 2,
-                        _HoldingsSort.returnPct => 3,
-                      }
-                    : sortColumnIndex;
-                final tableWidth = compactTable
-                    ? constraints.maxWidth
-                    : constraints.maxWidth < 1240
-                        ? 1240.0
-                        : constraints.maxWidth;
-                return Scrollbar(
-                  controller: _desktopTableScrollController,
-                  child: SingleChildScrollView(
+              const SizedBox(width: 12),
+              _desktopMetric(
+                context,
+                label: context.l10n.text('Cost basis'),
+                value: fmtCurrency(totalCost),
+              ),
+              const SizedBox(width: 12),
+              _desktopMetric(
+                context,
+                label: context.l10n.text('Unrealized P/L'),
+                value:
+                    '${totalUnrealized >= 0 ? '+' : ''}${fmtCurrency(totalUnrealized)}',
+                valueColor:
+                    totalUnrealized >= 0 ? Colors.green : Colors.redAccent,
+              ),
+              const SizedBox(width: 12),
+              _desktopMetric(
+                context,
+                label: context.l10n.text('Open positions'),
+                value: open.length.toString(),
+                detail: '$winners positive · ${open.length - winners} negative',
+              ),
+              const SizedBox(width: 4),
+              Tooltip(
+                message: context.l10n.text('Refresh'),
+                child: IconButton(
+                  onPressed: _refreshCandles,
+                  icon: const Icon(Icons.refresh_rounded),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: Card(
+              margin: EdgeInsets.zero,
+              clipBehavior: Clip.antiAlias,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final compactTable = constraints.maxWidth < 1000;
+                  final effectiveSortColumnIndex = compactTable
+                      ? switch (_desktopSort) {
+                          _HoldingsSort.symbol => 0,
+                          _HoldingsSort.value => 1,
+                          _HoldingsSort.unrealized => 2,
+                          _HoldingsSort.returnPct => 3,
+                        }
+                      : sortColumnIndex;
+                  final tableWidth = compactTable
+                      ? constraints.maxWidth
+                      : constraints.maxWidth < 1240
+                          ? 1240.0
+                          : constraints.maxWidth;
+                  return Scrollbar(
                     controller: _desktopTableScrollController,
                     child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: SizedBox(
-                        width: tableWidth,
-                        child: DataTable(
-                          showCheckboxColumn: _selecting && !ibkrManaged,
-                          sortColumnIndex: effectiveSortColumnIndex,
-                          sortAscending: _desktopSortAscending,
-                          headingRowColor: WidgetStatePropertyAll(
-                            theme.colorScheme.surfaceContainerLow,
-                          ),
-                          headingTextStyle:
-                              theme.textTheme.labelMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w700,
-                          ),
-                          dataRowMinHeight: 62,
-                          dataRowMaxHeight: 70,
-                          horizontalMargin: 18,
-                          columnSpacing: 24,
-                          columns: [
-                            DataColumn(
-                              label: Text(context.l10n.text('Holding')),
-                              onSort: (_, __) =>
-                                  _setDesktopSort(_HoldingsSort.symbol),
+                      controller: _desktopTableScrollController,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: SizedBox(
+                          width: tableWidth,
+                          child: DataTable(
+                            showCheckboxColumn: _selecting && !ibkrManaged,
+                            sortColumnIndex: effectiveSortColumnIndex,
+                            sortAscending: _desktopSortAscending,
+                            headingRowColor: WidgetStatePropertyAll(
+                              theme.colorScheme.surfaceContainerLow,
                             ),
-                            if (!compactTable) ...[
+                            headingTextStyle:
+                                theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            dataRowMinHeight: 62,
+                            dataRowMaxHeight: 70,
+                            horizontalMargin: 18,
+                            columnSpacing: 24,
+                            columns: [
+                              DataColumn(
+                                label: Text(context.l10n.text('Holding')),
+                                onSort: (_, __) =>
+                                    _setDesktopSort(_HoldingsSort.symbol),
+                              ),
+                              if (!compactTable) ...[
+                                DataColumn(
+                                  numeric: true,
+                                  label: Text(context.l10n.text('Shares')),
+                                ),
+                                DataColumn(
+                                  numeric: true,
+                                  label: Text(context.l10n.text('Avg cost')),
+                                ),
+                                DataColumn(
+                                  numeric: true,
+                                  label: Text(context.l10n.text('Price')),
+                                ),
+                              ],
                               DataColumn(
                                 numeric: true,
-                                label: Text(context.l10n.text('Shares')),
+                                label: Text(
+                                  context.l10n.text(
+                                    compactTable ? 'Value' : 'Market value',
+                                  ),
+                                ),
+                                onSort: (_, __) =>
+                                    _setDesktopSort(_HoldingsSort.value),
                               ),
                               DataColumn(
                                 numeric: true,
-                                label: Text(context.l10n.text('Avg cost')),
+                                label: Text(context.l10n.text('P/L')),
+                                onSort: (_, __) =>
+                                    _setDesktopSort(_HoldingsSort.unrealized),
                               ),
                               DataColumn(
                                 numeric: true,
-                                label: Text(context.l10n.text('Price')),
+                                label: Text(context.l10n.text('Return')),
+                                onSort: (_, __) =>
+                                    _setDesktopSort(_HoldingsSort.returnPct),
                               ),
                             ],
-                            DataColumn(
-                              numeric: true,
-                              label: Text(
-                                context.l10n.text(
-                                  compactTable ? 'Value' : 'Market value',
-                                ),
-                              ),
-                              onSort: (_, __) =>
-                                  _setDesktopSort(_HoldingsSort.value),
-                            ),
-                            DataColumn(
-                              numeric: true,
-                              label: Text(context.l10n.text('P/L')),
-                              onSort: (_, __) =>
-                                  _setDesktopSort(_HoldingsSort.unrealized),
-                            ),
-                            DataColumn(
-                              numeric: true,
-                              label: Text(context.l10n.text('Return')),
-                              onSort: (_, __) =>
-                                  _setDesktopSort(_HoldingsSort.returnPct),
-                            ),
-                          ],
-                          rows: [
-                            for (final summary in sorted)
-                              (() {
-                                final position = summary.position;
-                                final isClosed = position == null;
-                                final returnPct = position?.change ?? 0;
-                                final pnl = position?.unrealizedPL ??
-                                    summary.totalRealizedPL;
-                                final pnlText = isClosed
-                                    ? '${pnl >= 0 ? '+' : ''}${fmtNativeCurrency(pnl, symbolCurrency(summary.symbol))}'
-                                    : '${pnl >= 0 ? '+' : ''}${fmtCurrency(pnl)}';
-                                final shares = position == null
-                                    ? '—'
-                                    : position.netShares.toStringAsFixed(
-                                        position.netShares ==
-                                                position.netShares
-                                                    .roundToDouble()
-                                            ? 0
-                                            : 3,
-                                      );
-                                final changeColor = isClosed
-                                    ? theme.colorScheme.onSurfaceVariant
-                                    : returnPct >= 0
-                                        ? Colors.green
-                                        : Colors.redAccent;
-                                final pnlColor =
-                                    pnl >= 0 ? Colors.green : Colors.redAccent;
+                            rows: [
+                              for (final summary in sorted)
+                                (() {
+                                  final position = summary.position;
+                                  final isClosed = position == null;
+                                  final returnPct = position?.change ?? 0;
+                                  final pnl = position?.unrealizedPL ??
+                                      summary.totalRealizedPL;
+                                  final pnlText = isClosed
+                                      ? '${pnl >= 0 ? '+' : ''}${fmtNativeCurrency(pnl, symbolCurrency(summary.symbol))}'
+                                      : '${pnl >= 0 ? '+' : ''}${fmtCurrency(pnl)}';
+                                  final shares = position == null
+                                      ? '—'
+                                      : position.netShares.toStringAsFixed(
+                                          position.netShares ==
+                                                  position.netShares
+                                                      .roundToDouble()
+                                              ? 0
+                                              : 3,
+                                        );
+                                  final changeColor = isClosed
+                                      ? theme.colorScheme.onSurfaceVariant
+                                      : returnPct >= 0
+                                          ? Colors.green
+                                          : Colors.redAccent;
+                                  final pnlColor = pnl >= 0
+                                      ? Colors.green
+                                      : Colors.redAccent;
 
-                                return DataRow(
-                                  selected:
-                                      _selectedSymbols.contains(summary.symbol),
-                                  onSelectChanged: _selecting && !ibkrManaged
-                                      ? (_) => toggleSelection(summary)
-                                      : null,
-                                  cells: [
-                                    DataCell(
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            isClosed
-                                                ? Icons.history_rounded
-                                                : returnPct >= 0
-                                                    ? Icons.trending_up_rounded
-                                                    : Icons
-                                                        .trending_down_rounded,
-                                            size: 20,
-                                            color: changeColor,
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: Column(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  children: [
-                                                    Flexible(
-                                                      child: Text(
-                                                        summary.symbol,
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                        style: theme.textTheme
-                                                            .titleSmall
-                                                            ?.copyWith(
-                                                          fontWeight:
-                                                              FontWeight.w700,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    if (isClosed) ...[
-                                                      const SizedBox(width: 8),
-                                                      Text(
-                                                        context.l10n
-                                                            .text('Closed'),
-                                                        style: theme.textTheme
-                                                            .labelSmall
-                                                            ?.copyWith(
-                                                          color: theme
-                                                              .colorScheme
-                                                              .onSurfaceVariant,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ],
-                                                ),
-                                                Text(
-                                                  summary.name,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: theme
-                                                      .textTheme.bodySmall
-                                                      ?.copyWith(
-                                                    color: theme.colorScheme
-                                                        .onSurfaceVariant,
-                                                  ),
-                                                ),
-                                              ],
+                                  return DataRow(
+                                    selected: _selectedSymbols
+                                        .contains(summary.symbol),
+                                    onSelectChanged: _selecting && !ibkrManaged
+                                        ? (_) => toggleSelection(summary)
+                                        : null,
+                                    cells: [
+                                      DataCell(
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              isClosed
+                                                  ? Icons.history_rounded
+                                                  : returnPct >= 0
+                                                      ? Icons
+                                                          .trending_up_rounded
+                                                      : Icons
+                                                          .trending_down_rounded,
+                                              size: 20,
+                                              color: changeColor,
                                             ),
-                                          ),
-                                        ],
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Column(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    children: [
+                                                      Flexible(
+                                                        child: Text(
+                                                          summary.symbol,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                          style: theme.textTheme
+                                                              .titleSmall
+                                                              ?.copyWith(
+                                                            fontWeight:
+                                                                FontWeight.w700,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      if (isClosed) ...[
+                                                        const SizedBox(
+                                                          width: 8,
+                                                        ),
+                                                        Text(
+                                                          context.l10n
+                                                              .text('Closed'),
+                                                          style: theme.textTheme
+                                                              .labelSmall
+                                                              ?.copyWith(
+                                                            color: theme
+                                                                .colorScheme
+                                                                .onSurfaceVariant,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ],
+                                                  ),
+                                                  Text(
+                                                    summary.name,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: theme
+                                                        .textTheme.bodySmall
+                                                        ?.copyWith(
+                                                      color: theme.colorScheme
+                                                          .onSurfaceVariant,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        onTap: _selecting
+                                            ? null
+                                            : () => _openDetail(summary),
                                       ),
-                                      onTap: _selecting
-                                          ? null
-                                          : () => _openDetail(summary),
-                                    ),
-                                    if (!compactTable) ...[
+                                      if (!compactTable) ...[
+                                        textCell(
+                                          shares,
+                                          summary: summary,
+                                        ),
+                                        textCell(
+                                          position == null
+                                              ? '—'
+                                              : fmtNativeCurrency(
+                                                  position.avgCost,
+                                                  position.nativeCurrency,
+                                                ),
+                                          summary: summary,
+                                        ),
+                                        textCell(
+                                          position == null
+                                              ? '—'
+                                              : fmtNativeCurrency(
+                                                  position.currentPrice,
+                                                  position.nativeCurrency,
+                                                ),
+                                          summary: summary,
+                                        ),
+                                      ],
                                       textCell(
-                                        shares,
+                                        position == null
+                                            ? '—'
+                                            : fmtCurrency(
+                                                position.currentValue,
+                                              ),
                                         summary: summary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      textCell(
+                                        pnlText,
+                                        summary: summary,
+                                        color: pnlColor,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                       textCell(
                                         position == null
                                             ? '—'
-                                            : fmtNativeCurrency(
-                                                position.avgCost,
-                                                position.nativeCurrency,
-                                              ),
+                                            : '${returnPct >= 0 ? '+' : ''}${returnPct.toStringAsFixed(2)}%',
                                         summary: summary,
-                                      ),
-                                      textCell(
-                                        position == null
-                                            ? '—'
-                                            : fmtNativeCurrency(
-                                                position.currentPrice,
-                                                position.nativeCurrency,
-                                              ),
-                                        summary: summary,
+                                        color: changeColor,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ],
-                                    textCell(
-                                      position == null
-                                          ? '—'
-                                          : fmtCurrency(position.currentValue),
-                                      summary: summary,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    textCell(
-                                      pnlText,
-                                      summary: summary,
-                                      color: pnlColor,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    textCell(
-                                      position == null
-                                          ? '—'
-                                          : '${returnPct >= 0 ? '+' : ''}${returnPct.toStringAsFixed(2)}%',
-                                      summary: summary,
-                                      color: changeColor,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ],
-                                );
-                              })(),
-                          ],
+                                  );
+                                })(),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1056,48 +1066,48 @@ class HoldingsPageState extends State<HoldingsPage>
       final query = _search.text.trim();
       return _refreshableState(
         AppEmptyState(
-        icon: ibkrManaged
-            ? Icons.account_balance_rounded
-            : query.isEmpty
-                ? Icons.candlestick_chart_rounded
-                : Icons.search_off_rounded,
-        title: ibkrManaged
-            ? context.l10n.text('No IBKR stocks found')
-            : query.isEmpty
-                ? context.l10n.text('No stocks yet')
-                : context.l10n.text('No matching stocks'),
-        message: ibkrManaged
-            ? context.l10n.text(
-                'Refresh your portfolio or check your Interactive Brokers connection.',
-              )
-            : query.isEmpty
-                ? context.l10n.text(
-                    'Import a CSV or add your first trade manually.',
-                  )
-                : context.l10n.text(
-                    'Nothing matches “{query}”. You can add that ticker now.',
-                    {'query': query},
-                  ),
-        actionLabel: ibkrManaged
-            ? context.l10n.text('IBKR settings')
-            : query.isEmpty
-                ? context.l10n.text('Import CSV')
-                : context.l10n.text('Add {symbol}', {
-                    'symbol': query.toUpperCase(),
-                  }),
-        actionIcon: ibkrManaged
-            ? Icons.settings_rounded
-            : query.isEmpty
-                ? Icons.upload_file_rounded
-                : Icons.add_rounded,
-        onAction: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ibkrManaged || query.isEmpty
-                ? const SettingsPage()
-                : EditTickerPage(symbol: query.toUpperCase()),
+          icon: ibkrManaged
+              ? Icons.account_balance_rounded
+              : query.isEmpty
+                  ? Icons.candlestick_chart_rounded
+                  : Icons.search_off_rounded,
+          title: ibkrManaged
+              ? context.l10n.text('No IBKR stocks found')
+              : query.isEmpty
+                  ? context.l10n.text('No stocks yet')
+                  : context.l10n.text('No matching stocks'),
+          message: ibkrManaged
+              ? context.l10n.text(
+                  'Refresh your portfolio or check your Interactive Brokers connection.',
+                )
+              : query.isEmpty
+                  ? context.l10n.text(
+                      'Import a CSV or add your first trade manually.',
+                    )
+                  : context.l10n.text(
+                      'Nothing matches “{query}”. You can add that ticker now.',
+                      {'query': query},
+                    ),
+          actionLabel: ibkrManaged
+              ? context.l10n.text('IBKR settings')
+              : query.isEmpty
+                  ? context.l10n.text('Import CSV')
+                  : context.l10n.text('Add {symbol}', {
+                      'symbol': query.toUpperCase(),
+                    }),
+          actionIcon: ibkrManaged
+              ? Icons.settings_rounded
+              : query.isEmpty
+                  ? Icons.upload_file_rounded
+                  : Icons.add_rounded,
+          onAction: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ibkrManaged || query.isEmpty
+                  ? const SettingsPage()
+                  : EditTickerPage(symbol: query.toUpperCase()),
+            ),
           ),
-        ),
         ),
       );
     }

@@ -71,6 +71,10 @@ void main() {
     expect(find.text('Return'), findsOneWidget);
     expect(find.byType(ListTile), findsNothing);
     expect(find.byTooltip('Refresh'), findsOneWidget);
+    final desktopPadding = tester.widget<Padding>(
+      find.byKey(const Key('desktop-holdings-content')),
+    );
+    expect(desktopPadding.padding, const EdgeInsets.fromLTRB(24, 16, 24, 24));
     final scrollbar = tester.widget<Scrollbar>(find.byType(Scrollbar));
     expect(scrollbar.controller == null, false);
     expect(scrollbar.controller!.hasClients, true);

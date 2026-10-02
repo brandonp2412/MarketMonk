@@ -466,8 +466,8 @@ void main() {
       find.byKey(const Key('portfolio-summary-content')),
     );
     final summaryInsets = summaryPadding.padding as EdgeInsets;
-    expect(summaryInsets.left, 24);
-    expect(summaryInsets.right, 24);
+    expect(summaryInsets.left, 32);
+    expect(summaryInsets.right, 32);
     expect(performanceLoads, greaterThan(0));
     expect(find.text('+5.49%'), findsOneWidget);
     expect(find.textContaining('TWR'), findsNothing);
