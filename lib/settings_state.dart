@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
+import 'device_region_currency_stub.dart'
+    if (dart.library.io) 'device_region_currency_io.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
@@ -54,6 +57,7 @@ const supportedCurrencies = [
 
 class SettingsState extends ChangeNotifier {
   final Future<http.Response> Function(Uri) _rateFetcher;
+  final Future<String?> Function()? _localCurrencyDetector;
   late final Future<void> initialized;
 
   ThemeMode theme = ThemeMode.system;
@@ -68,8 +72,11 @@ class SettingsState extends ChangeNotifier {
   bool showMarketClosed = false;
   bool pureBlack = false;
 
-  SettingsState({Future<http.Response> Function(Uri)? rateFetcher})
-      : _rateFetcher = rateFetcher ?? http.get {
+  SettingsState({
+    Future<http.Response> Function(Uri)? rateFetcher,
+    Future<String?> Function()? localCurrencyDetector,
+  })  : _rateFetcher = rateFetcher ?? http.get,
+        _localCurrencyDetector = localCurrencyDetector {
     initialized = init();
   }
 
@@ -93,14 +100,33 @@ class SettingsState extends ChangeNotifier {
     return 'USD';
   }
 
-  static String _detectLocaleCurrency() =>
-      currencyForLocale(WidgetsBinding.instance.platformDispatcher.locale);
+  Future<String> _detectLocalCurrency() async {
+    try {
+      final detected = await (_localCurrencyDetector?.call() ??
+          detectDeviceRegionCurrency());
+      if (detected != null && supportedCurrencies.contains(detected)) {
+        return detected;
+      }
+    } catch (_) {}
 
-  static List<String> _defaultVisibleCurrencies() {
-    final home = _detectLocaleCurrency();
-    final defaults = {home, 'USD'};
-    return supportedCurrencies.where(defaults.contains).toList();
+    return currencyForLocale(WidgetsBinding.instance.platformDispatcher.locale);
   }
+
+  static List<String> _withUsd(Iterable<String> currencies) {
+    final normalized = <String>[];
+    for (final code in currencies) {
+      if (code != 'USD' &&
+          supportedCurrencies.contains(code) &&
+          !normalized.contains(code)) {
+        normalized.add(code);
+      }
+    }
+    normalized.add('USD');
+    return normalized;
+  }
+
+  static List<String> _defaultVisibleCurrencies(String homeCurrency) =>
+      _withUsd([homeCurrency]);
 
   Future<void> init() async {
     final prefs = await SqliteSettings.getInstance();
@@ -146,16 +172,20 @@ class SettingsState extends ChangeNotifier {
     final colorVal = prefs.getInt('seedColor');
     seedColor = colorVal != null ? Color(colorVal) : _defaultSeedColor;
 
+    final homeCurrency = await _detectLocalCurrency();
     final savedCurrencies = prefs.getStringList('visibleCurrencies');
     visibleCurrencies = (savedCurrencies != null && savedCurrencies.isNotEmpty)
-        ? savedCurrencies
-        : _defaultVisibleCurrencies();
+        ? _withUsd(savedCurrencies)
+        : _defaultVisibleCurrencies(homeCurrency);
+    if (savedCurrencies != null &&
+        !listEquals(savedCurrencies, visibleCurrencies)) {
+      await prefs.setStringList('visibleCurrencies', visibleCurrencies);
+    }
 
     showMarketClosed = prefs.getBool('showMarketClosed') ?? false;
     pureBlack = prefs.getBool('pureBlack') ?? false;
 
-    displayCurrency =
-        prefs.getString('displayCurrency') ?? _detectLocaleCurrency();
+    displayCurrency = prefs.getString('displayCurrency') ?? homeCurrency;
     if (!visibleCurrencies.contains(displayCurrency)) {
       displayCurrency = visibleCurrencies.first;
     }
@@ -293,10 +323,9 @@ class SettingsState extends ChangeNotifier {
   }
 
   Future<void> setVisibleCurrencies(List<String> currencies) async {
-    assert(currencies.isNotEmpty);
-    visibleCurrencies = List.from(currencies);
+    visibleCurrencies = _withUsd(currencies);
     final prefs = await SqliteSettings.getInstance();
-    await prefs.setStringList('visibleCurrencies', currencies);
+    await prefs.setStringList('visibleCurrencies', visibleCurrencies);
     if (!visibleCurrencies.contains(displayCurrency)) {
       await _setDisplayCurrency(visibleCurrencies.first, prefs);
       return;

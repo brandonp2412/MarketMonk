@@ -31,6 +31,25 @@ void main() {
     expect(SettingsState.currencyForLocale(const Locale('en', 'US')), 'USD');
   });
 
+  testWidgets(
+      'device region currency takes precedence over language-format locale',
+      (tester) async {
+    await seedTestSqlite({});
+    tester.binding.platformDispatcher.localeTestValue =
+        const Locale('en', 'GB');
+    addTearDown(tester.binding.platformDispatcher.clearLocaleTestValue);
+
+    final settings = SettingsState(
+      localCurrencyDetector: () async => 'NZD',
+      rateFetcher: (_) async => http.Response('{"rates":{"NZD":1.6}}', 200),
+    );
+    await settings.initialized;
+
+    expect(settings.displayCurrency, 'NZD');
+    expect(settings.visibleCurrencies, ['NZD', 'USD']);
+    expect(currency.currencyName, 'NZD');
+  });
+
   testWidgets('fresh install uses the Flutter device locale', (tester) async {
     await seedTestSqlite({});
     tester.binding.platformDispatcher.localeTestValue =
@@ -63,6 +82,32 @@ void main() {
 
     final prefs = await SqliteSettings.getInstance();
     expect(prefs.getString('displayCurrency'), 'NZD');
+  });
+
+  test('existing visible currencies are migrated to include USD', () async {
+    await seedTestSqlite({
+      'visibleCurrencies': ['NZD'],
+      'displayCurrency': 'NZD',
+      'exchangeRate_NZD': 1.6,
+    });
+
+    final settings = SettingsState();
+    await settings.initialized;
+
+    expect(settings.visibleCurrencies, ['NZD', 'USD']);
+    final prefs = await SqliteSettings.getInstance();
+    expect(prefs.getStringList('visibleCurrencies'), ['NZD', 'USD']);
+  });
+
+  test('USD remains available when visible currencies are changed', () async {
+    final settings = SettingsState();
+    await settings.initialized;
+
+    await settings.setVisibleCurrencies(['NZD']);
+
+    expect(settings.visibleCurrencies, ['NZD', 'USD']);
+    final prefs = await SqliteSettings.getInstance();
+    expect(prefs.getStringList('visibleCurrencies'), ['NZD', 'USD']);
   });
 
   test('changing display currency switches the formatter immediately',

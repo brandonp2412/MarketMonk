@@ -345,7 +345,7 @@ class _SettingsPageState extends State<SettingsPage> {
     BuildContext context,
     SettingsState settings,
   ) async {
-    var selected = Set<String>.from(settings.visibleCurrencies);
+    var selected = Set<String>.from(settings.visibleCurrencies)..add('USD');
 
     await showDialog<void>(
       context: context,
@@ -362,15 +362,17 @@ class _SettingsPageState extends State<SettingsPage> {
                       dense: true,
                       title: Text(c),
                       value: selected.contains(c),
-                      onChanged: (checked) {
-                        setState(() {
-                          if (checked == true) {
-                            selected.add(c);
-                          } else if (selected.length > 1) {
-                            selected.remove(c);
-                          }
-                        });
-                      },
+                      onChanged: c == 'USD'
+                          ? null
+                          : (checked) {
+                              setState(() {
+                                if (checked == true) {
+                                  selected.add(c);
+                                } else {
+                                  selected.remove(c);
+                                }
+                              });
+                            },
                     ),
                   )
                   .toList(),
