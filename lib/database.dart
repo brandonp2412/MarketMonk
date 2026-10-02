@@ -113,6 +113,9 @@ class Database extends _$Database {
     return driftDatabase(
       name: name,
       native: const DriftNativeOptions(
+        // Share the executor so cache writes wait for candle/trade transactions.
+        // https://pub.dev/packages/drift_flutter#sharing-databases-between-isolates
+        shareAcrossIsolates: true,
         databaseDirectory: getApplicationSupportDirectory,
       ),
     );

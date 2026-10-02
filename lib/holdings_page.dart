@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart' hide Column, Table;
 import 'package:flutter/material.dart';
 import 'package:market_monk/adaptive_layout.dart';
@@ -113,7 +115,9 @@ class HoldingsPageState extends State<HoldingsPage>
       }
       final result = await _computeSummaries(trades);
       if (mounted) setState(() => _summaries = result);
-    } catch (_) {}
+    } catch (error, stack) {
+      _reportError(error, stack, 'preloading holdings');
+    }
   }
 
   Future<List<Position>> _loadPositions(List<Trade> trades) async {
@@ -128,7 +132,7 @@ class HoldingsPageState extends State<HoldingsPage>
       final symbols = trades.map((trade) => trade.symbol).toSet().toList();
       final prices = await fetchLatestPrices(symbols);
       final positions = computePositions(trades, prices);
-      await accounts.cachePortfolio(accountName, positions, null);
+      await _cachePortfolio(accounts, accountName, positions, null);
       return positions;
     }
     if (!config.isConfigured) {
@@ -137,12 +141,37 @@ class HoldingsPageState extends State<HoldingsPage>
     final snapshot = await IbkrApiClient(config).fetchPortfolio();
     cacheIbkrAccountExchangeRate(snapshot);
     final positions = await computeIbkrPositions(snapshot.positions, trades);
-    await accounts.cachePortfolio(
+    await _cachePortfolio(
+      accounts,
       accountName,
       positions,
       snapshot.netLiquidation,
     );
     return positions;
+  }
+
+  Future<void> _cachePortfolio(
+    AccountManager accounts,
+    String accountName,
+    List<Position> positions,
+    IbkrAccountValue? netLiquidation,
+  ) async {
+    try {
+      await accounts.cachePortfolio(accountName, positions, netLiquidation);
+    } catch (error, stack) {
+      _reportError(error, stack, 'saving the holdings cache');
+    }
+  }
+
+  void _reportError(Object error, StackTrace stack, String operation) {
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: error,
+        stack: stack,
+        library: 'Market Monk holdings',
+        context: ErrorDescription('while $operation'),
+      ),
+    );
   }
 
   /// Fires candle syncs for all held symbols in the background without
@@ -163,7 +192,9 @@ class HoldingsPageState extends State<HoldingsPage>
           syncNamespace: accountName,
         );
       }
-    } catch (_) {}
+    } catch (error, stack) {
+      _reportError(error, stack, 'syncing holdings in the background');
+    }
     if (mounted) setState(() => _stream = _buildStream());
   }
 
@@ -221,7 +252,14 @@ class HoldingsPageState extends State<HoldingsPage>
   }
 
   Stream<List<SymbolSummary>> _buildStream() {
-    return db.trades.select().watch().asyncMap(_computeSummaries);
+    return db.trades.select().watch().asyncMap(_computeSummaries).transform(
+      StreamTransformer<List<SymbolSummary>, List<SymbolSummary>>.fromHandlers(
+        handleError: (error, stack, sink) {
+          _reportError(error, stack, 'loading holdings');
+          sink.addError(error, stack);
+        },
+      ),
+    );
   }
 
   void _exitSelecting() {
@@ -1119,7 +1157,22 @@ class HoldingsPageState extends State<HoldingsPage>
     AsyncSnapshot<List<SymbolSummary>> snap,
   ) {
     if (snap.hasError) {
-      return _refreshableState(Center(child: Text(snap.error.toString())));
+      return _refreshableState(
+        Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(context.l10n.text('Couldn’t load holdings')),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: _retryHoldings,
+                icon: const Icon(Icons.refresh),
+                label: Text(context.l10n.text('Try again')),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     final ibkrManaged = context.watch<AccountManager>().ibkrConfigFor().enabled;
@@ -1238,6 +1291,11 @@ class HoldingsPageState extends State<HoldingsPage>
       context,
       MaterialPageRoute(builder: (_) => TradeHistoryPage(summary: s)),
     );
+  }
+
+  void _retryHoldings() {
+    setState(() => _stream = _buildStream());
+    unawaited(_preload());
   }
 
   Future<void> _refreshCandles() async {
