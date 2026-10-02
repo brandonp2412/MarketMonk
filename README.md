@@ -71,6 +71,3 @@ from3To4: (Migrator m, Schema4 schema) async {
 
 4. Run `dart run build_runner build -d`
 
-## Attribution
-
-<a href="https://www.flaticon.com/free-icons/meditation" title="meditation icons">Meditation icons created by Freepik - Flaticon</a>
