@@ -1105,6 +1105,21 @@ class PortfolioPageState extends State<PortfolioPage>
                                 );
 
                                 if (constraints.maxWidth < 600) {
+                                  if (constraints.maxHeight < 280) {
+                                    return Row(
+                                      key: const Key(
+                                        'desktop-allocation-compact',
+                                      ),
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        Expanded(flex: 4, child: chart),
+                                        const SizedBox(width: 14),
+                                        Expanded(flex: 6, child: holdingsList),
+                                      ],
+                                    );
+                                  }
+
                                   return Column(
                                     key: const Key(
                                       'desktop-allocation-compact',
