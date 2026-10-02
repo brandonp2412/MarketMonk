@@ -30,3 +30,23 @@ class Candles extends Table {
   IntColumn get volume => integer().withDefault(const Constant(0))();
   RealColumn get adjClose => real().withDefault(const Constant(-1.0))();
 }
+
+class IbkrProfileSettings extends Table {
+  IntColumn get id => integer().withDefault(const Constant(1))();
+  BoolColumn get enabled => boolean().withDefault(const Constant(false))();
+  TextColumn get baseUrl => text().withDefault(const Constant(''))();
+  TextColumn get token => text().withDefault(const Constant(''))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class IbkrCacheEntries extends Table {
+  TextColumn get kind => text()();
+  TextColumn get cacheKey => text()();
+  TextColumn get payloadJson => text()();
+  DateTimeColumn get cachedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {kind, cacheKey};
+}

@@ -894,11 +894,546 @@ class TradesCompanion extends UpdateCompanion<Trade> {
   }
 }
 
+class $IbkrProfileSettingsTable extends IbkrProfileSettings
+    with TableInfo<$IbkrProfileSettingsTable, IbkrProfileSetting> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $IbkrProfileSettingsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(1));
+  static const VerificationMeta _enabledMeta =
+      const VerificationMeta('enabled');
+  @override
+  late final GeneratedColumn<bool> enabled = GeneratedColumn<bool>(
+      'enabled', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("enabled" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _baseUrlMeta =
+      const VerificationMeta('baseUrl');
+  @override
+  late final GeneratedColumn<String> baseUrl = GeneratedColumn<String>(
+      'base_url', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(''));
+  static const VerificationMeta _tokenMeta = const VerificationMeta('token');
+  @override
+  late final GeneratedColumn<String> token = GeneratedColumn<String>(
+      'token', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(''));
+  @override
+  List<GeneratedColumn> get $columns => [id, enabled, baseUrl, token];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'ibkr_profile_settings';
+  @override
+  VerificationContext validateIntegrity(Insertable<IbkrProfileSetting> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('enabled')) {
+      context.handle(_enabledMeta,
+          enabled.isAcceptableOrUnknown(data['enabled']!, _enabledMeta));
+    }
+    if (data.containsKey('base_url')) {
+      context.handle(_baseUrlMeta,
+          baseUrl.isAcceptableOrUnknown(data['base_url']!, _baseUrlMeta));
+    }
+    if (data.containsKey('token')) {
+      context.handle(
+          _tokenMeta, token.isAcceptableOrUnknown(data['token']!, _tokenMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  IbkrProfileSetting map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return IbkrProfileSetting(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      enabled: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}enabled'])!,
+      baseUrl: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}base_url'])!,
+      token: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}token'])!,
+    );
+  }
+
+  @override
+  $IbkrProfileSettingsTable createAlias(String alias) {
+    return $IbkrProfileSettingsTable(attachedDatabase, alias);
+  }
+}
+
+class IbkrProfileSetting extends DataClass
+    implements Insertable<IbkrProfileSetting> {
+  final int id;
+  final bool enabled;
+  final String baseUrl;
+  final String token;
+  const IbkrProfileSetting(
+      {required this.id,
+      required this.enabled,
+      required this.baseUrl,
+      required this.token});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['enabled'] = Variable<bool>(enabled);
+    map['base_url'] = Variable<String>(baseUrl);
+    map['token'] = Variable<String>(token);
+    return map;
+  }
+
+  IbkrProfileSettingsCompanion toCompanion(bool nullToAbsent) {
+    return IbkrProfileSettingsCompanion(
+      id: Value(id),
+      enabled: Value(enabled),
+      baseUrl: Value(baseUrl),
+      token: Value(token),
+    );
+  }
+
+  factory IbkrProfileSetting.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return IbkrProfileSetting(
+      id: serializer.fromJson<int>(json['id']),
+      enabled: serializer.fromJson<bool>(json['enabled']),
+      baseUrl: serializer.fromJson<String>(json['baseUrl']),
+      token: serializer.fromJson<String>(json['token']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'enabled': serializer.toJson<bool>(enabled),
+      'baseUrl': serializer.toJson<String>(baseUrl),
+      'token': serializer.toJson<String>(token),
+    };
+  }
+
+  IbkrProfileSetting copyWith(
+          {int? id, bool? enabled, String? baseUrl, String? token}) =>
+      IbkrProfileSetting(
+        id: id ?? this.id,
+        enabled: enabled ?? this.enabled,
+        baseUrl: baseUrl ?? this.baseUrl,
+        token: token ?? this.token,
+      );
+  IbkrProfileSetting copyWithCompanion(IbkrProfileSettingsCompanion data) {
+    return IbkrProfileSetting(
+      id: data.id.present ? data.id.value : this.id,
+      enabled: data.enabled.present ? data.enabled.value : this.enabled,
+      baseUrl: data.baseUrl.present ? data.baseUrl.value : this.baseUrl,
+      token: data.token.present ? data.token.value : this.token,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('IbkrProfileSetting(')
+          ..write('id: $id, ')
+          ..write('enabled: $enabled, ')
+          ..write('baseUrl: $baseUrl, ')
+          ..write('token: $token')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, enabled, baseUrl, token);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is IbkrProfileSetting &&
+          other.id == this.id &&
+          other.enabled == this.enabled &&
+          other.baseUrl == this.baseUrl &&
+          other.token == this.token);
+}
+
+class IbkrProfileSettingsCompanion extends UpdateCompanion<IbkrProfileSetting> {
+  final Value<int> id;
+  final Value<bool> enabled;
+  final Value<String> baseUrl;
+  final Value<String> token;
+  const IbkrProfileSettingsCompanion({
+    this.id = const Value.absent(),
+    this.enabled = const Value.absent(),
+    this.baseUrl = const Value.absent(),
+    this.token = const Value.absent(),
+  });
+  IbkrProfileSettingsCompanion.insert({
+    this.id = const Value.absent(),
+    this.enabled = const Value.absent(),
+    this.baseUrl = const Value.absent(),
+    this.token = const Value.absent(),
+  });
+  static Insertable<IbkrProfileSetting> custom({
+    Expression<int>? id,
+    Expression<bool>? enabled,
+    Expression<String>? baseUrl,
+    Expression<String>? token,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (enabled != null) 'enabled': enabled,
+      if (baseUrl != null) 'base_url': baseUrl,
+      if (token != null) 'token': token,
+    });
+  }
+
+  IbkrProfileSettingsCompanion copyWith(
+      {Value<int>? id,
+      Value<bool>? enabled,
+      Value<String>? baseUrl,
+      Value<String>? token}) {
+    return IbkrProfileSettingsCompanion(
+      id: id ?? this.id,
+      enabled: enabled ?? this.enabled,
+      baseUrl: baseUrl ?? this.baseUrl,
+      token: token ?? this.token,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (enabled.present) {
+      map['enabled'] = Variable<bool>(enabled.value);
+    }
+    if (baseUrl.present) {
+      map['base_url'] = Variable<String>(baseUrl.value);
+    }
+    if (token.present) {
+      map['token'] = Variable<String>(token.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('IbkrProfileSettingsCompanion(')
+          ..write('id: $id, ')
+          ..write('enabled: $enabled, ')
+          ..write('baseUrl: $baseUrl, ')
+          ..write('token: $token')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $IbkrCacheEntriesTable extends IbkrCacheEntries
+    with TableInfo<$IbkrCacheEntriesTable, IbkrCacheEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $IbkrCacheEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+      'kind', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _cacheKeyMeta =
+      const VerificationMeta('cacheKey');
+  @override
+  late final GeneratedColumn<String> cacheKey = GeneratedColumn<String>(
+      'cache_key', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _payloadJsonMeta =
+      const VerificationMeta('payloadJson');
+  @override
+  late final GeneratedColumn<String> payloadJson = GeneratedColumn<String>(
+      'payload_json', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _cachedAtMeta =
+      const VerificationMeta('cachedAt');
+  @override
+  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
+      'cached_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [kind, cacheKey, payloadJson, cachedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'ibkr_cache_entries';
+  @override
+  VerificationContext validateIntegrity(Insertable<IbkrCacheEntry> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('kind')) {
+      context.handle(
+          _kindMeta, kind.isAcceptableOrUnknown(data['kind']!, _kindMeta));
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('cache_key')) {
+      context.handle(_cacheKeyMeta,
+          cacheKey.isAcceptableOrUnknown(data['cache_key']!, _cacheKeyMeta));
+    } else if (isInserting) {
+      context.missing(_cacheKeyMeta);
+    }
+    if (data.containsKey('payload_json')) {
+      context.handle(
+          _payloadJsonMeta,
+          payloadJson.isAcceptableOrUnknown(
+              data['payload_json']!, _payloadJsonMeta));
+    } else if (isInserting) {
+      context.missing(_payloadJsonMeta);
+    }
+    if (data.containsKey('cached_at')) {
+      context.handle(_cachedAtMeta,
+          cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta));
+    } else if (isInserting) {
+      context.missing(_cachedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {kind, cacheKey};
+  @override
+  IbkrCacheEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return IbkrCacheEntry(
+      kind: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}kind'])!,
+      cacheKey: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}cache_key'])!,
+      payloadJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}payload_json'])!,
+      cachedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}cached_at'])!,
+    );
+  }
+
+  @override
+  $IbkrCacheEntriesTable createAlias(String alias) {
+    return $IbkrCacheEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class IbkrCacheEntry extends DataClass implements Insertable<IbkrCacheEntry> {
+  final String kind;
+  final String cacheKey;
+  final String payloadJson;
+  final DateTime cachedAt;
+  const IbkrCacheEntry(
+      {required this.kind,
+      required this.cacheKey,
+      required this.payloadJson,
+      required this.cachedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['kind'] = Variable<String>(kind);
+    map['cache_key'] = Variable<String>(cacheKey);
+    map['payload_json'] = Variable<String>(payloadJson);
+    map['cached_at'] = Variable<DateTime>(cachedAt);
+    return map;
+  }
+
+  IbkrCacheEntriesCompanion toCompanion(bool nullToAbsent) {
+    return IbkrCacheEntriesCompanion(
+      kind: Value(kind),
+      cacheKey: Value(cacheKey),
+      payloadJson: Value(payloadJson),
+      cachedAt: Value(cachedAt),
+    );
+  }
+
+  factory IbkrCacheEntry.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return IbkrCacheEntry(
+      kind: serializer.fromJson<String>(json['kind']),
+      cacheKey: serializer.fromJson<String>(json['cacheKey']),
+      payloadJson: serializer.fromJson<String>(json['payloadJson']),
+      cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'kind': serializer.toJson<String>(kind),
+      'cacheKey': serializer.toJson<String>(cacheKey),
+      'payloadJson': serializer.toJson<String>(payloadJson),
+      'cachedAt': serializer.toJson<DateTime>(cachedAt),
+    };
+  }
+
+  IbkrCacheEntry copyWith(
+          {String? kind,
+          String? cacheKey,
+          String? payloadJson,
+          DateTime? cachedAt}) =>
+      IbkrCacheEntry(
+        kind: kind ?? this.kind,
+        cacheKey: cacheKey ?? this.cacheKey,
+        payloadJson: payloadJson ?? this.payloadJson,
+        cachedAt: cachedAt ?? this.cachedAt,
+      );
+  IbkrCacheEntry copyWithCompanion(IbkrCacheEntriesCompanion data) {
+    return IbkrCacheEntry(
+      kind: data.kind.present ? data.kind.value : this.kind,
+      cacheKey: data.cacheKey.present ? data.cacheKey.value : this.cacheKey,
+      payloadJson:
+          data.payloadJson.present ? data.payloadJson.value : this.payloadJson,
+      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('IbkrCacheEntry(')
+          ..write('kind: $kind, ')
+          ..write('cacheKey: $cacheKey, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('cachedAt: $cachedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(kind, cacheKey, payloadJson, cachedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is IbkrCacheEntry &&
+          other.kind == this.kind &&
+          other.cacheKey == this.cacheKey &&
+          other.payloadJson == this.payloadJson &&
+          other.cachedAt == this.cachedAt);
+}
+
+class IbkrCacheEntriesCompanion extends UpdateCompanion<IbkrCacheEntry> {
+  final Value<String> kind;
+  final Value<String> cacheKey;
+  final Value<String> payloadJson;
+  final Value<DateTime> cachedAt;
+  final Value<int> rowid;
+  const IbkrCacheEntriesCompanion({
+    this.kind = const Value.absent(),
+    this.cacheKey = const Value.absent(),
+    this.payloadJson = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  IbkrCacheEntriesCompanion.insert({
+    required String kind,
+    required String cacheKey,
+    required String payloadJson,
+    required DateTime cachedAt,
+    this.rowid = const Value.absent(),
+  })  : kind = Value(kind),
+        cacheKey = Value(cacheKey),
+        payloadJson = Value(payloadJson),
+        cachedAt = Value(cachedAt);
+  static Insertable<IbkrCacheEntry> custom({
+    Expression<String>? kind,
+    Expression<String>? cacheKey,
+    Expression<String>? payloadJson,
+    Expression<DateTime>? cachedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (kind != null) 'kind': kind,
+      if (cacheKey != null) 'cache_key': cacheKey,
+      if (payloadJson != null) 'payload_json': payloadJson,
+      if (cachedAt != null) 'cached_at': cachedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  IbkrCacheEntriesCompanion copyWith(
+      {Value<String>? kind,
+      Value<String>? cacheKey,
+      Value<String>? payloadJson,
+      Value<DateTime>? cachedAt,
+      Value<int>? rowid}) {
+    return IbkrCacheEntriesCompanion(
+      kind: kind ?? this.kind,
+      cacheKey: cacheKey ?? this.cacheKey,
+      payloadJson: payloadJson ?? this.payloadJson,
+      cachedAt: cachedAt ?? this.cachedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (cacheKey.present) {
+      map['cache_key'] = Variable<String>(cacheKey.value);
+    }
+    if (payloadJson.present) {
+      map['payload_json'] = Variable<String>(payloadJson.value);
+    }
+    if (cachedAt.present) {
+      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('IbkrCacheEntriesCompanion(')
+          ..write('kind: $kind, ')
+          ..write('cacheKey: $cacheKey, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$Database extends GeneratedDatabase {
   _$Database(QueryExecutor e) : super(e);
   $DatabaseManager get managers => $DatabaseManager(this);
   late final $CandlesTable candles = $CandlesTable(this);
   late final $TradesTable trades = $TradesTable(this);
+  late final $IbkrProfileSettingsTable ibkrProfileSettings =
+      $IbkrProfileSettingsTable(this);
+  late final $IbkrCacheEntriesTable ibkrCacheEntries =
+      $IbkrCacheEntriesTable(this);
   late final Index idxCandlesSymbolDate = Index('idx_candles_symbol_date',
       'CREATE INDEX idx_candles_symbol_date ON candles (symbol, date)');
   late final Index idxTradesSymbolTradeDate = Index(
@@ -908,8 +1443,14 @@ abstract class _$Database extends GeneratedDatabase {
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities =>
-      [candles, trades, idxCandlesSymbolDate, idxTradesSymbolTradeDate];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+        candles,
+        trades,
+        ibkrProfileSettings,
+        ibkrCacheEntries,
+        idxCandlesSymbolDate,
+        idxTradesSymbolTradeDate
+      ];
 }
 
 typedef $$CandlesTableCreateCompanionBuilder = CandlesCompanion Function({
@@ -1347,6 +1888,320 @@ typedef $$TradesTableProcessedTableManager = ProcessedTableManager<
     (Trade, BaseReferences<_$Database, $TradesTable, Trade>),
     Trade,
     PrefetchHooks Function()>;
+typedef $$IbkrProfileSettingsTableCreateCompanionBuilder
+    = IbkrProfileSettingsCompanion Function({
+  Value<int> id,
+  Value<bool> enabled,
+  Value<String> baseUrl,
+  Value<String> token,
+});
+typedef $$IbkrProfileSettingsTableUpdateCompanionBuilder
+    = IbkrProfileSettingsCompanion Function({
+  Value<int> id,
+  Value<bool> enabled,
+  Value<String> baseUrl,
+  Value<String> token,
+});
+
+class $$IbkrProfileSettingsTableFilterComposer
+    extends Composer<_$Database, $IbkrProfileSettingsTable> {
+  $$IbkrProfileSettingsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get enabled => $composableBuilder(
+      column: $table.enabled, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get baseUrl => $composableBuilder(
+      column: $table.baseUrl, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get token => $composableBuilder(
+      column: $table.token, builder: (column) => ColumnFilters(column));
+}
+
+class $$IbkrProfileSettingsTableOrderingComposer
+    extends Composer<_$Database, $IbkrProfileSettingsTable> {
+  $$IbkrProfileSettingsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get enabled => $composableBuilder(
+      column: $table.enabled, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get baseUrl => $composableBuilder(
+      column: $table.baseUrl, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get token => $composableBuilder(
+      column: $table.token, builder: (column) => ColumnOrderings(column));
+}
+
+class $$IbkrProfileSettingsTableAnnotationComposer
+    extends Composer<_$Database, $IbkrProfileSettingsTable> {
+  $$IbkrProfileSettingsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<bool> get enabled =>
+      $composableBuilder(column: $table.enabled, builder: (column) => column);
+
+  GeneratedColumn<String> get baseUrl =>
+      $composableBuilder(column: $table.baseUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get token =>
+      $composableBuilder(column: $table.token, builder: (column) => column);
+}
+
+class $$IbkrProfileSettingsTableTableManager extends RootTableManager<
+    _$Database,
+    $IbkrProfileSettingsTable,
+    IbkrProfileSetting,
+    $$IbkrProfileSettingsTableFilterComposer,
+    $$IbkrProfileSettingsTableOrderingComposer,
+    $$IbkrProfileSettingsTableAnnotationComposer,
+    $$IbkrProfileSettingsTableCreateCompanionBuilder,
+    $$IbkrProfileSettingsTableUpdateCompanionBuilder,
+    (
+      IbkrProfileSetting,
+      BaseReferences<_$Database, $IbkrProfileSettingsTable, IbkrProfileSetting>
+    ),
+    IbkrProfileSetting,
+    PrefetchHooks Function()> {
+  $$IbkrProfileSettingsTableTableManager(
+      _$Database db, $IbkrProfileSettingsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$IbkrProfileSettingsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$IbkrProfileSettingsTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$IbkrProfileSettingsTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<bool> enabled = const Value.absent(),
+            Value<String> baseUrl = const Value.absent(),
+            Value<String> token = const Value.absent(),
+          }) =>
+              IbkrProfileSettingsCompanion(
+            id: id,
+            enabled: enabled,
+            baseUrl: baseUrl,
+            token: token,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<bool> enabled = const Value.absent(),
+            Value<String> baseUrl = const Value.absent(),
+            Value<String> token = const Value.absent(),
+          }) =>
+              IbkrProfileSettingsCompanion.insert(
+            id: id,
+            enabled: enabled,
+            baseUrl: baseUrl,
+            token: token,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$IbkrProfileSettingsTableProcessedTableManager = ProcessedTableManager<
+    _$Database,
+    $IbkrProfileSettingsTable,
+    IbkrProfileSetting,
+    $$IbkrProfileSettingsTableFilterComposer,
+    $$IbkrProfileSettingsTableOrderingComposer,
+    $$IbkrProfileSettingsTableAnnotationComposer,
+    $$IbkrProfileSettingsTableCreateCompanionBuilder,
+    $$IbkrProfileSettingsTableUpdateCompanionBuilder,
+    (
+      IbkrProfileSetting,
+      BaseReferences<_$Database, $IbkrProfileSettingsTable, IbkrProfileSetting>
+    ),
+    IbkrProfileSetting,
+    PrefetchHooks Function()>;
+typedef $$IbkrCacheEntriesTableCreateCompanionBuilder
+    = IbkrCacheEntriesCompanion Function({
+  required String kind,
+  required String cacheKey,
+  required String payloadJson,
+  required DateTime cachedAt,
+  Value<int> rowid,
+});
+typedef $$IbkrCacheEntriesTableUpdateCompanionBuilder
+    = IbkrCacheEntriesCompanion Function({
+  Value<String> kind,
+  Value<String> cacheKey,
+  Value<String> payloadJson,
+  Value<DateTime> cachedAt,
+  Value<int> rowid,
+});
+
+class $$IbkrCacheEntriesTableFilterComposer
+    extends Composer<_$Database, $IbkrCacheEntriesTable> {
+  $$IbkrCacheEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get kind => $composableBuilder(
+      column: $table.kind, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get cacheKey => $composableBuilder(
+      column: $table.cacheKey, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get payloadJson => $composableBuilder(
+      column: $table.payloadJson, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
+      column: $table.cachedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$IbkrCacheEntriesTableOrderingComposer
+    extends Composer<_$Database, $IbkrCacheEntriesTable> {
+  $$IbkrCacheEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get kind => $composableBuilder(
+      column: $table.kind, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get cacheKey => $composableBuilder(
+      column: $table.cacheKey, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get payloadJson => $composableBuilder(
+      column: $table.payloadJson, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
+      column: $table.cachedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$IbkrCacheEntriesTableAnnotationComposer
+    extends Composer<_$Database, $IbkrCacheEntriesTable> {
+  $$IbkrCacheEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get cacheKey =>
+      $composableBuilder(column: $table.cacheKey, builder: (column) => column);
+
+  GeneratedColumn<String> get payloadJson => $composableBuilder(
+      column: $table.payloadJson, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get cachedAt =>
+      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
+}
+
+class $$IbkrCacheEntriesTableTableManager extends RootTableManager<
+    _$Database,
+    $IbkrCacheEntriesTable,
+    IbkrCacheEntry,
+    $$IbkrCacheEntriesTableFilterComposer,
+    $$IbkrCacheEntriesTableOrderingComposer,
+    $$IbkrCacheEntriesTableAnnotationComposer,
+    $$IbkrCacheEntriesTableCreateCompanionBuilder,
+    $$IbkrCacheEntriesTableUpdateCompanionBuilder,
+    (
+      IbkrCacheEntry,
+      BaseReferences<_$Database, $IbkrCacheEntriesTable, IbkrCacheEntry>
+    ),
+    IbkrCacheEntry,
+    PrefetchHooks Function()> {
+  $$IbkrCacheEntriesTableTableManager(
+      _$Database db, $IbkrCacheEntriesTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$IbkrCacheEntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$IbkrCacheEntriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$IbkrCacheEntriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> kind = const Value.absent(),
+            Value<String> cacheKey = const Value.absent(),
+            Value<String> payloadJson = const Value.absent(),
+            Value<DateTime> cachedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              IbkrCacheEntriesCompanion(
+            kind: kind,
+            cacheKey: cacheKey,
+            payloadJson: payloadJson,
+            cachedAt: cachedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String kind,
+            required String cacheKey,
+            required String payloadJson,
+            required DateTime cachedAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              IbkrCacheEntriesCompanion.insert(
+            kind: kind,
+            cacheKey: cacheKey,
+            payloadJson: payloadJson,
+            cachedAt: cachedAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$IbkrCacheEntriesTableProcessedTableManager = ProcessedTableManager<
+    _$Database,
+    $IbkrCacheEntriesTable,
+    IbkrCacheEntry,
+    $$IbkrCacheEntriesTableFilterComposer,
+    $$IbkrCacheEntriesTableOrderingComposer,
+    $$IbkrCacheEntriesTableAnnotationComposer,
+    $$IbkrCacheEntriesTableCreateCompanionBuilder,
+    $$IbkrCacheEntriesTableUpdateCompanionBuilder,
+    (
+      IbkrCacheEntry,
+      BaseReferences<_$Database, $IbkrCacheEntriesTable, IbkrCacheEntry>
+    ),
+    IbkrCacheEntry,
+    PrefetchHooks Function()>;
 
 class $DatabaseManager {
   final _$Database _db;
@@ -1355,4 +2210,8 @@ class $DatabaseManager {
       $$CandlesTableTableManager(_db, _db.candles);
   $$TradesTableTableManager get trades =>
       $$TradesTableTableManager(_db, _db.trades);
+  $$IbkrProfileSettingsTableTableManager get ibkrProfileSettings =>
+      $$IbkrProfileSettingsTableTableManager(_db, _db.ibkrProfileSettings);
+  $$IbkrCacheEntriesTableTableManager get ibkrCacheEntries =>
+      $$IbkrCacheEntriesTableTableManager(_db, _db.ibkrCacheEntries);
 }

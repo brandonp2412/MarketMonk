@@ -9,10 +9,10 @@ import 'package:path_provider/path_provider.dart';
 
 part 'database.g.dart';
 
-@DriftDatabase(tables: [Candles, Trades])
+@DriftDatabase(tables: [Candles, Trades, IbkrProfileSettings, IbkrCacheEntries])
 class Database extends _$Database {
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   // Multiple short-lived instances are opened intentionally for secondary
   // accounts and are always closed after use.
@@ -21,6 +21,53 @@ class Database extends _$Database {
   }
 
   Database.connect(super.executor);
+
+  Future<IbkrProfileSetting?> readIbkrProfileSettings() =>
+      select(ibkrProfileSettings).getSingleOrNull();
+
+  Future<void> writeIbkrProfileSettings({
+    required bool enabled,
+    required String baseUrl,
+    required String token,
+  }) =>
+      into(ibkrProfileSettings).insertOnConflictUpdate(
+        IbkrProfileSettingsCompanion.insert(
+          id: const Value(1),
+          enabled: Value(enabled),
+          baseUrl: Value(baseUrl),
+          token: Value(token),
+        ),
+      );
+
+  Future<IbkrCacheEntry?> readIbkrCache(String kind, String cacheKey) =>
+      (select(ibkrCacheEntries)
+            ..where(
+              (row) => row.kind.equals(kind) & row.cacheKey.equals(cacheKey),
+            ))
+          .getSingleOrNull();
+
+  Future<void> writeIbkrCache({
+    required String kind,
+    required String cacheKey,
+    required String payloadJson,
+    required DateTime cachedAt,
+  }) =>
+      into(ibkrCacheEntries).insertOnConflictUpdate(
+        IbkrCacheEntriesCompanion.insert(
+          kind: kind,
+          cacheKey: cacheKey,
+          payloadJson: payloadJson,
+          cachedAt: cachedAt,
+        ),
+      );
+
+  Future<int> deleteIbkrCache({String? kind}) {
+    final statement = delete(ibkrCacheEntries);
+    if (kind != null) {
+      statement.where((row) => row.kind.equals(kind));
+    }
+    return statement.go();
+  }
 
   static QueryExecutor _openConnection([String name = 'market-monk']) {
     return driftDatabase(
@@ -196,6 +243,10 @@ class Database extends _$Database {
         'CREATE INDEX IF NOT EXISTS idx_trades_symbol_trade_date '
         'ON trades (symbol, trade_date)',
       );
+    },
+    from10To11: (Migrator m, Schema11 schema) async {
+      await m.createTable(schema.ibkrProfileSettings);
+      await m.createTable(schema.ibkrCacheEntries);
     },
   );
 }
