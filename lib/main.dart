@@ -6,6 +6,7 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:market_monk/adaptive_layout.dart';
+import 'package:market_monk/backup_archive.dart';
 import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/crash_logger.dart';
@@ -179,6 +180,9 @@ class AccountManager extends ChangeNotifier {
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
+    _ibkrConfigs.clear();
+    _portfolioCache.clear();
+    _ibkrPerformanceCache.clear();
     accounts = prefs.getStringList('accounts') ?? ['Default'];
     if (!accounts.contains('Default')) {
       accounts = ['Default', ...accounts];
@@ -255,7 +259,9 @@ class AccountManager extends ChangeNotifier {
       }
     }
     if (activeAccount != 'Default') {
+      final previousDb = db;
       db = Database('market-monk-$activeAccount');
+      await previousDb.close();
     }
     talker.info('Loaded ${accounts.length} portfolio accounts');
   }
@@ -453,6 +459,136 @@ class AccountManager extends ChangeNotifier {
       if (await stagedFile.exists()) await stagedFile.delete();
       if (await backupFile.exists()) await backupFile.delete();
     }
+  }
+
+  Future<File> exportBackup(Directory workingDirectory) async {
+    await db.customStatement('PRAGMA wal_checkpoint(FULL)');
+    final databaseDirectory = await getApplicationSupportDirectory();
+    final prefs = await SharedPreferences.getInstance();
+    return buildMarketMonkBackupArchive(
+      databaseDirectory: databaseDirectory,
+      workingDirectory: workingDirectory,
+      accounts: accounts,
+      activeAccount: activeAccount,
+      preferences: _snapshotPreferences(prefs),
+    );
+  }
+
+  Future<void> importBackup(File sourceFile) async {
+    final temporaryDirectory = await getTemporaryDirectory();
+    final workingDirectory =
+        await temporaryDirectory.createTemp('market-monk-restore-');
+    final rollbackDirectory =
+        Directory(p.join(workingDirectory.path, 'rollback'));
+    final databaseDirectory = await getApplicationSupportDirectory();
+    final prefs = await SharedPreferences.getInstance();
+    final previousPreferences = _snapshotPreferences(prefs);
+
+    try {
+      final restored = await extractMarketMonkBackupArchive(
+        archiveFile: sourceFile,
+        workingDirectory: workingDirectory,
+      );
+      await rollbackDirectory.create();
+      final existingFiles = _marketMonkDatabaseFiles(databaseDirectory);
+      await db.close();
+      var replacementStarted = false;
+      try {
+        for (final file in existingFiles) {
+          await file
+              .copy(p.join(rollbackDirectory.path, p.basename(file.path)));
+        }
+        replacementStarted = true;
+        for (final file in existingFiles) {
+          if (await file.exists()) await file.delete();
+        }
+        for (final entry in restored.databases.entries) {
+          final target = File(
+            p.join(
+              databaseDirectory.path,
+              databaseFileNameForAccount(entry.key),
+            ),
+          );
+          await entry.value.copy(target.path);
+        }
+
+        await _restorePreferences(prefs, restored.preferences);
+        await prefs.setStringList('accounts', restored.accounts);
+        await prefs.setString('activeAccount', restored.activeAccount);
+
+        db = Database();
+        await init();
+        clearAllSyncCache();
+        notifyListeners();
+        talker.info('Restored full Market Monk backup');
+      } catch (error, stackTrace) {
+        try {
+          await db.close();
+        } catch (_) {}
+        if (replacementStarted) {
+          for (final file in _marketMonkDatabaseFiles(databaseDirectory)) {
+            if (await file.exists()) await file.delete();
+          }
+          if (await rollbackDirectory.exists()) {
+            for (final entity in rollbackDirectory.listSync()) {
+              if (entity is File) {
+                await entity.copy(
+                  p.join(databaseDirectory.path, p.basename(entity.path)),
+                );
+              }
+            }
+          }
+        }
+        await _restorePreferences(prefs, previousPreferences);
+        db = Database();
+        await init();
+        talker.handle(
+          error,
+          stackTrace,
+          'Failed to restore Market Monk backup',
+        );
+        rethrow;
+      }
+    } finally {
+      if (await workingDirectory.exists()) {
+        await workingDirectory.delete(recursive: true);
+      }
+    }
+  }
+
+  Map<String, Object?> _snapshotPreferences(SharedPreferences prefs) => {
+        for (final key in prefs.getKeys()) key: prefs.get(key),
+      };
+
+  Future<void> _restorePreferences(
+    SharedPreferences prefs,
+    Map<String, Object?> values,
+  ) async {
+    await prefs.clear();
+    for (final entry in values.entries) {
+      final value = entry.value;
+      if (value is bool) {
+        await prefs.setBool(entry.key, value);
+      } else if (value is int) {
+        await prefs.setInt(entry.key, value);
+      } else if (value is double) {
+        await prefs.setDouble(entry.key, value);
+      } else if (value is String) {
+        await prefs.setString(entry.key, value);
+      } else if (value is List) {
+        await prefs.setStringList(entry.key, value.cast<String>());
+      }
+    }
+  }
+
+  List<File> _marketMonkDatabaseFiles(Directory directory) {
+    if (!directory.existsSync()) return const [];
+    final pattern = RegExp(r'^market-monk(?:-.+)?.sqlite(?:-(?:wal|shm))?$');
+    return directory
+        .listSync()
+        .whereType<File>()
+        .where((file) => pattern.hasMatch(p.basename(file.path)))
+        .toList();
   }
 
   Future<void> addAccount(String name) async {

@@ -168,4 +168,100 @@ void main() {
       isTrue,
     );
   });
+
+  test('full backup restores every profile database and account metadata',
+      () async {
+    final tempDir =
+        await Directory.systemTemp.createTemp('market-monk-backup-roundtrip-');
+    const pathProviderChannel =
+        MethodChannel('plugins.flutter.io/path_provider');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(pathProviderChannel, (call) async {
+      if (call.method == 'getApplicationSupportDirectory' ||
+          call.method == 'getTemporaryDirectory') {
+        return tempDir.path;
+      }
+      return null;
+    });
+    addTearDown(() async {
+      messenger.setMockMethodCallHandler(pathProviderChannel, null);
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    Future<void> createProfileDatabase(
+      String fileName,
+      String symbol,
+      int quantity,
+    ) async {
+      final profileDb = Database.connect(
+        DatabaseConnection(
+          NativeDatabase(File('${tempDir.path}/$fileName')),
+          closeStreamsSynchronously: true,
+        ),
+      );
+      await profileDb.trades.insertOne(
+        TradesCompanion.insert(
+          symbol: symbol,
+          name: symbol,
+          quantity: quantity.toDouble(),
+          price: 100,
+          tradeType: 'open',
+          tradeDate: DateTime(2026, 10, 2),
+        ),
+      );
+      await profileDb.close();
+    }
+
+    await createProfileDatabase('market-monk.sqlite', 'VTI', 10);
+    await createProfileDatabase('market-monk-Brokerage.sqlite', 'VXUS', 20);
+    SharedPreferences.setMockInitialValues({
+      'accounts': ['Default', 'Brokerage'],
+      'activeAccount': 'Brokerage',
+      'displayCurrency': 'NZD',
+    });
+
+    final manager = AccountManager();
+    await manager.init();
+    final exportDirectory = await tempDir.createTemp('export-');
+    final backup = await manager.exportBackup(exportDirectory);
+
+    expect(backup.path, endsWith('.zip'));
+    expect(await backup.exists(), isTrue);
+
+    await manager.switchAccount('Default');
+    await manager.deleteAccount('Brokerage');
+    await db.trades.insertOne(
+      TradesCompanion.insert(
+        symbol: 'BND',
+        name: 'BND',
+        quantity: 30,
+        price: 100,
+        tradeType: 'open',
+        tradeDate: DateTime(2026, 10, 2),
+      ),
+    );
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('displayCurrency', 'USD');
+
+    await manager.importBackup(backup);
+
+    expect(manager.accounts, ['Default', 'Brokerage']);
+    expect(manager.activeAccount, 'Brokerage');
+    expect(prefs.getString('displayCurrency'), 'NZD');
+
+    final brokerageTrades = await db.select(db.trades).get();
+    expect(brokerageTrades, hasLength(1));
+    expect(brokerageTrades.single.symbol, 'VXUS');
+    expect(brokerageTrades.single.quantity, 20);
+
+    final defaultDb = Database();
+    final defaultTrades = await defaultDb.select(defaultDb.trades).get();
+    expect(defaultTrades, hasLength(1));
+    expect(defaultTrades.single.symbol, 'VTI');
+    expect(defaultTrades.single.quantity, 10);
+    await defaultDb.close();
+  });
 }

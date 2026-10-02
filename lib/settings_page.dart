@@ -6,6 +6,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/accounts_page.dart';
+import 'package:market_monk/backup_archive.dart';
 import 'package:market_monk/whats_new.dart';
 import 'package:market_monk/csv_import.dart';
 import 'package:market_monk/ibkr_api.dart';
@@ -267,71 +268,77 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _importDatabase(BuildContext context) async {
     final accounts = context.read<AccountManager>();
-    final result = await FilePicker.pickFiles();
+    final result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['zip', 'sqlite'],
+    );
     if (!context.mounted || result == null) return;
 
     final selectedPath = result.files.single.path;
     if (selectedPath == null) {
       toast(
         context,
-        context.l10n.text('Could not access the selected database'),
+        context.l10n.text('Could not access the selected backup'),
       );
       return;
     }
 
     final sourceFile = File(selectedPath);
+    final isArchive = p.extension(selectedPath).toLowerCase() == '.zip';
     try {
-      final raf = await sourceFile.open();
-      final header = await raf.read(16);
-      await raf.close();
-
-      const sqliteMagic = [
-        0x53,
-        0x51,
-        0x4C,
-        0x69,
-        0x74,
-        0x65,
-        0x20,
-        0x66,
-        0x6F,
-        0x72,
-        0x6D,
-        0x61,
-        0x74,
-        0x20,
-        0x33,
-        0x00,
-      ];
-      final isValid = header.length == sqliteMagic.length &&
-          List.generate(
-            sqliteMagic.length,
-            (i) => header[i] == sqliteMagic[i],
-          ).every((matches) => matches);
-      if (!isValid) {
-        if (context.mounted) {
-          toast(
-            context,
-            context.l10n.text('Selected file is not a valid database'),
-          );
-        }
-        return;
+      if (isArchive) {
+        await accounts.importBackup(sourceFile);
+      } else {
+        await validateMarketMonkSqliteFile(sourceFile);
+        await accounts.importDatabase(sourceFile);
       }
-
-      await accounts.importDatabase(sourceFile);
     } catch (_) {
       if (context.mounted) {
-        toast(context, context.l10n.text('Database import failed'));
+        toast(context, context.l10n.text('Backup import failed'));
       }
       return;
     }
 
     if (!context.mounted) return;
-    toast(context, context.l10n.text('Database imported'));
+    toast(
+      context,
+      context.l10n.text(
+        isArchive
+            ? 'Full backup restored'
+            : 'Database imported into the active profile',
+      ),
+    );
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const MyHomePage()),
       (_) => false,
     );
+  }
+
+  Future<void> _exportBackup(BuildContext context) async {
+    final accounts = context.read<AccountManager>();
+    Navigator.pop(context);
+    final tempDirectory = await getTemporaryDirectory();
+    final workingDirectory =
+        await tempDirectory.createTemp('market-monk-backup-');
+    try {
+      final archive = await accounts.exportBackup(workingDirectory);
+      final result = await FilePicker.saveFile(
+        fileName: marketMonkBackupFileName,
+        bytes: await archive.readAsBytes(),
+      );
+      if (result == null) return;
+      if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+        await archive.copy(result);
+      }
+    } catch (_) {
+      if (context.mounted) {
+        toast(context, context.l10n.text('Backup export failed'));
+      }
+    } finally {
+      if (await workingDirectory.exists()) {
+        await workingDirectory.delete(recursive: true);
+      }
+    }
   }
 
   Future<void> _showCurrencyPicker(
@@ -666,28 +673,12 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           _sectionHeader(context.l10n.text('Data')),
           Tooltip(
-            message: context.l10n
-                .text('Download the database file for the entire app'),
+            message:
+                context.l10n.text('Download a full backup of every profile'),
             child: ListTile(
               leading: const Icon(Icons.download),
               title: Text(context.l10n.text('Export database')),
-              onTap: () async {
-                Navigator.pop(context);
-                final activeAccount =
-                    context.read<AccountManager>().activeAccount;
-                final dbName = activeAccount == 'Default'
-                    ? 'market-monk'
-                    : 'market-monk-$activeAccount';
-                final dbFolder = await getApplicationSupportDirectory();
-                final file = File(p.join(dbFolder.path, '$dbName.sqlite'));
-                final bytes = await file.readAsBytes();
-                final result = await FilePicker.saveFile(
-                  fileName: '$dbName.sqlite',
-                  bytes: bytes,
-                );
-                if (Platform.isMacOS || Platform.isWindows || Platform.isLinux)
-                  await file.copy(result!);
-              },
+              onTap: () => _exportBackup(context),
             ),
           ),
           Tooltip(
