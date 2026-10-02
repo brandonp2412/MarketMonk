@@ -675,7 +675,7 @@ class MyApp extends StatelessWidget {
 
     return DynamicColorBuilder(
       builder: (lightDynamic, darkDynamic) => MaterialApp(
-        title: 'MarketMonk',
+        title: 'Market Monk',
         theme: ThemeData(
           colorScheme: settings.systemColors
               ? lightDynamic
