@@ -62,7 +62,6 @@ class ChartsPageState extends State<ChartsPage>
   String? _selectedSymbol;
   List<String> _favoriteStocks = [];
   bool _networkLoading = false;
-  double? _syncProgress; // null = indeterminate, 0.0–1.0 = determinate
   String? _stockError;
   String _nativeCurrency = 'USD';
   double _centDivisor = 1.0;
@@ -392,8 +391,8 @@ class ChartsPageState extends State<ChartsPage>
     super.dispose();
   }
 
-  /// Syncs candles for all accounts and tracks determinate progress on
-  /// [_syncProgress]. Caller is responsible for setting [_networkLoading].
+  /// Syncs candles for all accounts. Caller is responsible for setting
+  /// [_networkLoading].
   Future<void> _refreshAllPortfolioCandles() async {
     final accountManager = context.read<AccountManager>();
 
@@ -438,10 +437,6 @@ class ChartsPageState extends State<ChartsPage>
       }
     }
 
-    final total = tasks.fold(0, (sum, t) => sum + t.symbols.length);
-    if (mounted) setState(() => _syncProgress = total > 0 ? 0.0 : null);
-
-    int done = 0;
     for (final task in tasks) {
       try {
         for (final symbol in task.symbols) {
@@ -451,10 +446,6 @@ class ChartsPageState extends State<ChartsPage>
             ibkrConfig: task.ibkrConfig,
             syncNamespace: task.accountName,
           );
-          done++;
-          if (mounted) {
-            setState(() => _syncProgress = total > 0 ? done / total : null);
-          }
         }
       } catch (_) {
       } finally {
@@ -471,7 +462,6 @@ class ChartsPageState extends State<ChartsPage>
 
     setState(() {
       _networkLoading = true;
-      _syncProgress = null;
       _stockError = null;
     });
 
@@ -982,7 +972,6 @@ class ChartsPageState extends State<ChartsPage>
       _mode = _ChartMode.stock;
       _selectedSymbol = symbol;
       _networkLoading = true;
-      _syncProgress = null;
       _stockError = null;
     });
     _setStockStream(symbol);
@@ -1146,14 +1135,6 @@ class ChartsPageState extends State<ChartsPage>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         _buildSearchBar(),
-                        if (_networkLoading)
-                          LinearProgressIndicator(
-                            minHeight: 2,
-                            value: _syncProgress,
-                            color: Theme.of(context).colorScheme.primary,
-                          )
-                        else
-                          const SizedBox(height: 2),
                       ],
                     ),
                   ),
@@ -1235,27 +1216,34 @@ class ChartsPageState extends State<ChartsPage>
       onTap: () => _selectSymbol(query),
     );
 
-    if (_searchLoading || _searchResults.isEmpty) {
-      return Column(mainAxisSize: MainAxisSize.min, children: [useAnywayTile]);
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.only(bottom: bottomNavScrollClearance),
-      itemCount: _searchResults.length + 1,
-      itemBuilder: (context, i) {
-        if (i == _searchResults.length) return useAnywayTile;
-        final r = _searchResults[i];
-        final name = r.longname.isNotEmpty ? r.longname : r.shortname;
-        return ListTile(
-          title: Text(r.symbol),
-          subtitle: Text(name),
-          trailing: Text(
-            r.exchange,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          onTap: () => _selectStock(r),
-        );
-      },
+    return RefreshIndicator(
+      triggerMode: RefreshIndicatorTriggerMode.anywhere,
+      onRefresh: () => _runTickerSearch(_searchController.text),
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(bottom: bottomNavScrollClearance),
+        itemCount: _searchLoading || _searchResults.isEmpty
+            ? 1
+            : _searchResults.length + 1,
+        itemBuilder: (context, i) {
+          if (_searchLoading ||
+              _searchResults.isEmpty ||
+              i == _searchResults.length) {
+            return useAnywayTile;
+          }
+          final r = _searchResults[i];
+          final name = r.longname.isNotEmpty ? r.longname : r.shortname;
+          return ListTile(
+            title: Text(r.symbol),
+            subtitle: Text(name),
+            trailing: Text(
+              r.exchange,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            onTap: () => _selectStock(r),
+          );
+        },
+      ),
     );
   }
 
@@ -1312,7 +1300,8 @@ class ChartsPageState extends State<ChartsPage>
 
   Widget _buildChartContent(SettingsState settings, List<Color> accountColors) {
     final desktop = isDesktopLayout(context);
-    return RefreshIndicator.noSpinner(
+    return RefreshIndicator(
+      triggerMode: RefreshIndicatorTriggerMode.anywhere,
       onRefresh: _refreshCurrentChart,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),

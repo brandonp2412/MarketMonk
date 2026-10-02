@@ -712,22 +712,15 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
             title: Text(context.l10n.text('Sync')),
             subtitle: settings.syncInProgress
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        context.l10n.text(
-                          'Syncing {symbol} ({completed}/{total})',
-                          {
-                            'symbol': settings.syncingSymbol ?? '',
-                            'completed': settings.syncCompleted,
-                            'total': settings.syncTotal,
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      LinearProgressIndicator(value: settings.syncProgress),
-                    ],
+                ? Text(
+                    context.l10n.text(
+                      'Syncing {symbol} ({completed}/{total})',
+                      {
+                        'symbol': settings.syncingSymbol ?? '',
+                        'completed': settings.syncCompleted,
+                        'total': settings.syncTotal,
+                      },
+                    ),
                   )
                 : Text(
                     settings.syncTotal == 0

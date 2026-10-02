@@ -995,17 +995,37 @@ class HoldingsPageState extends State<HoldingsPage>
     );
   }
 
+  Widget _refreshableState(Widget child) {
+    return RefreshIndicator(
+      triggerMode: RefreshIndicatorTriggerMode.anywhere,
+      onRefresh: _refreshCandles,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: child,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildList(
     BuildContext context,
     AsyncSnapshot<List<SymbolSummary>> snap,
   ) {
-    if (snap.hasError) return Center(child: Text(snap.error.toString()));
+    if (snap.hasError) {
+      return _refreshableState(Center(child: Text(snap.error.toString())));
+    }
 
     final ibkrManaged = context.watch<AccountManager>().ibkrConfigFor().enabled;
     final summaries = snap.data ?? _summaries;
 
     if (summaries.isEmpty && !snap.hasData) {
-      return const Center(child: CircularProgressIndicator());
+      return _refreshableState(
+        const Center(child: CircularProgressIndicator()),
+      );
     }
 
     if (snap.hasData && snap.data != _summaries) {
@@ -1016,7 +1036,8 @@ class HoldingsPageState extends State<HoldingsPage>
 
     if (summaries.isEmpty) {
       final query = _search.text.trim();
-      return AppEmptyState(
+      return _refreshableState(
+        AppEmptyState(
         icon: ibkrManaged
             ? Icons.account_balance_rounded
             : query.isEmpty
@@ -1059,6 +1080,7 @@ class HoldingsPageState extends State<HoldingsPage>
                 : EditTickerPage(symbol: query.toUpperCase()),
           ),
         ),
+        ),
       );
     }
 
@@ -1067,8 +1089,10 @@ class HoldingsPageState extends State<HoldingsPage>
     }
 
     return RefreshIndicator(
+      triggerMode: RefreshIndicatorTriggerMode.anywhere,
       onRefresh: _refreshCandles,
       child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.only(bottom: bottomNavScrollClearance),
         itemCount: summaries.length + 1,
         itemBuilder: (context, index) {

@@ -462,6 +462,22 @@ class PortfolioPageState extends State<PortfolioPage>
     );
   }
 
+  Widget _refreshableState(Widget child) {
+    return RefreshIndicator(
+      triggerMode: RefreshIndicatorTriggerMode.anywhere,
+      onRefresh: _updateCandles,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: child,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBody(
     BuildContext context,
     AsyncSnapshot<_LoadedPortfolio> snap,
@@ -469,13 +485,17 @@ class PortfolioPageState extends State<PortfolioPage>
     final positions = snap.data?.positions ?? _positions;
     final netLiquidation = snap.data?.netLiquidation ?? _netLiquidation;
 
-    if (snap.hasError && positions.isEmpty) return _buildLoadError(context);
+    if (snap.hasError && positions.isEmpty) {
+      return _refreshableState(_buildLoadError(context));
+    }
 
     if (positions.isEmpty && !snap.hasData && !_hasCachedPortfolio) {
-      return Center(
-        child: Semantics(
-          label: context.l10n.text('Loading portfolio'),
-          child: const CircularProgressIndicator(),
+      return _refreshableState(
+        Center(
+          child: Semantics(
+            label: context.l10n.text('Loading portfolio'),
+            child: const CircularProgressIndicator(),
+          ),
         ),
       );
     }
@@ -495,7 +515,8 @@ class PortfolioPageState extends State<PortfolioPage>
     if (positions.isEmpty) {
       final ibkrEnabled =
           context.watch<AccountManager>().ibkrConfigFor().enabled;
-      return AppEmptyState(
+      return _refreshableState(
+        AppEmptyState(
         icon: ibkrEnabled
             ? Icons.account_balance_rounded
             : Icons.pie_chart_outline_rounded,
@@ -515,6 +536,7 @@ class PortfolioPageState extends State<PortfolioPage>
         onAction: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const SettingsPage()),
+        ),
         ),
       );
     }
@@ -579,8 +601,10 @@ class PortfolioPageState extends State<PortfolioPage>
     }
 
     return RefreshIndicator(
+      triggerMode: RefreshIndicatorTriggerMode.anywhere,
       onRefresh: _updateCandles,
       child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           if (snap.hasError)
             SliverToBoxAdapter(
@@ -1270,16 +1294,7 @@ class _DesktopAllocationRow extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: (allocationPct / 100).clamp(0.0, 1.0),
-                  minHeight: 4,
-                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                  valueColor: AlwaysStoppedAnimation<Color>(color),
-                ),
-              ),
+
             ],
           ),
         ),
