@@ -135,7 +135,7 @@ void main() {
     expect(find.byType(BottomNav), findsOneWidget);
   });
 
-  testWidgets('desktop tab changes fade without horizontal page motion',
+  testWidgets('desktop tab changes immediately without animation',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(1400, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -162,23 +162,13 @@ void main() {
 
     final pageView = tester.widget<PageView>(find.byType(PageView));
     expect(pageView.controller!.page, 0);
+    expect(find.byKey(const ValueKey('desktop-tab-transition')), findsNothing);
 
     await tester.tap(find.byKey(const Key('desktop-HoldingsPage')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 35));
 
-    final fading = tester.widget<FadeTransition>(
-      find.byKey(const ValueKey('desktop-tab-transition')),
-    );
-    expect(fading.opacity.value, inExclusiveRange(0, 1));
-    expect(pageView.controller!.page, 0);
-
-    await tester.pump(const Duration(milliseconds: 45));
-    await tester.pump();
     expect(pageView.controller!.page, 2);
-
-    await tester.pump(const Duration(milliseconds: 120));
-    expect(fading.opacity.value, 1);
+    expect(pageView.controller!.position.isScrollingNotifier.value, isFalse);
+    expect(find.byKey(const ValueKey('desktop-tab-transition')), findsNothing);
   });
 
   testWidgets(
