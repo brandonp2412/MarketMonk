@@ -365,6 +365,9 @@ void main() {
     expect(find.text('Filter holdings...'), findsNothing);
     expect(find.byType(Card), findsNWidgets(2));
     expect(find.byTooltip('Refresh'), findsOneWidget);
+    final scrollbar = tester.widget<Scrollbar>(find.byType(Scrollbar));
+    expect(scrollbar.controller == null, false);
+    expect(scrollbar.controller!.hasClients, true);
     final pieFinder = find.byType(PieChart).first;
     final pie = tester.widget<PieChart>(pieFinder);
     expect(pie.data.sectionsSpace, 0);

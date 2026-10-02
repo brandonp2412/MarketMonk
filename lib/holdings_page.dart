@@ -50,6 +50,7 @@ class HoldingsPageState extends State<HoldingsPage>
   bool get wantKeepAlive => true;
 
   final _search = TextEditingController();
+  final _desktopTableScrollController = ScrollController();
   List<SymbolSummary> _summaries = [];
   late Stream<List<SymbolSummary>> _stream;
   String _lastAccount = '';
@@ -66,6 +67,13 @@ class HoldingsPageState extends State<HoldingsPage>
     super.initState();
     _stream = _buildStream();
     _preload();
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    _desktopTableScrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -769,7 +777,9 @@ class HoldingsPageState extends State<HoldingsPage>
                         ? 1240.0
                         : constraints.maxWidth;
                 return Scrollbar(
+                  controller: _desktopTableScrollController,
                   child: SingleChildScrollView(
+                    controller: _desktopTableScrollController,
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: SizedBox(

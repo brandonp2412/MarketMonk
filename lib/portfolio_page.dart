@@ -57,6 +57,7 @@ class PortfolioPageState extends State<PortfolioPage>
   bool _isLoadingPortfolio = false;
   int? touchedIndex;
   final _filterController = TextEditingController();
+  final _allocationScrollController = ScrollController();
   String _filterText = '';
   String _lastAccount = '';
   int _lastIbkrRefreshVersion = -1;
@@ -118,6 +119,7 @@ class PortfolioPageState extends State<PortfolioPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _filterController.dispose();
+    _allocationScrollController.dispose();
     super.dispose();
   }
 
@@ -1065,7 +1067,9 @@ class PortfolioPageState extends State<PortfolioPage>
                             child: LayoutBuilder(
                               builder: (context, constraints) {
                                 final holdingsList = Scrollbar(
+                                  controller: _allocationScrollController,
                                   child: ListView.separated(
+                                    controller: _allocationScrollController,
                                     itemCount: sorted.length,
                                     separatorBuilder: (_, __) =>
                                         const SizedBox(height: 14),

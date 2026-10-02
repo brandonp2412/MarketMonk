@@ -71,6 +71,9 @@ void main() {
     expect(find.text('Return'), findsOneWidget);
     expect(find.byType(ListTile), findsNothing);
     expect(find.byTooltip('Refresh'), findsOneWidget);
+    final scrollbar = tester.widget<Scrollbar>(find.byType(Scrollbar));
+    expect(scrollbar.controller == null, false);
+    expect(scrollbar.controller!.hasClients, true);
 
     await tester.tap(find.text('Return'));
     await tester.pump();
