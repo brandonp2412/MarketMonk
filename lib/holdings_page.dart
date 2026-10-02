@@ -6,6 +6,7 @@ import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
+import 'package:market_monk/ibkr_cash_out_pnl.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/settings_page.dart';
@@ -363,6 +364,7 @@ class HoldingsPageState extends State<HoldingsPage>
           );
 
     if (desktop) {
+      final accounts = context.watch<AccountManager>();
       final openCount =
           _summaries.where((summary) => summary.position != null).length;
       return Scaffold(
@@ -400,6 +402,51 @@ class HoldingsPageState extends State<HoldingsPage>
                       ],
                     ),
                   ),
+                  if (accounts.accounts.length > 1) ...[
+                    PopupMenuButton<String>(
+                      key: const Key('desktop-holdings-account-picker'),
+                      tooltip: context.l10n.text('Switch account'),
+                      onSelected: accounts.switchAccount,
+                      itemBuilder: (popupContext) => accounts.accounts
+                          .map(
+                            (account) => CheckedPopupMenuItem(
+                              value: account,
+                              checked: account == accounts.activeAccount,
+                              child: Text(account),
+                            ),
+                          )
+                          .toList(),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.account_balance_outlined,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              accounts.activeAccount,
+                              style: Theme.of(context).textTheme.labelLarge,
+                            ),
+                            const SizedBox(width: 6),
+                            const Icon(Icons.expand_more_rounded, size: 20),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   if (_selecting) ...[
                     TextButton.icon(
                       onPressed: _toggleSelectAll,
@@ -652,6 +699,27 @@ class HoldingsPageState extends State<HoldingsPage>
     );
   }
 
+  ({double gainUsd, double gainPct})? _ibkrCashOutSummary(
+    AccountManager accounts,
+  ) {
+    final account = accounts.activeAccount;
+    final performance = accounts.ibkrPerformanceCacheFor(account, '1Y');
+    final netLiquidation = accounts.portfolioCacheFor(account)?.netLiquidation;
+    if (performance == null || netLiquidation == null) return null;
+
+    try {
+      final pnl = calculateIbkrCashOutPnl(performance, netLiquidation);
+      final basePerUsd = requireUsdRate(performance.currency);
+      if (!basePerUsd.isFinite || basePerUsd <= 0) return null;
+      return (
+        gainUsd: pnl.profitLoss / basePerUsd,
+        gainPct: pnl.percent ?? 0,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   Widget _buildDesktopHoldings(
     BuildContext context,
     List<SymbolSummary> summaries,
@@ -666,8 +734,13 @@ class HoldingsPageState extends State<HoldingsPage>
         open.fold(0.0, (sum, position) => sum + position.currentValue);
     final totalCost =
         open.fold(0.0, (sum, position) => sum + position.costBasis);
-    final totalUnrealized =
+    final costBasisGain =
         open.fold(0.0, (sum, position) => sum + position.unrealizedPL);
+    final accounts = context.watch<AccountManager>();
+    final cashOutSummary = _ibkrCashOutSummary(accounts);
+    final totalUnrealized = cashOutSummary?.gainUsd ?? costBasisGain;
+    final totalUnrealizedPct = cashOutSummary?.gainPct ??
+        (totalCost > 0 ? costBasisGain / totalCost * 100 : 0.0);
     final winners = open.where((position) => position.change >= 0).length;
     final sorted = _sortDesktopSummaries(summaries);
 
@@ -738,6 +811,8 @@ class HoldingsPageState extends State<HoldingsPage>
                 label: context.l10n.text('Unrealized P/L'),
                 value:
                     '${totalUnrealized >= 0 ? '+' : ''}${fmtCurrency(totalUnrealized)}',
+                detail:
+                    '${totalUnrealizedPct >= 0 ? '+' : ''}${totalUnrealizedPct.toStringAsFixed(2)}%',
                 valueColor:
                     totalUnrealized >= 0 ? Colors.green : Colors.redAccent,
               ),
