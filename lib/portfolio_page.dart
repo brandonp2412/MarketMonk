@@ -10,6 +10,7 @@ import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
+import 'package:market_monk/ibkr_cash_out_pnl.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
@@ -62,6 +63,8 @@ class PortfolioPageState extends State<PortfolioPage>
   IbkrAccountConfig _lastIbkrConfig = const IbkrAccountConfig();
   final Map<(String, IbkrAccountConfig), Future<IbkrPortfolioSnapshot>>
       _ibkrSnapshotLoads = {};
+  final Map<(String, IbkrAccountConfig), Future<IbkrPerformanceSeries>>
+      _ibkrPerformanceLoads = {};
 
   @override
   void initState() {
@@ -177,6 +180,42 @@ class PortfolioPageState extends State<PortfolioPage>
     );
   }
 
+  Future<void> _loadIbkrCashOutPerformance(
+    String accountName,
+    IbkrAccountConfig config, {
+    bool forceRefresh = false,
+  }) async {
+    if (!config.enabled || !config.isConfigured) return;
+
+    const period = '1Y';
+    final accounts = context.read<AccountManager>();
+    final cached = accounts.ibkrPerformanceCacheFor(accountName, period);
+    if (!forceRefresh &&
+        cached != null &&
+        accounts.isIbkrPerformanceCacheFresh(accountName, period)) {
+      return;
+    }
+
+    final loadKey = (accountName, config);
+    try {
+      final performance =
+          await _ibkrPerformanceLoads.putIfAbsent(loadKey, () async {
+        try {
+          return await IbkrApiClient(config).fetchPerformance(period);
+        } finally {
+          _ibkrPerformanceLoads.remove(loadKey);
+        }
+      });
+      await accounts.cacheIbkrPerformance(accountName, performance);
+    } catch (error, stackTrace) {
+      talker.handle(
+        error,
+        stackTrace,
+        'Failed to load IBKR cash-out performance',
+      );
+    }
+  }
+
   Future<void> _preload({bool forceRefresh = false}) async {
     final accounts = context.read<AccountManager>();
     final accountName = accounts.activeAccount;
@@ -188,6 +227,11 @@ class PortfolioPageState extends State<PortfolioPage>
         config.isConfigured &&
         (forceRefresh || cachedBefore == null || !cacheWasFresh);
     final willLoadPortfolio = !config.enabled || willFetchIbkr;
+    final performanceFuture = _loadIbkrCashOutPerformance(
+      accountName,
+      config,
+      forceRefresh: forceRefresh,
+    );
     if (willLoadPortfolio &&
         mounted &&
         accounts.activeAccount == accountName &&
@@ -211,6 +255,7 @@ class PortfolioPageState extends State<PortfolioPage>
           netLiquidationUsd: loaded.netLiquidationUsd,
         );
       }
+      await performanceFuture;
       if (!mounted || accounts.activeAccount != accountName) return;
       setState(() {
         _positions = loaded.positions;
@@ -478,12 +523,33 @@ class PortfolioPageState extends State<PortfolioPage>
     );
   }
 
+  ({double gainUsd, double gainPct})? _ibkrCashOutSummary(
+    IbkrPerformanceSeries? performance,
+    IbkrAccountValue? netLiquidation,
+  ) {
+    if (performance == null || netLiquidation == null) return null;
+    try {
+      final pnl = calculateIbkrCashOutPnl(performance, netLiquidation);
+      final basePerUsd = requireUsdRate(performance.currency);
+      if (!basePerUsd.isFinite || basePerUsd <= 0) return null;
+      return (
+        gainUsd: pnl.profitLoss / basePerUsd,
+        gainPct: pnl.percent ?? 0,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   Widget _buildBody(
     BuildContext context,
     AsyncSnapshot<_LoadedPortfolio> snap,
   ) {
     final positions = snap.data?.positions ?? _positions;
     final netLiquidation = snap.data?.netLiquidation ?? _netLiquidation;
+    final accounts = context.watch<AccountManager>();
+    final performance =
+        accounts.ibkrPerformanceCacheFor(accounts.activeAccount, '1Y');
 
     if (snap.hasError && positions.isEmpty) {
       return _refreshableState(_buildLoadError(context));
@@ -543,8 +609,11 @@ class PortfolioPageState extends State<PortfolioPage>
 
     final totalValue = positions.fold(0.0, (sum, p) => sum + p.currentValue);
     final totalCost = positions.fold(0.0, (sum, p) => sum + p.costBasis);
-    final totalGain = totalValue - totalCost;
-    final totalGainPct = totalCost > 0 ? (totalGain / totalCost) * 100 : 0.0;
+    final costBasisGain = totalValue - totalCost;
+    final cashOutSummary = _ibkrCashOutSummary(performance, netLiquidation);
+    final totalGain = cashOutSummary?.gainUsd ?? costBasisGain;
+    final totalGainPct = cashOutSummary?.gainPct ??
+        (totalCost > 0 ? (costBasisGain / totalCost) * 100 : 0.0);
 
     final sorted = [...positions]
       ..sort((a, b) => b.currentValue.compareTo(a.currentValue));
@@ -596,6 +665,8 @@ class PortfolioPageState extends State<PortfolioPage>
         selectedIndex: selectedIndex,
         totalValue: totalValue,
         netLiquidation: netLiquidation,
+        totalGain: totalGain,
+        totalGainPct: totalGainPct,
         hasRefreshWarning: snap.hasError,
       );
     }
@@ -740,18 +811,14 @@ class PortfolioPageState extends State<PortfolioPage>
     required int? selectedIndex,
     required double totalValue,
     required IbkrAccountValue? netLiquidation,
+    required double totalGain,
+    required double totalGainPct,
     required bool hasRefreshWarning,
   }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final settings = context.watch<SettingsState>();
     final accounts = context.watch<AccountManager>();
-    final totalCost =
-        positions.fold(0.0, (sum, position) => sum + position.costBasis);
-    final totalUnrealized =
-        positions.fold(0.0, (sum, position) => sum + position.unrealizedPL);
-    final unrealizedPct =
-        totalCost > 0 ? totalUnrealized / totalCost * 100 : 0.0;
     final byReturn = [...positions]
       ..sort((a, b) => b.change.compareTo(a.change));
     final accountValue = netLiquidation == null
@@ -932,12 +999,12 @@ class PortfolioPageState extends State<PortfolioPage>
               _DesktopPortfolioMetric(
                 label: context.l10n.text('Unrealized P/L'),
                 value:
-                    '${totalUnrealized >= 0 ? '+' : ''}${fmtCurrency(totalUnrealized)}',
+                    '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}',
                 detail:
-                    '${unrealizedPct >= 0 ? '+' : ''}${unrealizedPct.toStringAsFixed(2)}%',
+                    '${totalGainPct >= 0 ? '+' : ''}${totalGainPct.toStringAsFixed(2)}%',
                 valueColor:
-                    totalUnrealized >= 0 ? Colors.green : Colors.redAccent,
-                icon: totalUnrealized >= 0
+                    totalGain >= 0 ? Colors.green : Colors.redAccent,
+                icon: totalGain >= 0
                     ? Icons.trending_up_rounded
                     : Icons.trending_down_rounded,
               ),
