@@ -548,83 +548,86 @@ Future<void> syncCandles(
 }) async {
   final d = database ?? db;
 
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  if (_syncGuardDate != today) {
-    _syncedSymbols.clear();
-    _syncGuardDate = today;
-  }
+  return d.runWhileOpen(() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    if (_syncGuardDate != today) {
+      _syncedSymbols.clear();
+      _syncGuardDate = today;
+    }
 
-  final guardKey = '${d.hashCode}:$symbol';
-  if (_syncedSymbols.contains(guardKey)) return;
-  _syncedSymbols.add(guardKey);
+    final guardKey = '${d.hashCode}:$symbol';
+    if (_syncedSymbols.contains(guardKey)) return;
+    _syncedSymbols.add(guardKey);
 
-  try {
-    final latest = await (d.candles.select()
-          ..where((tbl) => tbl.symbol.equals(symbol))
-          ..orderBy([
-            (u) => OrderingTerm(expression: u.date, mode: OrderingMode.desc),
-          ])
-          ..limit(1))
-        .getSingleOrNull();
-    final latestDay = latest == null
-        ? null
-        : DateTime(latest.date.year, latest.date.month, latest.date.day);
+    try {
+      final latest = await (d.candles.select()
+            ..where((tbl) => tbl.symbol.equals(symbol))
+            ..orderBy([
+              (u) => OrderingTerm(expression: u.date, mode: OrderingMode.desc),
+            ])
+            ..limit(1))
+          .getSingleOrNull();
+      final latestDay = latest == null
+          ? null
+          : DateTime(latest.date.year, latest.date.month, latest.date.day);
 
-    if (ibkrConfig?.isConfigured == true) {
-      final prefs = await SharedPreferences.getInstance();
-      final seedKey =
-          'ibkrHistorySeeded:${ibkrConfig!.baseUrl}:$syncNamespace:$symbol';
-      final seeded = prefs.getBool(seedKey) ?? false;
-      if (seeded && latestDay != null && !today.isAfter(latestDay)) return;
+      if (ibkrConfig?.isConfigured == true) {
+        final prefs = await SharedPreferences.getInstance();
+        final seedKey =
+            'ibkrHistorySeeded:${ibkrConfig!.baseUrl}:$syncNamespace:$symbol';
+        final seeded = prefs.getBool(seedKey) ?? false;
+        if (seeded && latestDay != null && !today.isAfter(latestDay)) return;
 
-      try {
-        final history = await IbkrApiClient(ibkrConfig).fetchHistoricalCandles(
-          symbol,
-          years: seeded && latest != null ? 1 : 10,
-        );
-        if (history.candles.isEmpty) {
-          throw StateError('IBKR returned no historical candles');
+        try {
+          final history =
+              await IbkrApiClient(ibkrConfig).fetchHistoricalCandles(
+            symbol,
+            years: seeded && latest != null ? 1 : 10,
+          );
+          if (history.candles.isEmpty) {
+            throw StateError('IBKR returned no historical candles');
+          }
+
+          final normalizedCurrency = cacheSymbolMeta(symbol, history.currency);
+          await prefs.setString('symbolRawCurrency_$symbol', history.currency);
+          if (normalizedCurrency != 'USD' &&
+              !allRatesFromUsd.containsKey(normalizedCurrency)) {
+            await _fetchAndCacheRate(normalizedCurrency);
+          }
+          await insertIbkrCandles(history.candles, symbol, database: d);
+          await prefs.setBool(seedKey, true);
+          talker.info('Completed IBKR candle sync');
+          return;
+        } catch (error) {
+          talker.warning(
+            'IBKR candle sync failed for $symbol; falling back to Yahoo: $error',
+          );
         }
-
-        final normalizedCurrency = cacheSymbolMeta(symbol, history.currency);
-        await prefs.setString('symbolRawCurrency_$symbol', history.currency);
-        if (normalizedCurrency != 'USD' &&
-            !allRatesFromUsd.containsKey(normalizedCurrency)) {
-          await _fetchAndCacheRate(normalizedCurrency);
-        }
-        await insertIbkrCandles(history.candles, symbol, database: d);
-        await prefs.setBool(seedKey, true);
-        talker.info('Completed IBKR candle sync');
-        return;
-      } catch (error) {
-        talker.warning(
-          'IBKR candle sync failed for $symbol; falling back to Yahoo: $error',
-        );
       }
-    }
 
-    unawaited(_fetchSymbolCurrencyAndRate(symbol));
+      unawaited(_fetchSymbolCurrencyAndRate(symbol));
 
-    if (latest == null) {
-      final response = await const YahooFinanceDailyReader().getDailyDTOs(
-        symbol,
-      );
-      await insertCandles(response.candlesData, symbol, database: d);
-      talker.info('Completed initial Yahoo candle sync');
-    } else if (today.isAfter(latestDay!)) {
-      final response = await const YahooFinanceDailyReader().getDailyDTOs(
-        symbol,
-        startDate: latest.date,
-      );
-      await insertCandles(response.candlesData, symbol, database: d);
-      talker.info('Completed incremental Yahoo candle sync');
+      if (latest == null) {
+        final response = await const YahooFinanceDailyReader().getDailyDTOs(
+          symbol,
+        );
+        await insertCandles(response.candlesData, symbol, database: d);
+        talker.info('Completed initial Yahoo candle sync');
+      } else if (today.isAfter(latestDay!)) {
+        final response = await const YahooFinanceDailyReader().getDailyDTOs(
+          symbol,
+          startDate: latest.date,
+        );
+        await insertCandles(response.candlesData, symbol, database: d);
+        talker.info('Completed incremental Yahoo candle sync');
+      }
+    } catch (error, stackTrace) {
+      _syncedSymbols.remove(guardKey);
+      talker.handle(error, stackTrace, 'Candle sync failed');
+      rethrow;
     }
-  } catch (error, stackTrace) {
-    _syncedSymbols.remove(guardKey);
-    talker.handle(error, stackTrace, 'Candle sync failed');
-    rethrow;
-  }
+  });
 }
 
 /// Fetches the native currency for [symbol] from the Yahoo Finance chart API,
