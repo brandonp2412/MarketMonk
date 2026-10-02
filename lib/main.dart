@@ -714,14 +714,35 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _MyHomePageState extends State<MyHomePage>
+    with SingleTickerProviderStateMixin {
   final _pageController = PageController();
+  late final AnimationController _desktopTabTransitionController;
+  late final Animation<double> _desktopTabOpacity;
   var _currentIndex = 0;
+  var _desktopTransitionGeneration = 0;
 
   static const _tabs = ['ChartPage', 'PortfolioPage', 'HoldingsPage'];
 
   @override
+  void initState() {
+    super.initState();
+    _desktopTabTransitionController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 120),
+      reverseDuration: const Duration(milliseconds: 70),
+      value: 1,
+    );
+    _desktopTabOpacity = CurvedAnimation(
+      parent: _desktopTabTransitionController,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+  }
+
+  @override
   void dispose() {
+    _desktopTabTransitionController.dispose();
     _pageController.dispose();
     super.dispose();
   }
@@ -735,6 +756,22 @@ class _MyHomePageState extends State<MyHomePage> {
       );
     }
     setState(() => _currentIndex = index);
+  }
+
+  Future<void> _selectDesktopPage(int index) async {
+    if (index == _currentIndex) return;
+
+    final generation = ++_desktopTransitionGeneration;
+    setState(() => _currentIndex = index);
+
+    await _desktopTabTransitionController.reverse();
+    if (!mounted || generation != _desktopTransitionGeneration) return;
+
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(index);
+    }
+
+    await _desktopTabTransitionController.forward();
   }
 
   @override
@@ -764,7 +801,14 @@ class _MyHomePageState extends State<MyHomePage> {
 
             final content = Stack(
               children: [
-                pages,
+                if (desktop)
+                  FadeTransition(
+                    key: const ValueKey('desktop-tab-transition'),
+                    opacity: _desktopTabOpacity,
+                    child: pages,
+                  )
+                else
+                  pages,
                 if (!desktop)
                   Positioned(
                     bottom: 0,
@@ -787,7 +831,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   tabs: _tabs,
                   compact: constraints.maxWidth < compactDesktopNavBreakpoint,
                   currentIndex: _currentIndex,
-                  onTap: _selectPage,
+                  onTap: _selectDesktopPage,
                   onSettings: () => Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const SettingsPage()),
