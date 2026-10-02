@@ -347,7 +347,8 @@ void main() {
     expect(ibkrLoads, 1);
     expect(find.textContaining('10,100'), findsWidgets);
     expect(allRatesFromUsd['NZD'], closeTo(10100 / 5800, 1e-9));
-    expect(find.textContaining('+11.69% TWR'), findsOneWidget);
+    expect(find.text('+11.69%'), findsOneWidget);
+    expect(find.textContaining('TWR'), findsNothing);
     expect(find.text('History unavailable'), findsNothing);
 
     final refreshedIbkrLoads = ibkrLoads;
@@ -364,7 +365,7 @@ void main() {
     expect(performanceLoads, successfulPerformanceLoads);
   });
 
-  testWidgets('IBKR portfolio summary uses broker TWR when available', (
+  testWidgets('IBKR portfolio summary shows concise broker return', (
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues({
@@ -455,12 +456,19 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    final pageList = tester
+        .widgetList<ListView>(find.byType(ListView))
+        .singleWhere((listView) => listView.scrollDirection == Axis.vertical);
+    final pagePadding = pageList.padding! as EdgeInsets;
+    expect(pagePadding.left, 0);
+    expect(pagePadding.right, 0);
     expect(performanceLoads, greaterThan(0));
-    expect(find.textContaining('+5.49% TWR'), findsOneWidget);
-    final adjustedReturnFinder = find.textContaining('return excl. transfers');
-    expect(adjustedReturnFinder, findsOneWidget);
-    final adjustedReturnText = tester.widget<Text>(adjustedReturnFinder).data!;
-    expect(adjustedReturnText, startsWith('-'));
+    expect(find.text('+5.49%'), findsOneWidget);
+    expect(find.textContaining('TWR'), findsNothing);
+    expect(find.textContaining('return excl. transfers'), findsNothing);
+    expect(find.textContaining('holdings change'), findsNothing);
+    expect(find.byIcon(Icons.arrow_upward), findsNothing);
+    expect(find.byIcon(Icons.arrow_downward), findsNothing);
     expect(find.textContaining('value change'), findsNothing);
     expect(tester.takeException(), null);
   });

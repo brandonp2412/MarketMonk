@@ -84,7 +84,6 @@ class ChartsPageState extends State<ChartsPage>
   Map<String, List<_DateValue>> _portfolioSeriesByAccount = {};
   Map<String, double> _portfolioReturnsByAccount = {};
   Map<String, double> _portfolioReturnAmountsByAccount = {};
-  Set<String> _currentHoldingsReplayAccounts = {};
   String? _portfolioError;
   bool _portfolioLoading = true;
   bool _chartPeriodLoaded = false;
@@ -613,7 +612,6 @@ class ChartsPageState extends State<ChartsPage>
     final newSeries = <String, List<_DateValue>>{};
     final newReturns = <String, double>{};
     final newReturnAmounts = <String, double>{};
-    final newCurrentHoldingsReplayAccounts = <String>{};
     String? firstError;
 
     for (final accountName in accounts) {
@@ -678,9 +676,6 @@ class ChartsPageState extends State<ChartsPage>
           accountDb,
         );
         newSeries[accountName] = fallback.series;
-        if (fallback.currentHoldingsReplay) {
-          newCurrentHoldingsReplayAccounts.add(accountName);
-        }
       } catch (e) {
         newSeries[accountName] = [];
         firstError ??= e.toString();
@@ -694,7 +689,6 @@ class ChartsPageState extends State<ChartsPage>
       _portfolioSeriesByAccount = newSeries;
       _portfolioReturnsByAccount = newReturns;
       _portfolioReturnAmountsByAccount = newReturnAmounts;
-      _currentHoldingsReplayAccounts = newCurrentHoldingsReplayAccounts;
       _portfolioError = firstError;
       _portfolioLoading = false;
     });
@@ -1322,11 +1316,9 @@ class ChartsPageState extends State<ChartsPage>
       onRefresh: _refreshCurrentChart,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.fromLTRB(
-          desktop ? 24 : 0,
-          _overlayHeight + 8,
-          desktop ? 24 : 0,
-          desktop ? 24 : bottomNavScrollClearance,
+        padding: EdgeInsets.only(
+          top: _overlayHeight + 8,
+          bottom: desktop ? 24 : bottomNavScrollClearance,
         ),
         children: [
           _buildTimeChips(),
@@ -1673,7 +1665,7 @@ class ChartsPageState extends State<ChartsPage>
     return SizedBox(
       height: height,
       child: Padding(
-        padding: const EdgeInsets.only(left: 8, right: 8, top: 8),
+        padding: const EdgeInsets.only(top: 8),
         child: LineChart(
           LineChartData(
             clipData: const FlClipData.all(),
@@ -1805,7 +1797,7 @@ class ChartsPageState extends State<ChartsPage>
     if (allSeries.isEmpty) return const SizedBox();
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         children: [
           for (final entry in allSeries.entries)
@@ -1851,9 +1843,6 @@ class ChartsPageState extends State<ChartsPage>
     final dotColor = accountColors[idx.clamp(0, accountColors.length - 1)];
     final brokerReturn = _portfolioReturnsByAccount[accountName];
     final brokerReturnAmount = _portfolioReturnAmountsByAccount[accountName];
-    final currentHoldingsReplay = _currentHoldingsReplayAccounts.contains(
-      accountName,
-    );
     final hasHistory = brokerReturn != null || series.length > 1;
     final pct = brokerReturn ??
         (hasHistory
@@ -1862,16 +1851,6 @@ class ChartsPageState extends State<ChartsPage>
     final returnColor = hasHistory
         ? (pct >= 0 ? Colors.green : Colors.redAccent)
         : Theme.of(context).colorScheme.onSurfaceVariant;
-    final returnKind = brokerReturn != null
-        ? ' TWR'
-        : currentHoldingsReplay
-            ? ' holdings'
-            : ' value';
-    final changeKind = brokerReturn != null
-        ? 'return excl. transfers'
-        : currentHoldingsReplay
-            ? 'current holdings change'
-            : 'holdings change';
     final change =
         brokerReturnAmount ?? (series.last.value - series.first.value);
     final isHidden = _hiddenAccounts.contains(accountName);
@@ -1899,28 +1878,15 @@ class ChartsPageState extends State<ChartsPage>
           ],
         );
 
-    Widget returnLabel() => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (hasHistory)
-              Icon(
-                pct >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
-                color: returnColor,
-                size: 18,
-              ),
-            Flexible(
-              child: Text(
-                hasHistory
-                    ? '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%$returnKind'
-                    : context.l10n.text('History unavailable'),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium!.copyWith(
-                  color: returnColor,
-                ),
-              ),
-            ),
-          ],
+    Widget returnLabel() => Text(
+          hasHistory
+              ? '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%'
+              : context.l10n.text('History unavailable'),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleMedium!.copyWith(
+            color: returnColor,
+          ),
         );
 
     final valueText = Text(
@@ -1932,7 +1898,7 @@ class ChartsPageState extends State<ChartsPage>
     );
     final changeText = Text(
       hasHistory
-          ? '${change >= 0 ? '+' : ''}${fmtCurrency(change)} $changeKind'
+          ? '${change >= 0 ? '+' : ''}${fmtCurrency(change)}'
           : context.l10n.text('Historical prices unavailable'),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
