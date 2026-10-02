@@ -955,51 +955,70 @@ class PortfolioPageState extends State<PortfolioPage>
                           ),
                           const SizedBox(height: 18),
                           Expanded(
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  flex: 5,
-                                  child: Center(
-                                    child: AspectRatio(
-                                      aspectRatio: 1,
-                                      child: allocationChart,
-                                    ),
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final holdingsList = Scrollbar(
+                                  child: ListView.separated(
+                                    itemCount: sorted.length,
+                                    separatorBuilder: (_, __) =>
+                                        const SizedBox(height: 14),
+                                    itemBuilder: (context, index) {
+                                      final position = sorted[index];
+                                      final allocationPct = totalValue > 0
+                                          ? position.currentValue /
+                                              totalValue *
+                                              100
+                                          : 0.0;
+                                      return _DesktopAllocationRow(
+                                        color: colors[index],
+                                        symbol: position.symbol,
+                                        name: position.name,
+                                        value: position.currentValue,
+                                        allocationPct: allocationPct,
+                                        selected: selectedIndex == index,
+                                        onTap: () => setState(
+                                          () => touchedIndex =
+                                              touchedIndex == index
+                                                  ? null
+                                                  : index,
+                                        ),
+                                      );
+                                    },
                                   ),
-                                ),
-                                const SizedBox(width: 28),
-                                Expanded(
-                                  flex: 6,
-                                  child: Scrollbar(
-                                    child: ListView.separated(
-                                      itemCount: sorted.length,
-                                      separatorBuilder: (_, __) =>
-                                          const SizedBox(height: 14),
-                                      itemBuilder: (context, index) {
-                                        final position = sorted[index];
-                                        final allocationPct = totalValue > 0
-                                            ? position.currentValue /
-                                                totalValue *
-                                                100
-                                            : 0.0;
-                                        return _DesktopAllocationRow(
-                                          color: colors[index],
-                                          symbol: position.symbol,
-                                          name: position.name,
-                                          value: position.currentValue,
-                                          allocationPct: allocationPct,
-                                          selected: selectedIndex == index,
-                                          onTap: () => setState(
-                                            () => touchedIndex =
-                                                touchedIndex == index
-                                                    ? null
-                                                    : index,
-                                          ),
-                                        );
-                                      },
-                                    ),
+                                );
+                                final chart = Center(
+                                  child: AspectRatio(
+                                    aspectRatio: 1,
+                                    child: allocationChart,
                                   ),
-                                ),
-                              ],
+                                );
+
+                                if (constraints.maxWidth < 600) {
+                                  return Column(
+                                    key: const Key(
+                                      'desktop-allocation-compact',
+                                    ),
+                                    children: [
+                                      SizedBox(
+                                        height: constraints.maxHeight < 500
+                                            ? 180
+                                            : 220,
+                                        child: chart,
+                                      ),
+                                      const SizedBox(height: 14),
+                                      Expanded(child: holdingsList),
+                                    ],
+                                  );
+                                }
+
+                                return Row(
+                                  children: [
+                                    Expanded(flex: 5, child: chart),
+                                    const SizedBox(width: 28),
+                                    Expanded(flex: 6, child: holdingsList),
+                                  ],
+                                );
+                              },
                             ),
                           ),
                         ],

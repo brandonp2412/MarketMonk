@@ -365,4 +365,42 @@ void main() {
     expect(find.byType(Card), findsNWidgets(2));
     expect(tester.takeException(), null);
   });
+
+  testWidgets('portfolio reflows allocation at compact desktop widths',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(879, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    SharedPreferences.setMockInitialValues({});
+
+    db = Database.connect(
+      DatabaseConnection(
+        NativeDatabase.memory(),
+        closeStreamsSynchronously: true,
+      ),
+    );
+    addTearDown(() => db.close());
+
+    final accounts = await configuredAccounts();
+    await accounts.cachePortfolio(
+      'Default',
+      [cachedPosition()],
+      const IbkrAccountValue(value: 5500, currency: 'USD'),
+    );
+    final pending = Completer<IbkrPortfolioSnapshot>();
+
+    await tester.pumpWidget(
+      app(accounts, PortfolioPage(ibkrLoader: (_) => pending.future)),
+    );
+    await tester.pump();
+
+    expect(
+      find.byKey(const Key('desktop-allocation-compact')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), null);
+  });
 }
