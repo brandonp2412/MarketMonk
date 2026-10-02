@@ -11,6 +11,9 @@ typedef ProfileDatabaseFactory = Database Function(String profile);
 /// Marks a successful one-time import; deletions must never be reseeded.
 const sqliteMigrationCompleteKey = 'sqliteMigrationCompleteV1';
 
+/// Marks import of the pre-cutover SQLite app-state database.
+const legacyAppStateMigrationCompleteKey = 'legacyAppStateMigrationCompleteV1';
+
 /// Legacy values that belong in profile tables rather than global settings.
 const legacyProfilePreferenceKeys = {
   'accounts',
@@ -36,30 +39,71 @@ Future<void> seedSqliteFromLegacyPreferences({
 
 /// Imports legacy app and profile values, also used for version-one backups.
 /// Existing SQLite rows win, making interrupted upgrades safe to retry.
+Future<List<String>> seedAppStateFromLegacyValues({
+  required Map<String, Object?> values,
+  required AppStateDatabase appState,
+}) async {
+  final storedAccounts =
+      (values['accounts'] as List?)?.cast<String>() ?? const <String>[];
+  final legacyAccounts = <String>{
+    'Default',
+    for (final account in storedAccounts)
+      if (account != 'Default') account,
+  }.toList();
+  for (final account in legacyAccounts) {
+    if (account.contains('/') || account.contains(r'\') || account.isEmpty) {
+      throw const FormatException('Invalid legacy profile name');
+    }
+  }
+
+  final existingAccounts = await appState.readProfiles();
+  final mergedAccounts = <String>[
+    'Default',
+    for (final account in existingAccounts)
+      if (account != 'Default') account,
+    for (final account in legacyAccounts)
+      if (account != 'Default' && !existingAccounts.contains(account)) account,
+  ];
+  if (existingAccounts.length != mergedAccounts.length ||
+      existingAccounts.indexed.any(
+        (entry) => mergedAccounts[entry.$1] != entry.$2,
+      )) {
+    await appState.replaceProfiles(mergedAccounts);
+  }
+
+  final legacyActiveAccount = values['activeAccount'] as String? ??
+      values[AppStateDatabase.activeProfileSettingKey] as String?;
+  final currentActiveAccount = await appState.readActiveProfile();
+  if (currentActiveAccount == null &&
+      legacyActiveAccount != null &&
+      mergedAccounts.contains(legacyActiveAccount)) {
+    await appState.setActiveProfile(legacyActiveAccount);
+  } else if (currentActiveAccount == null) {
+    await appState.setActiveProfile('Default');
+  }
+
+  for (final key in values.keys) {
+    if (legacyProfilePreferenceKeys.contains(key) ||
+        key == AppStateDatabase.activeProfileSettingKey ||
+        key == sqliteMigrationCompleteKey ||
+        key == legacyAppStateMigrationCompleteKey) {
+      continue;
+    }
+    await appState.seedSettingIfMissing(key, values[key]);
+  }
+
+  return legacyAccounts;
+}
+
 Future<void> seedSqliteFromLegacyValues({
   required Map<String, Object?> values,
   required AppStateDatabase appState,
   ProfileDatabaseFactory? profileDatabaseFactory,
 }) async {
-  final storedAccounts =
-      (values['accounts'] as List?)?.cast<String>() ?? const [];
-  final accounts = <String>{
-    'Default',
-    for (final account in storedAccounts)
-      if (account != 'Default') account,
-  }.toList();
-
-  await appState.seedProfilesIfEmpty(accounts);
-  await appState.seedSettingIfMissing(
-    AppStateDatabase.activeProfileSettingKey,
-    values['activeAccount'] as String? ?? 'Default',
+  final accounts = await seedAppStateFromLegacyValues(
+    values: values,
+    appState: appState,
   );
-
-  for (final key in values.keys) {
-    if (legacyProfilePreferenceKeys.contains(key) ||
-        key == sqliteMigrationCompleteKey) continue;
-    await appState.seedSettingIfMissing(key, values[key]);
-  }
 
   final configs = _decodeMap(values['ibkrAccountConfigs'] as String?);
   final portfolioCache =
@@ -69,12 +113,7 @@ Future<void> seedSqliteFromLegacyValues({
     discardMalformed: true,
   );
 
-  final profileNames = accounts;
-
-  for (final profile in profileNames) {
-    if (profile.contains('/') || profile.contains(r'\') || profile.isEmpty) {
-      throw FormatException('Invalid legacy profile name');
-    }
+  for (final profile in accounts) {
     final database = (profileDatabaseFactory ?? _openProfileDatabase)(profile);
     try {
       await _seedIbkrConfig(database, configs[profile]);

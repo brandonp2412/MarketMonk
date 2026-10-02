@@ -1,4 +1,7 @@
 import 'package:market_monk/app_state_database.dart';
+import 'package:market_monk/legacy_app_state_reader_stub.dart'
+    if (dart.library.io) 'package:market_monk/legacy_app_state_reader_io.dart';
+import 'package:market_monk/logging.dart';
 import 'package:market_monk/legacy_preferences_migration.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -35,8 +38,30 @@ class SqliteSettings {
   static Future<SqliteSettings> initialize(
     AppStateDatabase database, {
     Future<Map<String, Object?>> Function()? readLegacyValues,
+    Future<Map<String, Object?>?> Function()? readLegacyAppStateValues,
     ProfileDatabaseFactory? profileDatabaseFactory,
   }) async {
+    if (await database.readSetting(legacyAppStateMigrationCompleteKey) !=
+        true) {
+      try {
+        final values =
+            await (readLegacyAppStateValues ?? readLegacyAppStateFile)();
+        if (values != null) {
+          await seedAppStateFromLegacyValues(
+            values: values,
+            appState: database,
+          );
+        }
+        await database.writeSetting(legacyAppStateMigrationCompleteKey, true);
+      } catch (error, stack) {
+        talker.handle(
+          error,
+          stack,
+          'Could not import legacy SQLite app state; will retry next startup',
+        );
+      }
+    }
+
     if (await database.readSetting(sqliteMigrationCompleteKey) != true) {
       final values = await (readLegacyValues ?? _readLegacyValues)();
       await seedSqliteFromLegacyValues(
@@ -83,7 +108,8 @@ class SqliteSettings {
           if (entry.key != 'accounts' &&
               entry.key != 'activeAccount' &&
               entry.key != AppStateDatabase.activeProfileSettingKey &&
-              entry.key != sqliteMigrationCompleteKey)
+              entry.key != sqliteMigrationCompleteKey &&
+              entry.key != legacyAppStateMigrationCompleteKey)
             entry.key: entry.value is List
                 ? List<String>.from(entry.value as List)
                 : entry.value,
@@ -183,6 +209,10 @@ class SqliteSettings {
           }
           await database.setActiveProfile(activeProfile);
           await database.writeSetting(sqliteMigrationCompleteKey, true);
+          await database.writeSetting(
+            legacyAppStateMigrationCompleteKey,
+            true,
+          );
         });
         await reload();
       });

@@ -111,6 +111,73 @@ void main() {
     );
   });
 
+  test('repairs profiles lost when the app-state database was renamed',
+      () async {
+    final legacyAppState = AppStateDatabase.connect(
+      NativeDatabase(
+        File('${directory.path}/market-monk-app-state.sqlite'),
+      ),
+    );
+    await legacyAppState.replaceProfiles(['Default', 'IBKR Bot']);
+    await legacyAppState.setActiveProfile('IBKR Bot');
+    await legacyAppState.writeSetting('theme', 'ThemeMode.light');
+    await legacyAppState.close();
+
+    await appState.replaceProfiles(['Default']);
+    await appState.setActiveProfile('Default');
+    await appState.writeSetting(sqliteMigrationCompleteKey, true);
+    await appState.writeSetting('theme', 'ThemeMode.dark');
+
+    final botDb = profile('IBKR Bot');
+    await botDb.writeIbkrProfileSettings(
+      enabled: true,
+      baseUrl: 'https://bot.test',
+      token: 'still-there',
+    );
+    await botDb.close();
+
+    final repaired = await SqliteSettings.initialize(
+      appState,
+      readLegacyValues: () =>
+          throw StateError('SharedPreferences must not be needed for repair'),
+      profileDatabaseFactory: profile,
+    );
+    await SqliteSettings.useInstance(Future.value(repaired));
+
+    expect(await appState.readProfiles(), ['Default', 'IBKR Bot']);
+    expect(await appState.readActiveProfile(), 'Default');
+    expect(await appState.readSetting('theme'), 'ThemeMode.dark');
+    expect(
+      await appState.readSetting(legacyAppStateMigrationCompleteKey),
+      true,
+    );
+
+    final manager = AccountManager();
+    await manager.init();
+    expect(manager.accounts, ['Default', 'IBKR Bot']);
+    expect(manager.ibkrConfigFor('IBKR Bot').token, 'still-there');
+
+    await repaired.setProfiles(['Default'], 'Default');
+    await appState.close();
+    appState = AppStateDatabase.connect(
+      NativeDatabase(
+        File('${directory.path}/market-monk.settings.sqlite'),
+      ),
+    );
+
+    final restarted = await SqliteSettings.initialize(
+      appState,
+      readLegacyValues: () =>
+          throw StateError('SharedPreferences must not be read again'),
+      readLegacyAppStateValues: () =>
+          throw StateError('Legacy app state must not be re-imported'),
+      profileDatabaseFactory: profile,
+    );
+    await SqliteSettings.useInstance(Future.value(restarted));
+
+    expect(await appState.readProfiles(), ['Default']);
+  });
+
   test(
       'failed migration retries remaining profiles without replacing committed rows',
       () async {
