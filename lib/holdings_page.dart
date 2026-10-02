@@ -737,6 +737,14 @@ class HoldingsPageState extends State<HoldingsPage>
               value: open.length.toString(),
               detail: '$winners positive · ${open.length - winners} negative',
             ),
+            const SizedBox(width: 4),
+            Tooltip(
+              message: context.l10n.text('Refresh'),
+              child: IconButton(
+                onPressed: _refreshCandles,
+                icon: const Icon(Icons.refresh_rounded),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 16),

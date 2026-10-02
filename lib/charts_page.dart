@@ -1187,6 +1187,17 @@ class ChartsPageState extends State<ChartsPage>
               if (text.isNotEmpty) _onSearchChanged(text);
             },
             trailing: [
+              if (desktop && _mode != _ChartMode.searching)
+                IconButton(
+                  onPressed: _networkLoading ? null : _refreshCurrentChart,
+                  tooltip: context.l10n.text('Refresh'),
+                  icon: _networkLoading
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh_rounded),
+                ),
               if (!desktop)
                 IconButton(
                   onPressed: () => Navigator.push(
@@ -1669,14 +1680,14 @@ class ChartsPageState extends State<ChartsPage>
               leftTitles: AxisTitles(
                 sideTitles: SideTitles(
                   showTitles: true,
-                  reservedSize: scaleForComparison ? 64 : 50,
+                  reservedSize: scaleForComparison ? 72 : 64,
                   minIncluded: false,
                   maxIncluded: false,
                   getTitlesWidget: (value, meta) => SideTitleWidget(
                     meta: meta,
                     child: Text(
                       scaleForComparison
-                          ? '${value >= 0 ? '+' : ''}${value.toStringAsFixed(1)}%'
+                          ? fmtChartAxisPercent(value)
                           : fmtCompactCurrency(value),
                       maxLines: 1,
                       softWrap: false,

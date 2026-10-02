@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/database.dart';
@@ -363,6 +364,15 @@ void main() {
     expect(find.text('Return by holding'), findsOneWidget);
     expect(find.text('Filter holdings...'), findsNothing);
     expect(find.byType(Card), findsNWidgets(2));
+    expect(find.byTooltip('Refresh'), findsOneWidget);
+    final pieFinder = find.byType(PieChart).first;
+    final pie = tester.widget<PieChart>(pieFinder);
+    expect(pie.data.sectionsSpace, 0);
+    final subtitleBottom = tester
+        .getBottomLeft(find.text('How your stock portfolio is distributed'))
+        .dy;
+    final pieTop = tester.getTopLeft(pieFinder).dy;
+    expect(pieTop - subtitleBottom, greaterThanOrEqualTo(20));
     expect(tester.takeException(), null);
   });
 
@@ -401,6 +411,11 @@ void main() {
       find.byKey(const Key('desktop-allocation-compact')),
       findsOneWidget,
     );
+    final subtitleBottom = tester
+        .getBottomLeft(find.text('How your stock portfolio is distributed'))
+        .dy;
+    final pieTop = tester.getTopLeft(find.byType(PieChart).first).dy;
+    expect(pieTop - subtitleBottom, greaterThanOrEqualTo(20));
     expect(tester.takeException(), null);
   });
 }

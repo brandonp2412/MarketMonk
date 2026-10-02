@@ -6,6 +6,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/accounts_page.dart';
+import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/backup_archive.dart';
 import 'package:market_monk/whats_new.dart';
 import 'package:market_monk/csv_import.dart';
@@ -440,10 +441,497 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       );
 
+  Widget _desktopSettingsCard({
+    required IconData icon,
+    required String title,
+    required List<Widget> children,
+  }) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: theme.colorScheme.primary),
+                const SizedBox(width: 10),
+                Text(
+                  title,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Divider(color: theme.colorScheme.outlineVariant),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopSettings(
+    SettingsState settings,
+    Future<PackageInfo> packageInfo,
+  ) {
+    final accounts = context.watch<AccountManager>();
+    final ibkrConfig = accounts.ibkrConfigFor();
+
+    final appearance = _desktopSettingsCard(
+      icon: Icons.palette_outlined,
+      title: context.l10n.text('Appearance'),
+      children: [
+        const SizedBox(height: 8),
+        SegmentedButton<ThemeMode>(
+          segments: [
+            ButtonSegment(
+              value: ThemeMode.system,
+              label: Text(context.l10n.text('System')),
+              icon: const Icon(Icons.brightness_auto),
+            ),
+            ButtonSegment(
+              value: ThemeMode.dark,
+              label: Text(context.l10n.text('Dark')),
+              icon: const Icon(Icons.dark_mode),
+            ),
+            ButtonSegment(
+              value: ThemeMode.light,
+              label: Text(context.l10n.text('Light')),
+              icon: const Icon(Icons.light_mode),
+            ),
+          ],
+          selected: {settings.theme},
+          onSelectionChanged: (selection) async {
+            final value = selection.first;
+            settings.setTheme(value);
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('theme', value.toString());
+          },
+        ),
+        const SizedBox(height: 8),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.language),
+          title: Text(context.l10n.text('Language')),
+          trailing: DropdownButton<String>(
+            value: settings.languageCode ?? 'system',
+            underline: const SizedBox.shrink(),
+            items: [
+              DropdownMenuItem(
+                value: 'system',
+                child: Text(context.l10n.text('System default')),
+              ),
+              ..._languageNames.entries.map(
+                (entry) => DropdownMenuItem(
+                  value: entry.key,
+                  child: Text(entry.value),
+                ),
+              ),
+            ],
+            onChanged: (value) => settings.setLanguageCode(
+              value == 'system' ? null : value,
+            ),
+          ),
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: settings.systemColors
+              ? const Icon(Icons.color_lens)
+              : const Icon(Icons.color_lens_outlined),
+          title: Text(context.l10n.text('System color scheme')),
+          trailing: Switch(
+            value: settings.systemColors,
+            onChanged: settings.setSystemColors,
+          ),
+          onTap: () => settings.setSystemColors(!settings.systemColors),
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.contrast),
+          title: Text(context.l10n.text('Pure black (AMOLED)')),
+          subtitle: Text(
+            context.l10n.text('Use pure black for AMOLED displays'),
+          ),
+          trailing: Switch(
+            value: settings.pureBlack,
+            onChanged: settings.setPureBlack,
+          ),
+          onTap: () => settings.setPureBlack(!settings.pureBlack),
+        ),
+        if (!settings.systemColors) _ColorPicker(settings: settings),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          initialValue: settings.dateFormat,
+          items: const [
+            DropdownMenuItem(value: 'yyyy-MM-dd', child: Text('yyyy-MM-dd')),
+            DropdownMenuItem(value: 'd/M/yy', child: Text('d/M/yy')),
+            DropdownMenuItem(value: 'M/d/yy', child: Text('M/d/yy')),
+            DropdownMenuItem(value: 'd-M-yy', child: Text('d-M-yy')),
+            DropdownMenuItem(value: 'M-d-yy', child: Text('M-d-yy')),
+            DropdownMenuItem(value: 'd.M.yy', child: Text('d.M.yy')),
+            DropdownMenuItem(value: 'M.d.yy', child: Text('M.d.yy')),
+          ],
+          onChanged: (value) => settings.setDateFormat(value ?? 'd/M/yy'),
+          decoration: InputDecoration(
+            labelText: context.l10n.text(
+              'Date format ({example})',
+              {
+                'example':
+                    DateFormat(settings.dateFormat).format(DateTime.now()),
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+
+    final charts = _desktopSettingsCard(
+      icon: Icons.insights_outlined,
+      title: context.l10n.text('Charts'),
+      children: [
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: settings.showMarketClosed
+              ? const Icon(Icons.schedule)
+              : const Icon(Icons.schedule_outlined),
+          title: Text(context.l10n.text('Market closed indicator')),
+          trailing: Switch(
+            value: settings.showMarketClosed,
+            onChanged: settings.setShowMarketClosed,
+          ),
+          onTap: () => settings.setShowMarketClosed(!settings.showMarketClosed),
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.insights),
+          title: Text(context.l10n.text('Curve line graphs')),
+          trailing: Switch(
+            value: settings.curveLines,
+            onChanged: settings.setCurveLines,
+          ),
+          onTap: () => settings.setCurveLines(!settings.curveLines),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+          child: Row(
+            children: [
+              Expanded(child: Text(context.l10n.text('Curve smoothness'))),
+              SizedBox(
+                width: 220,
+                child: Slider(
+                  value: settings.curveSmoothness,
+                  onChanged: settings.setCurveSmoothness,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 180,
+          child: TickerLine(
+            spots: const [
+              FlSpot(0, 0.13),
+              FlSpot(1, 5),
+              FlSpot(2, 2),
+              FlSpot(3, 10),
+              FlSpot(4, 5),
+            ],
+            dates: [
+              DateTime.now().subtract(const Duration(days: 4)),
+              DateTime.now().subtract(const Duration(days: 3)),
+              DateTime.now().subtract(const Duration(days: 2)),
+              DateTime.now().subtract(const Duration(days: 1)),
+              DateTime.now(),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    final accountSettings = _desktopSettingsCard(
+      icon: Icons.account_balance_wallet_outlined,
+      title: context.l10n.text('Accounts'),
+      children: [
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.manage_accounts),
+          title: Text(context.l10n.text('Manage accounts')),
+          subtitle: Text(accounts.activeAccount),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AccountsPage()),
+          ),
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.currency_exchange),
+          title: Text(context.l10n.text('Currencies')),
+          subtitle: Text(settings.visibleCurrencies.join(', ')),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _showCurrencyPicker(context, settings),
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.account_balance),
+          title: Text(context.l10n.text('Interactive Brokers')),
+          subtitle: Text(
+            ibkrConfig.enabled
+                ? context.l10n.text(
+                    'IBKR portfolio source • {url}',
+                    {'url': ibkrConfig.baseUrl},
+                  )
+                : context.l10n.text('Use a self-hosted IBKR portfolio API'),
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _showIbkrSettings(context),
+        ),
+      ],
+    );
+
+    final data = _desktopSettingsCard(
+      icon: Icons.storage_outlined,
+      title: context.l10n.text('Data'),
+      children: [
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            OutlinedButton.icon(
+              onPressed: () => _exportBackup(context),
+              icon: const Icon(Icons.download),
+              label: Text(context.l10n.text('Export database')),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => _importDatabase(context),
+              icon: const Icon(Icons.upload),
+              label: Text(context.l10n.text('Import database')),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => _importCsv(context),
+              icon: const Icon(Icons.table_chart),
+              label: Text(context.l10n.text('Import CSV')),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          onTap:
+              settings.syncInProgress ? null : () => _syncAllTickers(context),
+          leading: settings.syncInProgress
+              ? const SizedBox.square(
+                  dimension: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(
+                  settings.syncFailed > 0 ? Icons.sync_problem : Icons.sync,
+                ),
+          title: Text(context.l10n.text('Sync')),
+          subtitle: Text(
+            settings.syncInProgress
+                ? context.l10n.text(
+                    'Syncing {symbol} ({completed}/{total})',
+                    {
+                      'symbol': settings.syncingSymbol ?? '',
+                      'completed': settings.syncCompleted,
+                      'total': settings.syncTotal,
+                    },
+                  )
+                : settings.syncTotal == 0
+                    ? context.l10n.text('No sync running')
+                    : settings.syncFailed == 0
+                        ? context.l10n.text(
+                            'Last sync completed {completed}/{total}',
+                            {
+                              'completed': settings.syncCompleted,
+                              'total': settings.syncTotal,
+                            },
+                          )
+                        : context.l10n.text(
+                            'Last sync completed with {failed} failed',
+                            {'failed': settings.syncFailed},
+                          ),
+          ),
+        ),
+        Divider(color: Theme.of(context).colorScheme.outlineVariant),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(
+            Icons.delete_forever,
+            color: Theme.of(context).colorScheme.error,
+          ),
+          title: Text(context.l10n.text('Delete all data')),
+          subtitle: Text(
+            context.l10n.text(
+              'Permanently delete all holdings, trades, and candles',
+            ),
+          ),
+          onTap: () async {
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: Text(context.l10n.text('Delete all data?')),
+                content: Text(
+                  context.l10n.text(
+                    'This will permanently delete all holdings, trades, and chart data. This cannot be undone.',
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: Text(context.l10n.text('Cancel')),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: Text(context.l10n.text('Delete')),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed != true || !mounted) return;
+            await db.delete(db.trades).go();
+            await db.delete(db.candles).go();
+            if (!mounted) return;
+            toast(context, context.l10n.text('All data deleted'));
+          },
+        ),
+      ],
+    );
+
+    final about = _desktopSettingsCard(
+      icon: Icons.info_outline,
+      title: context.l10n.text('About'),
+      children: [
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.new_releases_outlined),
+          title: Text(context.l10n.text("What's New")),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const WhatsNew()),
+          ),
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.info_outline),
+          title: Text(context.l10n.text('Version')),
+          subtitle: FutureBuilder(
+            future: packageInfo,
+            builder: (context, snapshot) =>
+                Text(snapshot.data?.version ?? '1.0.0'),
+          ),
+          onTap: () async {
+            const url = 'https://github.com/brandonp2412/MarketMonk/releases';
+            if (await canLaunchUrlString(url)) await launchUrlString(url);
+          },
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.person),
+          title: Text(context.l10n.text('Author')),
+          subtitle: const Text('Brandon Dick'),
+          onTap: () async {
+            const url = 'https://github.com/brandonp2412';
+            if (await canLaunchUrlString(url)) await launchUrlString(url);
+          },
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.code),
+          title: Text(context.l10n.text('Source code')),
+          subtitle: Text(context.l10n.text('Check it out on GitHub')),
+          onTap: () async {
+            const url = 'https://github.com/brandonp2412/MarketMonk';
+            if (await canLaunchUrlString(url)) await launchUrlString(url);
+          },
+        ),
+      ],
+    );
+
+    final cards = [
+      appearance,
+      accountSettings,
+      charts,
+      data,
+      if (Platform.isAndroid || Platform.isWindows) about,
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final twoColumns = constraints.maxWidth >= 920;
+        final content = twoColumns
+            ? Row(
+                key: const Key('desktop-settings-two-column'),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      children: [
+                        cards[0],
+                        const SizedBox(height: 16),
+                        cards[2],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        cards[1],
+                        const SizedBox(height: 16),
+                        cards[3],
+                        if (cards.length > 4) ...[
+                          const SizedBox(height: 16),
+                          cards[4],
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              )
+            : Column(
+                key: const Key('desktop-settings-single-column'),
+                children: [
+                  for (var i = 0; i < cards.length; i++) ...[
+                    cards[i],
+                    if (i != cards.length - 1) const SizedBox(height: 16),
+                  ],
+                ],
+              );
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1240),
+              child: content,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final packageInfo = PackageInfo.fromPlatform();
     final settings = context.watch<SettingsState>();
+
+    if (isDesktopLayout(context)) {
+      return Scaffold(
+        appBar: AppBar(title: Text(context.l10n.text('Settings'))),
+        body: _buildDesktopSettings(settings, packageInfo),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(title: Text(context.l10n.text('Settings'))),

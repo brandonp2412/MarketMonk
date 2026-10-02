@@ -722,7 +722,7 @@ class PortfolioPageState extends State<PortfolioPage>
                     PieChartData(
                       sections: sections,
                       centerSpaceRadius: 55,
-                      sectionsSpace: 2,
+                      sectionsSpace: 0,
                       pieTouchData: PieTouchData(
                         touchCallback: (event, response) {
                           setState(() {
@@ -835,7 +835,7 @@ class PortfolioPageState extends State<PortfolioPage>
           PieChartData(
             sections: sections,
             centerSpaceRadius: 72,
-            sectionsSpace: 2.5,
+            sectionsSpace: 0,
             pieTouchData: PieTouchData(
               touchCallback: (event, response) {
                 setState(() {
@@ -914,6 +914,19 @@ class PortfolioPageState extends State<PortfolioPage>
                   ],
                 ),
               ),
+              Tooltip(
+                message: context.l10n.text('Refresh'),
+                child: IconButton(
+                  onPressed: _isLoadingPortfolio ? null : _updateCandles,
+                  icon: _isLoadingPortfolio
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh_rounded),
+                ),
+              ),
+              const SizedBox(width: 4),
               PopupMenuButton<String>(
                 onSelected: (value) {
                   if (value == '__export__') {
@@ -1047,7 +1060,7 @@ class PortfolioPageState extends State<PortfolioPage>
                               color: colorScheme.onSurfaceVariant,
                             ),
                           ),
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 28),
                           Expanded(
                             child: LayoutBuilder(
                               builder: (context, constraints) {

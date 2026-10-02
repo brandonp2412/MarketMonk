@@ -540,4 +540,47 @@ void main() {
 
     await db.close();
   });
+
+  test('chart axis percentages use separators and compact huge values', () {
+    expect(fmtChartAxisPercent(35000), '+35,000.0%');
+    expect(fmtChartAxisPercent(350000), '+350K%');
+    expect(fmtChartAxisPercent(-350000), '-350K%');
+  });
+
+  testWidgets('desktop charts expose a manual refresh button', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1400, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    SharedPreferences.setMockInitialValues({});
+
+    db = Database.connect(
+      DatabaseConnection(
+        NativeDatabase.memory(),
+        closeStreamsSynchronously: true,
+      ),
+    );
+    addTearDown(() => db.close());
+
+    final accounts = AccountManager();
+    await accounts.init();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: const MaterialApp(home: Scaffold(body: ChartsPage())),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byTooltip('Refresh'), findsOneWidget);
+    expect(find.byIcon(Icons.refresh_rounded), findsOneWidget);
+    expect(tester.takeException(), null);
+  });
 }

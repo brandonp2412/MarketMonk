@@ -125,6 +125,22 @@ String fmtCompactNativeCurrency(double v, String nativeCurrency) {
   return fmtCompactCurrency(v / nativeRate);
 }
 
+/// Formats large percentage axis values without letting labels dominate the
+/// chart. Mid-sized values keep thousands separators; very large values are
+/// abbreviated (for example +350K%).
+String fmtChartAxisPercent(double value) {
+  final absolute = value.abs();
+  final magnitude = absolute >= 100000
+      ? NumberFormat.compact().format(absolute)
+      : NumberFormat('#,##0.0').format(absolute);
+  final sign = value > 0
+      ? '+'
+      : value < 0
+          ? '-'
+          : '';
+  return '$sign$magnitude%';
+}
+
 /// Returns the [NumberFormat.currencySymbol] for [nativeCurrency].
 String nativeCurrencySymbol(String nativeCurrency) =>
     NumberFormat.simpleCurrency(name: nativeCurrency).currencySymbol;

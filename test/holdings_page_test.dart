@@ -70,6 +70,7 @@ void main() {
     expect(find.text('Price'), findsOneWidget);
     expect(find.text('Return'), findsOneWidget);
     expect(find.byType(ListTile), findsNothing);
+    expect(find.byTooltip('Refresh'), findsOneWidget);
 
     await tester.tap(find.text('Return'));
     await tester.pump();
