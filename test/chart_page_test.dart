@@ -197,6 +197,21 @@ void main() {
       final chart = tester.widget<LineChart>(find.byType(LineChart));
       expect(chart.data.lineBarsData.single.spots, hasLength(6));
       expect(find.bySemanticsLabel('Loading portfolio'), findsNothing);
+      expect(
+        chart.data.lineTouchData.touchTooltipData.maxContentWidth,
+        240,
+      );
+
+      final bar = chart.data.lineBarsData.single;
+      final tooltipItems = chart.data.lineTouchData.touchTooltipData
+          .getTooltipItems([LineBarSpot(bar, 0, bar.spots.last)]);
+      final tooltip = tooltipItems.single;
+      expect(tooltip, isA<LineTooltipItem>());
+      expect(
+        tooltip!.text,
+        matches(RegExp(r'^\$[\d,.]+ · \d{1,2}/\d{1,2}/\d{2}$')),
+      );
+      expect(tooltip.text, isNot(contains('\n')));
 
       await tester.pumpAndSettle();
     },

@@ -1734,6 +1734,7 @@ class ChartsPageState extends State<ChartsPage>
               touchTooltipData: LineTouchTooltipData(
                 fitInsideHorizontally: true,
                 fitInsideVertically: true,
+                maxContentWidth: 240,
                 getTooltipColor: (_) => Theme.of(
                   context,
                 ).colorScheme.surface.withValues(alpha: 0.9),
@@ -1751,8 +1752,6 @@ class ChartsPageState extends State<ChartsPage>
                       0,
                       accountColors.length - 1,
                     )];
-                    final label =
-                        visibleKeys.length > 1 ? '$accountName\n' : '';
                     double? actualValue;
                     if (i >= 0 && i < sortedDates.length) {
                       for (final point in visibleSeries[accountName] ??
@@ -1764,15 +1763,8 @@ class ChartsPageState extends State<ChartsPage>
                       }
                     }
                     final valueLabel = fmtCurrency(actualValue ?? spot.y);
-                    final ibkrManaged =
-                        accountManager.ibkrConfigFor(accountName).enabled;
-                    final comparisonLabel = scaleForComparison
-                        ? ' · ${spot.y >= 0 ? '+' : ''}${spot.y.toStringAsFixed(2)}%'
-                        : '';
                     return LineTooltipItem(
-                      ibkrManaged
-                          ? valueLabel
-                          : '$label$valueLabel$comparisonLabel\n$date',
+                      '$valueLabel · $date',
                       Theme.of(
                         context,
                       ).textTheme.bodySmall!.copyWith(color: spotColor),
