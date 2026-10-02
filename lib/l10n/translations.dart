@@ -1202,7 +1202,8 @@ const appTranslations = <String, Map<String, String>>{
     "New account": "Nowe konto",
     "Add account": "Dodaj konto",
     "Delete \"{name}\"?": "Usunąć „{name}”?",
-    "All trades and data for this account will be permanently deleted. This cannot be undone.": "Wszystkie transakcje i dane tego konta zostaną trwale usunięte. Tej operacji nie można cofnąć.",
+    "All trades and data for this account will be permanently deleted. This cannot be undone.":
+        "Wszystkie transakcje i dane tego konta zostaną trwale usunięte. Tej operacji nie można cofnąć.",
     "Cancel": "Anuluj",
     "Delete": "Usuń",
     "Account name": "Nazwa konta",
@@ -1293,13 +1294,15 @@ const appTranslations = <String, Map<String, String>>{
     "Database imported": "Zaimportowano bazę danych",
     "Display currencies": "Wyświetlane waluty",
     "Delete all data?": "Usunąć wszystkie dane?",
-    "This will permanently delete all holdings, trades, and chart data. This cannot be undone.": "Spowoduje to trwałe usunięcie wszystkich pozycji, transakcji i danych wykresów. Tej operacji nie można cofnąć.",
+    "This will permanently delete all holdings, trades, and chart data. This cannot be undone.":
+        "Spowoduje to trwałe usunięcie wszystkich pozycji, transakcji i danych wykresów. Tej operacji nie można cofnąć.",
     "All data deleted": "Usunięto wszystkie dane",
     "Check it out on GitHub": "Zobacz na GitHubie",
     "Help support this project": "Wesprzyj ten projekt",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "Używaj danych portfela IBKR",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.": "Pozycje, bieżące wyceny i historia posiadanych akcji korzystają w pierwszej kolejności z własnej instancji API IBKR. Yahoo pozostaje źródłem zapasowym dla niedostępnej historii i innych symboli.",
+    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
+        "Pozycje, bieżące wyceny i historia posiadanych akcji korzystają w pierwszej kolejności z własnej instancji API IBKR. Yahoo pozostaje źródłem zapasowym dla niedostępnej historii i innych symboli.",
     "API URL": "Adres URL API",
     "Bearer token": "Token Bearer",
     "Test": "Testuj",
@@ -1358,14 +1361,19 @@ const appTranslations = <String, Map<String, String>>{
     "Go to Account (Me) → Statements.": "Przejdź do Account (Me) → Statements.",
     "Pick a date range covering the trades to import.":
         "Wybierz zakres dat obejmujący transakcje do zaimportowania.",
-    "Enable \"Display Detailed Trading Records\" so individual fills are included, not just summary totals.": "Włącz „Display Detailed Trading Records”, aby uwzględnić poszczególne wykonania zleceń, a nie tylko wartości zbiorcze.",
+    "Enable \"Display Detailed Trading Records\" so individual fills are included, not just summary totals.":
+        "Włącz „Display Detailed Trading Records”, aby uwzględnić poszczególne wykonania zleceń, a nie tylko wartości zbiorcze.",
     "Set the export format to CSV and download the statement.":
         "Ustaw format eksportu na CSV i pobierz wyciąg.",
     "Log into IBKR Client Portal.": "Zaloguj się do IBKR Client Portal.",
-    "Go to Reports → Flex Queries, then click \"+\" next to Activity Flex Query.": "Przejdź do Reports → Flex Queries, a następnie kliknij „+” obok Activity Flex Query.",
-    "Under Sections, add Trades, set Options to Execution (one row per fill), and click Select All for the fields.": "W sekcji Sections dodaj Trades, ustaw Options na Execution (jeden wiersz na każde wykonanie zlecenia), a następnie kliknij Select All dla pól.",
-    "Save the query, then set Period to a custom date range covering your trades (IBKR limits each run to 1 year).": "Zapisz zapytanie, a następnie ustaw Period na niestandardowy zakres dat obejmujący transakcje (IBKR ogranicza pojedyncze uruchomienie do 1 roku).",
-    "Set Format to CSV, then Run the query and download the file.": "Ustaw Format na CSV, uruchom zapytanie przyciskiem Run i pobierz plik.",
+    "Go to Reports → Flex Queries, then click \"+\" next to Activity Flex Query.":
+        "Przejdź do Reports → Flex Queries, a następnie kliknij „+” obok Activity Flex Query.",
+    "Under Sections, add Trades, set Options to Execution (one row per fill), and click Select All for the fields.":
+        "W sekcji Sections dodaj Trades, ustaw Options na Execution (jeden wiersz na każde wykonanie zlecenia), a następnie kliknij Select All dla pól.",
+    "Save the query, then set Period to a custom date range covering your trades (IBKR limits each run to 1 year).":
+        "Zapisz zapytanie, a następnie ustaw Period na niestandardowy zakres dat obejmujący transakcje (IBKR ogranicza pojedyncze uruchomienie do 1 roku).",
+    "Set Format to CSV, then Run the query and download the file.":
+        "Ustaw Format na CSV, uruchom zapytanie przyciskiem Run i pobierz plik.",
   },
   "it": {
     "Charts": "Grafici",
@@ -1657,7 +1665,8 @@ const appTranslations = <String, Map<String, String>>{
     "New account": "Nieuw account",
     "Add account": "Account toevoegen",
     "Delete \"{name}\"?": "\"{name}\" verwijderen?",
-    "All trades and data for this account will be permanently deleted. This cannot be undone.": "Alle transacties en gegevens voor dit account worden permanent verwijderd. Dit kan niet ongedaan worden gemaakt.",
+    "All trades and data for this account will be permanently deleted. This cannot be undone.":
+        "Alle transacties en gegevens voor dit account worden permanent verwijderd. Dit kan niet ongedaan worden gemaakt.",
     "Cancel": "Annuleren",
     "Delete": "Verwijderen",
     "Account name": "Accountnaam",
@@ -1681,7 +1690,8 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "Nog geen transactiegeschiedenis",
     "No completed trades were returned by Interactive Brokers.":
         "Interactive Brokers heeft geen voltooide transacties geretourneerd.",
-    "Add a trade to start building this ticker’s history.": "Voeg een transactie toe om de geschiedenis van dit tickersymbool op te bouwen.",
+    "Add a trade to start building this ticker’s history.":
+        "Voeg een transactie toe om de geschiedenis van dit tickersymbool op te bouwen.",
     "Edit trade": "Transactie bewerken",
     "Delete trade": "Transactie verwijderen",
     "Delete this trade? This cannot be undone.":
@@ -1747,13 +1757,15 @@ const appTranslations = <String, Map<String, String>>{
     "Database imported": "Database geïmporteerd",
     "Display currencies": "Weergavevaluta",
     "Delete all data?": "Alle gegevens verwijderen?",
-    "This will permanently delete all holdings, trades, and chart data. This cannot be undone.": "Hiermee worden alle posities, transacties en grafiekgegevens permanent verwijderd. Dit kan niet ongedaan worden gemaakt.",
+    "This will permanently delete all holdings, trades, and chart data. This cannot be undone.":
+        "Hiermee worden alle posities, transacties en grafiekgegevens permanent verwijderd. Dit kan niet ongedaan worden gemaakt.",
     "All data deleted": "Alle gegevens verwijderd",
     "Check it out on GitHub": "Bekijk het op GitHub",
     "Help support this project": "Help dit project ondersteunen",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "IBKR-portefeuillegegevens gebruiken",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.": "Posities, huidige waarderingen en geschiedenis van aangehouden aandelen gebruiken bij voorkeur je zelfgehoste IBKR-API. Yahoo blijft de fallback voor niet-beschikbare geschiedenis en andere symbolen.",
+    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
+        "Posities, huidige waarderingen en geschiedenis van aangehouden aandelen gebruiken bij voorkeur je zelfgehoste IBKR-API. Yahoo blijft de fallback voor niet-beschikbare geschiedenis en andere symbolen.",
     "API URL": "API-URL",
     "Bearer token": "Bearer-token",
     "Test": "Testen",
@@ -1787,7 +1799,8 @@ const appTranslations = <String, Map<String, String>>{
     "Loading portfolio": "Portefeuille laden",
     "No IBKR stock positions": "Geen IBKR-aandelenposities",
     "No holdings yet": "Nog geen posities",
-    "Check your Interactive Brokers connection or refresh your account.": "Controleer je verbinding met Interactive Brokers of vernieuw je account.",
+    "Check your Interactive Brokers connection or refresh your account.":
+        "Controleer je verbinding met Interactive Brokers of vernieuw je account.",
     "Import your trades to build your portfolio.":
         "Importeer je transacties om je portefeuille op te bouwen.",
     "Deselect all": "Alles deselecteren",
@@ -1796,10 +1809,12 @@ const appTranslations = <String, Map<String, String>>{
     "No IBKR stocks found": "Geen IBKR-aandelen gevonden",
     "No stocks yet": "Nog geen aandelen",
     "No matching stocks": "Geen overeenkomende aandelen",
-    "Refresh your portfolio or check your Interactive Brokers connection.": "Vernieuw je portefeuille of controleer je verbinding met Interactive Brokers.",
+    "Refresh your portfolio or check your Interactive Brokers connection.":
+        "Vernieuw je portefeuille of controleer je verbinding met Interactive Brokers.",
     "Import a CSV or add your first trade manually.":
         "Importeer een CSV of voeg je eerste transactie handmatig toe.",
-    "Nothing matches “{query}”. You can add that ticker now.": "Niets komt overeen met “{query}”. Je kunt dat tickersymbool nu toevoegen.",
+    "Nothing matches “{query}”. You can add that ticker now.":
+        "Niets komt overeen met “{query}”. Je kunt dat tickersymbool nu toevoegen.",
     "Add {symbol}": "{symbol} toevoegen",
     "Try another ticker": "Probeer een ander tickersymbool",
     "How to get this CSV from {broker}:": "Zo krijg je deze CSV van {broker}:",
@@ -1808,14 +1823,19 @@ const appTranslations = <String, Map<String, String>>{
     "Go to Account (Me) → Statements.": "Ga naar Account (Me) → Statements.",
     "Pick a date range covering the trades to import.":
         "Kies een datumbereik dat de te importeren transacties omvat.",
-    "Enable \"Display Detailed Trading Records\" so individual fills are included, not just summary totals.": "Schakel \"Display Detailed Trading Records\" in zodat afzonderlijke uitvoeringen worden opgenomen, niet alleen samenvattingstotalen.",
+    "Enable \"Display Detailed Trading Records\" so individual fills are included, not just summary totals.":
+        "Schakel \"Display Detailed Trading Records\" in zodat afzonderlijke uitvoeringen worden opgenomen, niet alleen samenvattingstotalen.",
     "Set the export format to CSV and download the statement.":
         "Stel het exportformaat in op CSV en download het overzicht.",
     "Log into IBKR Client Portal.": "Log in bij IBKR Client Portal.",
-    "Go to Reports → Flex Queries, then click \"+\" next to Activity Flex Query.": "Ga naar Reports → Flex Queries en klik vervolgens op \"+\" naast Activity Flex Query.",
-    "Under Sections, add Trades, set Options to Execution (one row per fill), and click Select All for the fields.": "Voeg onder Sections Trades toe, stel Options in op Execution (één rij per uitvoering) en klik op Select All voor de velden.",
-    "Save the query, then set Period to a custom date range covering your trades (IBKR limits each run to 1 year).": "Sla de query op en stel Period vervolgens in op een aangepast datumbereik dat je transacties omvat (IBKR beperkt elke uitvoering tot 1 jaar).",
-    "Set Format to CSV, then Run the query and download the file.": "Stel Format in op CSV, voer de query uit met Run en download het bestand.",
+    "Go to Reports → Flex Queries, then click \"+\" next to Activity Flex Query.":
+        "Ga naar Reports → Flex Queries en klik vervolgens op \"+\" naast Activity Flex Query.",
+    "Under Sections, add Trades, set Options to Execution (one row per fill), and click Select All for the fields.":
+        "Voeg onder Sections Trades toe, stel Options in op Execution (één rij per uitvoering) en klik op Select All voor de velden.",
+    "Save the query, then set Period to a custom date range covering your trades (IBKR limits each run to 1 year).":
+        "Sla de query op en stel Period vervolgens in op een aangepast datumbereik dat je transacties omvat (IBKR beperkt elke uitvoering tot 1 jaar).",
+    "Set Format to CSV, then Run the query and download the file.":
+        "Stel Format in op CSV, voer de query uit met Run en download het bestand.",
   },
   "pt-BR": {
     "Charts": "Gráficos",
@@ -2255,7 +2275,8 @@ const appTranslations = <String, Map<String, String>>{
     "Add {symbol}": "Adicionar {symbol}",
     "Try another ticker": "Tentar outro ticker",
     "How to get this CSV from {broker}:": "Como obter este CSV da {broker}:",
-    "Log into Tiger Trade (app or web).": "Inicie sessão no Tiger Trade (aplicação ou Web).",
+    "Log into Tiger Trade (app or web).":
+        "Inicie sessão no Tiger Trade (aplicação ou Web).",
     "Go to Account (Me) → Statements.": "Aceda a Account (Me) → Statements.",
     "Pick a date range covering the trades to import.":
         "Escolha um intervalo de datas que inclua as transações a importar.",
@@ -2263,7 +2284,8 @@ const appTranslations = <String, Map<String, String>>{
         "Ative \"Display Detailed Trading Records\" para incluir as execuções individuais, e não apenas os totais resumidos.",
     "Set the export format to CSV and download the statement.":
         "Defina o formato de exportação como CSV e transfira o extrato.",
-    "Log into IBKR Client Portal.": "Inicie sessão no Portal do Cliente da IBKR.",
+    "Log into IBKR Client Portal.":
+        "Inicie sessão no Portal do Cliente da IBKR.",
     "Go to Reports → Flex Queries, then click \"+\" next to Activity Flex Query.":
         "Aceda a Reports → Flex Queries e clique em \"+\" ao lado de Activity Flex Query.",
     "Under Sections, add Trades, set Options to Execution (one row per fill), and click Select All for the fields.":
@@ -2978,7 +3000,8 @@ const appTranslations = <String, Map<String, String>>{
     "New account": "Akaun baharu",
     "Add account": "Tambah akaun",
     "Delete \"{name}\"?": "Padam \"{name}\"?",
-    "All trades and data for this account will be permanently deleted. This cannot be undone.": "Semua dagangan dan data untuk akaun ini akan dipadam secara kekal. Tindakan ini tidak boleh dibuat asal.",
+    "All trades and data for this account will be permanently deleted. This cannot be undone.":
+        "Semua dagangan dan data untuk akaun ini akan dipadam secara kekal. Tindakan ini tidak boleh dibuat asal.",
     "Cancel": "Batal",
     "Delete": "Padam",
     "Account name": "Nama akaun",
@@ -3067,13 +3090,15 @@ const appTranslations = <String, Map<String, String>>{
     "Database imported": "Pangkalan data diimport",
     "Display currencies": "Mata wang paparan",
     "Delete all data?": "Padam semua data?",
-    "This will permanently delete all holdings, trades, and chart data. This cannot be undone.": "Ini akan memadam semua pegangan, dagangan dan data carta secara kekal. Tindakan ini tidak boleh dibuat asal.",
+    "This will permanently delete all holdings, trades, and chart data. This cannot be undone.":
+        "Ini akan memadam semua pegangan, dagangan dan data carta secara kekal. Tindakan ini tidak boleh dibuat asal.",
     "All data deleted": "Semua data dipadam",
     "Check it out on GitHub": "Lihat di GitHub",
     "Help support this project": "Bantu menyokong projek ini",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "Gunakan data portfolio IBKR",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.": "Bagi posisi, penilaian semasa dan sejarah saham yang dipegang, API IBKR hos sendiri anda akan diutamakan. Yahoo kekal sebagai pilihan sandaran untuk sejarah yang tidak tersedia dan simbol lain.",
+    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
+        "Bagi posisi, penilaian semasa dan sejarah saham yang dipegang, API IBKR hos sendiri anda akan diutamakan. Yahoo kekal sebagai pilihan sandaran untuk sejarah yang tidak tersedia dan simbol lain.",
     "API URL": "URL API",
     "Bearer token": "Token bearer",
     "Test": "Uji",
@@ -3117,10 +3142,12 @@ const appTranslations = <String, Map<String, String>>{
     "No IBKR stocks found": "Tiada saham IBKR ditemui",
     "No stocks yet": "Belum ada saham",
     "No matching stocks": "Tiada saham sepadan",
-    "Refresh your portfolio or check your Interactive Brokers connection.": "Muat semula portfolio anda atau semak sambungan Interactive Brokers anda.",
+    "Refresh your portfolio or check your Interactive Brokers connection.":
+        "Muat semula portfolio anda atau semak sambungan Interactive Brokers anda.",
     "Import a CSV or add your first trade manually.":
         "Import CSV atau tambah dagangan pertama anda secara manual.",
-    "Nothing matches “{query}”. You can add that ticker now.": "Tiada yang sepadan dengan “{query}”. Anda boleh menambah ticker itu sekarang.",
+    "Nothing matches “{query}”. You can add that ticker now.":
+        "Tiada yang sepadan dengan “{query}”. Anda boleh menambah ticker itu sekarang.",
     "Add {symbol}": "Tambah {symbol}",
     "Try another ticker": "Cuba ticker lain",
     "How to get this CSV from {broker}:":
@@ -3130,14 +3157,19 @@ const appTranslations = <String, Map<String, String>>{
     "Go to Account (Me) → Statements.": "Pergi ke Account (Me) → Statements.",
     "Pick a date range covering the trades to import.":
         "Pilih julat tarikh yang merangkumi dagangan untuk diimport.",
-    "Enable \"Display Detailed Trading Records\" so individual fills are included, not just summary totals.": "Aktifkan \"Display Detailed Trading Records\" supaya setiap pelaksanaan dagangan disertakan, bukan hanya jumlah ringkasan.",
+    "Enable \"Display Detailed Trading Records\" so individual fills are included, not just summary totals.":
+        "Aktifkan \"Display Detailed Trading Records\" supaya setiap pelaksanaan dagangan disertakan, bukan hanya jumlah ringkasan.",
     "Set the export format to CSV and download the statement.":
         "Tetapkan format eksport kepada CSV dan muat turun penyata.",
     "Log into IBKR Client Portal.": "Log masuk ke IBKR Client Portal.",
-    "Go to Reports → Flex Queries, then click \"+\" next to Activity Flex Query.": "Pergi ke Reports → Flex Queries, kemudian klik \"+\" di sebelah Activity Flex Query.",
-    "Under Sections, add Trades, set Options to Execution (one row per fill), and click Select All for the fields.": "Di bawah Sections, tambah Trades, tetapkan Options kepada Execution (satu baris bagi setiap pelaksanaan), dan klik Select All untuk medan.",
-    "Save the query, then set Period to a custom date range covering your trades (IBKR limits each run to 1 year).": "Simpan pertanyaan, kemudian tetapkan Period kepada julat tarikh tersuai yang merangkumi dagangan anda (IBKR mengehadkan setiap pelaksanaan pertanyaan kepada 1 tahun).",
-    "Set Format to CSV, then Run the query and download the file.": "Tetapkan Format kepada CSV, kemudian jalankan pertanyaan dan muat turun fail.",
+    "Go to Reports → Flex Queries, then click \"+\" next to Activity Flex Query.":
+        "Pergi ke Reports → Flex Queries, kemudian klik \"+\" di sebelah Activity Flex Query.",
+    "Under Sections, add Trades, set Options to Execution (one row per fill), and click Select All for the fields.":
+        "Di bawah Sections, tambah Trades, tetapkan Options kepada Execution (satu baris bagi setiap pelaksanaan), dan klik Select All untuk medan.",
+    "Save the query, then set Period to a custom date range covering your trades (IBKR limits each run to 1 year).":
+        "Simpan pertanyaan, kemudian tetapkan Period kepada julat tarikh tersuai yang merangkumi dagangan anda (IBKR mengehadkan setiap pelaksanaan pertanyaan kepada 1 tahun).",
+    "Set Format to CSV, then Run the query and download the file.":
+        "Tetapkan Format kepada CSV, kemudian jalankan pertanyaan dan muat turun fail.",
   },
   "tr": {
     "Charts": "Grafikler",
@@ -4523,7 +4555,8 @@ const appTranslations = <String, Map<String, String>>{
     "New account": "নতুন অ্যাকাউন্ট",
     "Add account": "অ্যাকাউন্ট যোগ করুন",
     "Delete \"{name}\"?": "\"{name}\" মুছবেন?",
-    "All trades and data for this account will be permanently deleted. This cannot be undone.": "এই অ্যাকাউন্টের সব ট্রেড ও ডেটা স্থায়ীভাবে মুছে যাবে। এটি পূর্বাবস্থায় ফেরানো যাবে না।",
+    "All trades and data for this account will be permanently deleted. This cannot be undone.":
+        "এই অ্যাকাউন্টের সব ট্রেড ও ডেটা স্থায়ীভাবে মুছে যাবে। এটি পূর্বাবস্থায় ফেরানো যাবে না।",
     "Cancel": "বাতিল",
     "Delete": "মুছুন",
     "Account name": "অ্যাকাউন্টের নাম",
@@ -4608,13 +4641,15 @@ const appTranslations = <String, Map<String, String>>{
     "Database imported": "ডেটাবেস ইমপোর্ট হয়েছে",
     "Display currencies": "প্রদর্শিত মুদ্রা",
     "Delete all data?": "সব ডেটা মুছবেন?",
-    "This will permanently delete all holdings, trades, and chart data. This cannot be undone.": "এতে সব হোল্ডিংস, ট্রেড ও চার্টের ডেটা স্থায়ীভাবে মুছে যাবে। এটি পূর্বাবস্থায় ফেরানো যাবে না।",
+    "This will permanently delete all holdings, trades, and chart data. This cannot be undone.":
+        "এতে সব হোল্ডিংস, ট্রেড ও চার্টের ডেটা স্থায়ীভাবে মুছে যাবে। এটি পূর্বাবস্থায় ফেরানো যাবে না।",
     "All data deleted": "সব ডেটা মুছে ফেলা হয়েছে",
     "Check it out on GitHub": "GitHub-এ দেখুন",
     "Help support this project": "এই প্রকল্পকে সহায়তা করুন",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "IBKR পোর্টফোলিও ডেটা ব্যবহার করুন",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.": "পজিশন, বর্তমান মূল্যায়ন এবং রাখা শেয়ারের ইতিহাসের জন্য আপনার স্ব-হোস্ট করা IBKR API অগ্রাধিকার পাবে। অনুপলব্ধ ইতিহাস ও অন্যান্য প্রতীকের জন্য Yahoo বিকল্প হিসেবে থাকবে।",
+    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
+        "পজিশন, বর্তমান মূল্যায়ন এবং রাখা শেয়ারের ইতিহাসের জন্য আপনার স্ব-হোস্ট করা IBKR API অগ্রাধিকার পাবে। অনুপলব্ধ ইতিহাস ও অন্যান্য প্রতীকের জন্য Yahoo বিকল্প হিসেবে থাকবে।",
     "API URL": "API URL",
     "Bearer token": "Bearer টোকেন",
     "Test": "পরীক্ষা",
@@ -4648,7 +4683,8 @@ const appTranslations = <String, Map<String, String>>{
     "Loading portfolio": "পোর্টফোলিও লোড হচ্ছে",
     "No IBKR stock positions": "কোনো IBKR শেয়ার পজিশন নেই",
     "No holdings yet": "এখনও কোনো হোল্ডিংস নেই",
-    "Check your Interactive Brokers connection or refresh your account.": "আপনার Interactive Brokers সংযোগ যাচাই করুন বা অ্যাকাউন্ট রিফ্রেশ করুন।",
+    "Check your Interactive Brokers connection or refresh your account.":
+        "আপনার Interactive Brokers সংযোগ যাচাই করুন বা অ্যাকাউন্ট রিফ্রেশ করুন।",
     "Import your trades to build your portfolio.":
         "পোর্টফোলিও তৈরি করতে আপনার ট্রেডগুলো ইমপোর্ট করুন।",
     "Deselect all": "সব নির্বাচন বাতিল করুন",
@@ -4657,7 +4693,8 @@ const appTranslations = <String, Map<String, String>>{
     "No IBKR stocks found": "কোনো IBKR শেয়ার পাওয়া যায়নি",
     "No stocks yet": "এখনও কোনো শেয়ার নেই",
     "No matching stocks": "মিলছে এমন কোনো শেয়ার নেই",
-    "Refresh your portfolio or check your Interactive Brokers connection.": "আপনার পোর্টফোলিও রিফ্রেশ করুন বা Interactive Brokers সংযোগ যাচাই করুন।",
+    "Refresh your portfolio or check your Interactive Brokers connection.":
+        "আপনার পোর্টফোলিও রিফ্রেশ করুন বা Interactive Brokers সংযোগ যাচাই করুন।",
     "Import a CSV or add your first trade manually.":
         "একটি CSV ইমপোর্ট করুন বা আপনার প্রথম ট্রেডটি হাতে যোগ করুন।",
     "Nothing matches “{query}”. You can add that ticker now.":
@@ -4668,14 +4705,19 @@ const appTranslations = <String, Map<String, String>>{
     "Log into Tiger Trade (app or web).":
         "Tiger Trade-এ লগ ইন করুন (অ্যাপ বা ওয়েব)।",
     "Go to Account (Me) → Statements.": "Account (Me) → Statements-এ যান।",
-    "Pick a date range covering the trades to import.": "ইমপোর্ট করতে চান এমন ট্রেডগুলো অন্তর্ভুক্ত করে একটি তারিখের পরিসর বেছে নিন।",
-    "Enable \"Display Detailed Trading Records\" so individual fills are included, not just summary totals.": "\"Display Detailed Trading Records\" চালু করুন, যাতে শুধু সারসংক্ষেপ নয়, প্রতিটি ফিল অন্তর্ভুক্ত হয়।",
+    "Pick a date range covering the trades to import.":
+        "ইমপোর্ট করতে চান এমন ট্রেডগুলো অন্তর্ভুক্ত করে একটি তারিখের পরিসর বেছে নিন।",
+    "Enable \"Display Detailed Trading Records\" so individual fills are included, not just summary totals.":
+        "\"Display Detailed Trading Records\" চালু করুন, যাতে শুধু সারসংক্ষেপ নয়, প্রতিটি ফিল অন্তর্ভুক্ত হয়।",
     "Set the export format to CSV and download the statement.":
         "এক্সপোর্ট ফরম্যাট CSV করে স্টেটমেন্ট ডাউনলোড করুন।",
     "Log into IBKR Client Portal.": "IBKR Client Portal-এ লগ ইন করুন।",
-    "Go to Reports → Flex Queries, then click \"+\" next to Activity Flex Query.": "Reports → Flex Queries-এ যান, তারপর Activity Flex Query-এর পাশে \"+\" ক্লিক করুন।",
-    "Under Sections, add Trades, set Options to Execution (one row per fill), and click Select All for the fields.": "Sections-এর অধীনে Trades যোগ করুন, Options-এ Execution (প্রতি ফিলে এক সারি) সেট করুন এবং ক্ষেত্রগুলোর জন্য Select All ক্লিক করুন।",
-    "Save the query, then set Period to a custom date range covering your trades (IBKR limits each run to 1 year).": "কোয়েরি সংরক্ষণ করুন, তারপর Period-এ আপনার ট্রেডগুলো অন্তর্ভুক্ত করে একটি কাস্টম তারিখের পরিসর সেট করুন (IBKR প্রতিটি রান সর্বোচ্চ ১ বছরে সীমিত রাখে)।",
+    "Go to Reports → Flex Queries, then click \"+\" next to Activity Flex Query.":
+        "Reports → Flex Queries-এ যান, তারপর Activity Flex Query-এর পাশে \"+\" ক্লিক করুন।",
+    "Under Sections, add Trades, set Options to Execution (one row per fill), and click Select All for the fields.":
+        "Sections-এর অধীনে Trades যোগ করুন, Options-এ Execution (প্রতি ফিলে এক সারি) সেট করুন এবং ক্ষেত্রগুলোর জন্য Select All ক্লিক করুন।",
+    "Save the query, then set Period to a custom date range covering your trades (IBKR limits each run to 1 year).":
+        "কোয়েরি সংরক্ষণ করুন, তারপর Period-এ আপনার ট্রেডগুলো অন্তর্ভুক্ত করে একটি কাস্টম তারিখের পরিসর সেট করুন (IBKR প্রতিটি রান সর্বোচ্চ ১ বছরে সীমিত রাখে)।",
     "Set Format to CSV, then Run the query and download the file.":
         "Format-এ CSV সেট করুন, তারপর কোয়েরি Run করে ফাইলটি ডাউনলোড করুন।",
   },
@@ -4964,7 +5006,8 @@ const appTranslations = <String, Map<String, String>>{
     "New account": "حساب جدید",
     "Add account": "افزودن حساب",
     "Delete \"{name}\"?": "«{name}» حذف شود؟",
-    "All trades and data for this account will be permanently deleted. This cannot be undone.": "همه معاملات و داده‌های این حساب برای همیشه حذف می‌شوند. این کار قابل بازگشت نیست.",
+    "All trades and data for this account will be permanently deleted. This cannot be undone.":
+        "همه معاملات و داده‌های این حساب برای همیشه حذف می‌شوند. این کار قابل بازگشت نیست.",
     "Cancel": "لغو",
     "Delete": "حذف",
     "Account name": "نام حساب",
@@ -5054,13 +5097,15 @@ const appTranslations = <String, Map<String, String>>{
     "Database imported": "پایگاه داده وارد شد",
     "Display currencies": "ارزهای نمایشی",
     "Delete all data?": "همه داده‌ها حذف شوند؟",
-    "This will permanently delete all holdings, trades, and chart data. This cannot be undone.": "این کار همه دارایی‌ها، معاملات و داده‌های نمودار را برای همیشه حذف می‌کند. این کار قابل بازگشت نیست.",
+    "This will permanently delete all holdings, trades, and chart data. This cannot be undone.":
+        "این کار همه دارایی‌ها، معاملات و داده‌های نمودار را برای همیشه حذف می‌کند. این کار قابل بازگشت نیست.",
     "All data deleted": "همه داده‌ها حذف شدند",
     "Check it out on GitHub": "مشاهده در GitHub",
     "Help support this project": "حمایت از این پروژه",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "استفاده از داده‌های سبد IBKR",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.": "برای موقعیت‌ها، ارزش‌گذاری فعلی و تاریخچه سهام در اختیار، API خودمیزبان IBKR شما در اولویت است. Yahoo برای تاریخچه ناموجود و سایر نمادها به‌عنوان گزینه جایگزین باقی می‌ماند.",
+    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
+        "برای موقعیت‌ها، ارزش‌گذاری فعلی و تاریخچه سهام در اختیار، API خودمیزبان IBKR شما در اولویت است. Yahoo برای تاریخچه ناموجود و سایر نمادها به‌عنوان گزینه جایگزین باقی می‌ماند.",
     "API URL": "نشانی API",
     "Bearer token": "توکن Bearer",
     "Test": "آزمایش",
@@ -5093,7 +5138,8 @@ const appTranslations = <String, Map<String, String>>{
     "Loading portfolio": "در حال بارگیری سبد",
     "No IBKR stock positions": "هیچ موقعیت سهامی IBKR وجود ندارد",
     "No holdings yet": "هنوز دارایی‌ای وجود ندارد",
-    "Check your Interactive Brokers connection or refresh your account.": "اتصال Interactive Brokers خود را بررسی کنید یا حسابتان را تازه‌سازی کنید.",
+    "Check your Interactive Brokers connection or refresh your account.":
+        "اتصال Interactive Brokers خود را بررسی کنید یا حسابتان را تازه‌سازی کنید.",
     "Import your trades to build your portfolio.":
         "معاملات خود را وارد کنید تا سبدتان ساخته شود.",
     "Deselect all": "لغو انتخاب همه",
@@ -5106,7 +5152,8 @@ const appTranslations = <String, Map<String, String>>{
         "سبد خود را تازه‌سازی کنید یا اتصال Interactive Brokers را بررسی کنید.",
     "Import a CSV or add your first trade manually.":
         "یک فایل CSV وارد کنید یا نخستین معامله خود را دستی اضافه کنید.",
-    "Nothing matches “{query}”. You can add that ticker now.": "هیچ موردی با «{query}» مطابقت ندارد. اکنون می‌توانید آن نماد را اضافه کنید.",
+    "Nothing matches “{query}”. You can add that ticker now.":
+        "هیچ موردی با «{query}» مطابقت ندارد. اکنون می‌توانید آن نماد را اضافه کنید.",
     "Add {symbol}": "افزودن {symbol}",
     "Try another ticker": "نماد دیگری را امتحان کنید",
     "How to get this CSV from {broker}:":
@@ -5116,16 +5163,20 @@ const appTranslations = <String, Map<String, String>>{
     "Go to Account (Me) → Statements.": "به Account (Me) → Statements بروید.",
     "Pick a date range covering the trades to import.":
         "بازه تاریخی پوشش‌دهنده معاملات موردنظر برای وارد کردن را انتخاب کنید.",
-    "Enable \"Display Detailed Trading Records\" so individual fills are included, not just summary totals.": "گزینه \"Display Detailed Trading Records\" را فعال کنید تا اجرای جداگانه هر معامله گنجانده شود، نه فقط مجموع‌های خلاصه.",
+    "Enable \"Display Detailed Trading Records\" so individual fills are included, not just summary totals.":
+        "گزینه \"Display Detailed Trading Records\" را فعال کنید تا اجرای جداگانه هر معامله گنجانده شود، نه فقط مجموع‌های خلاصه.",
     "Set the export format to CSV and download the statement.":
         "قالب خروجی را روی CSV بگذارید و صورت‌حساب را دانلود کنید.",
     "Log into IBKR Client Portal.": "وارد IBKR Client Portal شوید.",
-    "Go to Reports → Flex Queries, then click \"+\" next to Activity Flex Query.": "به Reports → Flex Queries بروید، سپس روی \"+\" کنار Activity Flex Query کلیک کنید.",
-    "Under Sections, add Trades, set Options to Execution (one row per fill), and click Select All for the fields.": "در بخش Sections، Trades را اضافه کنید، Options را روی Execution (یک ردیف برای هر اجرا) بگذارید و برای فیلدها روی Select All کلیک کنید.",
-    "Save the query, then set Period to a custom date range covering your trades (IBKR limits each run to 1 year).": "کوئری را ذخیره کنید، سپس Period را روی بازه تاریخی سفارشی پوشش‌دهنده معاملاتتان بگذارید (IBKR هر اجرا را به ۱ سال محدود می‌کند).",
-    "Set Format to CSV, then Run the query and download the file.": "Format را روی CSV بگذارید، سپس کوئری را Run کنید و فایل را دانلود کنید.",
+    "Go to Reports → Flex Queries, then click \"+\" next to Activity Flex Query.":
+        "به Reports → Flex Queries بروید، سپس روی \"+\" کنار Activity Flex Query کلیک کنید.",
+    "Under Sections, add Trades, set Options to Execution (one row per fill), and click Select All for the fields.":
+        "در بخش Sections، Trades را اضافه کنید، Options را روی Execution (یک ردیف برای هر اجرا) بگذارید و برای فیلدها روی Select All کلیک کنید.",
+    "Save the query, then set Period to a custom date range covering your trades (IBKR limits each run to 1 year).":
+        "کوئری را ذخیره کنید، سپس Period را روی بازه تاریخی سفارشی پوشش‌دهنده معاملاتتان بگذارید (IBKR هر اجرا را به ۱ سال محدود می‌کند).",
+    "Set Format to CSV, then Run the query and download the file.":
+        "Format را روی CSV بگذارید، سپس کوئری را Run کنید و فایل را دانلود کنید.",
   },
-
   "uk": {
     "Charts": "Графіки",
     "Portfolio": "Портфель",
@@ -5357,5 +5408,4 @@ const appTranslations = <String, Map<String, String>>{
     "Set Format to CSV, then Run the query and download the file.":
         "Встановіть Format на CSV, потім запустіть запит через Run і завантажте файл.",
   },
-
 };

@@ -28,7 +28,8 @@ IbkrCashOutPnl calculateIbkrCashOutPnl(
   if (!currentValue.value.isFinite || currentValue.value < 0) {
     throw StateError('Current IBKR account value is invalid');
   }
-  if (performance.currency.toUpperCase() != currentValue.currency.toUpperCase()) {
+  if (performance.currency.toUpperCase() !=
+      currentValue.currency.toUpperCase()) {
     throw StateError('IBKR performance and account currencies do not match');
   }
 

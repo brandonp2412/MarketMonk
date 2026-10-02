@@ -145,7 +145,7 @@ class TickerLine extends StatelessWidget {
     final date = formatter.format(dateStr);
 
     return [
-      LineTooltipItem('$price\n$date', Theme.of(context).textTheme.bodyLarge!),
+      LineTooltipItem('$price · $date', Theme.of(context).textTheme.bodyLarge!),
     ];
   }
 }
