@@ -1069,7 +1069,7 @@ class HoldingsPageState extends State<HoldingsPage>
     return RefreshIndicator(
       onRefresh: _refreshCandles,
       child: ListView.builder(
-        padding: EdgeInsets.zero,
+        padding: const EdgeInsets.only(bottom: bottomNavScrollClearance),
         itemCount: summaries.length + 1,
         itemBuilder: (context, index) {
           if (index == 0) return const SizedBox(height: 8);

@@ -682,6 +682,14 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           Tooltip(
+            message: context.l10n.text('Import a .sqlite database'),
+            child: ListTile(
+              leading: const Icon(Icons.upload),
+              title: Text(context.l10n.text('Import database')),
+              onTap: () => _importDatabase(context),
+            ),
+          ),
+          Tooltip(
             message:
                 context.l10n.text('Import holdings from a broker CSV export'),
             child: ListTile(
@@ -773,14 +781,6 @@ class _SettingsPageState extends State<SettingsPage> {
                 if (!context.mounted) return;
                 toast(context, context.l10n.text('All data deleted'));
               },
-            ),
-          ),
-          Tooltip(
-            message: context.l10n.text('Import a .sqlite database'),
-            child: ListTile(
-              leading: const Icon(Icons.upload),
-              title: Text(context.l10n.text('Import database')),
-              onTap: () => _importDatabase(context),
             ),
           ),
           if (Platform.isAndroid || Platform.isWindows) ...[

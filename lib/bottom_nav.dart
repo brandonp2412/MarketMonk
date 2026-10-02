@@ -7,6 +7,10 @@ import 'package:market_monk/l10n/app_localizations.dart';
 /// behind it needs this clearance plus a small visual gap.
 const double bottomNavHeight = 92;
 
+/// Bottom clearance for scrollable mobile content so the final item can be
+/// scrolled completely above the floating navigation dock.
+const double bottomNavScrollClearance = bottomNavHeight + 24;
+
 class BottomNav extends StatelessWidget {
   final List<String> tabs;
   final int currentIndex;

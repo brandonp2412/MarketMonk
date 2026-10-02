@@ -1246,6 +1246,7 @@ class ChartsPageState extends State<ChartsPage>
     }
 
     return ListView.builder(
+      padding: const EdgeInsets.only(bottom: bottomNavScrollClearance),
       itemCount: _searchResults.length + 1,
       itemBuilder: (context, i) {
         if (i == _searchResults.length) return useAnywayTile;
@@ -1325,7 +1326,7 @@ class ChartsPageState extends State<ChartsPage>
           desktop ? 24 : 0,
           _overlayHeight + 8,
           desktop ? 24 : 0,
-          desktop ? 24 : bottomNavHeight + 24,
+          desktop ? 24 : bottomNavScrollClearance,
         ),
         children: [
           _buildTimeChips(),
