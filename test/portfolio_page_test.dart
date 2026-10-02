@@ -364,7 +364,15 @@ void main() {
     expect(find.text('Return by holding'), findsOneWidget);
     expect(find.text('Filter holdings...'), findsNothing);
     expect(find.byType(Card), findsNWidgets(2));
-    expect(find.byTooltip('Refresh'), findsOneWidget);
+    final refresh = find.byTooltip('Refresh');
+    expect(refresh, findsOneWidget);
+    expect(
+      find.descendant(
+        of: refresh,
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsNothing,
+    );
     final scrollbar = tester.widget<Scrollbar>(find.byType(Scrollbar));
     expect(scrollbar.controller == null, false);
     expect(scrollbar.controller!.hasClients, true);
@@ -375,7 +383,7 @@ void main() {
         .getBottomLeft(find.text('How your stock portfolio is distributed'))
         .dy;
     final pieTop = tester.getTopLeft(pieFinder).dy;
-    expect(pieTop - subtitleBottom, greaterThanOrEqualTo(20));
+    expect(pieTop - subtitleBottom, greaterThanOrEqualTo(28));
     expect(tester.takeException(), null);
   });
 
@@ -417,8 +425,15 @@ void main() {
     final subtitleBottom = tester
         .getBottomLeft(find.text('How your stock portfolio is distributed'))
         .dy;
-    final pieTop = tester.getTopLeft(find.byType(PieChart).first).dy;
-    expect(pieTop - subtitleBottom, greaterThanOrEqualTo(20));
+    final compactPieFinder = find.byType(PieChart).first;
+    final pieTop = tester.getTopLeft(compactPieFinder).dy;
+    expect(pieTop - subtitleBottom, greaterThanOrEqualTo(28));
+    final compactPie = tester.widget<PieChart>(compactPieFinder);
+    expect(compactPie.data.centerSpaceRadius, 48);
+    expect(
+      compactPie.data.sections.every((section) => section.radius <= 60),
+      isTrue,
+    );
     expect(tester.takeException(), null);
   });
 

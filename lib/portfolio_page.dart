@@ -585,26 +585,27 @@ class PortfolioPageState extends State<PortfolioPage>
           context.watch<AccountManager>().ibkrConfigFor().enabled;
       return _refreshableState(
         AppEmptyState(
-        icon: ibkrEnabled
-            ? Icons.account_balance_rounded
-            : Icons.pie_chart_outline_rounded,
-        title: ibkrEnabled
-            ? context.l10n.text('No IBKR stock positions')
-            : context.l10n.text('No holdings yet'),
-        message: ibkrEnabled
-            ? context.l10n.text(
-                'Check your Interactive Brokers connection or refresh your account.',
-              )
-            : context.l10n.text('Import your trades to build your portfolio.'),
-        actionLabel: ibkrEnabled
-            ? context.l10n.text('IBKR settings')
-            : context.l10n.text('Import CSV'),
-        actionIcon:
-            ibkrEnabled ? Icons.settings_rounded : Icons.upload_file_rounded,
-        onAction: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const SettingsPage()),
-        ),
+          icon: ibkrEnabled
+              ? Icons.account_balance_rounded
+              : Icons.pie_chart_outline_rounded,
+          title: ibkrEnabled
+              ? context.l10n.text('No IBKR stock positions')
+              : context.l10n.text('No holdings yet'),
+          message: ibkrEnabled
+              ? context.l10n.text(
+                  'Check your Interactive Brokers connection or refresh your account.',
+                )
+              : context.l10n
+                  .text('Import your trades to build your portfolio.'),
+          actionLabel: ibkrEnabled
+              ? context.l10n.text('IBKR settings')
+              : context.l10n.text('Import CSV'),
+          actionIcon:
+              ibkrEnabled ? Icons.settings_rounded : Icons.upload_file_rounded,
+          onAction: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SettingsPage()),
+          ),
         ),
       );
     }
@@ -805,6 +806,83 @@ class PortfolioPageState extends State<PortfolioPage>
     );
   }
 
+  Widget _buildDesktopAllocationChart({
+    required List<PieChartSectionData> sections,
+    required List<Position> sorted,
+    required int? selectedIndex,
+    required bool compact,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final chartSections = compact
+        ? sections
+            .map(
+              (section) => section.copyWith(
+                radius: section.radius > 75 ? 60 : 54,
+              ),
+            )
+            .toList()
+        : sections;
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        PieChart(
+          PieChartData(
+            sections: chartSections,
+            centerSpaceRadius: compact ? 48 : 72,
+            sectionsSpace: 0,
+            pieTouchData: PieTouchData(
+              touchCallback: (event, response) {
+                setState(() {
+                  if (!event.isInterestedForInteractions ||
+                      response == null ||
+                      response.touchedSection == null) {
+                    touchedIndex = null;
+                    return;
+                  }
+                  final index = response.touchedSection!.touchedSectionIndex;
+                  touchedIndex = index >= 0 ? index : null;
+                });
+              },
+            ),
+          ),
+        ),
+        IgnorePointer(
+          child: SizedBox(
+            width: compact ? 108 : 132,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  selectedIndex == null
+                      ? context.l10n.text('Holdings')
+                      : sorted[selectedIndex].symbol,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  selectedIndex == null
+                      ? '${sorted.length} ${context.l10n.text('positions')}'
+                      : fmtCurrency(sorted[selectedIndex].currentValue),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildDesktopPortfolio({
     required List<Position> positions,
     required List<Position> sorted,
@@ -829,64 +907,6 @@ class PortfolioPageState extends State<PortfolioPage>
             netLiquidation.value,
             netLiquidation.currency,
           );
-
-    final allocationChart = Stack(
-      alignment: Alignment.center,
-      children: [
-        PieChart(
-          PieChartData(
-            sections: sections,
-            centerSpaceRadius: 72,
-            sectionsSpace: 0,
-            pieTouchData: PieTouchData(
-              touchCallback: (event, response) {
-                setState(() {
-                  if (!event.isInterestedForInteractions ||
-                      response == null ||
-                      response.touchedSection == null) {
-                    touchedIndex = null;
-                    return;
-                  }
-                  final index = response.touchedSection!.touchedSectionIndex;
-                  touchedIndex = index >= 0 ? index : null;
-                });
-              },
-            ),
-          ),
-        ),
-        IgnorePointer(
-          child: SizedBox(
-            width: 132,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  selectedIndex == null
-                      ? context.l10n.text('Holdings')
-                      : sorted[selectedIndex].symbol,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  selectedIndex == null
-                      ? '${positions.length} ${context.l10n.text('positions')}'
-                      : fmtCurrency(sorted[selectedIndex].currentValue),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(32, 28, 32, 24),
@@ -920,12 +940,7 @@ class PortfolioPageState extends State<PortfolioPage>
                 message: context.l10n.text('Refresh'),
                 child: IconButton(
                   onPressed: _isLoadingPortfolio ? null : _updateCandles,
-                  icon: _isLoadingPortfolio
-                      ? const SizedBox.square(
-                          dimension: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.refresh_rounded),
+                  icon: const Icon(Icons.refresh_rounded),
                 ),
               ),
               const SizedBox(width: 4),
@@ -1013,12 +1028,10 @@ class PortfolioPageState extends State<PortfolioPage>
               const SizedBox(width: 12),
               _DesktopPortfolioMetric(
                 label: context.l10n.text('Unrealized P/L'),
-                value:
-                    '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}',
+                value: '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}',
                 detail:
                     '${totalGainPct >= 0 ? '+' : ''}${totalGainPct.toStringAsFixed(2)}%',
-                valueColor:
-                    totalGain >= 0 ? Colors.green : Colors.redAccent,
+                valueColor: totalGain >= 0 ? Colors.green : Colors.redAccent,
                 icon: totalGain >= 0
                     ? Icons.trending_up_rounded
                     : Icons.trending_down_rounded,
@@ -1097,14 +1110,20 @@ class PortfolioPageState extends State<PortfolioPage>
                                     },
                                   ),
                                 );
+                                final compact = constraints.maxWidth < 600;
                                 final chart = Center(
                                   child: AspectRatio(
                                     aspectRatio: 1,
-                                    child: allocationChart,
+                                    child: _buildDesktopAllocationChart(
+                                      sections: sections,
+                                      sorted: sorted,
+                                      selectedIndex: selectedIndex,
+                                      compact: compact,
+                                    ),
                                   ),
                                 );
 
-                                if (constraints.maxWidth < 600) {
+                                if (compact) {
                                   if (constraints.maxHeight < 280) {
                                     return Row(
                                       key: const Key(
@@ -1126,9 +1145,7 @@ class PortfolioPageState extends State<PortfolioPage>
                                     ),
                                     children: [
                                       SizedBox(
-                                        height: constraints.maxHeight < 500
-                                            ? 180
-                                            : 220,
+                                        height: 220,
                                         child: chart,
                                       ),
                                       const SizedBox(height: 14),
@@ -1393,7 +1410,6 @@ class _DesktopAllocationRow extends StatelessWidget {
                   ),
                 ],
               ),
-
             ],
           ),
         ),

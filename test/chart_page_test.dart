@@ -462,6 +462,12 @@ void main() {
     final pagePadding = pageList.padding! as EdgeInsets;
     expect(pagePadding.left, 0);
     expect(pagePadding.right, 0);
+    final summaryPadding = tester.widget<Padding>(
+      find.byKey(const Key('portfolio-summary-content')),
+    );
+    final summaryInsets = summaryPadding.padding as EdgeInsets;
+    expect(summaryInsets.left, 24);
+    expect(summaryInsets.right, 24);
     expect(performanceLoads, greaterThan(0));
     expect(find.text('+5.49%'), findsOneWidget);
     expect(find.textContaining('TWR'), findsNothing);
@@ -541,8 +547,10 @@ void main() {
     await db.close();
   });
 
-  test('chart axis percentages use separators and compact huge values', () {
-    expect(fmtChartAxisPercent(35000), '+35,000.0%');
+  test('chart axis percentages compact values from one thousand', () {
+    expect(fmtChartAxisPercent(999), '+999.0%');
+    expect(fmtChartAxisPercent(1000), '+1K%');
+    expect(fmtChartAxisPercent(35000), '+35K%');
     expect(fmtChartAxisPercent(350000), '+350K%');
     expect(fmtChartAxisPercent(-350000), '-350K%');
   });
@@ -579,8 +587,16 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.byTooltip('Refresh'), findsOneWidget);
+    final refresh = find.byTooltip('Refresh');
+    expect(refresh, findsOneWidget);
     expect(find.byIcon(Icons.refresh_rounded), findsOneWidget);
+    expect(
+      find.descendant(
+        of: refresh,
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsNothing,
+    );
     expect(tester.takeException(), null);
   });
 }

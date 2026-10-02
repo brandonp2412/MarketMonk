@@ -1191,12 +1191,7 @@ class ChartsPageState extends State<ChartsPage>
                 IconButton(
                   onPressed: _networkLoading ? null : _refreshCurrentChart,
                   tooltip: context.l10n.text('Refresh'),
-                  icon: _networkLoading
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.refresh_rounded),
+                  icon: const Icon(Icons.refresh_rounded),
                 ),
               if (!desktop)
                 IconButton(
@@ -1436,7 +1431,10 @@ class ChartsPageState extends State<ChartsPage>
         (candles.last.close.value - candles.first.close.value) / _centDivisor;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.symmetric(
+        horizontal: isDesktopLayout(context) ? 24 : 16,
+        vertical: 8,
+      ),
       child: Column(
         children: [
           Wrap(
@@ -1520,7 +1518,12 @@ class ChartsPageState extends State<ChartsPage>
     return Padding(
       // The period selector sits immediately above this row. Give the cards a
       // clear separation without making the landing page feel oversized.
-      padding: const EdgeInsets.only(top: 16, bottom: 8),
+      padding: EdgeInsets.fromLTRB(
+        isDesktopLayout(context) ? 24 : 16,
+        16,
+        isDesktopLayout(context) ? 24 : 16,
+        8,
+      ),
       child: SizedBox(
         height: 64,
         child: ListView.builder(
@@ -1797,7 +1800,11 @@ class ChartsPageState extends State<ChartsPage>
     if (allSeries.isEmpty) return const SizedBox();
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      key: const Key('portfolio-summary-content'),
+      padding: EdgeInsets.symmetric(
+        horizontal: isDesktopLayout(context) ? 24 : 16,
+        vertical: 8,
+      ),
       child: Column(
         children: [
           for (final entry in allSeries.entries)
