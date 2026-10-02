@@ -12,6 +12,30 @@ void main() {
     expect(args.positionals, ['accounts', 'list']);
   });
 
+  test('--color forces ANSI styling', () {
+    final output = <String>[];
+    final exitCode = MarketMonkCli(
+      out: output.add,
+      err: output.add,
+      color: false,
+    ).run(['--color', '--help']);
+
+    expect(exitCode, 0);
+    expect(output.join('\n'), contains('[1;36mMarket Monk CLI[0m'));
+  });
+
+  test('--no-color disables ANSI styling', () {
+    final output = <String>[];
+    final exitCode = MarketMonkCli(
+      out: output.add,
+      err: output.add,
+      color: true,
+    ).run(['--no-color', '--help']);
+
+    expect(exitCode, 0);
+    expect(output.join('\n'), isNot(contains('[')));
+  });
+
   group('trade CRUD', () {
     late Directory tempDir;
     late String databasePath;
@@ -30,10 +54,8 @@ void main() {
       tempDir.deleteSync(recursive: true);
     });
 
-    MarketMonkCli cli() => MarketMonkCli(
-          out: stdoutLines.add,
-          err: stderrLines.add,
-        );
+    MarketMonkCli cli() =>
+        MarketMonkCli(out: stdoutLines.add, err: stderrLines.add);
 
     test('adds, updates, and deletes a trade with app-compatible signs', () {
       final addExit = cli().run([
@@ -131,12 +153,7 @@ void main() {
 
     test('backup produces an integrity-checked database', () {
       final backupPath = '${tempDir.path}/backup.sqlite';
-      final exitCode = cli().run([
-        '--db',
-        databasePath,
-        'backup',
-        backupPath,
-      ]);
+      final exitCode = cli().run(['--db', databasePath, 'backup', backupPath]);
 
       expect(exitCode, 0);
       final db = sqlite.sqlite3.open(

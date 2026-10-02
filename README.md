@@ -46,6 +46,10 @@ All issues and pull requests are welcome! Bugs will be fixed faster if you inclu
 
 Install [flutter](https://docs.flutter.dev/get-started/install) to run this app.
 
+## Command line
+
+Market Monk includes an installable `mm` terminal client for inspecting and editing portfolio data. See the [CLI guide](docs/cli.md) for installation, examples, safety notes, and screenshots.
+
 ## Interactive Brokers
 
 MarketMonk can use the standalone read-only proxy in [`server/`](server/) as the current portfolio source. The recommended backend connects to the standard TWS / IB Gateway socket API; the Client Portal Web API remains available as an alternative. With the native backend, current IBKR stock positions also prefer IBKR daily historical bars for charts. Yahoo remains the fallback for unheld symbols or when IBKR historical data is unavailable. The proxy is independent of any personal trading bot or login automation.

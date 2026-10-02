@@ -11,17 +11,25 @@ class MarketMonkCli {
     LineWriter? out,
     LineWriter? err,
     Map<String, String>? environment,
+    bool? color,
   })  : _out = out ?? print,
         _err = err ?? ((line) => stderr.writeln(line)),
-        _environment = environment ?? Platform.environment;
+        _environment = environment ?? Platform.environment,
+        _useColor = color ??
+            (out == null &&
+                stdout.supportsAnsiEscapes &&
+                !(environment ?? Platform.environment).containsKey('NO_COLOR'));
 
   final LineWriter _out;
   final LineWriter _err;
   final Map<String, String> _environment;
+  bool _useColor;
 
   int run(List<String> arguments) {
     try {
       final args = CliArguments.parse(arguments);
+      if (args.hasFlag('color')) _useColor = true;
+      if (args.hasFlag('no-color')) _useColor = false;
       if (args.hasFlag('help') || args.positionals.isEmpty) {
         _printHelp();
         return 0;
@@ -49,11 +57,11 @@ class MarketMonkCli {
           throw CliUsageException('Unknown command: ${args.positionals.first}');
       }
     } on CliUsageException catch (error) {
-      _err('Error: ${error.message}');
-      _err('Run with --help for usage.');
+      _err(_red('Error: ${error.message}'));
+      _err(_dim('Run with --help for usage.'));
       return 64;
     } on Exception catch (error) {
-      _err('Error: $error');
+      _err(_red('Error: $error'));
       return 1;
     }
   }
@@ -308,7 +316,7 @@ INSERT INTO trades (
     _out(
       args.hasFlag('json')
           ? jsonEncode({'id': id})
-          : 'Added ${side.label} trade $id for $symbol.',
+          : _green('Added ${side.label} trade $id for $symbol.'),
     );
     return 0;
   }
@@ -380,7 +388,9 @@ INSERT INTO trades (
       parameters,
     );
     _out(
-      args.hasFlag('json') ? jsonEncode({'updated': id}) : 'Updated trade $id.',
+      args.hasFlag('json')
+          ? jsonEncode({'updated': id})
+          : _green('Updated trade $id.'),
     );
     return 0;
   }
@@ -396,7 +406,9 @@ INSERT INTO trades (
 
     db.execute('DELETE FROM trades WHERE id = ?', [id]);
     _out(
-      args.hasFlag('json') ? jsonEncode({'deleted': id}) : 'Deleted trade $id.',
+      args.hasFlag('json')
+          ? jsonEncode({'deleted': id})
+          : _green('Deleted trade $id.'),
     );
     return 0;
   }
@@ -533,7 +545,9 @@ ORDER BY symbol
         _out(
           args.hasFlag('json')
               ? jsonEncode({'deleted': removed, 'symbol': symbol})
-              : 'Deleted $removed candle cache rows${symbol == null ? '' : ' for $symbol'}.',
+              : _green(
+                  'Deleted $removed candle cache rows${symbol == null ? '' : ' for $symbol'}.',
+                ),
         );
         return 0;
 
@@ -578,7 +592,7 @@ ORDER BY symbol
     _out(
       args.hasFlag('json')
           ? jsonEncode({'backup': destination.path})
-          : 'Backup written to ${destination.path}',
+          : _green('Backup written to ${destination.path}'),
     );
     return 0;
   }
@@ -830,6 +844,18 @@ WHERE id = ?
     return doubleValue.toStringAsFixed(8).replaceFirst(RegExp(r'0+$'), '');
   }
 
+  String _ansi(String text, String code) =>
+      _useColor ? '\x1B[${code}m$text\x1B[0m' : text;
+
+  String _cyan(String text, {bool bold = false}) =>
+      _ansi(text, bold ? '1;36' : '36');
+
+  String _green(String text) => _ansi(text, '32');
+
+  String _red(String text) => _ansi(text, '31');
+
+  String _dim(String text) => _ansi(text, '2');
+
   String _formatTable(List<String> headers, List<List<Object?>> rows) {
     final renderedRows = [
       headers,
@@ -850,65 +876,69 @@ WHERE id = ?
         ).join('  ').trimRight();
 
     return [
-      render(renderedRows.first),
-      widths.map((width) => '-' * width).join('  '),
+      _cyan(render(renderedRows.first), bold: true),
+      _dim(widths.map((width) => '─' * width).join('  ')),
       ...renderedRows.skip(1).map(render),
     ].join('\n');
   }
 
   void _printHelp() {
-    _out('''
-Market Monk CLI
-
-Usage:
-  dart run tool/market_monk.dart [global options] <command>
-
-Global options:
-  --account NAME       Use a named Market Monk account (default: Default)
-  --db PATH            Use an explicit SQLite database path
-  --data-dir PATH      Override the Market Monk application-support directory
-  --json               Emit machine-readable JSON where supported
-  --help               Show this help
-
-Commands:
-  accounts list
-      Discover Market Monk account databases.
-
-  info
-      Show database path, schema, integrity, and row counts.
-
-  trades list [--symbol SYMBOL] [--since DATE] [--until DATE] [--limit N]
-  trades get ID
-  trades add --symbol SYMBOL --side buy|sell --quantity QTY --price PRICE
-             [--name NAME] [--date ISO8601] [--realized-pl VALUE]
-             [--commission VALUE]
-  trades update ID [--symbol SYMBOL] [--name NAME] [--side buy|sell]
-                   [--quantity QTY] [--price PRICE] [--date ISO8601]
-                   [--realized-pl VALUE] [--commission VALUE]
-  trades delete ID --yes
-      Read and edit the user trade ledger.
-
-  holdings
-      Show net non-zero quantities derived from trades.
-
-  candles stats [--symbol SYMBOL]
-  candles clear [--symbol SYMBOL] --yes
-      Inspect or clear downloaded market-data cache rows.
-
-  backup PATH [--overwrite]
-      Create a consistent SQLite backup.
-
-  query "SELECT ..."
-      Run read-only SELECT/PRAGMA/WITH/EXPLAIN SQL.
-
-Examples:
-  dart run tool/market_monk.dart accounts list
-  dart run tool/market_monk.dart --account 1 trades list --symbol VTI
-  dart run tool/market_monk.dart trades add --symbol VTI --side buy --quantity 2 --price 312.45
-  dart run tool/market_monk.dart trades update 12 --price 313.10
-  dart run tool/market_monk.dart trades delete 12 --yes
-  dart run tool/market_monk.dart backup ~/backups/market-monk.sqlite
-''');
+    _out(
+      [
+        _cyan('Market Monk CLI', bold: true),
+        '',
+        'Usage:',
+        '  mm [global options] <command>',
+        '',
+        'Global options:',
+        '  --account NAME       Use a named Market Monk account (default: Default)',
+        '  --db PATH            Use an explicit SQLite database path',
+        '  --data-dir PATH      Override the Market Monk application-support directory',
+        '  --json               Emit machine-readable JSON where supported',
+        '  --color              Force ANSI color output',
+        '  --no-color           Disable ANSI color output',
+        '  --help               Show this help',
+        '',
+        'Commands:',
+        '  accounts list',
+        '      Discover Market Monk account databases.',
+        '',
+        '  info',
+        '      Show database path, schema, integrity, and row counts.',
+        '',
+        '  trades list [--symbol SYMBOL] [--since DATE] [--until DATE] [--limit N]',
+        '  trades get ID',
+        '  trades add --symbol SYMBOL --side buy|sell --quantity QTY --price PRICE',
+        '             [--name NAME] [--date ISO8601] [--realized-pl VALUE]',
+        '             [--commission VALUE]',
+        '  trades update ID [--symbol SYMBOL] [--name NAME] [--side buy|sell]',
+        '                   [--quantity QTY] [--price PRICE] [--date ISO8601]',
+        '                   [--realized-pl VALUE] [--commission VALUE]',
+        '  trades delete ID --yes',
+        '      Read and edit the user trade ledger.',
+        '',
+        '  holdings',
+        '      Show net non-zero quantities derived from trades.',
+        '',
+        '  candles stats [--symbol SYMBOL]',
+        '  candles clear [--symbol SYMBOL] --yes',
+        '      Inspect or clear downloaded market-data cache rows.',
+        '',
+        '  backup PATH [--overwrite]',
+        '      Create a consistent SQLite backup.',
+        '',
+        '  query "SELECT ..."',
+        '      Run read-only SELECT/PRAGMA/WITH/EXPLAIN SQL.',
+        '',
+        'Examples:',
+        '  mm accounts list',
+        '  mm --account 1 trades list --symbol VTI',
+        '  mm trades add --symbol VTI --side buy --quantity 2 --price 312.45',
+        '  mm trades update 12 --price 313.10',
+        '  mm trades delete 12 --yes',
+        '  mm backup ~/backups/market-monk.sqlite',
+      ].join('\n'),
+    );
   }
 }
 
@@ -938,7 +968,14 @@ class CliArguments {
         continue;
       }
 
-      const booleanOptions = {'help', 'json', 'yes', 'overwrite'};
+      const booleanOptions = {
+        'help',
+        'json',
+        'yes',
+        'overwrite',
+        'color',
+        'no-color',
+      };
       if (booleanOptions.contains(option)) {
         options[option] = null;
         continue;
