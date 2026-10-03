@@ -19,7 +19,10 @@ class _Changelog {
 }
 
 class _WhatsNewState extends State<WhatsNew> {
+  static const _pageSize = 10;
   List<_Changelog> _changelogs = [];
+  List<String> _changelogFiles = [];
+  int _page = 0;
   bool _isLoading = true;
   bool _loadFailed = false;
 
@@ -34,7 +37,10 @@ class _WhatsNewState extends State<WhatsNew> {
       final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
       final files = manifest
           .listAssets()
-          .where((key) => key.startsWith('assets/changelogs/'))
+          .where(
+            (key) =>
+                key.startsWith('assets/changelogs/') && key.endsWith('.txt'),
+          )
           .toList();
 
       files.sort((firstPath, secondPath) {
@@ -45,17 +51,12 @@ class _WhatsNewState extends State<WhatsNew> {
         return secondTimestamp.compareTo(firstTimestamp);
       });
 
-      final result = <_Changelog>[];
-      for (final path in files) {
-        final changelog = await _loadChangelogFile(path);
-        if (changelog != null) result.add(changelog);
-      }
-
       if (!mounted) return;
       setState(() {
-        _changelogs = result;
-        _isLoading = false;
+        _changelogFiles = files;
+        _page = 0;
       });
+      await _loadPage(0);
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -63,6 +64,30 @@ class _WhatsNewState extends State<WhatsNew> {
         _loadFailed = true;
       });
     }
+  }
+
+  Future<void> _loadPage(int page) async {
+    final pageFiles = _changelogFiles.skip(page * _pageSize).take(_pageSize);
+    final result = <_Changelog>[];
+    for (final path in pageFiles) {
+      final changelog = await _loadChangelogFile(path);
+      if (changelog != null) result.add(changelog);
+    }
+    if (!mounted || _page != page) return;
+    setState(() {
+      _changelogs = result;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _setPage(int page) async {
+    final pageCount = (_changelogFiles.length / _pageSize).ceil();
+    if (page < 0 || page >= pageCount) return;
+    setState(() {
+      _page = page;
+      _isLoading = true;
+    });
+    await _loadPage(page);
   }
 
   Future<_Changelog?> _loadChangelogFile(String path) async {
@@ -102,30 +127,57 @@ class _WhatsNewState extends State<WhatsNew> {
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: _changelogs.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (context, index) {
-        final log = _changelogs[index];
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final pageCount = (_changelogFiles.length / _pageSize).ceil();
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            itemCount: _changelogs.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final log = _changelogs[index];
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      log.created,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(log.content),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                log.created,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleSmall
-                    ?.copyWith(color: Theme.of(context).colorScheme.primary),
+              IconButton(
+                onPressed: _page > 0 ? () => _setPage(_page - 1) : null,
+                icon: const Icon(Icons.chevron_left),
+                tooltip: 'Previous page',
               ),
-              const SizedBox(height: 4),
-              Text(log.content),
+              Text('${_page + 1} / $pageCount'),
+              IconButton(
+                onPressed: _page + 1 < pageCount
+                    ? () => _setPage(_page + 1)
+                    : null,
+                icon: const Icon(Icons.chevron_right),
+                tooltip: 'Next page',
+              ),
             ],
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 
