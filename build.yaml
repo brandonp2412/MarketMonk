@@ -6,3 +6,4 @@ targets:
           databases:
             database: lib/database.dart
             app_state: lib/app_state_database.dart
+            unified_database: lib/unified_database.dart
