@@ -63,15 +63,26 @@ class _EditTickerPageState extends State<EditTickerPage> {
     super.dispose();
   }
 
+  DateTime _requiredCandleStart() {
+    final now = DateTime.now();
+    return DateTime(now.year - years, now.month - months, now.day - days - 1);
+  }
+
+  Future<void> _syncVisibleRange({bool forceRefresh = false}) async {
+    final tickerSymbol = canonicalMarketSymbol(symbol.text.split(' ').first);
+    if (tickerSymbol.isEmpty) return;
+    await syncCandles(
+      tickerSymbol,
+      requiredFrom: _requiredCandleStart(),
+      forceRefresh: forceRefresh,
+    );
+  }
+
   void setStream() {
     if (symbol.text.isEmpty) return;
 
-    final now = DateTime.now();
-    final after = DateTime(
-      now.year - years,
-      now.month - months,
-      now.day - days - 1,
-    );
+    final after = _requiredCandleStart();
+    final marketSymbol = canonicalMarketSymbol(symbol.text.split(' ').first);
     const weekExpression = CustomExpression<String>(
       "STRFTIME('%Y-%m-%W', DATE(\"date\", 'unixepoch', 'localtime'))",
     );
@@ -81,7 +92,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
     stream = (db.selectOnly(db.candles)
           ..addColumns([db.candles.date, db.candles.close])
           ..where(
-            db.candles.symbol.equals(symbol.text.split(' ').first) &
+            db.candles.symbol.equals(marketSymbol) &
                 db.candles.date.isBiggerOrEqualValue(after),
           )
           ..orderBy([
@@ -178,6 +189,10 @@ class _EditTickerPageState extends State<EditTickerPage> {
                 days = 0;
               });
               setStream();
+              runDetachedTask(
+                _syncVisibleRange(),
+                'Failed to backfill trade chart range',
+              );
             },
             style: OutlinedButton.styleFrom(
               side: BorderSide(
@@ -208,6 +223,10 @@ class _EditTickerPageState extends State<EditTickerPage> {
                 days = 0;
               });
               setStream();
+              runDetachedTask(
+                _syncVisibleRange(),
+                'Failed to backfill trade chart range',
+              );
             },
             style: OutlinedButton.styleFrom(
               side: BorderSide(
@@ -251,7 +270,10 @@ class _EditTickerPageState extends State<EditTickerPage> {
                         });
                         final tickerSymbol = value.split(' ').first;
                         try {
-                          await syncCandles(tickerSymbol);
+                          await syncCandles(
+                            tickerSymbol,
+                            requiredFrom: _requiredCandleStart(),
+                          );
                           await fetchSymbolCurrencyAndRate(tickerSymbol);
                         } catch (error, stackTrace) {
                           talker.handle(
@@ -322,7 +344,10 @@ class _EditTickerPageState extends State<EditTickerPage> {
                             });
                             final tickerSymbol = text.split(' ').first;
                             try {
-                              await syncCandles(tickerSymbol);
+                              await syncCandles(
+                                tickerSymbol,
+                                requiredFrom: _requiredCandleStart(),
+                              );
                               await fetchSymbolCurrencyAndRate(
                                 tickerSymbol,
                               );
@@ -398,9 +423,18 @@ class _EditTickerPageState extends State<EditTickerPage> {
                           enteredPrice <= 0) {
                         return;
                       }
+                      final tickerSymbol = canonicalMarketSymbol(
+                        symbol.text.split(' ').first,
+                      );
+                      await syncCandles(
+                        tickerSymbol,
+                        requiredFrom: _purchasedDate.subtract(
+                          const Duration(days: 7),
+                        ),
+                      );
                       final closest = await findClosestPrice(
                         enteredPrice,
-                        symbol.text.split(' ').first,
+                        tickerSymbol,
                       );
 
                       if (!mounted || closest == null) return;
@@ -434,10 +468,14 @@ class _EditTickerPageState extends State<EditTickerPage> {
                       setStream();
 
                       if (autoSetCreated) return;
-                      final closest = await findClosestDate(
-                        date,
+                      final tickerSymbol = canonicalMarketSymbol(
                         symbol.text.split(' ').first,
                       );
+                      await syncCandles(
+                        tickerSymbol,
+                        requiredFrom: date.subtract(const Duration(days: 7)),
+                      );
+                      final closest = await findClosestDate(date, tickerSymbol);
                       if (!mounted || closest == null) return;
                       setState(() {
                         price.text = closest.close.toStringAsFixed(2);
@@ -462,6 +500,10 @@ class _EditTickerPageState extends State<EditTickerPage> {
                               months = 0;
                             });
                             setStream();
+                            runDetachedTask(
+                              _syncVisibleRange(),
+                              'Failed to backfill trade chart range',
+                            );
                           },
                           style: OutlinedButton.styleFrom(
                             side: BorderSide(
@@ -530,7 +572,10 @@ class _EditTickerPageState extends State<EditTickerPage> {
 
           if (context.mounted) Navigator.of(context).pop();
           runDetachedTask(
-            syncCandles(tickerSymbol),
+            syncCandles(
+              tickerSymbol,
+              requiredFrom: _purchasedDate.subtract(const Duration(days: 7)),
+            ),
             'Failed to refresh candles after saving trade',
           );
         },

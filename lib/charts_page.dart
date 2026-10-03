@@ -396,6 +396,7 @@ class ChartsPageState extends State<ChartsPage>
           database: accountDatabase,
           ibkrConfig: ibkrConfig,
           syncNamespace: accountName,
+          requiredFrom: _requiredCandleStart(),
         );
       }
     } catch (error, stackTrace) {
@@ -503,6 +504,8 @@ class ChartsPageState extends State<ChartsPage>
             database: accountDb,
             ibkrConfig: ibkrConfig,
             syncNamespace: accountName,
+            requiredFrom: _requiredCandleStart(),
+            forceRefresh: true,
           );
         }
       } catch (error, stackTrace) {
@@ -536,6 +539,8 @@ class ChartsPageState extends State<ChartsPage>
           _selectedSymbol!,
           ibkrConfig: accountManager.ibkrConfigFor(),
           syncNamespace: accountManager.activeAccount,
+          requiredFrom: _requiredCandleStart(),
+          forceRefresh: true,
         );
         if (mounted) _setStockStream(_selectedSymbol!);
       } else {
@@ -1158,6 +1163,7 @@ class ChartsPageState extends State<ChartsPage>
             symbol,
             ibkrConfig: accountManager.ibkrConfigFor(),
             syncNamespace: accountManager.activeAccount,
+            requiredFrom: _requiredCandleStart(),
           );
         } catch (error, stackTrace) {
           talker.handle(error, stackTrace, 'Selected ticker sync failed');
@@ -1177,15 +1183,20 @@ class ChartsPageState extends State<ChartsPage>
     );
   }
 
+  DateTime _requiredCandleStart() {
+    final now = DateTime.now();
+    return days > 0
+        ? DateTime(now.year, now.month, now.day - days - 4)
+        : DateTime(now.year - years, now.month - months, now.day - 1);
+  }
+
   void _setStockStream(String symbol) {
     if (!widget.isActive) {
       _stockStream = null;
       return;
     }
-    final now = DateTime.now();
-    final after = days > 0
-        ? DateTime(now.year, now.month, now.day - days - 4)
-        : DateTime(now.year - years, now.month - months, now.day - 1);
+    final after = _requiredCandleStart();
+    final marketSymbol = canonicalMarketSymbol(symbol);
 
     const weekExpression = CustomExpression<String>(
       "STRFTIME('%Y-%m-%W', DATE(\"date\", 'unixepoch', 'localtime'))",
@@ -1197,7 +1208,7 @@ class ChartsPageState extends State<ChartsPage>
     _stockStream = (db.selectOnly(db.candles)
           ..addColumns([db.candles.date, db.candles.close])
           ..where(
-            db.candles.symbol.equals(symbol) &
+            db.candles.symbol.equals(marketSymbol) &
                 db.candles.date.isBiggerThanValue(after),
           )
           ..orderBy([
@@ -1239,10 +1250,32 @@ class ChartsPageState extends State<ChartsPage>
     });
     runDetachedTask(_savePeriod(), 'Failed to save chart period');
     if (_mode == _ChartMode.stock && _selectedSymbol != null) {
-      _setStockStream(_selectedSymbol!);
+      final symbol = _selectedSymbol!;
+      _setStockStream(symbol);
+      runDetachedTask(
+        () async {
+          final accountManager = context.read<AccountManager>();
+          await syncCandles(
+            symbol,
+            ibkrConfig: accountManager.ibkrConfigFor(),
+            syncNamespace: accountManager.activeAccount,
+            requiredFrom: _requiredCandleStart(),
+          );
+          if (mounted &&
+              widget.isActive &&
+              _mode == _ChartMode.stock &&
+              _selectedSymbol == symbol) {
+            _setStockStream(symbol);
+          }
+        }(),
+        'Failed to backfill selected chart period',
+      );
     } else {
       runDetachedTask(
-        _loadAllPortfolios(),
+        () async {
+          await _syncCandlesInBackground();
+          await _loadAllPortfolios();
+        }(),
         'Failed to reload portfolios for chart period',
       );
     }

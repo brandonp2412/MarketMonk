@@ -1,0 +1,195 @@
+import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:market_monk/database.dart';
+import 'package:market_monk/utils.dart';
+import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
+
+YahooFinanceCandleData _candle(DateTime date, {double close = 100}) {
+  return YahooFinanceCandleData(
+    date: date,
+    open: close - 1,
+    high: close + 1,
+    low: close - 2,
+    close: close,
+    adjClose: close,
+    volume: 1000,
+  );
+}
+
+DateTime _dayOffset(DateTime day, int offsetDays) =>
+    DateTime(day.year, day.month, day.day + offsetDays);
+
+DateTime _expectedMarketDay() {
+  var day = canonicalMarketDay(DateTime.now());
+  while (day.weekday == DateTime.saturday || day.weekday == DateTime.sunday) {
+    day = day.subtract(const Duration(days: 1));
+  }
+  return day;
+}
+
+Future<List<Candle>> _rows(Database database) => (database.candles.select()
+      ..orderBy([
+        (row) => OrderingTerm(
+              expression: row.date,
+              mode: OrderingMode.asc,
+            ),
+      ]))
+    .get();
+
+void main() {
+  setUp(() {
+    clearAllSyncCache();
+    cacheSymbolMeta('AAPL', 'USD');
+  });
+
+  test('empty DB fetches only requested range and canonicalizes identity',
+      () async {
+    final database = Database.connect(NativeDatabase.memory());
+    addTearDown(database.close);
+    final expected = _expectedMarketDay();
+    final requiredFrom = _dayOffset(expected, -30);
+    final requestedStarts = <DateTime>[];
+    var requests = 0;
+
+    await syncCandles(
+      ' aapl ',
+      database: database,
+      requiredFrom: requiredFrom,
+      yahooFetcher: (symbol, startDate) async {
+        requests++;
+        expect(symbol, 'AAPL');
+        requestedStarts.add(startDate);
+        return [
+          _candle(requiredFrom.add(const Duration(hours: 9)), close: 90),
+          _candle(expected, close: 101),
+          _candle(expected.add(const Duration(hours: 15)), close: 102),
+        ];
+      },
+    );
+
+    final rows = await _rows(database);
+    expect(requests, 1);
+    expect(requestedStarts, [canonicalMarketDay(requiredFrom)]);
+    expect(rows, hasLength(2));
+    expect(rows.map((row) => row.symbol).toSet(), {'AAPL'});
+    expect(
+      rows.every(
+        (row) =>
+            row.date.hour == 0 &&
+            row.date.minute == 0 &&
+            row.date.second == 0 &&
+            row.date.millisecond == 0,
+      ),
+      isTrue,
+    );
+    expect(rows.last.close, 102);
+  });
+
+  test('warm DB performs no market-data request or writes', () async {
+    final database = Database.connect(NativeDatabase.memory());
+    addTearDown(database.close);
+    final expected = _expectedMarketDay();
+    final requiredFrom = _dayOffset(expected, -30);
+
+    await insertCandles(
+      [_candle(requiredFrom), _candle(expected)],
+      'AAPL',
+      database: database,
+    );
+    final before = await _rows(database);
+    var requests = 0;
+
+    await syncCandles(
+      'AAPL',
+      database: database,
+      requiredFrom: requiredFrom,
+      yahooFetcher: (symbol, startDate) async {
+        requests++;
+        return const [];
+      },
+    );
+
+    final after = await _rows(database);
+    expect(requests, 0);
+    expect(after, hasLength(before.length));
+    expect(after.map((row) => row.id), before.map((row) => row.id));
+  });
+
+  test('stale DB requests only the incremental overlap', () async {
+    final database = Database.connect(NativeDatabase.memory());
+    addTearDown(database.close);
+    final expected = _expectedMarketDay();
+    final requiredFrom = _dayOffset(expected, -30);
+    final staleLatest = _dayOffset(expected, -3);
+    DateTime? requestedStart;
+    var requests = 0;
+
+    await insertCandles(
+      [_candle(requiredFrom), _candle(staleLatest, close: 95)],
+      'AAPL',
+      database: database,
+    );
+
+    await syncCandles(
+      'AAPL',
+      database: database,
+      requiredFrom: requiredFrom,
+      yahooFetcher: (symbol, startDate) async {
+        requests++;
+        requestedStart = startDate;
+        return [
+          _candle(staleLatest, close: 96),
+          _candle(expected, close: 103),
+        ];
+      },
+    );
+
+    final rows = await _rows(database);
+    expect(requests, 1);
+    expect(
+      requestedStart,
+      canonicalMarketDay(_dayOffset(staleLatest, -1)),
+    );
+    expect(rows, hasLength(3));
+    expect(rows.last.date, expected);
+    expect(rows.last.close, 103);
+  });
+
+  test('manual refresh requests newest overlap without growing row count',
+      () async {
+    final database = Database.connect(NativeDatabase.memory());
+    addTearDown(database.close);
+    final expected = _expectedMarketDay();
+    final requiredFrom = _dayOffset(expected, -30);
+    DateTime? requestedStart;
+    var requests = 0;
+
+    await insertCandles(
+      [_candle(requiredFrom), _candle(expected, close: 100)],
+      'AAPL',
+      database: database,
+    );
+
+    await syncCandles(
+      'AAPL',
+      database: database,
+      requiredFrom: requiredFrom,
+      forceRefresh: true,
+      yahooFetcher: (symbol, startDate) async {
+        requests++;
+        requestedStart = startDate;
+        return [_candle(expected.add(const Duration(hours: 12)), close: 104)];
+      },
+    );
+
+    final rows = await _rows(database);
+    expect(requests, 1);
+    expect(
+      requestedStart,
+      canonicalMarketDay(_dayOffset(expected, -1)),
+    );
+    expect(rows, hasLength(2));
+    expect(rows.last.close, 104);
+  });
+}

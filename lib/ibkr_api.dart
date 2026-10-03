@@ -443,7 +443,7 @@ class IbkrApiClient {
 
   Future<IbkrHistoricalSeries> fetchHistoricalCandles(
     String symbol, {
-    int years = 10,
+    int years = 1,
   }) async {
     if (years < 1 || years > 10) {
       throw RangeError.range(years, 1, 10, 'years');
