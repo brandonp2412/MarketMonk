@@ -14,6 +14,11 @@ import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 import 'sqlite_test_support.dart';
 
+Future<void> _disposeTestApp(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump(const Duration(milliseconds: 1));
+}
+
 IbkrPortfolioSnapshot snapshotFor(String account, String symbol) =>
     IbkrPortfolioSnapshot(
       account: account,
@@ -72,6 +77,19 @@ Future<void> seedCurrentCandle(String symbol) async {
       );
 }
 
+void _testWidgetsWithCleanup(
+  String description,
+  WidgetTesterCallback callback,
+) {
+  testWidgets(description, (tester) async {
+    try {
+      await callback(tester);
+    } finally {
+      await _disposeTestApp(tester);
+    }
+  });
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -102,13 +120,17 @@ void main() {
 
   Widget app(AccountManager accounts, Widget page) => MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider(
+            create: (_) => SettingsState(
+              localCurrencyDetector: () async => 'USD',
+            ),
+          ),
           ChangeNotifierProvider.value(value: accounts),
         ],
         child: MaterialApp(home: page),
       );
 
-  testWidgets('portfolio exposes a loading state while uncached data loads', (
+  _testWidgetsWithCleanup('portfolio exposes a loading state while uncached data loads', (
     tester,
   ) async {
     await seedTestSqlite({});
@@ -145,7 +167,7 @@ void main() {
     expect(loads, 1);
   });
 
-  testWidgets(
+  _testWidgetsWithCleanup(
     'portfolio renders persistent cache without waiting for refresh',
     (tester) async {
       await seedTestSqlite({});
@@ -209,7 +231,7 @@ void main() {
     expect(cached.netLiquidationUsd, 5500);
   });
 
-  testWidgets(
+  _testWidgetsWithCleanup(
     'switching IBKR accounts never keeps the previous stream snapshot',
     (tester) async {
       await seedTestSqlite({
@@ -247,7 +269,7 @@ void main() {
     },
   );
 
-  testWidgets(
+  _testWidgetsWithCleanup(
     'an old IBKR request cannot overwrite the newly selected account cache',
     (tester) async {
       await seedTestSqlite({
@@ -292,7 +314,7 @@ void main() {
     },
   );
 
-  testWidgets(
+  _testWidgetsWithCleanup(
     'portfolio shows a friendly IBKR error instead of exception text',
     (tester) async {
       await seedTestSqlite({});
@@ -332,7 +354,7 @@ void main() {
     },
   );
 
-  testWidgets('portfolio uses split desktop layout at wide widths',
+  _testWidgetsWithCleanup('portfolio uses split desktop layout at wide widths',
       (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1400, 900);
@@ -392,7 +414,7 @@ void main() {
     expect(tester.takeException(), null);
   });
 
-  testWidgets('portfolio reflows allocation at compact desktop widths',
+  _testWidgetsWithCleanup('portfolio reflows allocation at compact desktop widths',
       (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(879, 900);
@@ -442,7 +464,7 @@ void main() {
     expect(tester.takeException(), null);
   });
 
-  testWidgets(
+  _testWidgetsWithCleanup(
     'portfolio handles short compact desktop heights',
     (tester) async {
       tester.view.devicePixelRatio = 1;

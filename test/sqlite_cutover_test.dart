@@ -322,13 +322,25 @@ void main() {
     expect(await appState.readProfiles(), ['Default', 'IBKR Bot']);
     expect(await appState.readActiveProfile(), 'IBKR Bot');
     expect(await appState.readSetting('theme'), 'ThemeMode.light');
+    // Import alone must keep the source until the unified migration is
+    // confirmed, so an interrupted cutover remains recoverable.
     expect(
       File('${directory.path}/market-monk-app-state.sqlite').existsSync(),
-      isFalse,
+      isTrue,
     );
     final manager = AccountManager();
     await manager.init();
     expect(manager.ibkrConfigFor('IBKR Bot').token, 'bot-token');
+
+    await unifiedData.writeSetting(
+      UnifiedDatabase.legacyMigrationCompleteKey,
+      true,
+    );
+    await loaded.cleanupLegacyAppStateAfterUnifiedMigration(unifiedData);
+    expect(
+      File('${directory.path}/market-monk-app-state.sqlite').existsSync(),
+      isFalse,
+    );
   });
 
   test('stale app-state cannot resurrect renamed or deleted profiles',

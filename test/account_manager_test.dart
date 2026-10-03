@@ -82,6 +82,57 @@ void main() {
     expect(identical(db, runtimeDatabase), isTrue);
   });
 
+  test('deleteAccount removes obsolete legacy profile database files',
+      () async {
+    final tempDir =
+        await Directory.systemTemp.createTemp('market-monk-delete-profile-');
+    const pathProviderChannel =
+        MethodChannel('plugins.flutter.io/path_provider');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(pathProviderChannel, (call) async {
+      if (call.method == 'getApplicationSupportDirectory' ||
+          call.method == 'getTemporaryDirectory') {
+        return tempDir.path;
+      }
+      return null;
+    });
+
+    try {
+      await seedTestSqlite({
+        'accounts': ['Default', 'Brokerage'],
+        'activeAccount': 'Default',
+      });
+      final unifiedDatabase = UnifiedDatabase.connect(NativeDatabase.memory());
+      addTearDown(unifiedDatabase.close);
+      final manager = AccountManager(unifiedDatabase: unifiedDatabase);
+      await manager.init();
+
+      final legacy = File('${tempDir.path}/market-monk-Brokerage.sqlite');
+      expect(await legacy.exists(), isTrue);
+      final sidecars = [
+        File('${legacy.path}-wal'),
+        File('${legacy.path}-shm'),
+        File('${legacy.path}-journal'),
+      ];
+      for (final sidecar in sidecars) {
+        await sidecar.writeAsString('stale');
+      }
+
+      await manager.deleteAccount('Brokerage');
+
+      expect(await legacy.exists(), isFalse);
+      for (final sidecar in sidecars) {
+        expect(await sidecar.exists(), isFalse);
+      }
+    } finally {
+      messenger.setMockMethodCallHandler(pathProviderChannel, null);
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    }
+  });
+
   test('switchAccount publishes and persists without swapping runtime database',
       () async {
     final tempDir =

@@ -52,7 +52,11 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider(
+            create: (_) => SettingsState(
+              localCurrencyDetector: () async => 'USD',
+            ),
+          ),
           ChangeNotifierProvider.value(value: accounts),
         ],
         child: MaterialApp(
@@ -105,7 +109,11 @@ void main() {
       await tester.pumpWidget(
         MultiProvider(
           providers: [
-            ChangeNotifierProvider(create: (_) => SettingsState()),
+            ChangeNotifierProvider(
+              create: (_) => SettingsState(
+                localCurrencyDetector: () async => 'USD',
+              ),
+            ),
             ChangeNotifierProvider.value(value: accounts),
           ],
           child: const MyApp(),
@@ -226,7 +234,11 @@ void main() {
       await tester.pumpWidget(
         MultiProvider(
           providers: [
-            ChangeNotifierProvider(create: (_) => SettingsState()),
+            ChangeNotifierProvider(
+              create: (_) => SettingsState(
+                localCurrencyDetector: () async => 'USD',
+              ),
+            ),
             ChangeNotifierProvider.value(value: accounts),
           ],
           child: MaterialApp(
@@ -342,7 +354,11 @@ void main() {
       await tester.pumpWidget(
         MultiProvider(
           providers: [
-            ChangeNotifierProvider(create: (_) => SettingsState()),
+            ChangeNotifierProvider(
+              create: (_) => SettingsState(
+                localCurrencyDetector: () async => 'USD',
+              ),
+            ),
             ChangeNotifierProvider.value(value: accounts),
           ],
           child: const MaterialApp(
@@ -475,7 +491,11 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider(
+            create: (_) => SettingsState(
+              localCurrencyDetector: () async => 'USD',
+            ),
+          ),
           ChangeNotifierProvider.value(value: accounts),
         ],
         child: MaterialApp(
@@ -600,7 +620,11 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider(
+            create: (_) => SettingsState(
+              localCurrencyDetector: () async => 'USD',
+            ),
+          ),
           ChangeNotifierProvider.value(value: accounts),
         ],
         child: MaterialApp(
@@ -653,7 +677,11 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider(
+            create: (_) => SettingsState(
+              localCurrencyDetector: () async => 'USD',
+            ),
+          ),
           ChangeNotifierProvider.value(value: accounts),
         ],
         child: const MyApp(),
@@ -692,7 +720,11 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider(
+            create: (_) => SettingsState(
+              localCurrencyDetector: () async => 'USD',
+            ),
+          ),
           ChangeNotifierProvider.value(value: accounts),
         ],
         child: const MyApp(),
@@ -741,7 +773,11 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider(
+            create: (_) => SettingsState(
+              localCurrencyDetector: () async => 'USD',
+            ),
+          ),
           ChangeNotifierProvider.value(value: accounts),
         ],
         child: const MaterialApp(home: Scaffold(body: ChartsPage())),

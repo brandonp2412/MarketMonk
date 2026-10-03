@@ -7,6 +7,7 @@ import 'package:market_monk/app_state_database.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/legacy_preferences_migration.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/sqlite_settings.dart';
 import 'package:market_monk/unified_database.dart';
@@ -25,24 +26,10 @@ Future<void> seedTestSqlite(Map<String, Object?> values) async {
   final profileData = UnifiedDatabase.connect(NativeDatabase.memory());
   _profileDataTestDatabase = profileData;
   setProfileDataDatabaseForTesting(profileData);
-  final accountNames = ((values['accounts'] as List?) ?? const ['Default'])
-      .cast<String>()
-      .toList();
-  if (!accountNames.contains('Default')) accountNames.insert(0, 'Default');
-  for (var index = 0; index < accountNames.length; index++) {
-    await profileData.upsertProfile(
-      id: 'test-profile-$index',
-      name: accountNames[index],
-      sortOrder: index,
-    );
-  }
-  final requestedActive = values['activeAccount'] as String?;
-  final activeIndex = accountNames.indexOf(requestedActive ?? 'Default');
-  await profileData.setActiveProfileId(
-    'test-profile-${activeIndex < 0 ? 0 : activeIndex}',
-  );
+  setMarketDataDatabaseForTesting(profileData);
   addTearDown(() async {
     setProfileDataDatabaseForTesting(null);
+    setMarketDataDatabaseForTesting(null);
     _profileDataTestDatabase = null;
     await profileData.close();
     await database.close();
@@ -60,6 +47,16 @@ Future<void> seedTestSqlite(Map<String, Object?> values) async {
     return SqliteSettings.load(database);
   }();
   await SqliteSettings.useInstance(loaded);
+
+  // Exercise the production upgrade path so fixtures populate unified
+  // profiles, account settings, caches and active identity consistently.
+  final bootstrapAccounts = AccountManager(
+    profileDatabaseFactory: (name) => Database.connect(
+      NativeDatabase(File('${directory.path}/$name.sqlite')),
+    ),
+    unifiedDatabase: profileData,
+  );
+  await bootstrapAccounts.init();
 }
 
 Future<void> ensureTestProfile(String name) async {
@@ -77,6 +74,29 @@ Future<void> ensureTestProfile(String name) async {
 }
 
 /// Uses independent file connections so reopening exercises persistence.
+Future<void> seedTestCandle({
+  required String symbol,
+  required DateTime date,
+  required double close,
+}) async {
+  final database = _profileDataTestDatabase;
+  if (database == null) {
+    throw StateError('seedTestSqlite must be called first');
+  }
+  await database.upsertCandle(
+    symbol: symbol,
+    date: DateTime(date.year, date.month, date.day),
+    open: close,
+    high: close,
+    low: close,
+    close: close,
+    volume: 0,
+    adjClose: close,
+  );
+}
+
+/// Uses independent file connections so reopening exercises persistence.
+
 AccountManager testAccountManager() => AccountManager(
       profileDatabaseFactory: (name) => Database.connect(
         NativeDatabase(File('${_profileDirectory!.path}/$name.sqlite')),

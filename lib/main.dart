@@ -762,6 +762,25 @@ class AccountManager extends ChangeNotifier {
 
     final prefs = await SqliteSettings.getInstance();
     await prefs.setProfiles(accounts, activeAccount);
+
+    // Legacy per-profile databases are migration sources only. Remove them
+    // after the unified schema validates so a failed cutover stays recoverable.
+    try {
+      await _unifiedDatabase.validateUnifiedSchema();
+      final directory = await getApplicationSupportDirectory();
+      final fileName = databaseFileNameForAccount(name);
+      for (final suffix in ['', '-wal', '-shm', '-journal']) {
+        final file = File('${directory.path}/$fileName$suffix');
+        if (await file.exists()) await file.delete();
+      }
+    } catch (error, stackTrace) {
+      talker.handle(
+        error,
+        stackTrace,
+        'Failed to remove obsolete legacy portfolio database',
+      );
+    }
+
     notifyListeners();
     talker.info('Deleted portfolio account');
   }

@@ -152,6 +152,10 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   Future<void> _loadPeriodThenPortfolios() async {
+    final settings = context.read<SettingsState>();
+    await settings.initialized;
+    if (!mounted) return;
+
     final prefs = await SqliteSettings.getInstance();
     final periodYears = prefs.getInt('chartPeriodYears') ?? 1;
     final periodMonths = prefs.getInt('chartPeriodMonths') ?? 0;

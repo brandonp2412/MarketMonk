@@ -11,6 +11,7 @@ import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
@@ -28,6 +29,11 @@ class _FailedCacheAccountManager extends AccountManager {
     double? netLiquidationUsd,
   }) async =>
       throw failure;
+}
+
+Future<void> _disposeTestApp(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump(const Duration(milliseconds: 1));
 }
 
 void main() {
@@ -52,7 +58,11 @@ void main() {
 
   Widget app(AccountManager accounts, HoldingsPage page) => MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider(
+            create: (_) => SettingsState(
+              localCurrencyDetector: () async => 'USD',
+            ),
+          ),
           ChangeNotifierProvider.value(value: accounts),
         ],
         child: MaterialApp(home: page),
@@ -100,9 +110,11 @@ void main() {
       lastBuyDate: DateTime(2026),
     );
     var fail = true;
+    final accounts = testAccountManager();
+    await accounts.init();
     await tester.pumpWidget(
       app(
-        testAccountManager(),
+        accounts,
         HoldingsPage(
           positionsLoader: (_) async {
             if (fail) throw failure;
@@ -146,12 +158,14 @@ void main() {
       reported.where((details) => !identical(details.exception, failure)),
       isEmpty,
     );
+    await _disposeTestApp(tester);
   });
 
   testWidgets('cache failure is reported but fetched holdings remain visible',
       (tester) async {
     await prepare(tester);
     final accounts = _FailedCacheAccountManager();
+    await accounts.init();
     final reported = <FlutterErrorDetails>[];
     final previousOnError = FlutterError.onError;
     FlutterError.onError = (details) {
@@ -163,8 +177,12 @@ void main() {
     };
     addTearDown(() => FlutterError.onError = previousOnError);
     cacheSymbolMeta('VTI', 'USD');
-    await db.trades.insertOne(
-      TradesCompanion.insert(
+    final profileId = await profileDataRepository.profileIdForName(
+      accounts.activeAccount,
+    );
+    await profileDataRepository.addTrade(
+      profileId,
+      ProfileTradeWrite(
         symbol: 'VTI',
         name: 'Vanguard',
         quantity: 2,
@@ -173,12 +191,10 @@ void main() {
         tradeDate: DateTime(2026),
       ),
     );
-    await db.candles.insertOne(
-      CandlesCompanion.insert(
-        symbol: 'VTI',
-        date: DateTime.now(),
-        close: const Value(120),
-      ),
+    await seedTestCandle(
+      symbol: 'VTI',
+      date: DateTime.now(),
+      close: 120,
     );
     await tester.pumpWidget(app(accounts, const HoldingsPage()));
     await tester.pump();
@@ -201,5 +217,6 @@ void main() {
       ),
       isEmpty,
     );
+    await _disposeTestApp(tester);
   });
 }

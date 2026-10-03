@@ -9,11 +9,21 @@ import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 import 'sqlite_test_support.dart';
 
+Future<void> _disposeTestApp(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump(const Duration(milliseconds: 1));
+}
+
 Future<void> _pumpApp(WidgetTester tester, AccountManager accounts) async {
+  await accounts.init();
   await tester.pumpWidget(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => SettingsState()),
+        ChangeNotifierProvider(
+          create: (_) => SettingsState(
+            localCurrencyDetector: () async => 'USD',
+          ),
+        ),
         ChangeNotifierProvider.value(value: accounts),
       ],
       child: const MyApp(),
@@ -42,21 +52,9 @@ void main() {
       final accounts = testAccountManager();
 
       final today = DateTime.now();
-      final yesterday = today.subtract(const Duration(days: 1));
-      await db.candles.insertOne(
-        CandlesCompanion.insert(
-          symbol: 'AAPL',
-          date: yesterday,
-          close: const Value(180.0),
-        ),
-      );
-      await db.candles.insertOne(
-        CandlesCompanion.insert(
-          symbol: 'AAPL',
-          date: today,
-          close: const Value(190.0),
-        ),
-      );
+      final oldest = today.subtract(defaultMarketCandleLookback);
+      await seedTestCandle(symbol: 'AAPL', date: oldest, close: 180);
+      await seedTestCandle(symbol: 'AAPL', date: today, close: 190);
 
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(800, 600);
@@ -90,6 +88,7 @@ void main() {
       await _pumpApp(tester, testAccountManager());
       expect(find.text('AAPL'), findsNothing);
 
+      await _disposeTestApp(tester);
       await db.close();
     },
   );
@@ -107,13 +106,13 @@ void main() {
       );
       final accounts = testAccountManager();
 
-      await db.candles.insertOne(
-        CandlesCompanion.insert(
-          symbol: 'MSFT',
-          date: DateTime.now(),
-          close: const Value(400.0),
-        ),
+      final today = DateTime.now();
+      await seedTestCandle(
+        symbol: 'MSFT',
+        date: today.subtract(defaultMarketCandleLookback),
+        close: 390,
       );
+      await seedTestCandle(symbol: 'MSFT', date: today, close: 400);
 
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(800, 600);
@@ -130,6 +129,7 @@ void main() {
       expect(prefs.getStringList('favoriteStocks'), ['MSFT']);
       expect(prefs.getString('favoriteStock'), null);
 
+      await _disposeTestApp(tester);
       await db.close();
     },
   );

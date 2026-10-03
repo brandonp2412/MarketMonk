@@ -11,6 +11,11 @@ import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 import 'sqlite_test_support.dart';
 
+Future<void> _disposeTestApp(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump(const Duration(milliseconds: 1));
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -47,7 +52,11 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider(
+            create: (_) => SettingsState(
+              localCurrencyDetector: () async => 'USD',
+            ),
+          ),
           ChangeNotifierProvider.value(value: accounts),
         ],
         child: MaterialApp(
@@ -84,6 +93,7 @@ void main() {
     await tester.pump();
 
     expect(tester.takeException(), null);
+    await _disposeTestApp(tester);
   });
 
   testWidgets('compact desktop holdings fits half-width content',
@@ -120,7 +130,11 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider(
+            create: (_) => SettingsState(
+              localCurrencyDetector: () async => 'USD',
+            ),
+          ),
           ChangeNotifierProvider.value(value: accounts),
         ],
         child: MaterialApp(
@@ -145,6 +159,7 @@ void main() {
     await tester.tap(find.text('Return'));
     await tester.pump();
     expect(tester.takeException(), null);
+    await _disposeTestApp(tester);
   });
 
   testWidgets('desktop holdings matches portfolio cash-out P/L',
@@ -211,7 +226,11 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider(
+            create: (_) => SettingsState(
+              localCurrencyDetector: () async => 'USD',
+            ),
+          ),
           ChangeNotifierProvider.value(value: accounts),
         ],
         child: MaterialApp(
@@ -223,6 +242,7 @@ void main() {
 
     expect(find.text(r'+$939.36'), findsOneWidget);
     expect(find.text(r'+$500.00'), findsOneWidget);
+    await _disposeTestApp(tester);
   });
 
   testWidgets('desktop holdings exposes account picker', (tester) async {
@@ -258,7 +278,11 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider(
+            create: (_) => SettingsState(
+              localCurrencyDetector: () async => 'USD',
+            ),
+          ),
           ChangeNotifierProvider.value(value: accounts),
         ],
         child: MaterialApp(
@@ -276,5 +300,6 @@ void main() {
     expect(accounts.activeAccount, 'Default');
     expect(find.text('Brokerage'), findsOneWidget);
     expect(find.byType(CheckedPopupMenuItem<String>), findsNWidgets(2));
+    await _disposeTestApp(tester);
   });
 }

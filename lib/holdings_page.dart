@@ -69,6 +69,7 @@ class HoldingsPageState extends State<HoldingsPage>
   int _lastIbkrRefreshVersion = -1;
   IbkrAccountConfig _lastIbkrConfig = const IbkrAccountConfig();
   final Map<(bool, bool), Future<void>> _preloadLoads = {};
+  bool _preloadFailed = false;
 
   bool _selecting = false;
   final Set<String> _selectedSymbols = {};
@@ -86,7 +87,10 @@ class HoldingsPageState extends State<HoldingsPage>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isActive == widget.isActive) return;
 
-    setState(() => _stream = _buildStream(skipInitial: widget.isActive));
+    setState(() {
+      _preloadFailed = false;
+      _stream = _buildStream(skipInitial: widget.isActive);
+    });
     if (widget.isActive) {
       runDetachedTask(_preload(), 'Failed to preload holdings');
     }
@@ -125,6 +129,7 @@ class HoldingsPageState extends State<HoldingsPage>
     _lastIbkrConfig = ibkrConfig;
     _lastIbkrRefreshVersion = refreshVersion;
     setState(() {
+      _preloadFailed = false;
       _stream = _buildStream(skipInitial: widget.isActive);
       _summaries = [];
     });
@@ -250,6 +255,7 @@ class HoldingsPageState extends State<HoldingsPage>
         final result = _summariesFromPositions(trades, cached.positions);
         if (mounted) {
           setState(() {
+            _preloadFailed = false;
             _summaries = result;
           });
         }
@@ -258,11 +264,15 @@ class HoldingsPageState extends State<HoldingsPage>
       final result = await _computeSummaries(trades);
       if (mounted && widget.isActive && accounts.activeAccount == accountName) {
         setState(() {
+          _preloadFailed = false;
           _summaries = result;
         });
       }
     } catch (error, stackTrace) {
       _reportError(error, stackTrace, 'preloading holdings');
+      if (mounted && widget.isActive) {
+        setState(() => _preloadFailed = true);
+      }
     }
   }
 
@@ -1314,7 +1324,7 @@ class HoldingsPageState extends State<HoldingsPage>
     BuildContext context,
     AsyncSnapshot<List<SymbolSummary>> snap,
   ) {
-    if (snap.hasError) {
+    if (snap.hasError || _preloadFailed) {
       return _refreshableState(
         Center(
           child: Column(
@@ -1452,7 +1462,10 @@ class HoldingsPageState extends State<HoldingsPage>
   }
 
   void _retryHoldings() {
-    setState(() => _stream = _buildStream(skipInitial: true));
+    setState(() {
+      _preloadFailed = false;
+      _stream = _buildStream(skipInitial: true);
+    });
     runDetachedTask(_preload(), 'Failed to retry holdings preload');
   }
 
