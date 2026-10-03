@@ -15,12 +15,14 @@ import 'package:market_monk/main.dart';
 import 'package:market_monk/portfolio_chart_scale.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
+import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 import 'package:market_monk/sqlite_settings.dart';
+import 'package:market_monk/unified_database.dart';
 
 enum _ChartMode { portfolio, searching, stock }
 
@@ -319,7 +321,7 @@ class ChartsPageState extends State<ChartsPage>
       );
     }
     final symbols = trades.map((trade) => trade.symbol).toSet().toList();
-    final prices = await fetchLatestPrices(symbols, database: accountDb);
+    final prices = await fetchLatestPrices(symbols);
     return _LoadedChartPortfolio(
       positions: computePositions(trades, prices),
       currentValue: null,
@@ -393,7 +395,6 @@ class ChartsPageState extends State<ChartsPage>
         if (!mounted || !widget.isActive) return;
         await syncCandles(
           symbol,
-          database: accountDatabase,
           ibkrConfig: ibkrConfig,
           syncNamespace: accountName,
           requiredFrom: _requiredCandleStart(),
@@ -501,7 +502,6 @@ class ChartsPageState extends State<ChartsPage>
           if (!mounted || !widget.isActive) return;
           await syncCandles(
             symbol,
-            database: accountDb,
             ibkrConfig: ibkrConfig,
             syncNamespace: accountName,
             requiredFrom: _requiredCandleStart(),
@@ -878,10 +878,11 @@ class ChartsPageState extends State<ChartsPage>
     final Map<String, Map<DateTime, double>> pricesBySymbol = {};
 
     for (final symbol in symbols) {
-      final rows = await (accountDb.candles.select()
+      final marketSymbol = canonicalMarketSymbol(symbol);
+      final rows = await (marketDataDatabase.unifiedCandles.select()
             ..where(
               (candle) =>
-                  candle.symbol.equals(symbol) &
+                  candle.symbol.equals(marketSymbol) &
                   candle.date.isBiggerThanValue(after),
             )
             ..orderBy([
@@ -1201,19 +1202,19 @@ class ChartsPageState extends State<ChartsPage>
     const weekExpression = CustomExpression<String>(
       "STRFTIME('%Y-%m-%W', DATE(\"date\", 'unixepoch', 'localtime'))",
     );
-    Iterable<Expression<Object>> groupBy = [db.candles.date];
+    Iterable<Expression<Object>> groupBy = [marketDataDatabase.unifiedCandles.date];
     if (years > 0 || months > 5) groupBy = [weekExpression];
 
     final capturedDays = days;
-    _stockStream = (db.selectOnly(db.candles)
-          ..addColumns([db.candles.date, db.candles.close])
+    _stockStream = (marketDataDatabase.selectOnly(marketDataDatabase.unifiedCandles)
+          ..addColumns([marketDataDatabase.unifiedCandles.date, marketDataDatabase.unifiedCandles.close])
           ..where(
-            db.candles.symbol.equals(marketSymbol) &
-                db.candles.date.isBiggerThanValue(after),
+            marketDataDatabase.unifiedCandles.symbol.equals(marketSymbol) &
+                marketDataDatabase.unifiedCandles.date.isBiggerThanValue(after),
           )
           ..orderBy([
             OrderingTerm(
-              expression: db.candles.date,
+              expression: marketDataDatabase.unifiedCandles.date,
               mode: OrderingMode.asc,
             ),
           ])
@@ -1224,8 +1225,8 @@ class ChartsPageState extends State<ChartsPage>
           .map(
             (result) => CandleTicker(
               candle: CandlesCompanion(
-                date: Value(result.read(db.candles.date)!),
-                close: Value(result.read(db.candles.close)!),
+                date: Value(result.read(marketDataDatabase.unifiedCandles.date)!),
+                close: Value(result.read(marketDataDatabase.unifiedCandles.close)!),
               ),
             ),
           )
@@ -1769,7 +1770,6 @@ class ChartsPageState extends State<ChartsPage>
             return Padding(
               padding: const EdgeInsets.only(right: 8),
               child: _FavoriteCard(
-                db: db,
                 symbol: symbol,
                 isActive: widget.isActive,
                 onTap: () => _selectFavorite(symbol),
@@ -2363,13 +2363,11 @@ class _ActionChip extends StatelessWidget {
 /// A small card showing a favorited symbol's latest price and day change,
 /// used in the favorites row on the portfolio landing view.
 class _FavoriteCard extends StatelessWidget {
-  final Database db;
   final String symbol;
   final bool isActive;
   final VoidCallback onTap;
 
   const _FavoriteCard({
-    required this.db,
     required this.symbol,
     required this.isActive,
     required this.onTap,
@@ -2379,7 +2377,7 @@ class _FavoriteCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final stream = isActive
-        ? (db.candles.select()
+        ? (marketDataDatabase.unifiedCandles.select()
               ..where((candle) => candle.symbol.equals(symbol))
               ..orderBy([
                 (candle) => OrderingTerm(
@@ -2389,7 +2387,7 @@ class _FavoriteCard extends StatelessWidget {
               ])
               ..limit(2))
             .watch()
-        : const Stream<List<Candle>>.empty();
+        : const Stream<List<UnifiedCandle>>.empty();
 
     return Container(
       width: 92,
@@ -2418,7 +2416,7 @@ class _FavoriteCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                StreamBuilder<List<Candle>>(
+                StreamBuilder<List<UnifiedCandle>>(
                   stream: stream,
                   builder: (context, snapshot) {
                     final candles = snapshot.data;

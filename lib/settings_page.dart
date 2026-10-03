@@ -13,6 +13,7 @@ import 'package:market_monk/csv_import.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
@@ -801,7 +802,8 @@ class _SettingsPageState extends State<SettingsPage> {
             );
             if (confirmed != true || !mounted) return;
             await db.delete(db.trades).go();
-            await db.delete(db.candles).go();
+            await marketDataDatabase.delete(marketDataDatabase.unifiedCandles).go();
+            clearAllSyncCache();
             if (!mounted) return;
             toast(context, context.l10n.text('All data deleted'));
           },
@@ -1261,7 +1263,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 );
                 if (confirmed != true || !context.mounted) return;
                 await db.delete(db.trades).go();
-                await db.delete(db.candles).go();
+                await marketDataDatabase.delete(marketDataDatabase.unifiedCandles).go();
+                clearAllSyncCache();
                 if (!context.mounted) return;
                 toast(context, context.l10n.text('All data deleted'));
               },

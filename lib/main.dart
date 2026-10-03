@@ -16,6 +16,7 @@ import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
+import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/legacy_preferences_migration.dart';
 import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/settings_page.dart';
@@ -35,6 +36,7 @@ Future<void> main() async {
       talker.info('Starting Market Monk');
 
       await SqliteSettings.getInstance();
+      await migrateLegacyMarketDataOnStartup(defaultDatabase: db);
       final settings = SettingsState();
       final accounts = AccountManager();
       await Future.wait([settings.initialized, accounts.init()]);

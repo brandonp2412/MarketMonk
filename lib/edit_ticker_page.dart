@@ -11,6 +11,7 @@ import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
+import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
 
@@ -86,18 +87,18 @@ class _EditTickerPageState extends State<EditTickerPage> {
     const weekExpression = CustomExpression<String>(
       "STRFTIME('%Y-%m-%W', DATE(\"date\", 'unixepoch', 'localtime'))",
     );
-    Iterable<Expression<Object>> groupBy = [db.candles.date];
+    Iterable<Expression<Object>> groupBy = [marketDataDatabase.unifiedCandles.date];
     if (years > 0 || months > 5) groupBy = [weekExpression];
 
-    stream = (db.selectOnly(db.candles)
-          ..addColumns([db.candles.date, db.candles.close])
+    stream = (marketDataDatabase.selectOnly(marketDataDatabase.unifiedCandles)
+          ..addColumns([marketDataDatabase.unifiedCandles.date, marketDataDatabase.unifiedCandles.close])
           ..where(
-            db.candles.symbol.equals(marketSymbol) &
-                db.candles.date.isBiggerOrEqualValue(after),
+            marketDataDatabase.unifiedCandles.symbol.equals(marketSymbol) &
+                marketDataDatabase.unifiedCandles.date.isBiggerOrEqualValue(after),
           )
           ..orderBy([
             OrderingTerm(
-              expression: db.candles.date,
+              expression: marketDataDatabase.unifiedCandles.date,
               mode: OrderingMode.asc,
             ),
           ])
@@ -108,8 +109,8 @@ class _EditTickerPageState extends State<EditTickerPage> {
               .map(
                 (result) => CandleTicker(
                   candle: CandlesCompanion(
-                    date: Value(result.read(db.candles.date)!),
-                    close: Value(result.read(db.candles.close)!),
+                    date: Value(result.read(marketDataDatabase.unifiedCandles.date)!),
+                    close: Value(result.read(marketDataDatabase.unifiedCandles.close)!),
                   ),
                 ),
               )

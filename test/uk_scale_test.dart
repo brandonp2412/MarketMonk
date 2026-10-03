@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:market_monk/database.dart';
+import 'package:market_monk/unified_database.dart';
 import 'package:market_monk/utils.dart';
 import 'package:test/test.dart';
 
@@ -78,6 +79,8 @@ void main() {
       cacheSymbolMeta('AZN.L', 'GBp');
       final testDb = Database.connect(NativeDatabase.memory());
       addTearDown(testDb.close);
+      final marketDb = UnifiedDatabase.connect(NativeDatabase.memory());
+      addTearDown(marketDb.close);
 
       await testDb.trades.insertOne(
         TradesCompanion.insert(
@@ -89,8 +92,8 @@ void main() {
           tradeDate: DateTime(2025, 3, 1),
         ),
       );
-      await testDb.candles.insertOne(
-        CandlesCompanion.insert(
+      await marketDb.unifiedCandles.insertOne(
+        UnifiedCandlesCompanion.insert(
           symbol: 'AZN.L',
           date: DateTime(2025, 3, 10),
           close: const Value(3400.0),
@@ -98,7 +101,7 @@ void main() {
       );
 
       final trades = await testDb.trades.select().get();
-      final prices = await fetchLatestPrices(['AZN.L'], database: testDb);
+      final prices = await fetchLatestPrices(['AZN.L'], database: marketDb);
       expect(prices['AZN.L'], closeTo(3400.0, 0.0001));
 
       final p = computePositions(trades, prices).single;

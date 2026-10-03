@@ -8,9 +8,10 @@ import 'package:intl/intl.dart';
 import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
-import 'package:market_monk/main.dart';
 import 'package:market_monk/logging.dart';
+import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/sqlite_settings.dart';
+import 'package:market_monk/unified_database.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
 
 var currency = NumberFormat.simpleCurrency();
@@ -396,13 +397,19 @@ List<Position> computePositions(
 /// one row per symbol instead of all historical candles.
 Future<Map<String, double>> fetchLatestPrices(
   List<String> symbols, {
-  Database? database,
+  UnifiedDatabase? database,
 }) async {
   if (symbols.isEmpty) return {};
-  final targetDatabase = database ?? db;
+  final targetDatabase = database ?? marketDataDatabase;
+  final canonicalSymbols = symbols
+      .map(canonicalMarketSymbol)
+      .where((symbol) => symbol.isNotEmpty)
+      .toSet()
+      .toList();
+  if (canonicalSymbols.isEmpty) return {};
 
   await Future.wait(
-    symbols.map((symbol) async {
+    canonicalSymbols.map((symbol) async {
       await fetchSymbolCurrencyAndRate(symbol);
       final nativeCurrency = _symbolCurrencies[symbol];
       if (nativeCurrency == null || nativeCurrency.isEmpty) {
@@ -412,7 +419,7 @@ Future<Map<String, double>> fetchLatestPrices(
     }),
   );
 
-  final placeholders = List.filled(symbols.length, '?').join(', ');
+  final placeholders = List.filled(canonicalSymbols.length, '?').join(', ');
   try {
     final rows = await targetDatabase.customSelect(
       'SELECT candle.symbol, candle.close '
@@ -423,8 +430,10 @@ Future<Map<String, double>> fetchLatestPrices(
       ') latest ON candle.symbol = latest.symbol '
       'AND candle.date = latest.max_date '
       'WHERE candle.close > 0',
-      variables: [for (final symbol in symbols) Variable(symbol)],
-      readsFrom: {targetDatabase.candles},
+      variables: [
+        for (final symbol in canonicalSymbols) Variable(symbol),
+      ],
+      readsFrom: {targetDatabase.unifiedCandles},
     ).get();
 
     return {
@@ -439,8 +448,8 @@ Future<Map<String, double>> fetchLatestPrices(
       'Latest-price query failed; using fallback',
     );
     final prices = <String, double>{};
-    for (final symbol in symbols) {
-      final candle = await (targetDatabase.candles.select()
+    for (final symbol in canonicalSymbols) {
+      final candle = await (targetDatabase.unifiedCandles.select()
             ..where((row) => row.symbol.equals(symbol))
             ..orderBy([
               (row) => OrderingTerm(
@@ -494,10 +503,10 @@ int _ibkrYearsForRange(DateTime from, DateTime through) {
 Future<int> insertCandles(
   List<YahooFinanceCandleData> dataList,
   String symbol, {
-  Database? database,
+  UnifiedDatabase? database,
 }) async {
   const batchSize = 1000;
-  final targetDatabase = database ?? db;
+  final targetDatabase = database ?? marketDataDatabase;
   final canonicalSymbol = canonicalMarketSymbol(symbol);
   final byDay = <int, YahooFinanceCandleData>{};
 
@@ -512,7 +521,7 @@ Future<int> insertCandles(
 
   for (var offset = 0; offset < normalized.length; offset += batchSize) {
     final candleBatch = normalized.skip(offset).take(batchSize).map((data) {
-      return CandlesCompanion.insert(
+      return UnifiedCandlesCompanion.insert(
         date: data.date,
         symbol: canonicalSymbol,
         open: Value(data.open),
@@ -526,7 +535,7 @@ Future<int> insertCandles(
 
     await targetDatabase.batch((batchBuilder) {
       batchBuilder.insertAll(
-        targetDatabase.candles,
+        targetDatabase.unifiedCandles,
         candleBatch,
         mode: InsertMode.insertOrReplace,
       );
@@ -543,14 +552,13 @@ Future<int> insertCandles(
   return normalized.length;
 }
 
-/// Stores daily IBKR bars in the same candle cache used by chart rendering.
 Future<int> insertIbkrCandles(
   List<IbkrHistoricalCandle> dataList,
   String symbol, {
-  Database? database,
+  UnifiedDatabase? database,
 }) async {
   const batchSize = 1000;
-  final targetDatabase = database ?? db;
+  final targetDatabase = database ?? marketDataDatabase;
   final canonicalSymbol = canonicalMarketSymbol(symbol);
   final byDay = <int, IbkrHistoricalCandle>{};
 
@@ -572,7 +580,7 @@ Future<int> insertIbkrCandles(
 
   for (var offset = 0; offset < normalized.length; offset += batchSize) {
     final candleBatch = normalized.skip(offset).take(batchSize).map((data) {
-      return CandlesCompanion.insert(
+      return UnifiedCandlesCompanion.insert(
         date: data.date,
         symbol: canonicalSymbol,
         open: Value(data.open),
@@ -586,7 +594,7 @@ Future<int> insertIbkrCandles(
 
     await targetDatabase.batch((batchBuilder) {
       batchBuilder.insertAll(
-        targetDatabase.candles,
+        targetDatabase.unifiedCandles,
         candleBatch,
         mode: InsertMode.insertOrReplace,
       );
@@ -603,12 +611,13 @@ Future<int> insertIbkrCandles(
   return normalized.length;
 }
 
-Future<Candle?> findClosestDate(DateTime date, String symbol) {
+Future<UnifiedCandle?> findClosestDate(DateTime date, String symbol) {
   final canonicalSymbol = canonicalMarketSymbol(symbol);
   final dateOnly = canonicalMarketDay(date);
   final timestamp = dateOnly.millisecondsSinceEpoch / 1000;
+  final targetDatabase = marketDataDatabase;
 
-  return (db.candles.select()
+  return (targetDatabase.unifiedCandles.select()
         ..where((candle) => candle.symbol.equals(canonicalSymbol))
         ..orderBy([
           (candle) =>
@@ -618,9 +627,10 @@ Future<Candle?> findClosestDate(DateTime date, String symbol) {
       .getSingleOrNull();
 }
 
-Future<Candle?> findClosestPrice(double price, String symbol) {
+Future<UnifiedCandle?> findClosestPrice(double price, String symbol) {
   final canonicalSymbol = canonicalMarketSymbol(symbol);
-  return (db.candles.select()
+  final targetDatabase = marketDataDatabase;
+  return (targetDatabase.unifiedCandles.select()
         ..where((candle) => candle.symbol.equals(canonicalSymbol))
         ..orderBy([
           (candle) => OrderingTerm.asc(CustomExpression('ABS(close - $price)')),
@@ -639,14 +649,14 @@ double safePercentChange(double oldValue, double newValue) {
 // the same symbol is requested multiple times in one app session.
 // Resets automatically when the calendar day changes.
 // ---------------------------------------------------------------------------
-/// Removes [symbol] from the sync guard for all databases so the next
+/// Removes [symbol] from the global market-data sync guard so the next
 /// [syncCandles] call will actually re-check (used by pull-to-refresh).
 void clearSyncCache(String symbol) {
   final canonicalSymbol = canonicalMarketSymbol(symbol);
   backgroundNetworkCoordinator.clearFreshness(
     'market.candles',
     where: (key) =>
-        key is (int, String, int, bool) && key.$2 == canonicalSymbol,
+        key is (String, int, bool) && key.$1 == canonicalSymbol,
   );
 }
 
@@ -665,7 +675,7 @@ DateTime _latestExpectedMarketDay(DateTime today) {
 
 Future<bool> _syncIbkrCandlesIfAvailable(
   String symbol, {
-  required Database targetDatabase,
+  required UnifiedDatabase targetDatabase,
   required IbkrAccountConfig? ibkrConfig,
   required DateTime requestFrom,
   required DateTime expectedMarketDay,
@@ -686,8 +696,11 @@ Future<bool> _syncIbkrCandlesIfAvailable(
     }
 
     final normalizedCurrency = cacheSymbolMeta(symbol, history.currency);
-    final prefs = await SqliteSettings.getInstance();
-    await prefs.setString('symbolRawCurrency_$symbol', history.currency);
+    await upsertSymbolCurrencyMetadata(
+      symbol,
+      history.currency,
+      database: targetDatabase,
+    );
     if (normalizedCurrency != 'USD' &&
         !allRatesFromUsd.containsKey(normalizedCurrency)) {
       await _fetchAndCacheRate(normalizedCurrency);
@@ -729,7 +742,7 @@ Future<bool> _syncIbkrCandlesIfAvailable(
 
 Future<void> syncCandles(
   String symbol, {
-  Database? database,
+  UnifiedDatabase? database,
   IbkrAccountConfig? ibkrConfig,
   String syncNamespace = 'Default',
   DateTime? requiredFrom,
@@ -737,7 +750,7 @@ Future<void> syncCandles(
   YahooCandleFetcher? yahooFetcher,
   IbkrCandleFetcher? ibkrFetcher,
 }) async {
-  final targetDatabase = database ?? db;
+  final targetDatabase = database ?? marketDataDatabase;
   final canonicalSymbol = canonicalMarketSymbol(symbol);
   final now = DateTime.now();
   final today = canonicalMarketDay(now);
@@ -748,14 +761,13 @@ Future<void> syncCandles(
     expectedMarketDay,
   );
   final guardKey = (
-    targetDatabase.hashCode,
     canonicalSymbol,
     requiredStart.millisecondsSinceEpoch,
     forceRefresh,
   );
 
-  Future<void> performSync() => targetDatabase.runWhileOpen(() async {
-        final oldest = await (targetDatabase.candles.select()
+  Future<void> performSync() async {
+        final oldest = await (targetDatabase.unifiedCandles.select()
               ..where((row) => row.symbol.equals(canonicalSymbol))
               ..orderBy([
                 (row) =>
@@ -763,7 +775,7 @@ Future<void> syncCandles(
               ])
               ..limit(1))
             .getSingleOrNull();
-        final latest = await (targetDatabase.candles.select()
+        final latest = await (targetDatabase.unifiedCandles.select()
               ..where((row) => row.symbol.equals(canonicalSymbol))
               ..orderBy([
                 (row) =>
@@ -828,7 +840,7 @@ Future<void> syncCandles(
           'Completed Yahoo candle sync for $canonicalSymbol: $stored rows '
           'from ${requestFrom.toIso8601String()}',
         );
-      });
+  }
 
   try {
     if (forceRefresh) {
@@ -855,15 +867,18 @@ Future<void> syncCandles(
 /// then — only if that currency differs from USD — lazily fetches its USD-based
 /// exchange rate from Frankfurter and stores it in [allRatesFromUsd].
 ///
-/// Results are cached in-memory and in SqliteSettings, so repeat calls are
+/// Results are cached in-memory and in the unified symbol metadata table, so repeat calls are
 /// free and cent-quoted stocks (GBp/ZAc) keep the right scale offline.
 Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
-  if (_symbolCurrencies.containsKey(symbol)) return;
+  final canonicalSymbol = canonicalMarketSymbol(symbol);
+  if (_symbolCurrencies.containsKey(canonicalSymbol)) return;
 
+  final metadata =
+      await marketDataDatabase.readSymbolMetadata(canonicalSymbol);
+  final savedRaw = rawCurrencyFromMetadata(metadata);
   final prefs = await SqliteSettings.getInstance();
-  final savedRaw = prefs.getString('symbolRawCurrency_$symbol');
-  if (savedRaw != null) {
-    final normalized = cacheSymbolMeta(symbol, savedRaw);
+  if (savedRaw != null && savedRaw.isNotEmpty) {
+    final normalized = cacheSymbolMeta(canonicalSymbol, savedRaw);
     if (normalized != 'USD' && !allRatesFromUsd.containsKey(normalized)) {
       final savedRate = prefs.getDouble('exchangeRate_$normalized');
       if (savedRate != null) {
@@ -881,7 +896,7 @@ Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
 
   try {
     final uri = Uri.parse(
-      'https://query1.finance.yahoo.com/v8/finance/chart/$symbol'
+      'https://query1.finance.yahoo.com/v8/finance/chart/$canonicalSymbol'
       '?interval=1d&range=1d',
     );
     final response = await http.get(uri);
@@ -895,15 +910,14 @@ Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
         (result?['meta'] as Map<String, dynamic>?)?['currency'] as String?;
     if (rawCurr == null || rawCurr.isEmpty) return;
 
-    final normalizedCurr = cacheSymbolMeta(symbol, rawCurr);
-    await prefs.setString('symbolRawCurrency_$symbol', rawCurr);
+    final normalizedCurr = cacheSymbolMeta(canonicalSymbol, rawCurr);
+    await upsertSymbolCurrencyMetadata(canonicalSymbol, rawCurr);
 
     if (!allRatesFromUsd.containsKey(normalizedCurr) &&
         normalizedCurr != 'USD') {
       await _fetchAndCacheRate(normalizedCurr);
     }
   } catch (error, stackTrace) {
-    // Positions fall back to treating native as USD.
     talker.handle(
       error,
       stackTrace,
