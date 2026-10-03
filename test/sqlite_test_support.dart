@@ -31,7 +31,7 @@ Future<void> seedTestSqlite(Map<String, Object?> values) async {
   if (!accountNames.contains('Default')) accountNames.insert(0, 'Default');
   for (var index = 0; index < accountNames.length; index++) {
     await profileData.upsertProfile(
-      id: 'test-profile-' + index.toString(),
+      id: 'test-profile-$index',
       name: accountNames[index],
       sortOrder: index,
     );
@@ -39,7 +39,7 @@ Future<void> seedTestSqlite(Map<String, Object?> values) async {
   final requestedActive = values['activeAccount'] as String?;
   final activeIndex = accountNames.indexOf(requestedActive ?? 'Default');
   await profileData.setActiveProfileId(
-    'test-profile-' + (activeIndex < 0 ? 0 : activeIndex).toString(),
+    'test-profile-${activeIndex < 0 ? 0 : activeIndex}',
   );
   addTearDown(() async {
     setProfileDataDatabaseForTesting(null);
