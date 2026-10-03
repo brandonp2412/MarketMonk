@@ -237,7 +237,9 @@ class AccountManager extends ChangeNotifier {
             _ibkrPerformanceCache.putIfAbsent(
               account,
               () => {},
-            )[entry.cacheKey] = CachedIbkrPerformanceData.fromJson(value);
+            )[entry.cacheKey] = CachedIbkrPerformanceData.fromJson(
+              value,
+            );
           }
         } catch (error, stack) {
           talker.handle(error, stack, 'Skipped malformed SQLite IBKR cache');
@@ -522,26 +524,33 @@ class AccountManager extends ChangeNotifier {
       _serializeStorage(() => _exportBackup(workingDirectory));
 
   Future<File> _exportBackup(Directory workingDirectory) async {
-    final snapshotDirectory =
-        await workingDirectory.createTemp('sqlite-snapshot-');
+    final snapshotDirectory = await workingDirectory.createTemp(
+      'sqlite-snapshot-',
+    );
     final prefs = await SqliteSettings.getInstance();
     await prefs.flush();
     try {
+      final profileDatabases = <String, File>{};
       for (final account in accounts) {
-        final target =
-            p.join(snapshotDirectory.path, databaseFileNameForAccount(account));
+        final target = p.join(
+          snapshotDirectory.path,
+          databaseFileNameForAccount(account),
+        );
         await _withProfileDatabase(account, (database) async {
           // VACUUM INTO includes committed WAL pages in a consistent snapshot.
           // https://www.sqlite.org/lang_vacuum.html#vacuum_with_an_into_clause
           await database.customStatement('VACUUM INTO ?', [target]);
         });
+        profileDatabases[account] = File(target);
       }
       return await buildMarketMonkBackupArchive(
-        databaseDirectory: snapshotDirectory,
         workingDirectory: workingDirectory,
-        accounts: accounts,
-        activeAccount: activeAccount,
-        settings: prefs.snapshot(),
+        logical: MarketMonkLogicalBackup(
+          profiles: List<String>.of(accounts),
+          activeProfile: activeAccount,
+          settings: prefs.snapshot(),
+        ),
+        storage: MarketMonkBackupStorage.profileDatabases(profileDatabases),
       );
     } finally {
       await snapshotDirectory.delete(recursive: true);
@@ -554,15 +563,17 @@ class AccountManager extends ChangeNotifier {
 
   Future<void> _importBackup(File sourceFile) async {
     final temporaryDirectory = await getTemporaryDirectory();
-    final workingDirectory =
-        await temporaryDirectory.createTemp('market-monk-restore-');
+    final workingDirectory = await temporaryDirectory.createTemp(
+      'market-monk-restore-',
+    );
     try {
       final restored = await extractMarketMonkBackupArchive(
         archiveFile: sourceFile,
         workingDirectory: workingDirectory,
       );
-      final rollbackDirectory =
-          Directory(p.join(workingDirectory.path, 'rollback'));
+      final rollbackDirectory = Directory(
+        p.join(workingDirectory.path, 'rollback'),
+      );
       final databaseDirectory = await getApplicationSupportDirectory();
       final prefs = await SqliteSettings.getInstance();
       await _applyRestoredBackup(
@@ -590,6 +601,15 @@ class AccountManager extends ChangeNotifier {
     required List<String> previousAccounts,
     required String previousActiveAccount,
   }) async {
+    if (restored.storage.layout !=
+        MarketMonkBackupStorageLayout.profileDatabases) {
+      throw UnsupportedError(
+        'This Market Monk build cannot apply a unified-database backup yet',
+      );
+    }
+
+    final logical = restored.logical;
+    final profileDatabases = restored.storage.profileDatabases;
     await rollbackDirectory.create();
     final existingFiles = _marketMonkDatabaseFiles(databaseDirectory);
     await db.close();
@@ -597,31 +617,26 @@ class AccountManager extends ChangeNotifier {
 
     try {
       for (final file in existingFiles) {
-        await file.copy(
-          p.join(rollbackDirectory.path, p.basename(file.path)),
-        );
+        await file.copy(p.join(rollbackDirectory.path, p.basename(file.path)));
       }
       replacementStarted = true;
       for (final file in existingFiles) {
         if (await file.exists()) await file.delete();
       }
-      for (final entry in restored.databases.entries) {
+      for (final entry in profileDatabases.entries) {
         final target = File(
-          p.join(
-            databaseDirectory.path,
-            databaseFileNameForAccount(entry.key),
-          ),
+          p.join(databaseDirectory.path, databaseFileNameForAccount(entry.key)),
         );
         await entry.value.copy(target.path);
       }
 
       await prefs.restore(
-        restored.settings,
-        restored.accounts,
-        restored.activeAccount,
+        logical.settings,
+        logical.profiles,
+        logical.activeProfile,
       );
       await seedSqliteFromLegacyValues(
-        values: {...restored.settings, 'accounts': restored.accounts},
+        values: {...logical.settings, 'accounts': logical.profiles},
         appState: prefs.database,
         profileDatabaseFactory: _profileDatabaseFactory,
       );
@@ -634,10 +649,7 @@ class AccountManager extends ChangeNotifier {
     } catch (error, stackTrace) {
       await _closeCurrentDatabaseQuietly();
       if (replacementStarted) {
-        await _restoreRollbackDatabases(
-          rollbackDirectory,
-          databaseDirectory,
-        );
+        await _restoreRollbackDatabases(rollbackDirectory, databaseDirectory);
       }
       await prefs.restore(
         previousPreferences,
@@ -646,11 +658,7 @@ class AccountManager extends ChangeNotifier {
       );
       db = Database();
       await init();
-      talker.handle(
-        error,
-        stackTrace,
-        'Failed to restore Market Monk backup',
-      );
+      talker.handle(error, stackTrace, 'Failed to restore Market Monk backup');
       rethrow;
     }
   }

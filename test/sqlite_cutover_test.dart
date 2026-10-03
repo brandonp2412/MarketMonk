@@ -422,6 +422,13 @@ void main() {
         tradeDate: DateTime(2026),
       ),
     );
+    await writer.candles.insertOne(
+      CandlesCompanion.insert(
+        symbol: 'VTI',
+        date: DateTime(2026, 1, 2),
+        close: const Value(101),
+      ),
+    );
     final exportDirectory = await directory.createTemp('export-');
     final backup = await manager.exportBackup(exportDirectory);
     await writer.close();
@@ -433,6 +440,10 @@ void main() {
     expect(manager.portfolioCacheFor('Brokerage')!.netLiquidationUsd, 987);
     final restored = profile('Brokerage');
     expect((await restored.select(restored.trades).get()).single.symbol, 'VTI');
+    final restoredCandles = await restored.select(restored.candles).get();
+    expect(restoredCandles, hasLength(1));
+    expect(restoredCandles.single.symbol, 'VTI');
+    expect(restoredCandles.single.close, 101);
     await restored.close();
     expect(await appState.readSetting(sqliteMigrationCompleteKey), true);
     expect((await SharedPreferences.getInstance()).getKeys(), isEmpty);
@@ -489,21 +500,51 @@ void main() {
         token: 'original',
       ),
     );
+    await manager.cachePortfolio(
+      'Default',
+      [],
+      null,
+      netLiquidationUsd: 321,
+    );
+    await db.trades.insertOne(
+      TradesCompanion.insert(
+        symbol: 'KEEP',
+        name: 'Keep',
+        quantity: 1,
+        price: 42,
+        tradeType: 'open',
+        tradeDate: DateTime(2026, 10, 3),
+      ),
+    );
+    await db.candles.insertOne(
+      CandlesCompanion.insert(
+        symbol: 'KEEP',
+        date: DateTime(2026, 10, 3),
+        close: const Value(43),
+      ),
+    );
     final source = await directory.createTemp('invalid-');
     final corrupt = File('${source.path}/market-monk.sqlite');
     await corrupt.writeAsBytes(
       [...utf8.encode('SQLite format 3\u0000'), ...List.filled(100, 0)],
     );
     final archive = await buildMarketMonkBackupArchive(
-      databaseDirectory: source,
       workingDirectory: source,
-      accounts: ['Default'],
-      activeAccount: 'Default',
-      settings: {'languageCode': 'de'},
+      logical: const MarketMonkLogicalBackup(
+        profiles: ['Default'],
+        activeProfile: 'Default',
+        settings: {'languageCode': 'de'},
+      ),
+      storage: MarketMonkBackupStorage.profileDatabases({
+        'Default': corrupt,
+      }),
     );
     await expectLater(manager.importBackup(archive), throwsA(anything));
     expect(settings.getString('languageCode'), 'fr');
     expect(manager.ibkrConfigFor().token, 'original');
+    expect(manager.portfolioCacheFor()!.netLiquidationUsd, 321);
+    expect((await db.select(db.trades).get()).single.symbol, 'KEEP');
+    expect((await db.select(db.candles).get()).single.symbol, 'KEEP');
     expect(await appState.readSetting('languageCode'), 'fr');
   });
 }
