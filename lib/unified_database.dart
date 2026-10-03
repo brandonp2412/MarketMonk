@@ -6,6 +6,9 @@ import 'package:drift_flutter/drift_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'unified_legacy_source.dart';
+import 'unified_legacy_source_stub.dart'
+    if (dart.library.io) 'unified_legacy_source_io.dart' as legacy_source;
 import 'unified_tables.dart';
 
 part 'unified_database.g.dart';
@@ -24,11 +27,19 @@ part 'unified_database.g.dart';
 )
 class UnifiedDatabase extends _$UnifiedDatabase {
   static const databaseName = 'market-monk.unified';
+  static const legacyMigrationCompleteKey = 'unifiedLegacyMigrationV1Complete';
   static const _appStateRowId = 1;
 
-  UnifiedDatabase() : super(_openConnection());
+  final Future<LegacyUnifiedSnapshot?> Function()? _legacySnapshotLoader;
 
-  UnifiedDatabase.connect(super.executor);
+  UnifiedDatabase()
+      : _legacySnapshotLoader = legacy_source.loadLegacyUnifiedSnapshot,
+        super(_openConnection());
+
+  UnifiedDatabase.connect(
+    super.executor, {
+    Future<LegacyUnifiedSnapshot?> Function()? legacySnapshotLoader,
+  }) : _legacySnapshotLoader = legacySnapshotLoader;
 
   @override
   int get schemaVersion => 1;
@@ -45,9 +56,196 @@ class UnifiedDatabase extends _$UnifiedDatabase {
   MigrationStrategy get migration => MigrationStrategy(
         beforeOpen: (_) async {
           await customStatement('PRAGMA foreign_keys = ON');
+          final loader = _legacySnapshotLoader;
+          if (loader != null) {
+            await migrateLegacyDatabases(snapshotLoader: loader);
+          }
           if (kDebugMode) await validateDatabaseSchema();
         },
       );
+
+  Future<void> migrateLegacyDatabases({
+    required Future<LegacyUnifiedSnapshot?> Function() snapshotLoader,
+  }) async {
+    if (await readSetting(legacyMigrationCompleteKey) == true) return;
+    final snapshot = await snapshotLoader();
+    await migrateLegacySnapshot(snapshot);
+  }
+
+  Future<void> migrateLegacySnapshot(LegacyUnifiedSnapshot? snapshot) async {
+    final source = snapshot ??
+        const LegacyUnifiedSnapshot(
+          settings: {},
+          profiles: [LegacyProfileSnapshot(name: 'Default')],
+          activeProfileName: 'Default',
+        );
+
+    await transaction(() async {
+      if (await readSetting(legacyMigrationCompleteKey) == true) return;
+
+      await _clearIncompleteLegacyMigration();
+
+      final profileIds = <String, String>{};
+      for (var index = 0; index < source.profiles.length; index++) {
+        final profile = source.profiles[index];
+        final profileId = 'legacy-profile-${index + 1}';
+        profileIds[profile.name] = profileId;
+        await upsertProfile(
+          id: profileId,
+          name: profile.name,
+          sortOrder: index,
+        );
+      }
+
+      if (profileIds.isEmpty) {
+        profileIds['Default'] = 'legacy-profile-1';
+        await upsertProfile(
+          id: 'legacy-profile-1',
+          name: 'Default',
+          sortOrder: 0,
+        );
+      }
+
+      final activeProfileId = profileIds[source.activeProfileName] ??
+          profileIds['Default'] ??
+          profileIds.values.first;
+      await setActiveProfileId(activeProfileId);
+
+      for (final setting in source.settings.entries) {
+        if (setting.key == legacyMigrationCompleteKey ||
+            setting.key == 'activeProfile') {
+          continue;
+        }
+        await writeSetting(setting.key, setting.value);
+      }
+
+      final bestCandles = <String, LegacyCandleSnapshot>{};
+      for (final profile in source.profiles) {
+        final profileId = profileIds[profile.name];
+        if (profileId == null) continue;
+
+        for (final trade in profile.trades) {
+          await addTrade(
+            profileId: profileId,
+            symbol: trade.symbol,
+            name: trade.name,
+            quantity: trade.quantity,
+            price: trade.price,
+            tradeType: trade.tradeType,
+            tradeDate: trade.tradeDate,
+            realizedPL: trade.realizedPL,
+            commission: trade.commission,
+          );
+        }
+
+        final ibkrSettings = profile.ibkrSettings;
+        if (ibkrSettings != null) {
+          await writeIbkrSettings(
+            profileId: profileId,
+            enabled: ibkrSettings.enabled,
+            baseUrl: ibkrSettings.baseUrl,
+            token: ibkrSettings.token,
+          );
+        }
+
+        for (final entry in profile.ibkrCacheEntries) {
+          await writeIbkrCache(
+            profileId: profileId,
+            kind: entry.kind,
+            cacheKey: entry.cacheKey,
+            payloadJson: entry.payloadJson,
+            cachedAt: entry.cachedAt,
+          );
+        }
+
+        for (final candle in profile.candles) {
+          final canonical = _canonicalizeLegacyCandle(candle);
+          final key =
+              '${canonical.symbol}\u0000${canonical.date.microsecondsSinceEpoch}';
+          final current = bestCandles[key];
+          if (current == null || _isBetterCandle(canonical, current)) {
+            bestCandles[key] = canonical;
+          }
+        }
+      }
+
+      for (final candle in bestCandles.values) {
+        await upsertCandle(
+          symbol: candle.symbol,
+          date: candle.date,
+          open: candle.open,
+          high: candle.high,
+          low: candle.low,
+          close: candle.close,
+          volume: candle.volume,
+          adjClose: candle.adjClose,
+        );
+      }
+
+      await writeSetting(legacyMigrationCompleteKey, true);
+    });
+  }
+
+  Future<void> _clearIncompleteLegacyMigration() async {
+    await delete(unifiedIbkrCacheEntries).go();
+    await delete(unifiedIbkrSettings).go();
+    await delete(unifiedTrades).go();
+    await delete(unifiedAppState).go();
+    await delete(unifiedProfiles).go();
+    await delete(unifiedAppSettings).go();
+    await delete(unifiedCandles).go();
+    await delete(unifiedSymbolMetadata).go();
+  }
+
+  LegacyCandleSnapshot _canonicalizeLegacyCandle(
+    LegacyCandleSnapshot candle,
+  ) {
+    final utc = candle.date.toUtc();
+    return LegacyCandleSnapshot(
+      symbol: candle.symbol.trim().toUpperCase(),
+      date: DateTime.utc(utc.year, utc.month, utc.day),
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+      volume: candle.volume,
+      adjClose: candle.adjClose,
+    );
+  }
+
+  bool _isBetterCandle(
+    LegacyCandleSnapshot candidate,
+    LegacyCandleSnapshot current,
+  ) {
+    final candidateQuality = _candleQuality(candidate);
+    final currentQuality = _candleQuality(current);
+    if (candidateQuality != currentQuality) {
+      return candidateQuality > currentQuality;
+    }
+    return candidate.volume > current.volume;
+  }
+
+  int _candleQuality(LegacyCandleSnapshot candle) {
+    final prices = [
+      candle.open,
+      candle.high,
+      candle.low,
+      candle.close,
+      candle.adjClose,
+    ];
+    var score =
+        prices.where((value) => value.isFinite && value >= 0).length * 10;
+    if (candle.volume > 0) score += 2;
+    if (candle.open >= 0 &&
+        candle.high >= candle.open &&
+        candle.high >= candle.close &&
+        candle.low >= 0 &&
+        candle.low <= candle.open &&
+        candle.low <= candle.close) {
+      score += 5;
+    }
+    return score;
+  }
 
   Future<List<UnifiedProfile>> readProfiles() => (select(unifiedProfiles)
         ..orderBy([
