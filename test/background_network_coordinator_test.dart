@@ -59,4 +59,38 @@ void main() {
 
     expect(calls, 2);
   });
+
+  test('diagnostics expose request counts without request keys', () async {
+    final coordinator = BackgroundNetworkCoordinator();
+    final gate = Completer<int>();
+
+    final first = coordinator.coalesce<int>(
+      'ibkr.portfolio',
+      'secret-account-key',
+      () => gate.future,
+    );
+    final second = coordinator.coalesce<int>(
+      'ibkr.portfolio',
+      'secret-account-key',
+      () => Future.value(99),
+    );
+
+    expect(coordinator.startedCount('ibkr.portfolio'), 1);
+    expect(coordinator.coalescedCount('ibkr.portfolio'), 1);
+    expect(coordinator.activeRequestCount, 1);
+
+    gate.complete(42);
+    expect(await Future.wait([first, second]), [42, 42]);
+    expect(coordinator.activeRequestCount, 0);
+
+    await coordinator.runFresh('market.candles', 'AAPL', 'today', () async {});
+    await coordinator.runFresh('market.candles', 'AAPL', 'today', () async {});
+
+    expect(coordinator.startedCount('market.candles'), 1);
+    expect(coordinator.freshSkippedCount('market.candles'), 1);
+    final summary = coordinator.diagnosticsSummary(label: 'startup');
+    expect(summary, contains('ibkr.portfolio started=1 coalesced=1'));
+    expect(summary, contains('market.candles started=1'));
+    expect(summary, isNot(contains('secret-account-key')));
+  });
 }

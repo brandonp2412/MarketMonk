@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -30,13 +32,13 @@ DateTime _expectedMarketDay() {
 
 Future<List<UnifiedCandle>> _rows(UnifiedDatabase database) =>
     (database.unifiedCandles.select()
-      ..orderBy([
-        (row) => OrderingTerm(
-              expression: row.date,
-              mode: OrderingMode.asc,
-            ),
-      ]))
-    .get();
+          ..orderBy([
+            (row) => OrderingTerm(
+                  expression: row.date,
+                  mode: OrderingMode.asc,
+                ),
+          ]))
+        .get();
 
 void main() {
   setUp(() {
@@ -195,5 +197,117 @@ void main() {
     );
     expect(rows, hasLength(2));
     expect(rows.last.close, 104);
+  });
+
+  test('concurrent normal and manual refresh share one market request',
+      () async {
+    final database = UnifiedDatabase.connect(NativeDatabase.memory());
+    addTearDown(database.close);
+    final expected = _expectedMarketDay();
+    final requiredFrom = _dayOffset(expected, -30);
+    final gate = Completer<List<YahooFinanceCandleData>>();
+    var requests = 0;
+
+    Future<List<YahooFinanceCandleData>> fetch(
+      String symbol,
+      DateTime startDate,
+    ) {
+      requests++;
+      return gate.future;
+    }
+
+    final normal = syncCandles(
+      'AAPL',
+      database: database,
+      requiredFrom: requiredFrom,
+      yahooFetcher: fetch,
+    );
+    await Future<void>.delayed(Duration.zero);
+    final manual = syncCandles(
+      'aapl',
+      database: database,
+      requiredFrom: requiredFrom,
+      forceRefresh: true,
+      yahooFetcher: fetch,
+    );
+
+    expect(requests, 1);
+    gate.complete([
+      _candle(requiredFrom, close: 90),
+      _candle(expected, close: 101),
+    ]);
+    await Future.wait([normal, manual]);
+
+    expect(requests, 1);
+    expect(await _rows(database), hasLength(2));
+  });
+
+  test('overlapping ranges serialize and only backfill missing coverage',
+      () async {
+    final database = UnifiedDatabase.connect(NativeDatabase.memory());
+    addTearDown(database.close);
+    final expected = _expectedMarketDay();
+    final shortStart = _dayOffset(expected, -30);
+    final longStart = _dayOffset(expected, -365);
+    final firstGate = Completer<void>();
+    final starts = <DateTime>[];
+    var activeRequests = 0;
+    var maxActiveRequests = 0;
+
+    Future<List<YahooFinanceCandleData>> fetch(
+      String symbol,
+      DateTime startDate,
+    ) async {
+      starts.add(startDate);
+      activeRequests++;
+      if (activeRequests > maxActiveRequests) {
+        maxActiveRequests = activeRequests;
+      }
+      try {
+        if (starts.length == 1) {
+          await firstGate.future;
+          return [
+            _candle(shortStart, close: 95),
+            _candle(expected, close: 101),
+          ];
+        }
+        return [
+          _candle(longStart, close: 80),
+          _candle(expected, close: 102),
+        ];
+      } finally {
+        activeRequests--;
+      }
+    }
+
+    final shortSync = syncCandles(
+      'AAPL',
+      database: database,
+      requiredFrom: shortStart,
+      yahooFetcher: fetch,
+    );
+    await Future<void>.delayed(Duration.zero);
+    final longSync = syncCandles(
+      'AAPL',
+      database: database,
+      requiredFrom: longStart,
+      yahooFetcher: fetch,
+    );
+
+    expect(starts, [canonicalMarketDay(shortStart)]);
+    firstGate.complete();
+    await Future.wait([shortSync, longSync]);
+
+    expect(maxActiveRequests, 1);
+    expect(starts, [
+      canonicalMarketDay(shortStart),
+      canonicalMarketDay(longStart),
+    ]);
+    final rows = await _rows(database);
+    expect(
+      rows.map((row) => row.date),
+      contains(canonicalMarketDay(longStart)),
+    );
+    expect(rows.last.close, 102);
   });
 }

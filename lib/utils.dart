@@ -100,11 +100,13 @@ String symbolPriceUnit(String symbol) {
 /// Returns immediately if already cached. Remote metadata is best-effort so
 /// local portfolio and chart UI remain responsive when Yahoo is unavailable.
 Future<void> fetchSymbolCurrencyAndRate(String symbol) async {
+  final canonicalSymbol = canonicalMarketSymbol(symbol);
+  if (canonicalSymbol.isEmpty) return;
   try {
     await backgroundNetworkCoordinator.coalesce<void>(
       'yahoo.symbolMetadata',
-      symbol,
-      () => _fetchSymbolCurrencyAndRate(symbol)
+      canonicalSymbol,
+      () => _fetchSymbolCurrencyAndRate(canonicalSymbol)
           .timeout(const Duration(seconds: 2)),
     );
   } on TimeoutException {
@@ -655,8 +657,7 @@ void clearSyncCache(String symbol) {
   final canonicalSymbol = canonicalMarketSymbol(symbol);
   backgroundNetworkCoordinator.clearFreshness(
     'market.candles',
-    where: (key) =>
-        key is (String, int, bool) && key.$1 == canonicalSymbol,
+    where: (key) => key is (String, int, bool) && key.$1 == canonicalSymbol,
   );
 }
 
@@ -760,102 +761,113 @@ Future<void> syncCandles(
         _offsetMarketDay(today, -defaultMarketCandleLookback.inDays),
     expectedMarketDay,
   );
-  final guardKey = (
-    canonicalSymbol,
-    requiredStart.millisecondsSinceEpoch,
-    forceRefresh,
-  );
 
-  Future<void> performSync() async {
-        final oldest = await (targetDatabase.unifiedCandles.select()
-              ..where((row) => row.symbol.equals(canonicalSymbol))
-              ..orderBy([
-                (row) =>
-                    OrderingTerm(expression: row.date, mode: OrderingMode.asc),
-              ])
-              ..limit(1))
-            .getSingleOrNull();
-        final latest = await (targetDatabase.unifiedCandles.select()
-              ..where((row) => row.symbol.equals(canonicalSymbol))
-              ..orderBy([
-                (row) =>
-                    OrderingTerm(expression: row.date, mode: OrderingMode.desc),
-              ])
-              ..limit(1))
-            .getSingleOrNull();
+  Future<({bool covered, DateTime? latestDay})> readCoverage() async {
+    final oldest = await (targetDatabase.unifiedCandles.select()
+          ..where((row) => row.symbol.equals(canonicalSymbol))
+          ..orderBy([
+            (row) => OrderingTerm(expression: row.date, mode: OrderingMode.asc),
+          ])
+          ..limit(1))
+        .getSingleOrNull();
+    final latest = await (targetDatabase.unifiedCandles.select()
+          ..where((row) => row.symbol.equals(canonicalSymbol))
+          ..orderBy([
+            (row) =>
+                OrderingTerm(expression: row.date, mode: OrderingMode.desc),
+          ])
+          ..limit(1))
+        .getSingleOrNull();
 
-        final oldestDay =
-            oldest == null ? null : canonicalMarketDay(oldest.date);
-        final latestDay =
-            latest == null ? null : canonicalMarketDay(latest.date);
-        final needsBackfill =
-            oldestDay == null || oldestDay.isAfter(requiredStart);
-        final needsForward =
-            latestDay == null || expectedMarketDay.isAfter(latestDay);
+    final oldestDay = oldest == null ? null : canonicalMarketDay(oldest.date);
+    final latestDay = latest == null ? null : canonicalMarketDay(latest.date);
+    final covered = oldestDay != null &&
+        !oldestDay.isAfter(requiredStart) &&
+        latestDay != null &&
+        !expectedMarketDay.isAfter(latestDay);
+    return (covered: covered, latestDay: latestDay);
+  }
 
-        if (!forceRefresh && !needsBackfill && !needsForward) return;
+  Future<bool> performSync() async {
+    final coverage = await readCoverage();
+    if (!forceRefresh && coverage.covered) return false;
 
-        var requestFrom = needsBackfill || latestDay == null
-            ? requiredStart
-            : _offsetMarketDay(latestDay, -1);
-        if (requestFrom.isBefore(requiredStart)) {
-          requestFrom = requiredStart;
-        }
+    var requestFrom = coverage.latestDay == null
+        ? requiredStart
+        : _offsetMarketDay(coverage.latestDay!, -1);
+    if (!coverage.covered) {
+      final oldest = await (targetDatabase.unifiedCandles.select()
+            ..where((row) => row.symbol.equals(canonicalSymbol))
+            ..orderBy([
+              (row) =>
+                  OrderingTerm(expression: row.date, mode: OrderingMode.asc),
+            ])
+            ..limit(1))
+          .getSingleOrNull();
+      final oldestDay = oldest == null ? null : canonicalMarketDay(oldest.date);
+      if (oldestDay == null || oldestDay.isAfter(requiredStart)) {
+        requestFrom = requiredStart;
+      }
+    }
+    if (requestFrom.isBefore(requiredStart)) {
+      requestFrom = requiredStart;
+    }
 
-        final ibkrHandled = await _syncIbkrCandlesIfAvailable(
-          canonicalSymbol,
-          targetDatabase: targetDatabase,
-          ibkrConfig: ibkrConfig,
-          requestFrom: requestFrom,
-          expectedMarketDay: expectedMarketDay,
-          ibkrFetcher: ibkrFetcher,
-        );
-        if (ibkrHandled) return;
+    final ibkrHandled = await _syncIbkrCandlesIfAvailable(
+      canonicalSymbol,
+      targetDatabase: targetDatabase,
+      ibkrConfig: ibkrConfig,
+      requestFrom: requestFrom,
+      expectedMarketDay: expectedMarketDay,
+      ibkrFetcher: ibkrFetcher,
+    );
+    if (ibkrHandled) return true;
 
-        runDetachedTask(
-          fetchSymbolCurrencyAndRate(canonicalSymbol),
-          'Failed to refresh candle currency metadata',
-        );
+    runDetachedTask(
+      fetchSymbolCurrencyAndRate(canonicalSymbol),
+      'Failed to refresh candle currency metadata',
+    );
 
-        final fetch = yahooFetcher ??
-            (String ticker, DateTime startDate) async {
-              final response =
-                  await const YahooFinanceDailyReader().getDailyDTOs(
-                ticker,
-                startDate: startDate,
-              );
-              return response.candlesData;
-            };
-        final response = await fetch(canonicalSymbol, requestFrom);
-        final requestedCandles = response.where((candle) {
-          final day = canonicalMarketDay(candle.date);
-          return !day.isBefore(requestFrom) && !day.isAfter(expectedMarketDay);
-        }).toList();
-        final stored = await insertCandles(
-          requestedCandles,
-          canonicalSymbol,
-          database: targetDatabase,
-        );
-        talker.info(
-          'Completed Yahoo candle sync for $canonicalSymbol: $stored rows '
-          'from ${requestFrom.toIso8601String()}',
-        );
+    final fetch = yahooFetcher ??
+        (String ticker, DateTime startDate) async {
+          final response = await const YahooFinanceDailyReader().getDailyDTOs(
+            ticker,
+            startDate: startDate,
+          );
+          return response.candlesData;
+        };
+    final response = await fetch(canonicalSymbol, requestFrom);
+    final requestedCandles = response.where((candle) {
+      final day = canonicalMarketDay(candle.date);
+      return !day.isBefore(requestFrom) && !day.isAfter(expectedMarketDay);
+    }).toList();
+    final stored = await insertCandles(
+      requestedCandles,
+      canonicalSymbol,
+      database: targetDatabase,
+    );
+    talker.info(
+      'Completed Yahoo candle sync for $canonicalSymbol: $stored rows '
+      'from ${requestFrom.toIso8601String()}',
+    );
+    return true;
   }
 
   try {
-    if (forceRefresh) {
-      await backgroundNetworkCoordinator.coalesce<void>(
+    while (true) {
+      final networkRequested =
+          await backgroundNetworkCoordinator.coalesce<bool>(
         'market.candles',
-        guardKey,
+        canonicalSymbol,
         performSync,
       );
-    } else {
-      await backgroundNetworkCoordinator.runFresh(
-        'market.candles',
-        guardKey,
-        today,
-        performSync,
-      );
+
+      if (forceRefresh) {
+        if (networkRequested) return;
+        continue;
+      }
+
+      if ((await readCoverage()).covered) return;
     }
   } catch (error, stackTrace) {
     talker.handle(error, stackTrace, 'Candle sync failed');
@@ -873,8 +885,7 @@ Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
   final canonicalSymbol = canonicalMarketSymbol(symbol);
   if (_symbolCurrencies.containsKey(canonicalSymbol)) return;
 
-  final metadata =
-      await marketDataDatabase.readSymbolMetadata(canonicalSymbol);
+  final metadata = await marketDataDatabase.readSymbolMetadata(canonicalSymbol);
   final savedRaw = rawCurrencyFromMetadata(metadata);
   final prefs = await SqliteSettings.getInstance();
   if (savedRaw != null && savedRaw.isNotEmpty) {

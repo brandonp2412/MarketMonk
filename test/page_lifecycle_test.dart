@@ -394,4 +394,69 @@ void main() {
     expect(defaultLoads, 1);
     expect(botLoads, 0);
   });
+
+  testWidgets('fresh chart startup stays within the IBKR request budget',
+      (tester) async {
+    await seedTestSqlite({});
+    db = Database.connect(
+      DatabaseConnection(
+        NativeDatabase.memory(),
+        closeStreamsSynchronously: true,
+      ),
+    );
+    addTearDown(() => db.close());
+
+    final accounts = testAccountManager();
+    await accounts.init();
+    accounts.accounts = ['Default', 'Bot'];
+    await ensureTestProfile('Bot');
+    await accounts.setIbkrConfig(
+      'Default',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://default-startup.example.test',
+        token: 'secret-token',
+      ),
+    );
+    await accounts.setIbkrConfig(
+      'Bot',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://bot-startup.example.test',
+        token: 'secret-token',
+      ),
+    );
+
+    var portfolioLoads = 0;
+    var performanceLoads = 0;
+    const freshStartupRequestBudget = 4;
+
+    await tester.pumpWidget(
+      _app(
+        accounts,
+        ChartsPage(
+          isActive: true,
+          ibkrLoader: (config) async {
+            portfolioLoads++;
+            return _snapshot(
+              config.baseUrl.contains('bot') ? 'Bot' : 'Default',
+            );
+          },
+          ibkrPerformanceLoader: (_, __) async {
+            performanceLoads++;
+            return _performance();
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 150));
+
+    expect(portfolioLoads, 2);
+    expect(performanceLoads, 2);
+    expect(
+      portfolioLoads + performanceLoads,
+      lessThanOrEqualTo(freshStartupRequestBudget),
+    );
+  });
 }

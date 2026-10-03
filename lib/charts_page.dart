@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/candle_ticker.dart';
 import 'package:market_monk/adaptive_layout.dart';
+import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
@@ -101,6 +102,7 @@ class ChartsPageState extends State<ChartsPage>
 
   int _lastTradesVersion = 0;
   String _lastAccountsKey = '';
+  String _lastActiveAccount = '';
   int _lastIbkrRefreshVersion = 0;
   int _portfolioLoadGeneration = 0;
   AccountManager? _accountManager;
@@ -167,7 +169,14 @@ class ChartsPageState extends State<ChartsPage>
     _hydratePortfolioSeriesFromCache(accountManager);
     if (widget.isActive) {
       runDetachedTask(
-        _syncCandlesInBackground(refreshPerformance: true),
+        () async {
+          await _syncCandlesInBackground(refreshPerformance: true);
+          talker.info(
+            backgroundNetworkCoordinator.diagnosticsSummary(
+              label: 'Startup request summary',
+            ),
+          );
+        }(),
         'Failed to initialize active chart data',
       );
     }
@@ -410,26 +419,28 @@ class ChartsPageState extends State<ChartsPage>
       return;
     }
 
-    final accountsKey = [
-      accountManager.activeAccount,
-      accountManager.accounts.join(','),
-    ].join('|');
+    final accountsKey = accountManager.accounts.join(',');
+    final activeAccount = accountManager.activeAccount;
     final ibkrRefreshVersion = accountManager.ibkrRefreshVersion;
     final accountsChanged = accountsKey != _lastAccountsKey;
+    final activeAccountChanged = activeAccount != _lastActiveAccount;
     final ibkrChanged = ibkrRefreshVersion != _lastIbkrRefreshVersion;
-    if (!accountsChanged && !ibkrChanged) return;
+    if (!accountsChanged && !activeAccountChanged && !ibkrChanged) return;
 
     _lastAccountsKey = accountsKey;
+    _lastActiveAccount = activeAccount;
     _lastIbkrRefreshVersion = ibkrRefreshVersion;
     if (ibkrChanged) clearAllSyncCache();
 
-    runDetachedTask(
-      _syncCandlesInBackground(
-        refreshPerformance: true,
-        forcePerformanceRefresh: ibkrChanged,
-      ),
-      'Failed to refresh charts after account change',
-    );
+    if (accountsChanged || ibkrChanged) {
+      runDetachedTask(
+        _syncCandlesInBackground(
+          refreshPerformance: true,
+          forcePerformanceRefresh: ibkrChanged,
+        ),
+        'Failed to refresh charts after account change',
+      );
+    }
     if (_selectedSymbol != null) _setStockStream(_selectedSymbol!);
   }
 
@@ -449,9 +460,15 @@ class ChartsPageState extends State<ChartsPage>
 
     final accountManager = context.read<AccountManager>();
     if (!identical(_accountManager, accountManager)) {
+      final firstManager = _accountManager == null;
       _accountManager?.removeListener(_handleAccountManagerChanged);
       _accountManager = accountManager;
       accountManager.addListener(_handleAccountManagerChanged);
+      if (firstManager) {
+        _lastAccountsKey = accountManager.accounts.join(',');
+        _lastActiveAccount = accountManager.activeAccount;
+        _lastIbkrRefreshVersion = accountManager.ibkrRefreshVersion;
+      }
     }
     if (_chartPeriodLoaded) {
       _hydratePortfolioSeriesFromCache(accountManager);
@@ -1171,7 +1188,7 @@ class ChartsPageState extends State<ChartsPage>
       "STRFTIME('%Y-%m-%W', DATE(\"date\", 'unixepoch', 'localtime'))",
     );
     Iterable<Expression<Object>> groupBy = [
-      marketDataDatabase.unifiedCandles.date
+      marketDataDatabase.unifiedCandles.date,
     ];
     if (years > 0 || months > 5) groupBy = [weekExpression];
 
@@ -1180,7 +1197,7 @@ class ChartsPageState extends State<ChartsPage>
         (marketDataDatabase.selectOnly(marketDataDatabase.unifiedCandles)
               ..addColumns([
                 marketDataDatabase.unifiedCandles.date,
-                marketDataDatabase.unifiedCandles.close
+                marketDataDatabase.unifiedCandles.close,
               ])
               ..where(
                 marketDataDatabase.unifiedCandles.symbol.equals(marketSymbol) &
@@ -1203,7 +1220,8 @@ class ChartsPageState extends State<ChartsPage>
                 date:
                     Value(result.read(marketDataDatabase.unifiedCandles.date)!),
                 close: Value(
-                    result.read(marketDataDatabase.unifiedCandles.close)!),
+                  result.read(marketDataDatabase.unifiedCandles.close)!,
+                ),
               ),
             ),
           )
