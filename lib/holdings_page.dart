@@ -77,7 +77,7 @@ class HoldingsPageState extends State<HoldingsPage>
   @override
   void initState() {
     super.initState();
-    _stream = _buildStream();
+    _stream = _buildStream(skipInitial: widget.isActive);
   }
 
   @override
@@ -85,7 +85,7 @@ class HoldingsPageState extends State<HoldingsPage>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isActive == widget.isActive) return;
 
-    setState(() => _stream = _buildStream());
+    setState(() => _stream = _buildStream(skipInitial: widget.isActive));
     if (widget.isActive) {
       unawaited(_preload());
     }
@@ -124,7 +124,7 @@ class HoldingsPageState extends State<HoldingsPage>
     _lastIbkrConfig = ibkrConfig;
     _lastIbkrRefreshVersion = refreshVersion;
     setState(() {
-      _stream = _buildStream();
+      _stream = _buildStream(skipInitial: widget.isActive);
       _summaries = [];
     });
     if (widget.isActive) {
@@ -162,6 +162,7 @@ class HoldingsPageState extends State<HoldingsPage>
 
     final existingLoad = _ibkrTradesLoad;
     if (!forceRefresh && existingLoad != null) return existingLoad;
+    if (!widget.isActive) return _ibkrTrades;
 
     final load = () async {
       try {
@@ -210,27 +211,30 @@ class HoldingsPageState extends State<HoldingsPage>
     bool refreshPortfolio = false,
     bool refreshTrades = false,
   }) async {
+    if (!mounted || !widget.isActive) return;
     try {
       final accounts = context.read<AccountManager>();
-      final trades = await _loadTradesForHoldings(
-        forceRefresh: refreshTrades,
-      );
-      final cached = accounts.portfolioCacheFor();
+      final accountName = accounts.activeAccount;
+      final trades = await _loadTradesForHoldings(forceRefresh: refreshTrades);
+      if (!mounted ||
+          !widget.isActive ||
+          accounts.activeAccount != accountName) {
+        return;
+      }
+      final cached = accounts.portfolioCacheFor(accountName);
       if (cached != null && !refreshPortfolio) {
         final result = _summariesFromPositions(trades, cached.positions);
         if (mounted) {
           setState(() {
             _summaries = result;
-            _stream = _buildStream();
           });
         }
         return;
       }
       final result = await _computeSummaries(trades);
-      if (mounted) {
+      if (mounted && widget.isActive && accounts.activeAccount == accountName) {
         setState(() {
           _summaries = result;
-          _stream = _buildStream();
         });
       }
     } catch (error, stackTrace) {
@@ -239,15 +243,22 @@ class HoldingsPageState extends State<HoldingsPage>
   }
 
   Future<List<Position>> _loadPositions(List<Trade> trades) async {
+    final accounts = context.read<AccountManager>();
+    if (!widget.isActive) {
+      return accounts.portfolioCacheFor()?.positions ?? const <Position>[];
+    }
     if (widget._positionsLoader != null) {
       return widget._positionsLoader!(trades);
     }
 
-    final accounts = context.read<AccountManager>();
     final config = accounts.ibkrConfigFor();
     final accountName = accounts.activeAccount;
     if (!config.enabled) {
       final symbols = trades.map((trade) => trade.symbol).toSet().toList();
+      if (!widget.isActive) {
+        return accounts.portfolioCacheFor(accountName)?.positions ??
+            const <Position>[];
+      }
       final prices = await fetchLatestPrices(symbols);
       final positions = computePositions(trades, prices);
       await _cachePortfolio(accounts, accountName, positions, null);
@@ -255,6 +266,10 @@ class HoldingsPageState extends State<HoldingsPage>
     }
     if (!config.isConfigured) {
       throw StateError('IBKR portfolio source is not fully configured');
+    }
+    if (!widget.isActive) {
+      return accounts.portfolioCacheFor(accountName)?.positions ??
+          const <Position>[];
     }
     final snapshot = await IbkrApiClient(config).fetchPortfolio();
     cacheIbkrAccountExchangeRate(snapshot);
@@ -354,15 +369,24 @@ class HoldingsPageState extends State<HoldingsPage>
     return summaries;
   }
 
-  Stream<List<SymbolSummary>> _buildStream() {
-    return db.trades.select().watch().asyncMap(_summariesForStream).transform(
-      StreamTransformer<List<SymbolSummary>, List<SymbolSummary>>.fromHandlers(
-        handleError: (error, stack, sink) {
-          _reportError(error, stack, 'loading holdings');
-          sink.addError(error, stack);
-        },
-      ),
-    );
+  Stream<List<SymbolSummary>> _buildStream({bool skipInitial = false}) {
+    if (!widget.isActive) return Stream.value(_summaries);
+
+    Stream<List<Trade>> trades = db.trades.select().watch();
+    if (skipInitial) trades = trades.skip(1);
+    return trades
+        .asyncMap(_summariesForStream)
+        .transform(
+          StreamTransformer<
+            List<SymbolSummary>,
+            List<SymbolSummary>
+          >.fromHandlers(
+            handleError: (error, stack, sink) {
+              _reportError(error, stack, 'loading holdings');
+              sink.addError(error, stack);
+            },
+          ),
+        );
   }
 
   Future<List<SymbolSummary>> _summariesForStream(
@@ -520,8 +544,9 @@ class HoldingsPageState extends State<HoldingsPage>
 
     if (desktop) {
       final accounts = context.watch<AccountManager>();
-      final openCount =
-          _summaries.where((summary) => summary.position != null).length;
+      final openCount = _summaries
+          .where((summary) => summary.position != null)
+          .length;
       return Scaffold(
         body: Padding(
           padding: const EdgeInsets.fromLTRB(32, 28, 32, 24),
@@ -537,22 +562,18 @@ class HoldingsPageState extends State<HoldingsPage>
                       children: [
                         Text(
                           context.l10n.text('Holdings'),
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
+                          style: Theme.of(context).textTheme.headlineMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           '$openCount open · ${_summaries.length} total symbols',
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
                         ),
                       ],
                     ),
@@ -605,8 +626,9 @@ class HoldingsPageState extends State<HoldingsPage>
                   if (_selecting) ...[
                     TextButton.icon(
                       onPressed: _toggleSelectAll,
-                      icon:
-                          Icon(allSelected ? Icons.deselect : Icons.select_all),
+                      icon: Icon(
+                        allSelected ? Icons.deselect : Icons.select_all,
+                      ),
                       label: Text(
                         allSelected
                             ? context.l10n.text('Deselect all')
@@ -618,10 +640,9 @@ class HoldingsPageState extends State<HoldingsPage>
                       onPressed: () => _deleteSelected(context),
                       icon: const Icon(Icons.delete_outline),
                       label: Text(
-                        context.l10n.text(
-                          'Delete ({count})',
-                          {'count': _selectedSymbols.length},
-                        ),
+                        context.l10n.text('Delete ({count})', {
+                          'count': _selectedSymbols.length,
+                        }),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -707,10 +728,9 @@ class HoldingsPageState extends State<HoldingsPage>
               child: SearchBar(
                 controller: _search,
                 hintText: _selecting
-                    ? context.l10n.text(
-                        '{count} selected',
-                        {'count': _selectedSymbols.length},
-                      )
+                    ? context.l10n.text('{count} selected', {
+                        'count': _selectedSymbols.length,
+                      })
                     : context.l10n.text('Search...'),
                 padding: WidgetStateProperty.all(
                   const EdgeInsets.only(right: 8),
@@ -738,33 +758,31 @@ class HoldingsPageState extends State<HoldingsPage>
       floatingActionButton: ibkrManaged
           ? null
           : _selecting
-              ? FloatingActionButton.extended(
-                  onPressed: () => _deleteSelected(context),
-                  label: Text(
-                    context.l10n.text('Delete ({count})', {
-                      'count': _selectedSymbols.length,
-                    }),
-                  ),
-                  icon: const Icon(Icons.delete),
-                )
-              : Padding(
-                  padding: const EdgeInsets.only(bottom: bottomNavHeight),
-                  child: FloatingActionButton.extended(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const EditTickerPage()),
-                    ),
-                    label: Text(context.l10n.text('Add')),
-                    icon: const Icon(Icons.add),
-                    tooltip: context.l10n.text('Add trade'),
-                  ),
+          ? FloatingActionButton.extended(
+              onPressed: () => _deleteSelected(context),
+              label: Text(
+                context.l10n.text('Delete ({count})', {
+                  'count': _selectedSymbols.length,
+                }),
+              ),
+              icon: const Icon(Icons.delete),
+            )
+          : Padding(
+              padding: const EdgeInsets.only(bottom: bottomNavHeight),
+              child: FloatingActionButton.extended(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const EditTickerPage()),
                 ),
+                label: Text(context.l10n.text('Add')),
+                icon: const Icon(Icons.add),
+                tooltip: context.l10n.text('Add trade'),
+              ),
+            ),
     );
   }
 
-  List<SymbolSummary> _sortDesktopSummaries(
-    List<SymbolSummary> summaries,
-  ) {
+  List<SymbolSummary> _sortDesktopSummaries(List<SymbolSummary> summaries) {
     final sorted = [...summaries];
     int compare(SymbolSummary a, SymbolSummary b) {
       final multiplier = _desktopSortAscending ? 1 : -1;
@@ -773,12 +791,14 @@ class HoldingsPageState extends State<HoldingsPage>
           return multiplier * a.symbol.compareTo(b.symbol);
         case _HoldingsSort.value:
           return multiplier *
-              (a.position?.currentValue ?? 0)
-                  .compareTo(b.position?.currentValue ?? 0);
+              (a.position?.currentValue ?? 0).compareTo(
+                b.position?.currentValue ?? 0,
+              );
         case _HoldingsSort.returnPct:
           return multiplier *
-              (a.position?.change ?? double.negativeInfinity)
-                  .compareTo(b.position?.change ?? double.negativeInfinity);
+              (a.position?.change ?? double.negativeInfinity).compareTo(
+                b.position?.change ?? double.negativeInfinity,
+              );
         case _HoldingsSort.unrealized:
           return multiplier *
               (a.position?.unrealizedPL ?? a.totalRealizedPL).compareTo(
@@ -866,10 +886,7 @@ class HoldingsPageState extends State<HoldingsPage>
       final pnl = calculateIbkrCashOutPnl(performance, netLiquidation);
       final basePerUsd = requireUsdRate(performance.currency);
       if (!basePerUsd.isFinite || basePerUsd <= 0) return null;
-      return (
-        gainUsd: pnl.profitLoss / basePerUsd,
-        gainPct: pnl.percent ?? 0,
-      );
+      return (gainUsd: pnl.profitLoss / basePerUsd, gainPct: pnl.percent ?? 0);
     } catch (_) {
       return null;
     }
@@ -885,16 +902,23 @@ class HoldingsPageState extends State<HoldingsPage>
         .where((summary) => summary.position != null)
         .map((summary) => summary.position!)
         .toList();
-    final totalValue =
-        open.fold(0.0, (sum, position) => sum + position.currentValue);
-    final totalCost =
-        open.fold(0.0, (sum, position) => sum + position.costBasis);
-    final costBasisGain =
-        open.fold(0.0, (sum, position) => sum + position.unrealizedPL);
+    final totalValue = open.fold(
+      0.0,
+      (sum, position) => sum + position.currentValue,
+    );
+    final totalCost = open.fold(
+      0.0,
+      (sum, position) => sum + position.costBasis,
+    );
+    final costBasisGain = open.fold(
+      0.0,
+      (sum, position) => sum + position.unrealizedPL,
+    );
     final accounts = context.watch<AccountManager>();
     final cashOutSummary = _ibkrCashOutSummary(accounts);
     final totalUnrealized = cashOutSummary?.gainUsd ?? costBasisGain;
-    final totalUnrealizedPct = cashOutSummary?.gainPct ??
+    final totalUnrealizedPct =
+        cashOutSummary?.gainPct ??
         (totalCost > 0 ? costBasisGain / totalCost * 100 : 0.0);
     final winners = open.where((position) => position.change >= 0).length;
     final sorted = _sortDesktopSummaries(summaries);
@@ -968,8 +992,9 @@ class HoldingsPageState extends State<HoldingsPage>
                     '${totalUnrealized >= 0 ? '+' : ''}${fmtCurrency(totalUnrealized)}',
                 detail:
                     '${totalUnrealizedPct >= 0 ? '+' : ''}${totalUnrealizedPct.toStringAsFixed(2)}%',
-                valueColor:
-                    totalUnrealized >= 0 ? Colors.green : Colors.redAccent,
+                valueColor: totalUnrealized >= 0
+                    ? Colors.green
+                    : Colors.redAccent,
               ),
               const SizedBox(width: 12),
               _desktopMetric(
@@ -1007,8 +1032,8 @@ class HoldingsPageState extends State<HoldingsPage>
                   final tableWidth = compactTable
                       ? constraints.maxWidth
                       : constraints.maxWidth < 1240
-                          ? 1240.0
-                          : constraints.maxWidth;
+                      ? 1240.0
+                      : constraints.maxWidth;
                   return Scrollbar(
                     controller: _desktopTableScrollController,
                     child: SingleChildScrollView(
@@ -1024,11 +1049,11 @@ class HoldingsPageState extends State<HoldingsPage>
                             headingRowColor: WidgetStatePropertyAll(
                               theme.colorScheme.surfaceContainerLow,
                             ),
-                            headingTextStyle:
-                                theme.textTheme.labelMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w700,
-                            ),
+                            headingTextStyle: theme.textTheme.labelMedium
+                                ?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.w700,
+                                ),
                             dataRowMinHeight: 62,
                             dataRowMaxHeight: 70,
                             horizontalMargin: 18,
@@ -1082,7 +1107,8 @@ class HoldingsPageState extends State<HoldingsPage>
                                   final position = summary.position;
                                   final isClosed = position == null;
                                   final returnPct = position?.change ?? 0;
-                                  final pnl = position?.unrealizedPL ??
+                                  final pnl =
+                                      position?.unrealizedPL ??
                                       summary.totalRealizedPL;
                                   final pnlText = isClosed
                                       ? '${pnl >= 0 ? '+' : ''}${fmtNativeCurrency(pnl, symbolCurrency(summary.symbol))}'
@@ -1099,15 +1125,16 @@ class HoldingsPageState extends State<HoldingsPage>
                                   final changeColor = isClosed
                                       ? theme.colorScheme.onSurfaceVariant
                                       : returnPct >= 0
-                                          ? Colors.green
-                                          : Colors.redAccent;
+                                      ? Colors.green
+                                      : Colors.redAccent;
                                   final pnlColor = pnl >= 0
                                       ? Colors.green
                                       : Colors.redAccent;
 
                                   return DataRow(
-                                    selected: _selectedSymbols
-                                        .contains(summary.symbol),
+                                    selected: _selectedSymbols.contains(
+                                      summary.symbol,
+                                    ),
                                     onSelectChanged: _selecting && !ibkrManaged
                                         ? (_) => toggleSelection(summary)
                                         : null,
@@ -1119,10 +1146,8 @@ class HoldingsPageState extends State<HoldingsPage>
                                               isClosed
                                                   ? Icons.history_rounded
                                                   : returnPct >= 0
-                                                      ? Icons
-                                                          .trending_up_rounded
-                                                      : Icons
-                                                          .trending_down_rounded,
+                                                  ? Icons.trending_up_rounded
+                                                  : Icons.trending_down_rounded,
                                               size: 20,
                                               color: changeColor,
                                             ),
@@ -1141,12 +1166,14 @@ class HoldingsPageState extends State<HoldingsPage>
                                                           summary.symbol,
                                                           overflow: TextOverflow
                                                               .ellipsis,
-                                                          style: theme.textTheme
+                                                          style: theme
+                                                              .textTheme
                                                               .titleSmall
                                                               ?.copyWith(
-                                                            fontWeight:
-                                                                FontWeight.w700,
-                                                          ),
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w700,
+                                                              ),
                                                         ),
                                                       ),
                                                       if (isClosed) ...[
@@ -1154,15 +1181,17 @@ class HoldingsPageState extends State<HoldingsPage>
                                                           width: 8,
                                                         ),
                                                         Text(
-                                                          context.l10n
-                                                              .text('Closed'),
-                                                          style: theme.textTheme
+                                                          context.l10n.text(
+                                                            'Closed',
+                                                          ),
+                                                          style: theme
+                                                              .textTheme
                                                               .labelSmall
                                                               ?.copyWith(
-                                                            color: theme
-                                                                .colorScheme
-                                                                .onSurfaceVariant,
-                                                          ),
+                                                                color: theme
+                                                                    .colorScheme
+                                                                    .onSurfaceVariant,
+                                                              ),
                                                         ),
                                                       ],
                                                     ],
@@ -1173,11 +1202,13 @@ class HoldingsPageState extends State<HoldingsPage>
                                                     overflow:
                                                         TextOverflow.ellipsis,
                                                     style: theme
-                                                        .textTheme.bodySmall
+                                                        .textTheme
+                                                        .bodySmall
                                                         ?.copyWith(
-                                                      color: theme.colorScheme
-                                                          .onSurfaceVariant,
-                                                    ),
+                                                          color: theme
+                                                              .colorScheme
+                                                              .onSurfaceVariant,
+                                                        ),
                                                   ),
                                                 ],
                                               ),
@@ -1189,10 +1220,7 @@ class HoldingsPageState extends State<HoldingsPage>
                                             : () => _openDetail(summary),
                                       ),
                                       if (!compactTable) ...[
-                                        textCell(
-                                          shares,
-                                          summary: summary,
-                                        ),
+                                        textCell(shares, summary: summary),
                                         textCell(
                                           position == null
                                               ? '—'
@@ -1259,12 +1287,7 @@ class HoldingsPageState extends State<HoldingsPage>
       onRefresh: _refreshCandles,
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: child,
-          ),
-        ],
+        slivers: [SliverFillRemaining(hasScrollBody: false, child: child)],
       ),
     );
   }
@@ -1314,37 +1337,37 @@ class HoldingsPageState extends State<HoldingsPage>
           icon: ibkrManaged
               ? Icons.account_balance_rounded
               : query.isEmpty
-                  ? Icons.candlestick_chart_rounded
-                  : Icons.search_off_rounded,
+              ? Icons.candlestick_chart_rounded
+              : Icons.search_off_rounded,
           title: ibkrManaged
               ? context.l10n.text('No IBKR stocks found')
               : query.isEmpty
-                  ? context.l10n.text('No stocks yet')
-                  : context.l10n.text('No matching stocks'),
+              ? context.l10n.text('No stocks yet')
+              : context.l10n.text('No matching stocks'),
           message: ibkrManaged
               ? context.l10n.text(
                   'Refresh your portfolio or check your Interactive Brokers connection.',
                 )
               : query.isEmpty
-                  ? context.l10n.text(
-                      'Import a CSV or add your first trade manually.',
-                    )
-                  : context.l10n.text(
-                      'Nothing matches “{query}”. You can add that ticker now.',
-                      {'query': query},
-                    ),
+              ? context.l10n.text(
+                  'Import a CSV or add your first trade manually.',
+                )
+              : context.l10n.text(
+                  'Nothing matches “{query}”. You can add that ticker now.',
+                  {'query': query},
+                ),
           actionLabel: ibkrManaged
               ? context.l10n.text('IBKR settings')
               : query.isEmpty
-                  ? context.l10n.text('Import CSV')
-                  : context.l10n.text('Add {symbol}', {
-                      'symbol': query.toUpperCase(),
-                    }),
+              ? context.l10n.text('Import CSV')
+              : context.l10n.text('Add {symbol}', {
+                  'symbol': query.toUpperCase(),
+                }),
           actionIcon: ibkrManaged
               ? Icons.settings_rounded
               : query.isEmpty
-                  ? Icons.upload_file_rounded
-                  : Icons.add_rounded,
+              ? Icons.upload_file_rounded
+              : Icons.add_rounded,
           onAction: () => Navigator.push(
             context,
             MaterialPageRoute(
@@ -1411,7 +1434,7 @@ class HoldingsPageState extends State<HoldingsPage>
   }
 
   void _retryHoldings() {
-    setState(() => _stream = _buildStream());
+    setState(() => _stream = _buildStream(skipInitial: true));
     unawaited(_preload());
   }
 
@@ -1419,10 +1442,7 @@ class HoldingsPageState extends State<HoldingsPage>
     final accountManager = context.read<AccountManager>();
     final config = accountManager.ibkrConfigFor();
     clearAllSyncCache();
-    await _preload(
-      refreshPortfolio: true,
-      refreshTrades: config.enabled,
-    );
+    await _preload(refreshPortfolio: true, refreshTrades: config.enabled);
 
     if (!config.enabled) {
       final symbols = _summaries.map((summary) => summary.symbol).toSet();
@@ -1434,7 +1454,7 @@ class HoldingsPageState extends State<HoldingsPage>
         );
       }
     }
-    if (mounted) setState(() => _stream = _buildStream());
+    if (!mounted || !widget.isActive) return;
   }
 }
 
@@ -1483,9 +1503,8 @@ class _SymbolTile extends StatelessWidget {
 
     return ListTile(
       selected: isSelected,
-      selectedTileColor: Theme.of(
-        context,
-      ).colorScheme.primaryContainer.withValues(alpha: 0.3),
+      selectedTileColor: Theme.of(context).colorScheme.primaryContainer
+          .withValues(alpha: 0.3),
       leading: leadingWidget,
       title: Text(summary.symbol),
       subtitle: position != null
@@ -1504,8 +1523,9 @@ class _SymbolTile extends StatelessWidget {
                   Text(
                     'Realized today: ${realizedToday >= 0 ? '+' : ''}${fmtCurrency(realizedToday)}',
                     style: TextStyle(
-                      color:
-                          realizedToday >= 0 ? Colors.green : Colors.redAccent,
+                      color: realizedToday >= 0
+                          ? Colors.green
+                          : Colors.redAccent,
                       fontSize: 12,
                     ),
                   )
