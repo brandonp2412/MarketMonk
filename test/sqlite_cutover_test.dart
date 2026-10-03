@@ -23,6 +23,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory directory;
   late AppStateDatabase appState;
+  late UnifiedDatabase unifiedData;
   const channel = MethodChannel('plugins.flutter.io/path_provider');
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
@@ -51,11 +52,15 @@ void main() {
       ),
     );
     db = Database();
+    unifiedData = UnifiedDatabase.connect(NativeDatabase.memory());
+    setProfileDataDatabaseForTesting(unifiedData);
     SharedPreferences.setMockInitialValues({});
   });
 
   tearDown(() async {
     await db.close();
+    setProfileDataDatabaseForTesting(null);
+    await unifiedData.close();
     await appState.close();
     messenger.setMockMethodCallHandler(channel, null);
     await directory.delete(recursive: true);
@@ -148,14 +153,29 @@ void main() {
         appStateReads += 1;
         throw StateError('Legacy app-state must not be read');
       },
-      cleanupLegacyAppState: () async {
-        cleanups += 1;
-      },
       profileDatabaseFactory: profile,
     );
 
     expect(preferenceReads, 0);
     expect(appStateReads, 0);
+    expect(cleanups, 0);
+    expect(
+      await appState.readSetting(legacyAppStateCleanupCompleteKey),
+      isNull,
+    );
+
+    final unified = UnifiedDatabase.connect(NativeDatabase.memory());
+    addTearDown(unified.close);
+    await unified.writeSetting(
+      UnifiedDatabase.legacyMigrationCompleteKey,
+      true,
+    );
+    await loaded.cleanupLegacyAppStateAfterUnifiedMigration(
+      unified,
+      cleanupLegacyAppState: () async {
+        cleanups += 1;
+      },
+    );
     expect(cleanups, 1);
     expect(
       await appState.readSetting(legacyAppStateCleanupCompleteKey),
@@ -174,8 +194,6 @@ void main() {
           throw StateError('SharedPreferences must not initialize'),
       readLegacyAppStateValues: () =>
           throw StateError('Legacy app-state must not be read'),
-      cleanupLegacyAppState: () =>
-          throw StateError('Cleanup must not run after its marker'),
       profileDatabaseFactory: profile,
     );
   });
@@ -216,6 +234,13 @@ void main() {
       profileDatabaseFactory: profile,
     );
     await SqliteSettings.useInstance(Future.value(repaired));
+    final unified = UnifiedDatabase.connect(NativeDatabase.memory());
+    addTearDown(unified.close);
+    await unified.writeSetting(
+      UnifiedDatabase.legacyMigrationCompleteKey,
+      true,
+    );
+    await repaired.cleanupLegacyAppStateAfterUnifiedMigration(unified);
 
     expect(await appState.readProfiles(), ['Default', 'IBKR Bot']);
     expect(await appState.readActiveProfile(), 'Default');

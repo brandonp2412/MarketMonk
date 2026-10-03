@@ -4,6 +4,7 @@ import 'package:market_monk/legacy_app_state_reader_stub.dart'
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/legacy_preferences_migration.dart';
 import 'package:market_monk/legacy_preferences_reader.dart';
+import 'package:market_monk/unified_database.dart';
 
 /// Cached application settings whose only writable persistence is SQLite.
 class SqliteSettings {
@@ -39,7 +40,6 @@ class SqliteSettings {
     AppStateDatabase database, {
     Future<Map<String, Object?>> Function()? readLegacyValues,
     Future<Map<String, Object?>?> Function()? readLegacyAppStateValues,
-    Future<void> Function()? cleanupLegacyAppState,
     Future<bool> Function(String profileName)? legacyProfileExists,
     ProfileDatabaseFactory? profileDatabaseFactory,
   }) async {
@@ -93,26 +93,6 @@ class SqliteSettings {
       await database.writeSetting(sqliteMigrationCompleteKey, true);
     }
 
-    final appStateMigrated =
-        await database.readSetting(legacyAppStateMigrationCompleteKey) == true;
-    final preferencesMigrated =
-        await database.readSetting(sqliteMigrationCompleteKey) == true;
-    final cleanupComplete =
-        await database.readSetting(legacyAppStateCleanupCompleteKey) == true;
-    if (appStateMigrated && preferencesMigrated && !cleanupComplete) {
-      try {
-        await (cleanupLegacyAppState ?? deleteLegacyAppStateFile)();
-        await database.writeSetting(legacyAppStateCleanupCompleteKey, true);
-      } catch (error, stack) {
-        talker.handle(
-          error,
-          stack,
-          'Could not remove obsolete legacy SQLite app state; '
-          'will retry next startup',
-        );
-      }
-    }
-
     return load(database);
   }
 
@@ -127,6 +107,37 @@ class SqliteSettings {
   static Future<SqliteSettings> useInstance(Future<SqliteSettings> instance) {
     _loaded = null;
     return _instance = instance.then((value) => _loaded = value);
+  }
+
+  /// Removes the obsolete pre-cutover app-state file only after the unified
+  /// migration marker exists and Drift validates the unified schema.
+  Future<void> cleanupLegacyAppStateAfterUnifiedMigration(
+    UnifiedDatabase unifiedDatabase, {
+    Future<void> Function()? cleanupLegacyAppState,
+  }) async {
+    await flush();
+    if (await database.readSetting(legacyAppStateMigrationCompleteKey) != true ||
+        await database.readSetting(sqliteMigrationCompleteKey) != true ||
+        await database.readSetting(legacyAppStateCleanupCompleteKey) == true ||
+        await unifiedDatabase
+                .readSetting(UnifiedDatabase.legacyMigrationCompleteKey) !=
+            true) {
+      return;
+    }
+
+    await unifiedDatabase.validateUnifiedSchema();
+    try {
+      await (cleanupLegacyAppState ?? deleteLegacyAppStateFile)();
+      await database.writeSetting(legacyAppStateCleanupCompleteKey, true);
+      _values[legacyAppStateCleanupCompleteKey] = true;
+    } catch (error, stack) {
+      talker.handle(
+        error,
+        stack,
+        'Could not remove obsolete legacy SQLite app state; '
+        'will retry next startup',
+      );
+    }
   }
 
   /// Refreshes the in-memory view after a transactional restore.

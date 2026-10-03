@@ -40,11 +40,13 @@ Future<void> main() async {
       installTalkerErrorHandlers();
       talker.info('Starting Market Monk');
 
-      await SqliteSettings.getInstance();
-      await migrateLegacyMarketDataOnStartup(defaultDatabase: db);
+      final sqliteSettings = await SqliteSettings.getInstance();
       final settings = SettingsState();
       final accounts = AccountManager();
       await Future.wait([settings.initialized, accounts.init()]);
+      await sqliteSettings.cleanupLegacyAppStateAfterUnifiedMigration(
+        profileDataDatabase,
+      );
       talker.info('Account manager initialized');
 
       runApp(
@@ -64,7 +66,9 @@ Future<void> main() async {
   );
 }
 
-Database db = Database();
+Database? _legacyDatabaseShim;
+Database get db => _legacyDatabaseShim ??= Database();
+set db(Database value) => _legacyDatabaseShim = value;
 
 class CachedPortfolioData {
   final List<Position> positions;
@@ -336,52 +340,6 @@ class AccountManager extends ChangeNotifier {
         );
       }
     });
-  }
-
-  Future<void> _replaceUnifiedProfileRegistry(
-    List<String> profileNames,
-    String requestedActive,
-  ) async {
-    final normalized = <String>[
-      'Default',
-      ...profileNames.where((name) => name != 'Default'),
-    ];
-    final existing = await _unifiedDatabase.readProfiles();
-    final existingIds = {
-      for (final profile in existing) profile.name: profile.id,
-    };
-
-    for (final profile in existing) {
-      if (!normalized.contains(profile.name)) {
-        await _unifiedDatabase.deleteProfile(profile.id);
-      }
-    }
-
-    _profileIdsByName.clear();
-    final restoredSeed = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
-    for (var index = 0; index < normalized.length; index++) {
-      final name = normalized[index];
-      final profileId = existingIds[name] ??
-          (name == 'Default'
-              ? 'profile-default'
-              : 'profile-restored-$restoredSeed-$index');
-      await _unifiedDatabase.upsertProfile(
-        id: profileId,
-        name: name,
-        sortOrder: index,
-      );
-      _profileIdsByName[name] = profileId;
-    }
-
-    accounts = normalized;
-    activeAccount =
-        accounts.contains(requestedActive) ? requestedActive : 'Default';
-    await _unifiedDatabase.setActiveProfileId(activeProfileId);
-
-    for (final account in accounts) {
-      await _migrateLegacyProfileState(account, replace: true);
-      await _loadProfileState(account);
-    }
   }
 
   AccountManager({
@@ -661,7 +619,7 @@ class AccountManager extends ChangeNotifier {
     final prefs = await SqliteSettings.getInstance();
     await prefs.flush();
 
-    final unified = profileDataDatabase;
+    final unified = _unifiedDatabase;
     final globalCandles = await marketDataDatabase
         .select(marketDataDatabase.unifiedCandles)
         .get();
@@ -688,6 +646,9 @@ class AccountManager extends ChangeNotifier {
           final unifiedProfile = await unified.readProfileByName(account);
           if (unifiedProfile != null) {
             final trades = await unified.readTrades(unifiedProfile.id);
+            final ibkrSettings =
+                await unified.readIbkrSettings(unifiedProfile.id);
+            final ibkrCaches = await unified.readIbkrCaches(unifiedProfile.id);
             await snapshot.transaction(() async {
               await snapshot.delete(snapshot.trades).go();
               for (final trade in trades) {
@@ -703,6 +664,23 @@ class AccountManager extends ChangeNotifier {
                         commission: Value(trade.commission),
                       ),
                     );
+              }
+              await snapshot.delete(snapshot.ibkrProfileSettings).go();
+              if (ibkrSettings != null) {
+                await snapshot.writeIbkrProfileSettings(
+                  enabled: ibkrSettings.enabled,
+                  baseUrl: ibkrSettings.baseUrl,
+                  token: ibkrSettings.token,
+                );
+              }
+              await snapshot.delete(snapshot.ibkrCacheEntries).go();
+              for (final cache in ibkrCaches) {
+                await snapshot.writeIbkrCache(
+                  kind: cache.kind,
+                  cacheKey: cache.cacheKey,
+                  payloadJson: cache.payloadJson,
+                  cachedAt: cache.cachedAt,
+                );
               }
             });
           }
@@ -815,6 +793,23 @@ class AccountManager extends ChangeNotifier {
         );
         await entry.value.copy(target.path);
       }
+      for (final profile in logical.profiles) {
+        final restoredDatabase = Database.connect(
+          NativeDatabase(
+            File(
+              p.join(
+                databaseDirectory.path,
+                databaseFileNameForAccount(profile),
+              ),
+            ),
+          ),
+        );
+        try {
+          await restoredDatabase.customSelect('PRAGMA quick_check').get();
+        } finally {
+          await restoredDatabase.close();
+        }
+      }
 
       await prefs.restore(
         logical.settings,
@@ -832,16 +827,22 @@ class AccountManager extends ChangeNotifier {
       // now reads.
       final restoredSnapshot = await readLegacyUnifiedSnapshot(
         appState: prefs.database,
-        openProfileDatabase: (name) async => _profileDatabaseFactory(name),
+        openProfileDatabase: (name) async => Database.connect(
+          NativeDatabase(
+            File(
+              p.join(
+                databaseDirectory.path,
+                databaseFileNameForAccount(name),
+              ),
+            ),
+          ),
+        ),
       );
       await _unifiedDatabase.migrateLegacySnapshot(
         restoredSnapshot,
         replaceExisting: true,
       );
-      await _replaceUnifiedProfileRegistry(
-        logical.profiles,
-        logical.activeProfile,
-      );
+      await init();
 
       clearAllSyncCache();
       notifyListeners();
@@ -855,10 +856,7 @@ class AccountManager extends ChangeNotifier {
         previousAccounts,
         previousActiveAccount,
       );
-      await _replaceUnifiedProfileRegistry(
-        previousAccounts,
-        previousActiveAccount,
-      );
+      await init();
       talker.handle(error, stackTrace, 'Failed to restore Market Monk backup');
       rethrow;
     }

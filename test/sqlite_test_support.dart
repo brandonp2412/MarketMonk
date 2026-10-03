@@ -25,10 +25,21 @@ Future<void> seedTestSqlite(Map<String, Object?> values) async {
   final profileData = UnifiedDatabase.connect(NativeDatabase.memory());
   _profileDataTestDatabase = profileData;
   setProfileDataDatabaseForTesting(profileData);
-  await profileData.upsertProfile(
-    id: 'test-profile-default',
-    name: 'Default',
-    sortOrder: 0,
+  final accountNames = ((values['accounts'] as List?) ?? const ['Default'])
+      .cast<String>()
+      .toList();
+  if (!accountNames.contains('Default')) accountNames.insert(0, 'Default');
+  for (var index = 0; index < accountNames.length; index++) {
+    await profileData.upsertProfile(
+      id: 'test-profile-' + index.toString(),
+      name: accountNames[index],
+      sortOrder: index,
+    );
+  }
+  final requestedActive = values['activeAccount'] as String?;
+  final activeIndex = accountNames.indexOf(requestedActive ?? 'Default');
+  await profileData.setActiveProfileId(
+    'test-profile-' + (activeIndex < 0 ? 0 : activeIndex).toString(),
   );
   addTearDown(() async {
     setProfileDataDatabaseForTesting(null);

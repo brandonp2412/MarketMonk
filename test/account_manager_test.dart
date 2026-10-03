@@ -270,6 +270,18 @@ void main() {
     addTearDown(unifiedDatabase.close);
     final manager = AccountManager(unifiedDatabase: unifiedDatabase);
     await manager.init();
+    for (final entry in const [('Default', 'VTI', 10.0), ('Brokerage', 'VXUS', 20.0)]) {
+      final profile = await unifiedDatabase.readProfileByName(entry.$1);
+      await unifiedDatabase.addTrade(
+        profileId: profile!.id,
+        symbol: entry.$2,
+        name: entry.$2,
+        quantity: entry.$3,
+        price: 100,
+        tradeType: 'open',
+        tradeDate: DateTime(2026, 10, 2),
+      );
+    }
     final exportDirectory = await tempDir.createTemp('export-');
     final backup = await manager.exportBackup(exportDirectory);
 

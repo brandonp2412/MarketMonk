@@ -2,13 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 import 'package:market_monk/database.dart';
-import 'package:market_monk/logging.dart';
-import 'package:market_monk/sqlite_settings.dart';
 import 'package:market_monk/unified_database.dart';
-
-const int marketDataLegacyMigrationVersion = 1;
-const String marketDataLegacyMigrationSetting =
-    'marketDataLegacyMigrationVersion';
 
 UnifiedDatabase? _marketDataDatabase;
 
@@ -211,64 +205,4 @@ Future<LegacyMarketDataMergeResult> mergeLegacyCandlesIntoUnified({
     writtenRows: toWrite.length,
     symbols: selected.values.map((row) => row.symbol).toSet().length,
   );
-}
-
-Future<void> _migrateLegacySymbolMetadata(
-  UnifiedDatabase target,
-  SqliteSettings settings,
-) async {
-  for (final entry in settings.snapshot().entries) {
-    const prefix = 'symbolRawCurrency_';
-    if (!entry.key.startsWith(prefix) || entry.value is! String) continue;
-    final symbol = entry.key.substring(prefix.length);
-    final rawCurrency = entry.value! as String;
-    if (symbol.trim().isEmpty || rawCurrency.isEmpty) continue;
-    await upsertSymbolCurrencyMetadata(symbol, rawCurrency, database: target);
-  }
-}
-
-Future<void> migrateLegacyMarketDataOnStartup({
-  Database? defaultDatabase,
-}) async {
-  final settings = await SqliteSettings.getInstance();
-  final target = marketDataDatabase;
-  final migrated =
-      await target.readSetting(marketDataLegacyMigrationSetting) as int?;
-  if ((migrated ?? 0) >= marketDataLegacyMigrationVersion) return;
-
-  final accounts = settings.getStringList('accounts') ?? const ['Default'];
-  final opened = <Database>[];
-  final sources = <Database>[];
-  try {
-    for (final account in accounts.toSet()) {
-      if (account == 'Default' && defaultDatabase != null) {
-        sources.add(defaultDatabase);
-        continue;
-      }
-      final database = Database(
-        account == 'Default' ? 'market-monk' : 'market-monk-$account',
-      );
-      opened.add(database);
-      sources.add(database);
-    }
-
-    final result = await mergeLegacyCandlesIntoUnified(
-      target: target,
-      legacyDatabases: sources,
-    );
-    await _migrateLegacySymbolMetadata(target, settings);
-    await target.writeSetting(
-      marketDataLegacyMigrationSetting,
-      marketDataLegacyMigrationVersion,
-    );
-    talker.info(
-      'Unified market-data migration complete: '
-      '${result.scannedRows} legacy rows scanned, '
-      '${result.writtenRows} rows merged across ${result.symbols} symbols',
-    );
-  } finally {
-    for (final database in opened) {
-      await database.close();
-    }
-  }
 }

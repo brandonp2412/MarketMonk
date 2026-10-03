@@ -14,9 +14,7 @@ class Database extends _$Database {
   @override
   int get schemaVersion => 12;
 
-  Database([String name = 'market-monk']) : super(_openConnection(name)) {
-    driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
-  }
+  Database([String name = 'market-monk']) : super(_openConnection(name));
 
   Database.connect(super.executor);
 

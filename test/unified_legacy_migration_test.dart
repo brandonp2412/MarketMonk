@@ -47,6 +47,9 @@ void main() {
       expect(await target.readActiveProfileId(), botId);
       expect(await target.readSetting('displayCurrency'), 'NZD');
       expect(await target.readSetting('showValues'), isTrue);
+      final metadata = await target.readSymbolMetadata('VOD.L');
+      expect(metadata?.currency, 'GBP');
+      expect(metadata?.payloadJson, contains('GBp'));
       expect(
         await target.readSetting(UnifiedDatabase.legacyMigrationCompleteKey),
         isTrue,
@@ -313,6 +316,7 @@ Future<_LegacyFixture> _createLegacyFixture() async {
   await appState.setActiveProfile('IBKR Bot');
   await appState.writeSetting('displayCurrency', 'NZD');
   await appState.writeSetting('showValues', true);
+  await appState.writeSetting('symbolRawCurrency_VOD.L', 'GBp');
 
   await defaultDatabase.into(defaultDatabase.trades).insert(
         TradesCompanion.insert(

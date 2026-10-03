@@ -44,6 +44,8 @@ class UnifiedDatabase extends _$UnifiedDatabase {
   @override
   int get schemaVersion => 1;
 
+  Future<void> validateUnifiedSchema() => validateDatabaseSchema();
+
   static QueryExecutor _openConnection() => driftDatabase(
         name: databaseName,
         native: const DriftNativeOptions(
@@ -123,6 +125,25 @@ class UnifiedDatabase extends _$UnifiedDatabase {
           continue;
         }
         await writeSetting(setting.key, setting.value);
+        const currencyPrefix = 'symbolRawCurrency_';
+        final settingValue = setting.value;
+        if (setting.key.startsWith(currencyPrefix) &&
+            settingValue is String &&
+            settingValue.isNotEmpty) {
+          final symbol = setting.key.substring(currencyPrefix.length).trim();
+          if (symbol.isNotEmpty) {
+            await upsertSymbolMetadata(
+              symbol: symbol.toUpperCase(),
+              currency: switch (settingValue) {
+                'GBp' => 'GBP',
+                'ZAc' => 'ZAR',
+                _ => settingValue,
+              },
+              payloadJson: jsonEncode({'rawCurrency': settingValue}),
+              cachedAt: DateTime.now().toUtc(),
+            );
+          }
+        }
       }
 
       final bestCandles = <String, LegacyCandleSnapshot>{};
