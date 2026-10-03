@@ -253,7 +253,11 @@ class HoldingsPageState extends State<HoldingsPage>
         return;
       }
       final cached = accounts.portfolioCacheFor(accountName);
-      if (cached != null && !refreshPortfolio) {
+      final config = accounts.ibkrConfigFor(accountName);
+      final cacheFresh = accounts.isPortfolioCacheFresh(accountName);
+      if (cached != null &&
+          !refreshPortfolio &&
+          (cacheFresh || (config.enabled && !config.isConfigured))) {
         final result = _summariesFromPositions(trades, cached.positions);
         if (mounted) {
           setState(() {

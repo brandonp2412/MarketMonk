@@ -11,6 +11,15 @@ import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 import 'sqlite_test_support.dart';
 
+class _StalePortfolioAccountManager extends AccountManager {
+  @override
+  bool isPortfolioCacheFresh(
+    String name, {
+    Duration maxAge = AccountManager.ibkrPortfolioCacheMaxAge,
+  }) =>
+      false;
+}
+
 Future<void> _disposeTestApp(WidgetTester tester) async {
   await tester.pumpWidget(const SizedBox.shrink());
   await tester.pump(const Duration(milliseconds: 1));
@@ -369,6 +378,60 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(accounts.activeAccount, 'Brokerage');
+    await _disposeTestApp(tester);
+  });
+
+  testWidgets('stale empty portfolio cache does not hide refreshed holdings',
+      (tester) async {
+    await seedTestSqlite({});
+    db = Database.connect(
+      DatabaseConnection(
+        NativeDatabase.memory(),
+        closeStreamsSynchronously: true,
+      ),
+    );
+    addTearDown(() => db.close());
+
+    final AccountManager accounts = _StalePortfolioAccountManager();
+    await accounts.init();
+    await accounts.cachePortfolio('Default', const [], null);
+    final position = Position(
+      symbol: 'VOO',
+      name: 'VANGUARD S&P 500 ETF',
+      nativeCurrency: 'USD',
+      netShares: 10,
+      avgCost: 500,
+      currentPrice: 550,
+      firstBuyDate: DateTime(2025),
+      lastBuyDate: DateTime(2026),
+    );
+    var positionLoads = 0;
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create: (_) => SettingsState(
+              localCurrencyDetector: () async => 'USD',
+            ),
+          ),
+          ChangeNotifierProvider<AccountManager>.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: HoldingsPage(
+            positionsLoader: (_) async {
+              positionLoads++;
+              return [position];
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(positionLoads, 1);
+    expect(find.text('VOO'), findsOneWidget);
+    expect(find.text('No IBKR stocks found'), findsNothing);
     await _disposeTestApp(tester);
   });
 }
