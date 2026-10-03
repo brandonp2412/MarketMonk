@@ -4,6 +4,7 @@ import 'package:drift/drift.dart' show DatabaseConnection;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/holdings_page.dart';
@@ -50,6 +51,14 @@ IbkrPerformanceSeries _performance() => IbkrPerformanceSeries(
       returnDates: [DateTime(2025, 10, 3), DateTime(2026, 10, 2)],
       returns: const [0, 0.1],
     );
+
+Future<T> _observed<T>(String category, Future<T> Function() request) =>
+    backgroundNetworkCoordinator.observe<T>(category, request);
+
+Future<void> _disposeTestApp(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump(const Duration(milliseconds: 1));
+}
 
 Position _position() => Position(
       symbol: 'VOO',
@@ -166,6 +175,8 @@ class _LifecycleTabsState extends State<_LifecycleTabs> {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  setUp(backgroundNetworkCoordinator.resetDiagnostics);
+
   testWidgets('tab switching does not let the hidden portfolio fetch', (
     tester,
   ) async {
@@ -192,14 +203,16 @@ void main() {
             throw StateError('chart load deliberately leaves cache empty');
           },
           chartPerformanceLoader: (_, __) async => _performance(),
-          portfolioLoader: (_) async {
+          portfolioLoader: (_) =>
+              _observed(RequestCategory.ibkrPortfolio, () async {
             portfolioLoads++;
             return _snapshot('Default');
-          },
-          portfolioPerformanceLoader: (_, __) async {
+          }),
+          portfolioPerformanceLoader: (_, __) =>
+              _observed(RequestCategory.ibkrPerformance, () async {
             portfolioPerformanceLoads++;
             return _performance();
-          },
+          }),
         ),
       ),
     );
@@ -209,6 +222,16 @@ void main() {
     expect(chartPortfolioLoads, greaterThan(0));
     expect(portfolioLoads, 0);
     expect(portfolioPerformanceLoads, 0);
+    expect(
+      backgroundNetworkCoordinator.startedCount(RequestCategory.ibkrPortfolio),
+      0,
+    );
+    expect(
+      backgroundNetworkCoordinator.startedCount(
+        RequestCategory.ibkrPerformance,
+      ),
+      0,
+    );
     final chartLoadsBeforeSwitch = chartPortfolioLoads;
 
     await tester.tap(find.byKey(const Key('portfolio-tab')));
@@ -218,6 +241,17 @@ void main() {
     expect(portfolioLoads, 1);
     expect(portfolioPerformanceLoads, 1);
     expect(chartPortfolioLoads, chartLoadsBeforeSwitch);
+    expect(
+      backgroundNetworkCoordinator.startedCount(RequestCategory.ibkrPortfolio),
+      1,
+    );
+    expect(
+      backgroundNetworkCoordinator.startedCount(
+        RequestCategory.ibkrPerformance,
+      ),
+      1,
+    );
+    await _disposeTestApp(tester);
   });
 
   testWidgets('inactive portfolio ignores app resume', (tester) async {
@@ -247,14 +281,16 @@ void main() {
           PortfolioPage(
             key: key,
             isActive: isActive,
-            ibkrLoader: (_) async {
+            ibkrLoader: (_) =>
+                _observed(RequestCategory.ibkrPortfolio, () async {
               portfolioLoads++;
               return _snapshot('Default');
-            },
-            ibkrPerformanceLoader: (_, __) async {
+            }),
+            ibkrPerformanceLoader: (_, __) =>
+                _observed(RequestCategory.ibkrPerformance, () async {
               performanceLoads++;
               return _performance();
-            },
+            }),
           ),
         );
 
@@ -265,6 +301,16 @@ void main() {
 
     expect(portfolioLoads, 0);
     expect(performanceLoads, 0);
+    expect(
+      backgroundNetworkCoordinator.startedCount(RequestCategory.ibkrPortfolio),
+      0,
+    );
+    expect(
+      backgroundNetworkCoordinator.startedCount(
+        RequestCategory.ibkrPerformance,
+      ),
+      0,
+    );
 
     await tester.pumpWidget(page(true));
     await tester.pump();
@@ -280,7 +326,269 @@ void main() {
 
     expect(portfolioLoads, 0);
     expect(performanceLoads, 0);
+    expect(
+      backgroundNetworkCoordinator.startedCount(RequestCategory.ibkrPortfolio),
+      0,
+    );
+    expect(
+      backgroundNetworkCoordinator.startedCount(
+        RequestCategory.ibkrPerformance,
+      ),
+      0,
+    );
+    await _disposeTestApp(tester);
   });
+
+  testWidgets('fresh portfolio launch records one request per IBKR category', (
+    tester,
+  ) async {
+    await seedTestSqlite({});
+    db = Database.connect(
+      DatabaseConnection(
+        NativeDatabase.memory(),
+        closeStreamsSynchronously: true,
+      ),
+    );
+    addTearDown(() => db.close());
+
+    final accounts = await _configuredAccount();
+    await tester.pumpWidget(
+      _app(
+        accounts,
+        PortfolioPage(
+          ibkrLoader: (_) => _observed(
+            RequestCategory.ibkrPortfolio,
+            () async => _snapshot('Default'),
+          ),
+          ibkrPerformanceLoader: (_, __) => _observed(
+            RequestCategory.ibkrPerformance,
+            () async => _performance(),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(
+      backgroundNetworkCoordinator.startedCount(RequestCategory.ibkrPortfolio),
+      1,
+    );
+    expect(
+      backgroundNetworkCoordinator.completedCount(
+        RequestCategory.ibkrPortfolio,
+      ),
+      1,
+    );
+    expect(
+      backgroundNetworkCoordinator.startedCount(
+        RequestCategory.ibkrPerformance,
+      ),
+      1,
+    );
+    expect(
+      backgroundNetworkCoordinator.completedCount(
+        RequestCategory.ibkrPerformance,
+      ),
+      1,
+    );
+    await _disposeTestApp(tester);
+  });
+
+  testWidgets(
+    'warm portfolio launch with fresh cache records no IBKR requests',
+    (tester) async {
+      await seedTestSqlite({});
+      db = Database.connect(
+        DatabaseConnection(
+          NativeDatabase.memory(),
+          closeStreamsSynchronously: true,
+        ),
+      );
+      addTearDown(() => db.close());
+
+      final accounts = await _configuredAccount();
+      await accounts.cachePortfolio(
+        'Default',
+        [_position()],
+        const IbkrAccountValue(value: 100, currency: 'USD'),
+        netLiquidationUsd: 100,
+      );
+      await accounts.cacheIbkrPerformance('Default', _performance());
+
+      await tester.pumpWidget(
+        _app(
+          accounts,
+          PortfolioPage(
+            ibkrLoader: (_) => _observed(
+              RequestCategory.ibkrPortfolio,
+              () async => throw StateError('fresh cache should be used'),
+            ),
+            ibkrPerformanceLoader: (_, __) => _observed(
+              RequestCategory.ibkrPerformance,
+              () async => throw StateError('fresh cache should be used'),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(
+        backgroundNetworkCoordinator.startedCount(
+          RequestCategory.ibkrPortfolio,
+        ),
+        0,
+      );
+      expect(
+        backgroundNetworkCoordinator.startedCount(
+          RequestCategory.ibkrPerformance,
+        ),
+        0,
+      );
+      await _disposeTestApp(tester);
+    },
+  );
+
+  testWidgets('manual refresh records exactly one request per IBKR category', (
+    tester,
+  ) async {
+    await seedTestSqlite({});
+    db = Database.connect(
+      DatabaseConnection(
+        NativeDatabase.memory(),
+        closeStreamsSynchronously: true,
+      ),
+    );
+    addTearDown(() => db.close());
+
+    final accounts = await _configuredAccount();
+    await accounts.cachePortfolio(
+      'Default',
+      [_position()],
+      const IbkrAccountValue(value: 100, currency: 'USD'),
+      netLiquidationUsd: 100,
+    );
+    await accounts.cacheIbkrPerformance('Default', _performance());
+
+    await tester.pumpWidget(
+      _app(
+        accounts,
+        PortfolioPage(
+          ibkrLoader: (_) => _observed(
+            RequestCategory.ibkrPortfolio,
+            () async => _snapshot('Default'),
+          ),
+          ibkrPerformanceLoader: (_, __) => _observed(
+            RequestCategory.ibkrPerformance,
+            () async => _performance(),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(
+      backgroundNetworkCoordinator.startedCount(RequestCategory.ibkrPortfolio),
+      0,
+    );
+
+    accounts.requestIbkrRefresh();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(
+      backgroundNetworkCoordinator.startedCount(RequestCategory.ibkrPortfolio),
+      1,
+    );
+    expect(
+      backgroundNetworkCoordinator.startedCount(
+        RequestCategory.ibkrPerformance,
+      ),
+      1,
+    );
+    await _disposeTestApp(tester);
+  });
+
+  testWidgets(
+    'account switch fetches only the newly active IBKR profile once',
+    (tester) async {
+      await seedTestSqlite({});
+      db = Database.connect(
+        DatabaseConnection(
+          NativeDatabase.memory(),
+          closeStreamsSynchronously: true,
+        ),
+      );
+      addTearDown(() => db.close());
+
+      final accounts = await _configuredAccount();
+      await accounts.addAccount('Bot');
+      await accounts.setIbkrConfig(
+        'Bot',
+        const IbkrAccountConfig(
+          enabled: true,
+          baseUrl: 'https://bot.example.test',
+          token: 'secret-token',
+        ),
+      );
+      await accounts.cachePortfolio(
+        'Default',
+        [_position()],
+        const IbkrAccountValue(value: 100, currency: 'USD'),
+        netLiquidationUsd: 100,
+      );
+      await accounts.cacheIbkrPerformance('Default', _performance());
+
+      final loadedHosts = <String>[];
+      await tester.pumpWidget(
+        _app(
+          accounts,
+          PortfolioPage(
+            ibkrLoader: (config) => _observed(
+              RequestCategory.ibkrPortfolio,
+              () async {
+                loadedHosts.add(Uri.parse(config.baseUrl).host);
+                return _snapshot('Bot');
+              },
+            ),
+            ibkrPerformanceLoader: (_, __) => _observed(
+              RequestCategory.ibkrPerformance,
+              () async => _performance(),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(
+        backgroundNetworkCoordinator.startedCount(
+          RequestCategory.ibkrPortfolio,
+        ),
+        0,
+      );
+
+      await accounts.switchAccount('Bot');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(accounts.activeAccount, 'Bot');
+      expect(loadedHosts, ['bot.example.test']);
+      expect(
+        backgroundNetworkCoordinator.startedCount(
+          RequestCategory.ibkrPortfolio,
+        ),
+        1,
+      );
+      expect(
+        backgroundNetworkCoordinator.startedCount(
+          RequestCategory.ibkrPerformance,
+        ),
+        1,
+      );
+      await _disposeTestApp(tester);
+    },
+  );
 
   testWidgets('holdings reactivation performs one preload', (tester) async {
     await seedTestSqlite({});
@@ -322,6 +630,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     expect(positionLoads, 2);
+    await _disposeTestApp(tester);
   });
 
   testWidgets('deactivating charts stops follow-on broker requests', (
@@ -393,6 +702,7 @@ void main() {
 
     expect(defaultLoads, 1);
     expect(botLoads, 0);
+    await _disposeTestApp(tester);
   });
 
   testWidgets('fresh chart startup stays within the IBKR request budget',
@@ -429,7 +739,7 @@ void main() {
 
     var portfolioLoads = 0;
     var performanceLoads = 0;
-    const freshStartupRequestBudget = 4;
+    const freshStartupRequestBudget = 2;
 
     await tester.pumpWidget(
       _app(
@@ -452,11 +762,12 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 150));
 
-    expect(portfolioLoads, 2);
-    expect(performanceLoads, 2);
+    expect(portfolioLoads, 1);
+    expect(performanceLoads, 1);
     expect(
       portfolioLoads + performanceLoads,
       lessThanOrEqualTo(freshStartupRequestBudget),
     );
+    await _disposeTestApp(tester);
   });
 }

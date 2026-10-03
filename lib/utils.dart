@@ -104,7 +104,7 @@ Future<void> fetchSymbolCurrencyAndRate(String symbol) async {
   if (canonicalSymbol.isEmpty) return;
   try {
     await backgroundNetworkCoordinator.coalesce<void>(
-      'yahoo.symbolMetadata',
+      RequestCategory.yahooSymbolMetadata,
       canonicalSymbol,
       () => _fetchSymbolCurrencyAndRate(canonicalSymbol)
           .timeout(const Duration(seconds: 2)),
@@ -656,14 +656,14 @@ double safePercentChange(double oldValue, double newValue) {
 void clearSyncCache(String symbol) {
   final canonicalSymbol = canonicalMarketSymbol(symbol);
   backgroundNetworkCoordinator.clearFreshness(
-    'market.candles',
+    RequestCategory.marketCandles,
     where: (key) => key is (String, int, bool) && key.$1 == canonicalSymbol,
   );
 }
 
 /// Removes all symbols from the sync guard (e.g. after a full manual refresh).
 void clearAllSyncCache() =>
-    backgroundNetworkCoordinator.clearFreshness('market.candles');
+    backgroundNetworkCoordinator.clearFreshness(RequestCategory.marketCandles);
 
 DateTime _latestExpectedMarketDay(DateTime today) {
   var expectedDay = today;
@@ -689,7 +689,10 @@ Future<bool> _syncIbkrCandlesIfAvailable(
 
   try {
     final history = ibkrFetcher != null
-        ? await ibkrFetcher(symbol, years)
+        ? await backgroundNetworkCoordinator.observe<IbkrHistoricalSeries>(
+            RequestCategory.ibkrHistorical,
+            () => ibkrFetcher(symbol, years),
+          )
         : await IbkrApiClient(config)
             .fetchHistoricalCandles(symbol, years: years);
     if (history.candles.isEmpty) {
@@ -719,6 +722,10 @@ Future<bool> _syncIbkrCandlesIfAvailable(
       requestedCandles,
       symbol,
       database: targetDatabase,
+    );
+    backgroundNetworkCoordinator.recordRows(
+      RequestCategory.ibkrHistorical,
+      stored,
     );
     talker.info(
       'Completed IBKR candle sync for $symbol: $stored rows from '
@@ -836,7 +843,11 @@ Future<void> syncCandles(
           );
           return response.candlesData;
         };
-    final response = await fetch(canonicalSymbol, requestFrom);
+    final response =
+        await backgroundNetworkCoordinator.observe<List<YahooFinanceCandleData>>(
+      RequestCategory.yahooCandles,
+      () => fetch(canonicalSymbol, requestFrom),
+    );
     final requestedCandles = response.where((candle) {
       final day = canonicalMarketDay(candle.date);
       return !day.isBefore(requestFrom) && !day.isAfter(expectedMarketDay);
@@ -846,6 +857,7 @@ Future<void> syncCandles(
       canonicalSymbol,
       database: targetDatabase,
     );
+    backgroundNetworkCoordinator.recordRows(RequestCategory.yahooCandles, stored);
     talker.info(
       'Completed Yahoo candle sync for $canonicalSymbol: $stored rows '
       'from ${requestFrom.toIso8601String()}',
@@ -857,7 +869,7 @@ Future<void> syncCandles(
     while (true) {
       final networkRequested =
           await backgroundNetworkCoordinator.coalesce<bool>(
-        'market.candles',
+        RequestCategory.marketCandles,
         canonicalSymbol,
         performSync,
       );
@@ -942,7 +954,7 @@ Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
 Future<void> _fetchAndCacheRate(String currencyCode) async {
   try {
     final rate = await backgroundNetworkCoordinator.coalesce<double?>(
-      'fx.rate',
+      RequestCategory.fxRate,
       currencyCode,
       () async {
         final uri = Uri.parse(
@@ -1017,7 +1029,7 @@ class YahooFinanceApi {
 
   Future<List<StockResult>> _performSearch(String query) =>
       backgroundNetworkCoordinator.coalesce<List<StockResult>>(
-        'yahoo.search',
+        RequestCategory.yahooSearch,
         query,
         () async {
           try {

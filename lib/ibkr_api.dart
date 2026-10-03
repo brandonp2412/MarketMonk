@@ -398,19 +398,22 @@ class IbkrApiClient {
     Future<http.Response> Function(Uri, {Map<String, String>? headers})? get,
   }) : _get = get ?? http.get;
 
-  Future<void> testConnection() async {
-    final response = await _request('/v1/health');
-    final body = _decodeJsonObject(response, '/v1/health');
-    if (body['status'] != 'ok') {
-      throw StateError(
-        body['detail'] ?? body['error'] ?? 'IBKR API unavailable',
+  Future<void> testConnection() => backgroundNetworkCoordinator.observe<void>(
+        RequestCategory.ibkrHealth,
+        () async {
+          final response = await _request('/v1/health');
+          final body = _decodeJsonObject(response, '/v1/health');
+          if (body['status'] != 'ok') {
+            throw StateError(
+              body['detail'] ?? body['error'] ?? 'IBKR API unavailable',
+            );
+          }
+        },
       );
-    }
-  }
 
   Future<IbkrPortfolioSnapshot> fetchPortfolio() =>
       backgroundNetworkCoordinator.coalesce<IbkrPortfolioSnapshot>(
-        'ibkr.portfolio',
+        RequestCategory.ibkrPortfolio,
         config,
         () async {
           final response = await _request('/v1/portfolio');
@@ -428,7 +431,7 @@ class IbkrApiClient {
       throw ArgumentError.value(period, 'period', 'Unsupported IBKR period');
     }
     return backgroundNetworkCoordinator.coalesce<IbkrPerformanceSeries>(
-      'ibkr.performance',
+      RequestCategory.ibkrPerformance,
       (config, normalized),
       () async {
         final response = await _request(
@@ -448,7 +451,7 @@ class IbkrApiClient {
       throw RangeError.range(days, 1, 3650, 'days');
     }
     return backgroundNetworkCoordinator.coalesce<IbkrTradeHistory>(
-      'ibkr.trades',
+      RequestCategory.ibkrTrades,
       (config, days),
       () async {
         final response = await _request(
@@ -468,16 +471,22 @@ class IbkrApiClient {
   Future<IbkrHistoricalSeries> fetchHistoricalCandles(
     String symbol, {
     int years = 1,
-  }) async {
+  }) {
     if (years < 1 || years > 10) {
       throw RangeError.range(years, 1, 10, 'years');
     }
-    final response = await _request(
-      '/v1/historical',
-      queryParameters: {'symbol': symbol, 'years': '$years'},
-    );
-    return IbkrHistoricalSeries.fromJson(
-      _decodeJsonObject(response, '/v1/historical'),
+    return backgroundNetworkCoordinator.coalesce<IbkrHistoricalSeries>(
+      RequestCategory.ibkrHistorical,
+      (config, symbol, years),
+      () async {
+        final response = await _request(
+          '/v1/historical',
+          queryParameters: {'symbol': symbol, 'years': '$years'},
+        );
+        return IbkrHistoricalSeries.fromJson(
+          _decodeJsonObject(response, '/v1/historical'),
+        );
+      },
     );
   }
 

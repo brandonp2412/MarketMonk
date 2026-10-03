@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/unified_database.dart';
 import 'package:market_monk/utils.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
@@ -42,6 +43,7 @@ Future<List<UnifiedCandle>> _rows(UnifiedDatabase database) =>
 
 void main() {
   setUp(() {
+    backgroundNetworkCoordinator.resetDiagnostics();
     clearAllSyncCache();
     cacheSymbolMeta('AAPL', 'USD');
   });
@@ -74,6 +76,24 @@ void main() {
     final rows = await _rows(database);
     expect(requests, 1);
     expect(requestedStarts, [canonicalMarketDay(requiredFrom)]);
+    expect(
+      backgroundNetworkCoordinator.startedCount(RequestCategory.yahooCandles),
+      1,
+    );
+    expect(
+      backgroundNetworkCoordinator.completedCount(
+        RequestCategory.yahooCandles,
+      ),
+      1,
+    );
+    expect(
+      backgroundNetworkCoordinator.rowCount(RequestCategory.yahooCandles),
+      2,
+    );
+    expect(
+      backgroundNetworkCoordinator.startedCount(RequestCategory.marketCandles),
+      1,
+    );
     expect(rows, hasLength(2));
     expect(rows.map((row) => row.symbol).toSet(), {'AAPL'});
     expect(
@@ -115,6 +135,14 @@ void main() {
 
     final after = await _rows(database);
     expect(requests, 0);
+    expect(
+      backgroundNetworkCoordinator.startedCount(RequestCategory.yahooCandles),
+      0,
+    );
+    expect(
+      backgroundNetworkCoordinator.rowCount(RequestCategory.yahooCandles),
+      0,
+    );
     expect(after, hasLength(before.length));
     expect(
       after.map((row) => (row.symbol, row.date, row.close)),

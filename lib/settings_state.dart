@@ -237,7 +237,7 @@ class SettingsState extends ChangeNotifier {
     }
     try {
       final rate = await backgroundNetworkCoordinator.coalesce<double?>(
-        'fx.rate',
+        RequestCategory.fxRate,
         currencyCode,
         () async {
           final uri = Uri.parse(

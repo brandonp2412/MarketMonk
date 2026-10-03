@@ -89,8 +89,11 @@ void main() {
     expect(coordinator.startedCount('market.candles'), 1);
     expect(coordinator.freshSkippedCount('market.candles'), 1);
     final summary = coordinator.diagnosticsSummary(label: 'startup');
-    expect(summary, contains('ibkr.portfolio started=1 coalesced=1'));
-    expect(summary, contains('market.candles started=1'));
+    expect(summary, contains('ibkr.portfolio started=1 completed=1 failed=0'));
+    expect(summary, contains('coalesced=1'));
+    expect(summary, contains('market.candles started=1 completed=1 failed=0'));
     expect(summary, isNot(contains('secret-account-key')));
+    expect(summary, isNot(contains('http')));
+    expect(summary, isNot(contains('token')));
   });
 }
