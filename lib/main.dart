@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/backup_archive.dart';
+import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/crash_logger.dart';
@@ -173,8 +174,10 @@ class AccountManager extends ChangeNotifier {
   String activeAccount = 'Default';
   int ibkrRefreshVersion = 0;
   final Map<String, IbkrAccountConfig> _ibkrConfigs = {};
-  static const ibkrPortfolioCacheMaxAge = Duration(minutes: 5);
-  static const ibkrPerformanceCacheMaxAge = Duration(minutes: 30);
+  static const ibkrPortfolioCacheMaxAge =
+      BackgroundNetworkCoordinator.ibkrPortfolioFreshness;
+  static const ibkrPerformanceCacheMaxAge =
+      BackgroundNetworkCoordinator.ibkrPerformanceFreshness;
 
   final Map<String, CachedPortfolioData> _portfolioCache = {};
   final Map<String, Map<String, CachedIbkrPerformanceData>>
@@ -303,7 +306,7 @@ class AccountManager extends ChangeNotifier {
   }) {
     final cached = _portfolioCache[name];
     return cached != null &&
-        DateTime.now().difference(cached.cachedAt) <= maxAge;
+        backgroundNetworkCoordinator.isTimestampFresh(cached.cachedAt, maxAge);
   }
 
   IbkrPerformanceSeries? ibkrPerformanceCacheFor(String name, String period) =>
@@ -316,7 +319,7 @@ class AccountManager extends ChangeNotifier {
   }) {
     final cached = _ibkrPerformanceCache[name]?[period];
     return cached != null &&
-        DateTime.now().difference(cached.cachedAt) <= maxAge;
+        backgroundNetworkCoordinator.isTimestampFresh(cached.cachedAt, maxAge);
   }
 
   /// Persists a performance series in its owning profile database.

@@ -5,6 +5,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
@@ -91,8 +92,12 @@ String symbolPriceUnit(String symbol) {
 /// local portfolio and chart UI remain responsive when Yahoo is unavailable.
 Future<void> fetchSymbolCurrencyAndRate(String symbol) async {
   try {
-    await _fetchSymbolCurrencyAndRate(symbol).timeout(
-      const Duration(seconds: 2),
+    await backgroundNetworkCoordinator.coalesce<void>(
+      'yahoo.symbolMetadata',
+      symbol,
+      () => _fetchSymbolCurrencyAndRate(symbol).timeout(
+        const Duration(seconds: 2),
+      ),
     );
   } on TimeoutException {
     talker.warning(
@@ -560,17 +565,17 @@ double safePercentChange(double oldValue, double newValue) {
 // the same symbol is requested multiple times in one app session.
 // Resets automatically when the calendar day changes.
 // ---------------------------------------------------------------------------
-DateTime? _syncGuardDate;
-final Set<String> _syncedSymbols = {};
-
 /// Removes [symbol] from the sync guard for all databases so the next
 /// [syncCandles] call will actually re-check (used by pull-to-refresh).
-void clearSyncCache(String symbol) => _syncedSymbols.removeWhere(
-      (guardKey) => guardKey.endsWith(':$symbol'),
+void clearSyncCache(String symbol) =>
+    backgroundNetworkCoordinator.clearFreshness(
+      'market.candles',
+      where: (key) => key is String && key.endsWith(':$symbol'),
     );
 
 /// Removes all symbols from the sync guard (e.g. after a full manual refresh).
-void clearAllSyncCache() => _syncedSymbols.clear();
+void clearAllSyncCache() =>
+    backgroundNetworkCoordinator.clearFreshness('market.candles');
 
 /// Syncs daily candles for [symbol], preferring the configured IBKR service.
 ///
@@ -644,79 +649,75 @@ Future<void> syncCandles(
   String syncNamespace = 'Default',
 }) async {
   final targetDatabase = database ?? db;
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final expectedMarketDay = _latestExpectedMarketDay(today);
+  final databaseKey = targetDatabase.hashCode;
+  final guardKey = '$databaseKey:$symbol';
 
-  return targetDatabase.runWhileOpen(() async {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final expectedMarketDay = _latestExpectedMarketDay(today);
-    if (_syncGuardDate != today) {
-      _syncedSymbols.clear();
-      _syncGuardDate = today;
-    }
+  try {
+    return await backgroundNetworkCoordinator.runFresh(
+      'market.candles',
+      guardKey,
+      today,
+      () => targetDatabase.runWhileOpen(() async {
+        final latest = await (targetDatabase.candles.select()
+              ..where((row) => row.symbol.equals(symbol))
+              ..orderBy([
+                (row) => OrderingTerm(
+                      expression: row.date,
+                      mode: OrderingMode.desc,
+                    ),
+              ])
+              ..limit(1))
+            .getSingleOrNull();
+        final latestDay = latest == null
+            ? null
+            : DateTime(latest.date.year, latest.date.month, latest.date.day);
 
-    final databaseKey = targetDatabase.hashCode;
-    final guardKey = '$databaseKey:$symbol';
-    if (_syncedSymbols.contains(guardKey)) return;
-    _syncedSymbols.add(guardKey);
+        final ibkrHandled = await _syncIbkrCandlesIfAvailable(
+          symbol,
+          targetDatabase: targetDatabase,
+          ibkrConfig: ibkrConfig,
+          syncNamespace: syncNamespace,
+          latest: latest,
+          latestDay: latestDay,
+          expectedMarketDay: expectedMarketDay,
+        );
+        if (ibkrHandled) return;
 
-    try {
-      final latest = await (targetDatabase.candles.select()
-            ..where((row) => row.symbol.equals(symbol))
-            ..orderBy([
-              (row) => OrderingTerm(
-                    expression: row.date,
-                    mode: OrderingMode.desc,
-                  ),
-            ])
-            ..limit(1))
-          .getSingleOrNull();
-      final latestDay = latest == null
-          ? null
-          : DateTime(latest.date.year, latest.date.month, latest.date.day);
+        unawaited(fetchSymbolCurrencyAndRate(symbol));
 
-      final ibkrHandled = await _syncIbkrCandlesIfAvailable(
-        symbol,
-        targetDatabase: targetDatabase,
-        ibkrConfig: ibkrConfig,
-        syncNamespace: syncNamespace,
-        latest: latest,
-        latestDay: latestDay,
-        expectedMarketDay: expectedMarketDay,
-      );
-      if (ibkrHandled) return;
+        if (latest == null) {
+          final response = await const YahooFinanceDailyReader().getDailyDTOs(
+            symbol,
+          );
+          await insertCandles(
+            response.candlesData,
+            symbol,
+            database: targetDatabase,
+          );
+          talker.info('Completed initial Yahoo candle sync');
+          return;
+        }
 
-      unawaited(fetchSymbolCurrencyAndRate(symbol));
-
-      if (latest == null) {
+        if (!expectedMarketDay.isAfter(latestDay!)) return;
         final response = await const YahooFinanceDailyReader().getDailyDTOs(
           symbol,
+          startDate: latest.date,
         );
         await insertCandles(
           response.candlesData,
           symbol,
           database: targetDatabase,
         );
-        talker.info('Completed initial Yahoo candle sync');
-        return;
-      }
-
-      if (!expectedMarketDay.isAfter(latestDay!)) return;
-      final response = await const YahooFinanceDailyReader().getDailyDTOs(
-        symbol,
-        startDate: latest.date,
-      );
-      await insertCandles(
-        response.candlesData,
-        symbol,
-        database: targetDatabase,
-      );
-      talker.info('Completed incremental Yahoo candle sync');
-    } catch (error, stackTrace) {
-      _syncedSymbols.remove(guardKey);
-      talker.handle(error, stackTrace, 'Candle sync failed');
-      rethrow;
-    }
-  });
+        talker.info('Completed incremental Yahoo candle sync');
+      }),
+    );
+  } catch (error, stackTrace) {
+    talker.handle(error, stackTrace, 'Candle sync failed');
+    rethrow;
+  }
 }
 
 /// Fetches the native currency for [symbol] from the Yahoo Finance chart API,
@@ -781,15 +782,21 @@ Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
 /// [allRatesFromUsd]. Called lazily, only for currencies we haven't seen yet.
 Future<void> _fetchAndCacheRate(String currencyCode) async {
   try {
-    final uri = Uri.parse(
-      'https://api.frankfurter.app/latest?from=USD&to=$currencyCode',
-    );
-    final response = await http.get(uri);
-    if (response.statusCode != 200) return;
+    final rate = await backgroundNetworkCoordinator.coalesce<double?>(
+      'fx.rate',
+      currencyCode,
+      () async {
+        final uri = Uri.parse(
+          'https://api.frankfurter.app/latest?from=USD&to=$currencyCode',
+        );
+        final response = await http.get(uri);
+        if (response.statusCode != 200) return null;
 
-    final data = json.decode(response.body) as Map<String, dynamic>;
-    final rate = ((data['rates'] as Map<String, dynamic>)[currencyCode] as num?)
-        ?.toDouble();
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        return ((data['rates'] as Map<String, dynamic>)[currencyCode] as num?)
+            ?.toDouble();
+      },
+    );
     if (rate != null) {
       allRatesFromUsd[currencyCode] = rate;
       final prefs = await SqliteSettings.getInstance();
@@ -841,31 +848,38 @@ class YahooFinanceApi {
     return completer.future;
   }
 
-  Future<List<StockResult>> _performSearch(String query) async {
-    try {
-      final response = await _searchFetcher(
-        Uri.parse('$_baseUrl?q=${Uri.encodeComponent(query)}'),
-      ).timeout(const Duration(seconds: 5));
+  Future<List<StockResult>> _performSearch(String query) =>
+      backgroundNetworkCoordinator.coalesce<List<StockResult>>(
+        'yahoo.search',
+        query,
+        () async {
+          try {
+            final response = await _searchFetcher(
+              Uri.parse('$_baseUrl?q=${Uri.encodeComponent(query)}'),
+            ).timeout(const Duration(seconds: 5));
 
-      if (response.statusCode != 200) {
-        talker.warning('Ticker search returned HTTP ${response.statusCode}');
-        return [];
-      }
+            if (response.statusCode != 200) {
+              talker.warning(
+                'Ticker search returned HTTP ${response.statusCode}',
+              );
+              return [];
+            }
 
-      final Map<String, dynamic> data = json.decode(response.body);
-      final List<dynamic> quotes = data['quotes'] ?? [];
+            final Map<String, dynamic> data = json.decode(response.body);
+            final List<dynamic> quotes = data['quotes'] ?? [];
 
-      // Include EQUITYs, ETFs, and ETNs — all have tradeable candle data.
-      const tradeable = {'EQUITY', 'ETF', 'ETN'};
-      return quotes
-          .where((quote) => tradeable.contains(quote['quoteType']))
-          .map((quote) => StockResult.fromJson(quote))
-          .toList();
-    } catch (error, stackTrace) {
-      talker.handle(error, stackTrace, 'Ticker search request failed');
-      return [];
-    }
-  }
+            // Include EQUITYs, ETFs, and ETNs — all have tradeable candle data.
+            const tradeable = {'EQUITY', 'ETF', 'ETN'};
+            return quotes
+                .where((quote) => tradeable.contains(quote['quoteType']))
+                .map((quote) => StockResult.fromJson(quote))
+                .toList();
+          } catch (error, stackTrace) {
+            talker.handle(error, stackTrace, 'Ticker search request failed');
+            return [];
+          }
+        },
+      );
 
   void cancelPendingSearch() {
     _debounceTimer?.cancel();

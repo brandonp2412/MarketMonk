@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:market_monk/background_network_coordinator.dart';
 
 /// Per-MarketMonk-account connection details for a self-hosted IBKR service.
 class IbkrAccountConfig {
@@ -378,49 +379,66 @@ class IbkrApiClient {
     }
   }
 
-  Future<IbkrPortfolioSnapshot> fetchPortfolio() async {
-    final response = await _request('/v1/portfolio');
-    return IbkrPortfolioSnapshot.fromJson(
-      _decodeJsonObject(response, '/v1/portfolio'),
-    );
-  }
+  Future<IbkrPortfolioSnapshot> fetchPortfolio() =>
+      backgroundNetworkCoordinator.coalesce<IbkrPortfolioSnapshot>(
+        'ibkr.portfolio',
+        config,
+        () async {
+          final response = await _request('/v1/portfolio');
+          return IbkrPortfolioSnapshot.fromJson(
+            _decodeJsonObject(response, '/v1/portfolio'),
+          );
+        },
+      );
 
   /// Fetches IBKR PortfolioAnalyst NAV and TWR history for [period].
-  Future<IbkrPerformanceSeries> fetchPerformance(String period) async {
+  Future<IbkrPerformanceSeries> fetchPerformance(String period) {
     const validPeriods = {'1D', '7D', 'MTD', '1M', 'YTD', '1Y'};
     final normalized = period.trim().toUpperCase();
     if (!validPeriods.contains(normalized)) {
       throw ArgumentError.value(period, 'period', 'Unsupported IBKR period');
     }
-    final response = await _request(
-      '/v1/performance',
-      queryParameters: {'period': normalized},
-    );
-    return IbkrPerformanceSeries.fromJson(
-      _decodeJsonObject(response, '/v1/performance'),
+    return backgroundNetworkCoordinator.coalesce<IbkrPerformanceSeries>(
+      'ibkr.performance',
+      (config, normalized),
+      () async {
+        final response = await _request(
+          '/v1/performance',
+          queryParameters: {'period': normalized},
+        );
+        return IbkrPerformanceSeries.fromJson(
+          _decodeJsonObject(response, '/v1/performance'),
+        );
+      },
     );
   }
 
   /// Fetches up to [years] years of daily bars for a current IBKR stock position.
-  Future<List<IbkrTrade>> fetchTrades({int days = 3650}) async {
+  Future<List<IbkrTrade>> fetchTrades({int days = 3650}) {
     if (days < 1 || days > 3650) {
       throw RangeError.range(days, 1, 3650, 'days');
     }
-    final response = await _request(
-      '/v1/trades',
-      queryParameters: {'days': '$days'},
+    return backgroundNetworkCoordinator.coalesce<List<IbkrTrade>>(
+      'ibkr.trades',
+      (config, days),
+      () async {
+        final response = await _request(
+          '/v1/trades',
+          queryParameters: {'days': '$days'},
+        );
+        final body = _decodeJsonObject(response, '/v1/trades');
+        return (body['trades'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(IbkrTrade.fromJson)
+            .where(
+              (trade) =>
+                  trade.symbol.isNotEmpty &&
+                  trade.quantity != 0 &&
+                  trade.price.isFinite,
+            )
+            .toList();
+      },
     );
-    final body = _decodeJsonObject(response, '/v1/trades');
-    return (body['trades'] as List<dynamic>? ?? const [])
-        .whereType<Map<String, dynamic>>()
-        .map(IbkrTrade.fromJson)
-        .where(
-          (trade) =>
-              trade.symbol.isNotEmpty &&
-              trade.quantity != 0 &&
-              trade.price.isFinite,
-        )
-        .toList();
   }
 
   Future<IbkrHistoricalSeries> fetchHistoricalCandles(

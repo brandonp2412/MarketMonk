@@ -7,6 +7,7 @@ import 'device_region_currency_stub.dart'
     if (dart.library.io) 'device_region_currency_io.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/utils.dart';
 import 'package:market_monk/logging.dart';
@@ -215,14 +216,21 @@ class SettingsState extends ChangeNotifier {
       return;
     }
     try {
-      final uri = Uri.parse(
-        'https://api.frankfurter.app/latest?from=USD&to=$currencyCode',
+      final rate = await backgroundNetworkCoordinator.coalesce<double?>(
+        'fx.rate',
+        currencyCode,
+        () async {
+          final uri = Uri.parse(
+            'https://api.frankfurter.app/latest?from=USD&to=$currencyCode',
+          );
+          final response = await _rateFetcher(uri);
+          if (response.statusCode != 200) return null;
+          final data = json.decode(response.body) as Map<String, dynamic>;
+          final rates = data['rates'] as Map<String, dynamic>;
+          return (rates[currencyCode] as num).toDouble();
+        },
       );
-      final response = await _rateFetcher(uri);
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body) as Map<String, dynamic>;
-        final rates = data['rates'] as Map<String, dynamic>;
-        final rate = (rates[currencyCode] as num).toDouble();
+      if (rate != null) {
         allRatesFromUsd[currencyCode] = rate;
         final prefs = await SqliteSettings.getInstance();
         await prefs.setDouble('exchangeRate_$currencyCode', rate);
