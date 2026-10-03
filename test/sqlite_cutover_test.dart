@@ -111,6 +111,56 @@ void main() {
     );
   });
 
+  test('completed migration skips legacy readers and only retries cleanup',
+      () async {
+    await appState.writeSetting(legacyAppStateMigrationCompleteKey, true);
+    await appState.writeSetting(sqliteMigrationCompleteKey, true);
+
+    var preferenceReads = 0;
+    var appStateReads = 0;
+    var cleanups = 0;
+    final loaded = await SqliteSettings.initialize(
+      appState,
+      readLegacyValues: () async {
+        preferenceReads += 1;
+        throw StateError('SharedPreferences must not initialize');
+      },
+      readLegacyAppStateValues: () async {
+        appStateReads += 1;
+        throw StateError('Legacy app-state must not be read');
+      },
+      cleanupLegacyAppState: () async {
+        cleanups += 1;
+      },
+      profileDatabaseFactory: profile,
+    );
+
+    expect(preferenceReads, 0);
+    expect(appStateReads, 0);
+    expect(cleanups, 1);
+    expect(
+      await appState.readSetting(legacyAppStateCleanupCompleteKey),
+      true,
+    );
+
+    await loaded.database.close();
+    appState = AppStateDatabase.connect(
+      NativeDatabase(
+        File('${directory.path}/market-monk.settings.sqlite'),
+      ),
+    );
+    await SqliteSettings.initialize(
+      appState,
+      readLegacyValues: () =>
+          throw StateError('SharedPreferences must not initialize'),
+      readLegacyAppStateValues: () =>
+          throw StateError('Legacy app-state must not be read'),
+      cleanupLegacyAppState: () =>
+          throw StateError('Cleanup must not run after its marker'),
+      profileDatabaseFactory: profile,
+    );
+  });
+
   test('repairs profiles lost when the app-state database was renamed',
       () async {
     final legacyAppState = AppStateDatabase.connect(
@@ -122,6 +172,10 @@ void main() {
     await legacyAppState.setActiveProfile('IBKR Bot');
     await legacyAppState.writeSetting('theme', 'ThemeMode.light');
     await legacyAppState.close();
+    File('${directory.path}/market-monk-app-state.sqlite-wal')
+        .writeAsStringSync('stale');
+    File('${directory.path}/market-monk-app-state.sqlite-shm')
+        .writeAsStringSync('stale');
 
     await appState.replaceProfiles(['Default']);
     await appState.setActiveProfile('Default');
@@ -150,6 +204,22 @@ void main() {
     expect(
       await appState.readSetting(legacyAppStateMigrationCompleteKey),
       true,
+    );
+    expect(
+      await appState.readSetting(legacyAppStateCleanupCompleteKey),
+      true,
+    );
+    expect(
+      File('${directory.path}/market-monk-app-state.sqlite').existsSync(),
+      isFalse,
+    );
+    expect(
+      File('${directory.path}/market-monk-app-state.sqlite-wal').existsSync(),
+      isFalse,
+    );
+    expect(
+      File('${directory.path}/market-monk-app-state.sqlite-shm').existsSync(),
+      isFalse,
     );
 
     final manager = AccountManager();

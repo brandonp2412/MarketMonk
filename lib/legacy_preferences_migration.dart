@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:market_monk/app_state_database.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/logging.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// Opens an independently owned connection for a named profile.
 typedef ProfileDatabaseFactory = Database Function(String profile);
@@ -14,6 +13,9 @@ const sqliteMigrationCompleteKey = 'sqliteMigrationCompleteV1';
 /// Marks import of the pre-cutover SQLite app-state database.
 const legacyAppStateMigrationCompleteKey = 'legacyAppStateMigrationCompleteV1';
 
+/// Marks deletion of the obsolete pre-cutover app-state SQLite file.
+const legacyAppStateCleanupCompleteKey = 'legacyAppStateCleanupCompleteV1';
+
 /// Legacy values that belong in profile tables rather than global settings.
 const legacyProfilePreferenceKeys = {
   'accounts',
@@ -22,20 +24,6 @@ const legacyProfilePreferenceKeys = {
   'portfolioCacheV1',
   'ibkrPerformanceCacheV1',
 };
-
-/// Copies legacy preferences without modifying the upgrade source.
-Future<void> seedSqliteFromLegacyPreferences({
-  required SharedPreferences preferences,
-  required AppStateDatabase appState,
-  ProfileDatabaseFactory? profileDatabaseFactory,
-}) =>
-    seedSqliteFromLegacyValues(
-      values: {
-        for (final key in preferences.getKeys()) key: preferences.get(key),
-      },
-      appState: appState,
-      profileDatabaseFactory: profileDatabaseFactory,
-    );
 
 /// Imports legacy app and profile values, also used for version-one backups.
 /// Existing SQLite rows win, making interrupted upgrades safe to retry.
@@ -86,7 +74,8 @@ Future<List<String>> seedAppStateFromLegacyValues({
     if (legacyProfilePreferenceKeys.contains(key) ||
         key == AppStateDatabase.activeProfileSettingKey ||
         key == sqliteMigrationCompleteKey ||
-        key == legacyAppStateMigrationCompleteKey) {
+        key == legacyAppStateMigrationCompleteKey ||
+        key == legacyAppStateCleanupCompleteKey) {
       continue;
     }
     await appState.seedSettingIfMissing(key, values[key]);

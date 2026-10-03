@@ -3,7 +3,7 @@ import 'package:market_monk/legacy_app_state_reader_stub.dart'
     if (dart.library.io) 'package:market_monk/legacy_app_state_reader_io.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/legacy_preferences_migration.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:market_monk/legacy_preferences_reader.dart';
 
 /// Cached application settings whose only writable persistence is SQLite.
 class SqliteSettings {
@@ -39,6 +39,7 @@ class SqliteSettings {
     AppStateDatabase database, {
     Future<Map<String, Object?>> Function()? readLegacyValues,
     Future<Map<String, Object?>?> Function()? readLegacyAppStateValues,
+    Future<void> Function()? cleanupLegacyAppState,
     ProfileDatabaseFactory? profileDatabaseFactory,
   }) async {
     if (await database.readSetting(legacyAppStateMigrationCompleteKey) !=
@@ -63,7 +64,7 @@ class SqliteSettings {
     }
 
     if (await database.readSetting(sqliteMigrationCompleteKey) != true) {
-      final values = await (readLegacyValues ?? _readLegacyValues)();
+      final values = await (readLegacyValues ?? readLegacyPreferences)();
       await seedSqliteFromLegacyValues(
         values: values,
         appState: database,
@@ -71,12 +72,28 @@ class SqliteSettings {
       );
       await database.writeSetting(sqliteMigrationCompleteKey, true);
     }
-    return load(database);
-  }
 
-  static Future<Map<String, Object?>> _readLegacyValues() async {
-    final preferences = await SharedPreferences.getInstance();
-    return {for (final key in preferences.getKeys()) key: preferences.get(key)};
+    final appStateMigrated =
+        await database.readSetting(legacyAppStateMigrationCompleteKey) == true;
+    final preferencesMigrated =
+        await database.readSetting(sqliteMigrationCompleteKey) == true;
+    final cleanupComplete =
+        await database.readSetting(legacyAppStateCleanupCompleteKey) == true;
+    if (appStateMigrated && preferencesMigrated && !cleanupComplete) {
+      try {
+        await (cleanupLegacyAppState ?? deleteLegacyAppStateFile)();
+        await database.writeSetting(legacyAppStateCleanupCompleteKey, true);
+      } catch (error, stack) {
+        talker.handle(
+          error,
+          stack,
+          'Could not remove obsolete legacy SQLite app state; '
+          'will retry next startup',
+        );
+      }
+    }
+
+    return load(database);
   }
 
   /// Loads a supplied SQLite store, including its profile registry.
@@ -109,7 +126,8 @@ class SqliteSettings {
               entry.key != 'activeAccount' &&
               entry.key != AppStateDatabase.activeProfileSettingKey &&
               entry.key != sqliteMigrationCompleteKey &&
-              entry.key != legacyAppStateMigrationCompleteKey)
+              entry.key != legacyAppStateMigrationCompleteKey &&
+              entry.key != legacyAppStateCleanupCompleteKey)
             entry.key: entry.value is List
                 ? List<String>.from(entry.value as List)
                 : entry.value,

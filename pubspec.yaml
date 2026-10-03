@@ -20,7 +20,7 @@ dependencies:
   drift_dev: ^2.23.1
   test: ^1.25.8
   flutter_launcher_icons: ^0.14.2
-  shared_preferences: ^2.3.5 # Read-only legacy migration source; SQLite owns writes.
+  shared_preferences: ^2.3.5 # Legacy reader only; remove after pre-SQLite upgrades are unsupported.
   provider: ^6.1.2
   package_info_plus: ^10.2.0
   url_launcher: ^6.3.1

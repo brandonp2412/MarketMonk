@@ -6,7 +6,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/app_state_database.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/legacy_preferences_migration.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -60,7 +59,7 @@ void main() {
     expect(cache?.cachedAt.isAtSameMomentAs(DateTime.utc(2026, 10, 2)), isTrue);
   });
 
-  test('legacy preference seam copies state without deleting preferences',
+  test('legacy preference values copy state without mutating the source',
       () async {
     final tempDir = await Directory.systemTemp.createTemp(
       'market-monk-sqlite-foundation-',
@@ -68,7 +67,7 @@ void main() {
     addTearDown(() => tempDir.delete(recursive: true));
 
     final cachedAt = DateTime.utc(2026, 10, 2, 1, 2, 3);
-    SharedPreferences.setMockInitialValues({
+    final legacyValues = <String, Object?>{
       'accounts': ['Default', 'Brokerage'],
       'activeAccount': 'Brokerage',
       'pureBlack': true,
@@ -99,8 +98,7 @@ void main() {
           },
         },
       }),
-    });
-    final preferences = await SharedPreferences.getInstance();
+    };
     final appState = AppStateDatabase.connect(NativeDatabase.memory());
     addTearDown(appState.close);
 
@@ -110,8 +108,8 @@ void main() {
           ),
         );
 
-    await seedSqliteFromLegacyPreferences(
-      preferences: preferences,
+    await seedSqliteFromLegacyValues(
+      values: legacyValues,
       appState: appState,
       profileDatabaseFactory: factory,
     );
@@ -135,18 +133,18 @@ void main() {
     expect(portfolio?.cachedAt.isAtSameMomentAs(cachedAt), isTrue);
     expect(performance?.cachedAt.isAtSameMomentAs(cachedAt), isTrue);
 
-    expect(preferences.getStringList('accounts'), ['Default', 'Brokerage']);
-    expect(preferences.getString('activeAccount'), 'Brokerage');
-    expect(preferences.getString('ibkrAccountConfigs'), isNotNull);
+    expect(legacyValues['accounts'], ['Default', 'Brokerage']);
+    expect(legacyValues['activeAccount'], 'Brokerage');
+    expect(legacyValues['ibkrAccountConfigs'], isNotNull);
   });
 
-  test('legacy preference seam never overwrites newer SQLite state', () async {
+  test('legacy preference values never overwrite newer SQLite state', () async {
     final tempDir = await Directory.systemTemp.createTemp(
       'market-monk-sqlite-foundation-existing-',
     );
     addTearDown(() => tempDir.delete(recursive: true));
 
-    SharedPreferences.setMockInitialValues({
+    final legacyValues = <String, Object?>{
       'accounts': ['Default'],
       'activeAccount': 'Default',
       'theme': 'ThemeMode.light',
@@ -157,8 +155,7 @@ void main() {
           'token': 'legacy-token',
         },
       }),
-    });
-    final preferences = await SharedPreferences.getInstance();
+    };
     final appState = AppStateDatabase.connect(NativeDatabase.memory());
     addTearDown(appState.close);
     await appState.replaceProfiles(['Default', 'Existing']);
@@ -179,8 +176,8 @@ void main() {
     );
     await initialDefault.close();
 
-    await seedSqliteFromLegacyPreferences(
-      preferences: preferences,
+    await seedSqliteFromLegacyValues(
+      values: legacyValues,
       appState: appState,
       profileDatabaseFactory: factory,
     );
