@@ -769,6 +769,7 @@ class HoldingsPageState extends State<HoldingsPage>
               const SizedBox(height: 16),
               Expanded(
                 child: StreamBuilder<List<SymbolSummary>>(
+                  key: ObjectKey(_stream),
                   stream: _stream,
                   builder: _buildList,
                 ),
@@ -812,6 +813,7 @@ class HoldingsPageState extends State<HoldingsPage>
             ),
             Expanded(
               child: StreamBuilder<List<SymbolSummary>>(
+                key: ObjectKey(_stream),
                 stream: _stream,
                 builder: _buildList,
               ),
