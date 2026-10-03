@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:drift/drift.dart' hide Column, Table;
 import 'package:flutter/material.dart';
 import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/bottom_nav.dart';
@@ -10,6 +9,7 @@ import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/ibkr_cash_out_pnl.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/settings_page.dart';
@@ -148,7 +148,7 @@ class HoldingsPageState extends State<HoldingsPage>
     final accountName = accounts.activeAccount;
     final config = accounts.ibkrConfigFor(accountName);
     if (!config.enabled) {
-      return db.trades.select().get();
+      return profileDataRepository.readTradesForAccount(accountName);
     }
 
     if (!config.isConfigured) {
@@ -395,7 +395,9 @@ class HoldingsPageState extends State<HoldingsPage>
   Stream<List<SymbolSummary>> _buildStream({bool skipInitial = false}) {
     if (!widget.isActive) return Stream.value(_summaries);
 
-    Stream<List<Trade>> trades = db.trades.select().watch();
+    final accountName = context.read<AccountManager>().activeAccount;
+    Stream<List<Trade>> trades =
+        profileDataRepository.watchTradesForAccount(accountName);
     if (skipInitial) trades = trades.skip(1);
     return trades.asyncMap(_summariesForStream).transform(
       StreamTransformer<List<SymbolSummary>, List<SymbolSummary>>.fromHandlers(
@@ -472,10 +474,12 @@ class HoldingsPageState extends State<HoldingsPage>
 
     if (confirmed != true || !ctx.mounted) return;
 
-    for (final symbol in _selectedSymbols) {
-      await (db.trades.delete()..where((trade) => trade.symbol.equals(symbol)))
-          .go();
-    }
+    final accountName = context.read<AccountManager>().activeAccount;
+    final profileId = await profileDataRepository.profileIdForName(accountName);
+    await profileDataRepository.deleteTradesForSymbols(
+      profileId,
+      _selectedSymbols,
+    );
     _exitSelecting();
     if (ctx.mounted)
       toast(

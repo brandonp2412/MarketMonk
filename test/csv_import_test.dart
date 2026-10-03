@@ -1,11 +1,8 @@
-import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:market_monk/csv_import.dart';
-import 'package:market_monk/database.dart';
-import 'package:market_monk/main.dart' as app;
+import 'package:market_monk/profile_data_repository.dart';
+import 'package:market_monk/unified_database.dart';
 import 'package:test/test.dart';
-
-Database _openDb() => Database.connect(NativeDatabase.memory());
 
 // ---------------------------------------------------------------------------
 // Minimal Tiger Brokers CSV fixture that mirrors the real format exactly:
@@ -338,34 +335,44 @@ void main() {
 
   // ─── importTrades — database round-trip ───────────────────────────────────
   group('importTrades — database round-trip', () {
-    late Database testDb;
+    late UnifiedDatabase testDb;
+    late ProfileDataRepository repository;
 
-    setUp(() {
-      testDb = _openDb();
-      app.db = testDb;
+    setUp(() async {
+      testDb = UnifiedDatabase.connect(NativeDatabase.memory());
+      repository = ProfileDataRepository(testDb);
+      await testDb.upsertProfile(
+        id: 'profile-default',
+        name: 'Default',
+        sortOrder: 0,
+      );
     });
 
-    tearDown(() async {
-      await testDb.close();
-    });
+    tearDown(() => testDb.close());
 
     test('all parsed trades are persisted to the DB', () async {
       final result = TigerBrokersParser().parse(_tigerCsvMinimal);
-      final count = await importTrades(result.trades);
+      final count = await importTrades(
+        result.trades,
+        profileId: 'profile-default',
+        repository: repository,
+      );
 
       expect(count, equals(3));
-
-      final stored = await testDb.trades.select().get();
-      expect(stored, hasLength(3));
+      expect(await repository.readTrades('profile-default'), hasLength(3));
     });
 
     test('stored trade data matches parsed data', () async {
       final result = TigerBrokersParser().parse(_tigerCsvMinimal);
-      await importTrades(result.trades);
+      await importTrades(
+        result.trades,
+        profileId: 'profile-default',
+        repository: repository,
+      );
 
-      final stored = await testDb.trades.select().get();
+      final stored = await repository.readTrades('profile-default');
       final sell = stored.firstWhere(
-        (t) => t.symbol == 'AAPL' && t.tradeType == 'close',
+        (trade) => trade.symbol == 'AAPL' && trade.tradeType == 'close',
       );
 
       expect(sell.quantity, closeTo(-5.0, 0.001));
@@ -378,9 +385,13 @@ void main() {
       'closed-position trades stored even with no matching holding',
       () async {
         final result = TigerBrokersParser().parse(_closedPositionCsv);
-        final tCount = await importTrades(result.trades);
+        final count = await importTrades(
+          result.trades,
+          profileId: 'profile-default',
+          repository: repository,
+        );
 
-        expect(tCount, equals(2));
+        expect(count, equals(2));
       },
     );
 
@@ -395,10 +406,16 @@ void main() {
       ''');
       final result = TigerBrokersParser().parse(_tigerCsvMinimal);
 
-      await expectLater(importTrades(result.trades), throwsA(anything));
+      await expectLater(
+        importTrades(
+          result.trades,
+          profileId: 'profile-default',
+          repository: repository,
+        ),
+        throwsA(anything),
+      );
 
-      final stored = await testDb.trades.select().get();
-      expect(stored, isEmpty);
+      expect(await repository.readTrades('profile-default'), isEmpty);
     });
   });
 }

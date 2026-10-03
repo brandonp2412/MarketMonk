@@ -7,11 +7,14 @@ import 'package:market_monk/app_state_database.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/legacy_preferences_migration.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/sqlite_settings.dart';
+import 'package:market_monk/unified_database.dart';
 
 export 'package:market_monk/sqlite_settings.dart';
 
 Directory? _profileDirectory;
+UnifiedDatabase? _profileDataTestDatabase;
 
 /// Seeds isolated real SQLite stores from a legacy fixture.
 Future<void> seedTestSqlite(Map<String, Object?> values) async {
@@ -19,7 +22,18 @@ Future<void> seedTestSqlite(Map<String, Object?> values) async {
   final directory = Directory.systemTemp.createTempSync('monk-test-profiles-');
   _profileDirectory = directory;
   final database = AppStateDatabase.connect(NativeDatabase.memory());
+  final profileData = UnifiedDatabase.connect(NativeDatabase.memory());
+  _profileDataTestDatabase = profileData;
+  setProfileDataDatabaseForTesting(profileData);
+  await profileData.upsertProfile(
+    id: 'test-profile-default',
+    name: 'Default',
+    sortOrder: 0,
+  );
   addTearDown(() async {
+    setProfileDataDatabaseForTesting(null);
+    _profileDataTestDatabase = null;
+    await profileData.close();
     await database.close();
     directory.deleteSync(recursive: true);
   });
@@ -35,6 +49,20 @@ Future<void> seedTestSqlite(Map<String, Object?> values) async {
     return SqliteSettings.load(database);
   }();
   await SqliteSettings.useInstance(loaded);
+}
+
+Future<void> ensureTestProfile(String name) async {
+  final database = _profileDataTestDatabase;
+  if (database == null) {
+    throw StateError('seedTestSqlite must be called first');
+  }
+  if (await database.readProfileByName(name) != null) return;
+  final profiles = await database.readProfiles();
+  await database.upsertProfile(
+    id: ['test-profile', profiles.length + 1].join('-'),
+    name: name,
+    sortOrder: profiles.length,
+  );
 }
 
 /// Uses independent file connections so reopening exercises persistence.

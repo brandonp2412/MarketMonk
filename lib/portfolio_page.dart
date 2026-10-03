@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:drift/drift.dart' hide Column, Table;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -12,6 +11,7 @@ import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/ibkr_cash_out_pnl.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/settings_page.dart';
@@ -303,7 +303,6 @@ class PortfolioPageState extends State<PortfolioPage>
     final accounts = context.read<AccountManager>();
     final accountName = accounts.activeAccount;
     final config = accounts.ibkrConfigFor(accountName);
-    final accountDb = db;
     final cachedBefore = accounts.portfolioCacheFor(accountName);
     final cacheWasFresh = accounts.isPortfolioCacheFresh(accountName);
     final willFetchIbkr = config.enabled &&
@@ -320,7 +319,8 @@ class PortfolioPageState extends State<PortfolioPage>
       setState(() => _isLoadingPortfolio = true);
     }
     try {
-      final trades = await accountDb.trades.select().get();
+      final trades =
+          await profileDataRepository.readTradesForAccount(accountName);
       if (!mounted ||
           !widget.isActive ||
           accounts.activeAccount != accountName) {
@@ -377,10 +377,10 @@ class PortfolioPageState extends State<PortfolioPage>
     final accounts = context.read<AccountManager>();
     final accountName = accounts.activeAccount;
     final config = accounts.ibkrConfigFor(accountName);
-    final accountDb = db;
     try {
       final useIbkr = config.enabled;
-      final trades = await accountDb.trades.select().get();
+      final trades =
+          await profileDataRepository.readTradesForAccount(accountName);
       if (!mounted ||
           !widget.isActive ||
           accounts.activeAccount != accountName) {
@@ -429,7 +429,8 @@ class PortfolioPageState extends State<PortfolioPage>
     }
 
     final config = accounts.ibkrConfigFor(accountName);
-    Stream<List<Trade>> trades = db.trades.select().watch();
+    Stream<List<Trade>> trades =
+        profileDataRepository.watchTradesForAccount(accountName);
     if (skipInitial) trades = trades.skip(1);
     return trades.asyncMap(
       (rows) => _loadPortfolioForStream(accountName, rows, config, accounts),

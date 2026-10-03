@@ -1,6 +1,4 @@
-import 'package:drift/drift.dart';
-import 'package:market_monk/database.dart';
-import 'package:market_monk/main.dart';
+import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/logging.dart';
 
 class ImportedTrade {
@@ -247,26 +245,27 @@ BrokerCsvParser? detectBrokerCsv(
   return null;
 }
 
-Future<int> importTrades(List<ImportedTrade> trades) async {
-  final count = await db.transaction(() async {
-    int inserted = 0;
-    for (final trade in trades) {
-      await db.trades.insertOne(
-        TradesCompanion(
-          symbol: Value(trade.symbol),
-          name: Value(trade.name),
-          quantity: Value(trade.quantity),
-          price: Value(trade.price),
-          tradeType: Value(trade.tradeType),
-          tradeDate: Value(trade.tradeDate),
-          realizedPL: Value(trade.realizedPL),
-          commission: Value(trade.commission),
-        ),
-      );
-      inserted++;
-    }
-    return inserted;
-  });
+Future<int> importTrades(
+  List<ImportedTrade> trades, {
+  required String profileId,
+  ProfileDataRepository? repository,
+}) async {
+  final target = repository ?? profileDataRepository;
+  final count = await target.addTrades(
+    profileId,
+    trades.map(
+      (trade) => ProfileTradeWrite(
+        symbol: trade.symbol,
+        name: trade.name,
+        quantity: trade.quantity,
+        price: trade.price,
+        tradeType: trade.tradeType,
+        tradeDate: trade.tradeDate,
+        realizedPL: trade.realizedPL,
+        commission: trade.commission,
+      ),
+    ),
+  );
   talker.info('Imported $count trades');
   return count;
 }

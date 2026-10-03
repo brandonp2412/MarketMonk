@@ -14,6 +14,7 @@ import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/market_data_store.dart';
+import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
@@ -252,11 +253,17 @@ class _SettingsPageState extends State<SettingsPage> {
 
     if (!confirmed || !context.mounted) return;
 
-    final tradesCount = await importTrades(parsed.trades);
+    final accounts = context.read<AccountManager>();
+    final profileId =
+        await profileDataRepository.profileIdForName(accounts.activeAccount);
+    final tradesCount = await importTrades(
+      parsed.trades,
+      profileId: profileId,
+    );
     if (!context.mounted) return;
     final settings = context.read<SettingsState>();
     settings.notifyTradesImported();
-    final allTrades = await db.select(db.trades).get();
+    final allTrades = await profileDataRepository.readTrades(profileId);
     if (!context.mounted) return;
     final symbols = allTrades.map((trade) => trade.symbol).toSet();
     for (final symbol in symbols) {
@@ -421,7 +428,9 @@ class _SettingsPageState extends State<SettingsPage> {
 
     final accounts = context.read<AccountManager>();
     final config = accounts.ibkrConfigFor();
-    final trades = await db.select(db.trades).get();
+    final profileId =
+        await profileDataRepository.profileIdForName(accounts.activeAccount);
+    final trades = await profileDataRepository.readTrades(profileId);
     final symbols = config.enabled
         ? (await IbkrApiClient(config).fetchPortfolio())
             .positions
@@ -801,8 +810,13 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             );
             if (confirmed != true || !mounted) return;
-            await db.delete(db.trades).go();
-            await marketDataDatabase.delete(marketDataDatabase.unifiedCandles).go();
+            final accounts = context.read<AccountManager>();
+            final profileId = await profileDataRepository
+                .profileIdForName(accounts.activeAccount);
+            await profileDataRepository.clearTrades(profileId);
+            await marketDataDatabase
+                .delete(marketDataDatabase.unifiedCandles)
+                .go();
             clearAllSyncCache();
             if (!mounted) return;
             toast(context, context.l10n.text('All data deleted'));
@@ -1262,8 +1276,13 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 );
                 if (confirmed != true || !context.mounted) return;
-                await db.delete(db.trades).go();
-                await marketDataDatabase.delete(marketDataDatabase.unifiedCandles).go();
+                final accounts = context.read<AccountManager>();
+                final profileId = await profileDataRepository
+                    .profileIdForName(accounts.activeAccount);
+                await profileDataRepository.clearTrades(profileId);
+                await marketDataDatabase
+                    .delete(marketDataDatabase.unifiedCandles)
+                    .go();
                 clearAllSyncCache();
                 if (!context.mounted) return;
                 toast(context, context.l10n.text('All data deleted'));

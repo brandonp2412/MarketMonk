@@ -254,6 +254,10 @@ class UnifiedDatabase extends _$UnifiedDatabase {
         ]))
       .get();
 
+  Future<UnifiedProfile?> readProfileByName(String name) =>
+      (select(unifiedProfiles)..where((row) => row.name.equals(name)))
+          .getSingleOrNull();
+
   Future<void> upsertProfile({
     required String id,
     required String name,
@@ -345,10 +349,69 @@ class UnifiedDatabase extends _$UnifiedDatabase {
   }
 
   Future<List<UnifiedTrade>> readTrades(String profileId) =>
-      (select(unifiedTrades)
-            ..where((row) => row.profileId.equals(profileId))
-            ..orderBy([(row) => OrderingTerm.asc(row.tradeDate)]))
-          .get();
+      _tradesForProfile(profileId).get();
+
+  Stream<List<UnifiedTrade>> watchTrades(String profileId) =>
+      _tradesForProfile(profileId).watch();
+
+  SimpleSelectStatement<$UnifiedTradesTable, UnifiedTrade> _tradesForProfile(
+    String profileId,
+  ) =>
+      select(unifiedTrades)
+        ..where((row) => row.profileId.equals(profileId))
+        ..orderBy([(row) => OrderingTerm.asc(row.tradeDate)]);
+
+  Future<int> deleteTrade(String profileId, int tradeId) =>
+      (delete(unifiedTrades)
+            ..where(
+              (row) => row.profileId.equals(profileId) & row.id.equals(tradeId),
+            ))
+          .go();
+
+  Future<int> deleteTradesForSymbols(
+    String profileId,
+    Iterable<String> symbols,
+  ) {
+    final values = symbols.toSet();
+    if (values.isEmpty) return Future.value(0);
+    return (delete(unifiedTrades)
+          ..where(
+            (row) => row.profileId.equals(profileId) & row.symbol.isIn(values),
+          ))
+        .go();
+  }
+
+  Future<int> clearTrades(String profileId) =>
+      (delete(unifiedTrades)..where((row) => row.profileId.equals(profileId)))
+          .go();
+
+  Future<int> updateTrade({
+    required String profileId,
+    required int tradeId,
+    double? quantity,
+    double? price,
+    String? tradeType,
+    DateTime? tradeDate,
+    double? realizedPL,
+    double? commission,
+  }) {
+    return (update(unifiedTrades)
+          ..where(
+            (row) => row.profileId.equals(profileId) & row.id.equals(tradeId),
+          ))
+        .write(
+      UnifiedTradesCompanion(
+        quantity: quantity == null ? const Value.absent() : Value(quantity),
+        price: price == null ? const Value.absent() : Value(price),
+        tradeType: tradeType == null ? const Value.absent() : Value(tradeType),
+        tradeDate: tradeDate == null ? const Value.absent() : Value(tradeDate),
+        realizedPL:
+            realizedPL == null ? const Value.absent() : Value(realizedPL),
+        commission:
+            commission == null ? const Value.absent() : Value(commission),
+      ),
+    );
+  }
 
   Future<UnifiedIbkrSetting?> readIbkrSettings(String profileId) =>
       (select(unifiedIbkrSettings)

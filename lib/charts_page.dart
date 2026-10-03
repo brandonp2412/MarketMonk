@@ -12,6 +12,7 @@ import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/portfolio_chart_scale.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
@@ -237,13 +238,13 @@ class ChartsPageState extends State<ChartsPage>
 
   Future<_LoadedChartPortfolio> _portfolioForAccount(
     String accountName,
-    Database accountDb,
     IbkrAccountConfig ibkrConfig,
     AccountManager accountManager, {
     bool refreshIbkr = false,
     bool forceIbkrRefresh = false,
   }) async {
-    final trades = await accountDb.trades.select().get();
+    final trades =
+        await profileDataRepository.readTradesForAccount(accountName);
     if (ibkrConfig.enabled) {
       final cached = accountManager.portfolioCacheFor(accountName);
       final cacheFresh = accountManager.isPortfolioCacheFresh(accountName);
@@ -285,7 +286,7 @@ class ChartsPageState extends State<ChartsPage>
         );
       }
 
-      final loadKey = '$accountName|${ibkrConfig.hashCode}';
+      final loadKey = [accountName, ibkrConfig.hashCode].join('|');
       return _ibkrLoads.putIfAbsent(loadKey, () async {
         try {
           final snapshot = await (widget._ibkrLoader?.call(ibkrConfig) ??
@@ -377,18 +378,9 @@ class ChartsPageState extends State<ChartsPage>
     String accountName,
     IbkrAccountConfig ibkrConfig,
   ) async {
-    final accountManager = context.read<AccountManager>();
-    final isActiveAccount = accountName == accountManager.activeAccount;
-    final accountDatabase = isActiveAccount
-        ? db
-        : Database(
-            accountName == 'Default'
-                ? 'market-monk'
-                : 'market-monk-$accountName',
-          );
-
     try {
-      final trades = await accountDatabase.trades.select().get();
+      final trades =
+          await profileDataRepository.readTradesForAccount(accountName);
       if (!mounted || !widget.isActive) return;
       final symbols = trades.map((trade) => trade.symbol).toSet();
       for (final symbol in symbols) {
@@ -406,8 +398,6 @@ class ChartsPageState extends State<ChartsPage>
         stackTrace,
         'Background candle sync failed for $accountName',
       );
-    } finally {
-      if (!isActiveAccount) await accountDatabase.close();
     }
   }
 
@@ -489,14 +479,9 @@ class ChartsPageState extends State<ChartsPage>
       final ibkrConfig = accountManager.ibkrConfigFor(accountName);
       if (ibkrConfig.enabled) continue;
 
-      final isActive = accountName == accountManager.activeAccount;
-      final accountDb = isActive
-          ? db
-          : (accountName == 'Default'
-              ? Database()
-              : Database('market-monk-$accountName'));
       try {
-        final trades = await accountDb.trades.select().get();
+        final trades =
+            await profileDataRepository.readTradesForAccount(accountName);
         if (!mounted || !widget.isActive) return;
         for (final symbol in trades.map((trade) => trade.symbol).toSet()) {
           if (!mounted || !widget.isActive) return;
@@ -514,8 +499,6 @@ class ChartsPageState extends State<ChartsPage>
           stackTrace,
           'Portfolio candle refresh failed for $accountName',
         );
-      } finally {
-        if (!isActive) await accountDb.close();
       }
     }
   }
@@ -754,17 +737,10 @@ class ChartsPageState extends State<ChartsPage>
           generation != _portfolioLoadGeneration) {
         return;
       }
-      final isActive = accountName == accountManager.activeAccount;
-      final accountDb = isActive
-          ? db
-          : (accountName == 'Default'
-              ? Database()
-              : Database('market-monk-$accountName'));
       try {
         final ibkrConfig = accountManager.ibkrConfigFor(accountName);
         final loaded = await _portfolioForAccount(
           accountName,
-          accountDb,
           ibkrConfig,
           accountManager,
           refreshIbkr: refreshIbkrPortfolio,
@@ -813,15 +789,13 @@ class ChartsPageState extends State<ChartsPage>
         }
 
         final fallback = await _buildPortfolioSeries(
+          accountName,
           loaded.positions,
-          accountDb,
         );
         newSeries[accountName] = fallback.series;
       } catch (error) {
         newSeries[accountName] = [];
         firstError ??= error.toString();
-      } finally {
-        if (!isActive) await accountDb.close();
       }
     }
 
@@ -841,8 +815,8 @@ class ChartsPageState extends State<ChartsPage>
 
   Future<({List<_DateValue> series, bool currentHoldingsReplay})>
       _buildPortfolioSeries(
-    List<Position> positions,
-    Database accountDb, {
+    String accountName,
+    List<Position> positions, {
     double? currentPortfolioValueUsd,
   }) async {
     if (positions.isEmpty) {
@@ -853,14 +827,8 @@ class ChartsPageState extends State<ChartsPage>
     final after = days > 0
         ? DateTime(now.year, now.month, now.day - days - 4)
         : DateTime(now.year - years, now.month - months, now.day - 1);
-    final trades = await (accountDb.trades.select()
-          ..orderBy([
-            (trade) => OrderingTerm(
-                  expression: trade.tradeDate,
-                  mode: OrderingMode.asc,
-                ),
-          ]))
-        .get();
+    final trades =
+        await profileDataRepository.readTradesForAccount(accountName);
     final currentHoldingsReplay = trades.isEmpty;
     final currentHoldingsValueUsd = positions.fold<double>(
       0,
@@ -1202,31 +1170,40 @@ class ChartsPageState extends State<ChartsPage>
     const weekExpression = CustomExpression<String>(
       "STRFTIME('%Y-%m-%W', DATE(\"date\", 'unixepoch', 'localtime'))",
     );
-    Iterable<Expression<Object>> groupBy = [marketDataDatabase.unifiedCandles.date];
+    Iterable<Expression<Object>> groupBy = [
+      marketDataDatabase.unifiedCandles.date
+    ];
     if (years > 0 || months > 5) groupBy = [weekExpression];
 
     final capturedDays = days;
-    _stockStream = (marketDataDatabase.selectOnly(marketDataDatabase.unifiedCandles)
-          ..addColumns([marketDataDatabase.unifiedCandles.date, marketDataDatabase.unifiedCandles.close])
-          ..where(
-            marketDataDatabase.unifiedCandles.symbol.equals(marketSymbol) &
-                marketDataDatabase.unifiedCandles.date.isBiggerThanValue(after),
-          )
-          ..orderBy([
-            OrderingTerm(
-              expression: marketDataDatabase.unifiedCandles.date,
-              mode: OrderingMode.asc,
-            ),
-          ])
-          ..groupBy(groupBy))
-        .watch()
-        .map((results) {
+    _stockStream =
+        (marketDataDatabase.selectOnly(marketDataDatabase.unifiedCandles)
+              ..addColumns([
+                marketDataDatabase.unifiedCandles.date,
+                marketDataDatabase.unifiedCandles.close
+              ])
+              ..where(
+                marketDataDatabase.unifiedCandles.symbol.equals(marketSymbol) &
+                    marketDataDatabase.unifiedCandles.date
+                        .isBiggerThanValue(after),
+              )
+              ..orderBy([
+                OrderingTerm(
+                  expression: marketDataDatabase.unifiedCandles.date,
+                  mode: OrderingMode.asc,
+                ),
+              ])
+              ..groupBy(groupBy))
+            .watch()
+            .map((results) {
       var list = results
           .map(
             (result) => CandleTicker(
               candle: CandlesCompanion(
-                date: Value(result.read(marketDataDatabase.unifiedCandles.date)!),
-                close: Value(result.read(marketDataDatabase.unifiedCandles.close)!),
+                date:
+                    Value(result.read(marketDataDatabase.unifiedCandles.date)!),
+                close: Value(
+                    result.read(marketDataDatabase.unifiedCandles.close)!),
               ),
             ),
           )

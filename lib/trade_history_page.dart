@@ -1,4 +1,3 @@
-import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/database.dart';
@@ -7,6 +6,7 @@ import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 
@@ -20,20 +20,21 @@ class TradeHistoryPage extends StatefulWidget {
 }
 
 class _TradeHistoryPageState extends State<TradeHistoryPage> {
+  late final String _accountName;
   late Stream<List<Trade>> _tradesStream;
 
   @override
   void initState() {
     super.initState();
-    _tradesStream = (db.trades.select()
-          ..where((trade) => trade.symbol.equals(widget.summary.symbol))
-          ..orderBy([
-            (trade) => OrderingTerm(
-                  expression: trade.tradeDate,
-                  mode: OrderingMode.desc,
-                ),
-          ]))
-        .watch();
+    _accountName = context.read<AccountManager>().activeAccount;
+    _tradesStream =
+        profileDataRepository.watchTradesForAccount(_accountName).map((trades) {
+      final filtered = trades
+          .where((trade) => trade.symbol == widget.summary.symbol)
+          .toList()
+        ..sort((a, b) => b.tradeDate.compareTo(a.tradeDate));
+      return filtered;
+    });
     runDetachedTask(
       fetchSymbolCurrencyAndRate(widget.summary.symbol).then((_) {
         if (mounted) setState(() {});
@@ -257,7 +258,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
   Future<void> _editTrade(Trade trade) async {
     await showDialog<void>(
       context: context,
-      builder: (_) => _EditTradeDialog(trade: trade),
+      builder: (_) => _EditTradeDialog(trade: trade, accountName: _accountName),
     );
   }
 
@@ -282,7 +283,9 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
       ),
     );
     if (confirmed != true) return;
-    await (db.trades.delete()..where((row) => row.id.equals(trade.id))).go();
+    final profileId =
+        await profileDataRepository.profileIdForName(_accountName);
+    await profileDataRepository.deleteTrade(profileId, trade.id);
   }
 }
 
@@ -377,8 +380,12 @@ class _TradeTile extends StatelessWidget {
 
 class _EditTradeDialog extends StatefulWidget {
   final Trade trade;
+  final String accountName;
 
-  const _EditTradeDialog({required this.trade});
+  const _EditTradeDialog({
+    required this.trade,
+    required this.accountName,
+  });
 
   @override
   State<_EditTradeDialog> createState() => _EditTradeDialogState();
@@ -429,15 +436,16 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
     final realizedPL = double.tryParse(_realizedPL.text) ?? 0.0;
     if (qty == null || qty <= 0 || price == null || price <= 0) return;
 
-    await (db.trades.update()..where((row) => row.id.equals(widget.trade.id)))
-        .write(
-      TradesCompanion(
-        quantity: Value(_isBuy ? qty : -qty),
-        price: Value(price),
-        tradeType: Value(_isBuy ? 'open' : 'close'),
-        tradeDate: Value(_tradeDate),
-        realizedPL: Value(realizedPL),
-      ),
+    final profileId =
+        await profileDataRepository.profileIdForName(widget.accountName);
+    await profileDataRepository.updateTrade(
+      profileId: profileId,
+      tradeId: widget.trade.id,
+      quantity: _isBuy ? qty : -qty,
+      price: price,
+      tradeType: _isBuy ? 'open' : 'close',
+      tradeDate: _tradeDate,
+      realizedPL: realizedPL,
     );
 
     if (mounted) Navigator.pop(context);

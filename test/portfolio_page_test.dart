@@ -42,6 +42,7 @@ Future<AccountManager> configuredTwoAccounts() async {
   final accounts = testAccountManager();
   await accounts.init();
   accounts.accounts = ['Default', 'IBKR Bot'];
+  await ensureTestProfile('IBKR Bot');
   await accounts.setIbkrConfig(
     'Default',
     const IbkrAccountConfig(

@@ -9,11 +9,13 @@ import 'package:market_monk/candle_ticker.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
+import 'package:provider/provider.dart';
 
 class EditTickerPage extends StatefulWidget {
   final String? symbol;
@@ -560,8 +562,12 @@ class _EditTickerPageState extends State<EditTickerPage> {
               .join(' ')
               .replaceAll(RegExp(r'\(|\)'), '');
 
-          await db.trades.insertOne(
-            TradesCompanion.insert(
+          final accountName = context.read<AccountManager>().activeAccount;
+          final profileId =
+              await profileDataRepository.profileIdForName(accountName);
+          await profileDataRepository.addTrade(
+            profileId,
+            ProfileTradeWrite(
               symbol: tickerSymbol,
               name: name.isNotEmpty ? name : tickerSymbol,
               quantity: _isSell ? -qty : qty,
