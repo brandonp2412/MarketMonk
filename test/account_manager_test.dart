@@ -26,6 +26,24 @@ void main() {
     await db.close();
   });
 
+  test('configured IBKR empty portfolio cache is never fresh', () async {
+    await seedTestSqlite({});
+    final manager = testAccountManager();
+    await manager.init();
+    await manager.setIbkrConfig(
+      'Default',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'token',
+      ),
+    );
+    await manager.cachePortfolio('Default', const [], null);
+
+    expect(manager.portfolioCacheFor('Default') == null, isFalse);
+    expect(manager.isPortfolioCacheFresh('Default'), isFalse);
+  });
+
   test('repairs a persisted active account that no longer exists', () async {
     await seedTestSqlite({
       'accounts': ['Default', 'Brokerage'],

@@ -431,8 +431,15 @@ class AccountManager extends ChangeNotifier {
     Duration maxAge = ibkrPortfolioCacheMaxAge,
   }) {
     final cached = _portfolioCache[name];
-    return cached != null &&
-        backgroundNetworkCoordinator.isTimestampFresh(cached.cachedAt, maxAge);
+    if (cached == null) return false;
+    final config = ibkrConfigFor(name);
+    if (config.enabled && config.isConfigured && cached.positions.isEmpty) {
+      return false;
+    }
+    return backgroundNetworkCoordinator.isTimestampFresh(
+      cached.cachedAt,
+      maxAge,
+    );
   }
 
   IbkrPerformanceSeries? ibkrPerformanceCacheFor(String name, String period) =>
