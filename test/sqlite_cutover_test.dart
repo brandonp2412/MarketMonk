@@ -12,7 +12,11 @@ import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/legacy_preferences_migration.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/market_data_store.dart';
+import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/sqlite_settings.dart';
+import 'package:market_monk/unified_database.dart';
+import 'package:market_monk/unified_legacy_source.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -79,6 +83,21 @@ void main() {
     expect(manager.activeAccount, 'Brokerage');
     expect(manager.ibkrConfigFor().token, 'old');
     expect(settings.getStringList('favoriteStocks'), ['VTI']);
+
+    final legacySnapshot = await readLegacyUnifiedSnapshot(
+      appState: appState,
+      openProfileDatabase: (name) async => profile(name),
+    );
+    final unified = UnifiedDatabase.connect(NativeDatabase.memory());
+    await unified.migrateLegacySnapshot(legacySnapshot);
+    final unifiedBrokerage = await unified.readProfileByName('Brokerage');
+    expect(unifiedBrokerage, isNotNull);
+    expect(
+      (await unified.readIbkrSettings(unifiedBrokerage!.id))!.token,
+      'old',
+    );
+    expect(await unified.readSetting('favoriteStocks'), ['VTI']);
+    await unified.close();
 
     await settings.remove('languageCode');
     await settings.setStringList('favoriteStocks', ['VXUS']);
@@ -248,6 +267,97 @@ void main() {
     expect(await appState.readProfiles(), ['Default']);
   });
 
+  test('old app-state-only install preserves profiles and active account',
+      () async {
+    final legacyAppState = AppStateDatabase.connect(
+      NativeDatabase(
+        File('${directory.path}/market-monk-app-state.sqlite'),
+      ),
+    );
+    await legacyAppState.replaceProfiles(['Default', 'IBKR Bot']);
+    await legacyAppState.setActiveProfile('IBKR Bot');
+    await legacyAppState.writeSetting('theme', 'ThemeMode.light');
+    await legacyAppState.close();
+
+    final bot = profile('IBKR Bot');
+    await bot.writeIbkrProfileSettings(
+      enabled: true,
+      baseUrl: 'https://bot.test',
+      token: 'bot-token',
+    );
+    await bot.close();
+
+    final loaded = await SqliteSettings.initialize(
+      appState,
+      readLegacyValues: () async => const {},
+      profileDatabaseFactory: profile,
+    );
+    await SqliteSettings.useInstance(Future.value(loaded));
+
+    expect(await appState.readProfiles(), ['Default', 'IBKR Bot']);
+    expect(await appState.readActiveProfile(), 'IBKR Bot');
+    expect(await appState.readSetting('theme'), 'ThemeMode.light');
+    expect(
+      File('${directory.path}/market-monk-app-state.sqlite').existsSync(),
+      isFalse,
+    );
+    final manager = AccountManager();
+    await manager.init();
+    expect(manager.ibkrConfigFor('IBKR Bot').token, 'bot-token');
+  });
+
+  test('stale app-state cannot resurrect renamed or deleted profiles',
+      () async {
+    final legacyAppState = AppStateDatabase.connect(
+      NativeDatabase(
+        File('${directory.path}/market-monk-app-state.sqlite'),
+      ),
+    );
+    await legacyAppState.replaceProfiles(['Default', 'Old Name', 'Deleted']);
+    await legacyAppState.setActiveProfile('Old Name');
+    await legacyAppState.writeSetting('legacyOnlySetting', 'preserve-me');
+    await legacyAppState.close();
+
+    await appState.replaceProfiles(['Default', 'Renamed']);
+    await appState.setActiveProfile('Renamed');
+    await appState.writeSetting(sqliteMigrationCompleteKey, true);
+    await appState.writeSetting('theme', 'ThemeMode.dark');
+
+    final renamed = profile('Renamed');
+    await renamed.writeIbkrProfileSettings(
+      enabled: true,
+      baseUrl: 'https://renamed.test',
+      token: 'renamed-token',
+    );
+    await renamed.close();
+
+    final loaded = await SqliteSettings.initialize(
+      appState,
+      readLegacyValues: () =>
+          throw StateError('SharedPreferences must not be consulted'),
+      profileDatabaseFactory: profile,
+    );
+    await SqliteSettings.useInstance(Future.value(loaded));
+
+    expect(await appState.readProfiles(), ['Default', 'Renamed']);
+    expect(await appState.readActiveProfile(), 'Renamed');
+    expect(await appState.readSetting('theme'), 'ThemeMode.dark');
+    expect(await appState.readSetting('legacyOnlySetting'), 'preserve-me');
+    expect(
+      File('${directory.path}/market-monk-Old Name.sqlite').existsSync(),
+      isFalse,
+    );
+    expect(
+      File('${directory.path}/market-monk-Deleted.sqlite').existsSync(),
+      isFalse,
+    );
+
+    final manager = AccountManager();
+    await manager.init();
+    expect(manager.accounts, ['Default', 'Renamed']);
+    expect(manager.ibkrConfigFor('Renamed').token, 'renamed-token');
+  });
+
   test(
       'failed migration retries remaining profiles without replacing committed rows',
       () async {
@@ -393,7 +503,7 @@ void main() {
   });
 
   test(
-      'full backup restores SQLite globals, IBKR state and committed WAL trades',
+      'full backup restores unified trades/candles plus SQLite globals and IBKR state',
       () async {
     final settings = await start();
     final manager = AccountManager();
@@ -409,6 +519,7 @@ void main() {
     );
     await manager.cachePortfolio('Brokerage', [], null, netLiquidationUsd: 987);
     await settings.setStringList('favoriteStocks', ['VTI']);
+
     final writer = profile('Brokerage');
     await writer.customStatement('PRAGMA journal_mode=WAL');
     await writer.customStatement('PRAGMA wal_autocheckpoint=0');
@@ -429,22 +540,84 @@ void main() {
         close: const Value(101),
       ),
     );
+
+    final unified = UnifiedDatabase.connect(NativeDatabase.memory());
+    setProfileDataDatabaseForTesting(unified);
+    setMarketDataDatabaseForTesting(unified);
+    addTearDown(() async {
+      setProfileDataDatabaseForTesting(null);
+      setMarketDataDatabaseForTesting(null);
+      await unified.close();
+    });
+    final preCutover = await readLegacyUnifiedSnapshot(
+      appState: appState,
+      openProfileDatabase: (name) async => profile(name),
+    );
+    await unified.migrateLegacySnapshot(preCutover);
+
+    final brokerageProfile = await unified.readProfileByName('Brokerage');
+    expect(brokerageProfile, isNotNull);
+    await unified.addTrade(
+      profileId: brokerageProfile!.id,
+      symbol: 'NEW',
+      name: 'Unified only',
+      quantity: 4,
+      price: 25,
+      tradeType: 'open',
+      tradeDate: DateTime(2026, 10, 3),
+      commission: 0.75,
+    );
+    await unified.upsertCandle(
+      symbol: 'NEW',
+      date: DateTime.utc(2026, 10, 3),
+      open: 24,
+      high: 26,
+      low: 23,
+      close: 25,
+      volume: 123,
+      adjClose: 25,
+    );
+
     final exportDirectory = await directory.createTemp('export-');
     final backup = await manager.exportBackup(exportDirectory);
     await writer.close();
+
+    await unified.clearTrades(brokerageProfile.id);
+    await unified.delete(unified.unifiedCandles).go();
     await manager.deleteAccount('Brokerage');
     await settings.remove('favoriteStocks');
+
     await manager.importBackup(backup);
+
     expect(settings.getStringList('favoriteStocks'), ['VTI']);
     expect(manager.ibkrConfigFor('Brokerage').token, 'backup-token');
     expect(manager.portfolioCacheFor('Brokerage')!.netLiquidationUsd, 987);
-    final restored = profile('Brokerage');
-    expect((await restored.select(restored.trades).get()).single.symbol, 'VTI');
-    final restoredCandles = await restored.select(restored.candles).get();
-    expect(restoredCandles, hasLength(1));
-    expect(restoredCandles.single.symbol, 'VTI');
-    expect(restoredCandles.single.close, 101);
-    await restored.close();
+
+    final restoredProfile = await unified.readProfileByName('Brokerage');
+    expect(restoredProfile, isNotNull);
+    final restoredUnifiedTrades = await unified.readTrades(restoredProfile!.id);
+    expect(
+      restoredUnifiedTrades.map((trade) => trade.symbol).toSet(),
+      {'VTI', 'NEW'},
+    );
+    expect(
+      restoredUnifiedTrades
+          .singleWhere((trade) => trade.symbol == 'NEW')
+          .commission,
+      0.75,
+    );
+    expect((await unified.readCandles('VTI')).single.close, 101);
+    expect((await unified.readCandles('NEW')).single.volume, 123);
+
+    final restoredLegacy = profile('Brokerage');
+    final restoredLegacyTrades =
+        await restoredLegacy.select(restoredLegacy.trades).get();
+    expect(
+      restoredLegacyTrades.map((trade) => trade.symbol).toSet(),
+      {'VTI', 'NEW'},
+    );
+    await restoredLegacy.close();
+
     expect(await appState.readSetting(sqliteMigrationCompleteKey), true);
     expect((await SharedPreferences.getInstance()).getKeys(), isEmpty);
   });

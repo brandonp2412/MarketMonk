@@ -40,13 +40,33 @@ class SqliteSettings {
     Future<Map<String, Object?>> Function()? readLegacyValues,
     Future<Map<String, Object?>?> Function()? readLegacyAppStateValues,
     Future<void> Function()? cleanupLegacyAppState,
+    Future<bool> Function(String profileName)? legacyProfileExists,
     ProfileDatabaseFactory? profileDatabaseFactory,
   }) async {
+    final sqliteAlreadyMigrated =
+        await database.readSetting(sqliteMigrationCompleteKey) == true;
+
     if (await database.readSetting(legacyAppStateMigrationCompleteKey) !=
         true) {
       try {
-        final values =
+        var values =
             await (readLegacyAppStateValues ?? readLegacyAppStateFile)();
+        if (values != null && sqliteAlreadyMigrated) {
+          final currentProfiles = await database.readProfiles();
+          if (currentProfiles.isNotEmpty) {
+            final exists = legacyProfileExists ?? legacyProfileDatabaseExists;
+            final legacyProfiles =
+                (values['accounts'] as List?)?.whereType<String>().toList() ??
+                    const <String>[];
+            final safeProfiles = <String>[];
+            for (final profile in legacyProfiles) {
+              if (currentProfiles.contains(profile) || await exists(profile)) {
+                safeProfiles.add(profile);
+              }
+            }
+            values = {...values, 'accounts': safeProfiles};
+          }
+        }
         if (values != null) {
           await seedAppStateFromLegacyValues(
             values: values,
@@ -63,7 +83,7 @@ class SqliteSettings {
       }
     }
 
-    if (await database.readSetting(sqliteMigrationCompleteKey) != true) {
+    if (!sqliteAlreadyMigrated) {
       final values = await (readLegacyValues ?? readLegacyPreferences)();
       await seedSqliteFromLegacyValues(
         values: values,

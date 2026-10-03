@@ -103,6 +103,122 @@ void main() {
     },
   );
 
+  test('current single-profile settings migrate without losing trade data',
+      () async {
+    final appState = AppStateDatabase.connect(NativeDatabase.memory());
+    final profile = Database.connect(NativeDatabase.memory());
+    addTearDown(appState.close);
+    addTearDown(profile.close);
+
+    await appState.replaceProfiles(['Default']);
+    await appState.setActiveProfile('Default');
+    await appState.writeSetting('displayCurrency', 'NZD');
+    await profile.into(profile.trades).insert(
+          TradesCompanion.insert(
+            symbol: 'VOO',
+            name: 'Vanguard S&P 500 ETF',
+            quantity: 3,
+            price: 590,
+            tradeType: 'open',
+            tradeDate: DateTime.utc(2026, 9, 30),
+            commission: const Value(1.1),
+          ),
+        );
+
+    final snapshot = await readLegacyUnifiedSnapshot(
+      appState: appState,
+      openProfileDatabase: (_) async => profile,
+      closeProfileDatabases: false,
+    );
+    final target = UnifiedDatabase.connect(NativeDatabase.memory());
+    addTearDown(target.close);
+    await target.migrateLegacySnapshot(snapshot);
+
+    final migrated = (await target.readProfiles()).single;
+    expect(migrated.name, 'Default');
+    expect(await target.readActiveProfileId(), migrated.id);
+    expect(await target.readSetting('displayCurrency'), 'NZD');
+    final trades = await target.readTrades(migrated.id);
+    expect(trades, hasLength(1));
+    expect(trades.single.symbol, 'VOO');
+    expect(trades.single.commission, 1.1);
+  });
+
+  test('profile registry prevents renamed or deleted profile resurrection',
+      () async {
+    final appState = AppStateDatabase.connect(NativeDatabase.memory());
+    final defaultDatabase = Database.connect(NativeDatabase.memory());
+    final renamedDatabase = Database.connect(NativeDatabase.memory());
+    final staleOldDatabase = Database.connect(NativeDatabase.memory());
+    final deletedDatabase = Database.connect(NativeDatabase.memory());
+    addTearDown(() async {
+      await appState.close();
+      await defaultDatabase.close();
+      await renamedDatabase.close();
+      await staleOldDatabase.close();
+      await deletedDatabase.close();
+    });
+
+    await appState.replaceProfiles(['Default', 'Renamed']);
+    await appState.setActiveProfile('Renamed');
+    await renamedDatabase.into(renamedDatabase.trades).insert(
+          TradesCompanion.insert(
+            symbol: 'KEEP',
+            name: 'Keep',
+            quantity: 1,
+            price: 10,
+            tradeType: 'open',
+            tradeDate: DateTime.utc(2026, 10, 1),
+          ),
+        );
+    await deletedDatabase.into(deletedDatabase.trades).insert(
+          TradesCompanion.insert(
+            symbol: 'GHOST',
+            name: 'Deleted',
+            quantity: 1,
+            price: 99,
+            tradeType: 'open',
+            tradeDate: DateTime.utc(2026, 9, 1),
+          ),
+        );
+
+    final databases = <String, Database>{
+      'Default': defaultDatabase,
+      'Renamed': renamedDatabase,
+      'Old Name': staleOldDatabase,
+      'Deleted': deletedDatabase,
+    };
+    final opened = <String>[];
+    final snapshot = await readLegacyUnifiedSnapshot(
+      appState: appState,
+      openProfileDatabase: (name) async {
+        opened.add(name);
+        return databases[name];
+      },
+      closeProfileDatabases: false,
+    );
+
+    expect(opened, ['Default', 'Renamed']);
+    expect(
+      snapshot.profiles.map((profile) => profile.name),
+      ['Default', 'Renamed'],
+    );
+
+    final target = UnifiedDatabase.connect(NativeDatabase.memory());
+    addTearDown(target.close);
+    await target.migrateLegacySnapshot(snapshot);
+
+    expect(
+      (await target.readProfiles()).map((profile) => profile.name),
+      ['Default', 'Renamed'],
+    );
+    expect(await target.readProfileByName('Old Name'), isNull);
+    expect(await target.readProfileByName('Deleted'), isNull);
+    final renamed = await target.readProfileByName('Renamed');
+    expect(renamed, isNotNull);
+    expect((await target.readTrades(renamed!.id)).single.symbol, 'KEEP');
+  });
+
   test('failed migration rolls back and a corrected snapshot can recover',
       () async {
     final target = UnifiedDatabase.connect(NativeDatabase.memory());

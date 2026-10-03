@@ -28,6 +28,14 @@ Future<Map<String, Object?>?> readLegacyAppStateFile() async {
   }
 }
 
+Future<bool> legacyProfileDatabaseExists(String profileName) async {
+  final directory = await getApplicationSupportDirectory();
+  final fileName = profileName == 'Default'
+      ? 'market-monk.sqlite'
+      : 'market-monk-$profileName.sqlite';
+  return File('${directory.path}/$fileName').exists();
+}
+
 /// Removes the obsolete app-state database only after all legacy imports commit.
 ///
 /// SQLite sidecars are removed as well. Missing files are treated as already

@@ -72,7 +72,10 @@ class UnifiedDatabase extends _$UnifiedDatabase {
     await migrateLegacySnapshot(snapshot);
   }
 
-  Future<void> migrateLegacySnapshot(LegacyUnifiedSnapshot? snapshot) async {
+  Future<void> migrateLegacySnapshot(
+    LegacyUnifiedSnapshot? snapshot, {
+    bool replaceExisting = false,
+  }) async {
     final source = snapshot ??
         const LegacyUnifiedSnapshot(
           settings: {},
@@ -81,7 +84,10 @@ class UnifiedDatabase extends _$UnifiedDatabase {
         );
 
     await transaction(() async {
-      if (await readSetting(legacyMigrationCompleteKey) == true) return;
+      if (!replaceExisting &&
+          await readSetting(legacyMigrationCompleteKey) == true) {
+        return;
+      }
 
       await _clearIncompleteLegacyMigration();
 

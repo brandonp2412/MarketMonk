@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:drift/drift.dart' show Value;
+import 'package:drift/native.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -19,6 +21,7 @@ import 'package:market_monk/logging.dart';
 import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/legacy_preferences_migration.dart';
 import 'package:market_monk/portfolio_page.dart';
+import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
@@ -26,6 +29,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:market_monk/sqlite_settings.dart';
+import 'package:market_monk/unified_legacy_source.dart';
 
 Future<void> main() async {
   await runZonedGuarded<Future<void>>(
@@ -531,6 +535,12 @@ class AccountManager extends ChangeNotifier {
     );
     final prefs = await SqliteSettings.getInstance();
     await prefs.flush();
+
+    final unified = profileDataDatabase;
+    final globalCandles = await marketDataDatabase
+        .select(marketDataDatabase.unifiedCandles)
+        .get();
+
     try {
       final profileDatabases = <String, File>{};
       for (final account in accounts) {
@@ -543,6 +553,56 @@ class AccountManager extends ChangeNotifier {
           // https://www.sqlite.org/lang_vacuum.html#vacuum_with_an_into_clause
           await database.customStatement('VACUUM INTO ?', [target]);
         });
+
+        // During the unified cutover, profile-local SQLite still owns IBKR
+        // configuration/cache while trades and candles already live in the
+        // unified store. Hydrate the portable snapshot with the authoritative
+        // unified rows so a backup cannot silently omit post-cutover data.
+        final snapshot = Database.connect(NativeDatabase(File(target)));
+        try {
+          final unifiedProfile = await unified.readProfileByName(account);
+          if (unifiedProfile != null) {
+            final trades = await unified.readTrades(unifiedProfile.id);
+            await snapshot.transaction(() async {
+              await snapshot.delete(snapshot.trades).go();
+              for (final trade in trades) {
+                await snapshot.into(snapshot.trades).insert(
+                      TradesCompanion.insert(
+                        symbol: trade.symbol,
+                        name: trade.name,
+                        quantity: trade.quantity,
+                        price: trade.price,
+                        tradeType: trade.tradeType,
+                        tradeDate: trade.tradeDate,
+                        realizedPL: Value(trade.realizedPL),
+                        commission: Value(trade.commission),
+                      ),
+                    );
+              }
+            });
+          }
+
+          await snapshot.delete(snapshot.candles).go();
+          if (account == 'Default') {
+            for (final candle in globalCandles) {
+              await snapshot.into(snapshot.candles).insert(
+                    CandlesCompanion.insert(
+                      symbol: candle.symbol,
+                      date: candle.date,
+                      open: Value(candle.open),
+                      high: Value(candle.high),
+                      low: Value(candle.low),
+                      close: Value(candle.close),
+                      volume: Value(candle.volume),
+                      adjClose: Value(candle.adjClose),
+                    ),
+                  );
+            }
+          }
+        } finally {
+          await snapshot.close();
+        }
+
         profileDatabases[account] = File(target);
       }
       return await buildMarketMonkBackupArchive(
@@ -645,6 +705,21 @@ class AccountManager extends ChangeNotifier {
 
       db = Database();
       await init();
+
+      // Backup v3 still stores per-profile databases for compatibility. Rebuild
+      // the unified store from the restored registry and database payload in one
+      // transaction so restored trades/candles cannot diverge from what the UI
+      // now reads. A failed rebuild rolls back without touching the prior
+      // unified state.
+      final restoredSnapshot = await readLegacyUnifiedSnapshot(
+        appState: prefs.database,
+        openProfileDatabase: (name) async => _profileDatabaseFactory(name),
+      );
+      await profileDataDatabase.migrateLegacySnapshot(
+        restoredSnapshot,
+        replaceExisting: true,
+      );
+
       clearAllSyncCache();
       notifyListeners();
       talker.info('Restored full Market Monk backup');
