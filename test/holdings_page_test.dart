@@ -302,4 +302,73 @@ void main() {
     expect(find.byType(CheckedPopupMenuItem<String>), findsNWidgets(2));
     await _disposeTestApp(tester);
   });
+
+  testWidgets('mobile holdings exposes account picker and switches account',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({
+      'accounts': ['Default', 'Brokerage'],
+    });
+    db = Database.connect(
+      DatabaseConnection(
+        NativeDatabase.memory(),
+        closeStreamsSynchronously: true,
+      ),
+    );
+    addTearDown(() => db.close());
+
+    final accounts = testAccountManager();
+    await accounts.init();
+    final position = Position(
+      symbol: 'VOO',
+      name: 'VANGUARD S&P 500 ETF',
+      nativeCurrency: 'USD',
+      netShares: 10,
+      avgCost: 500,
+      currentPrice: 550,
+      firstBuyDate: DateTime(2025),
+      lastBuyDate: DateTime(2026),
+    );
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create: (_) => SettingsState(
+              localCurrencyDetector: () async => 'USD',
+            ),
+          ),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: HoldingsPage(positionsLoader: (_) async => [position]),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(accounts.activeAccount, 'Default');
+    await tester.tap(find.byKey(const Key('holdings-account-picker')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Brokerage'), findsOneWidget);
+    expect(find.byType(CheckedPopupMenuItem<String>), findsNWidgets(2));
+
+    await tester.tap(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is CheckedPopupMenuItem<String> &&
+            widget.value == 'Brokerage',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(accounts.activeAccount, 'Brokerage');
+    await _disposeTestApp(tester);
+  });
 }

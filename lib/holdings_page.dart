@@ -124,6 +124,8 @@ class HoldingsPageState extends State<HoldingsPage>
       _ibkrTrades = [];
       _ibkrTradesAccount = null;
       _ibkrTradeHistoryAvailable = true;
+      _selecting = false;
+      _selectedSymbols.clear();
     }
     _lastAccount = account;
     _lastIbkrConfig = ibkrConfig;
@@ -507,7 +509,8 @@ class HoldingsPageState extends State<HoldingsPage>
     super.build(context);
 
     final desktop = isDesktopLayout(context);
-    final ibkrManaged = context.watch<AccountManager>().ibkrConfigFor().enabled;
+    final accounts = context.watch<AccountManager>();
+    final ibkrManaged = accounts.ibkrConfigFor().enabled;
     final allSelected =
         _summaries.isNotEmpty && _selectedSymbols.length == _summaries.length;
 
@@ -559,6 +562,27 @@ class HoldingsPageState extends State<HoldingsPage>
       ],
     );
 
+    final accountPicker = accounts.accounts.length > 1
+        ? PopupMenuButton<String>(
+            key: const Key('holdings-account-picker'),
+            tooltip: context.l10n.text('Switch account'),
+            onSelected: (account) => runDetachedTask(
+              accounts.switchAccount(account),
+              'Failed to switch account',
+            ),
+            itemBuilder: (popupContext) => accounts.accounts
+                .map(
+                  (account) => CheckedPopupMenuItem<String>(
+                    value: account,
+                    checked: account == accounts.activeAccount,
+                    child: Text(account),
+                  ),
+                )
+                .toList(),
+            icon: const Icon(Icons.account_balance_outlined),
+          )
+        : null;
+
     final leading = _search.text.isEmpty
         ? const Padding(
             padding: EdgeInsets.only(left: 16, right: 8),
@@ -576,7 +600,6 @@ class HoldingsPageState extends State<HoldingsPage>
           );
 
     if (desktop) {
-      final accounts = context.watch<AccountManager>();
       final openCount =
           _summaries.where((summary) => summary.position != null).length;
       return Scaffold(
@@ -777,7 +800,10 @@ class HoldingsPageState extends State<HoldingsPage>
                 onChanged: (_) => setState(() {
                   _stream = _buildStream();
                 }),
-                trailing: [menuButton],
+                trailing: [
+                  if (accountPicker != null) accountPicker,
+                  menuButton,
+                ],
               ),
             ),
             Expanded(
