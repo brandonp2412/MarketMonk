@@ -531,7 +531,16 @@ void main() {
       'full backup restores unified trades/candles plus SQLite globals and IBKR state',
       () async {
     final settings = await start();
-    final manager = AccountManager();
+    final unified = UnifiedDatabase.connect(NativeDatabase.memory());
+    setProfileDataDatabaseForTesting(unified);
+    setMarketDataDatabaseForTesting(unified);
+    addTearDown(() async {
+      setProfileDataDatabaseForTesting(null);
+      setMarketDataDatabaseForTesting(null);
+      await unified.close();
+    });
+
+    final manager = AccountManager(unifiedDatabase: unified);
     await manager.init();
     await manager.addAccount('Brokerage');
     await manager.setIbkrConfig(
@@ -545,45 +554,19 @@ void main() {
     await manager.cachePortfolio('Brokerage', [], null, netLiquidationUsd: 987);
     await settings.setStringList('favoriteStocks', ['VTI']);
 
-    final writer = profile('Brokerage');
-    await writer.customStatement('PRAGMA journal_mode=WAL');
-    await writer.customStatement('PRAGMA wal_autocheckpoint=0');
-    await writer.trades.insertOne(
-      TradesCompanion.insert(
-        symbol: 'VTI',
-        name: 'VTI',
-        quantity: 2,
-        price: 100,
-        tradeType: 'open',
-        tradeDate: DateTime(2026),
-      ),
-    );
-    await writer.candles.insertOne(
-      CandlesCompanion.insert(
-        symbol: 'VTI',
-        date: DateTime(2026, 1, 2),
-        close: const Value(101),
-      ),
-    );
-
-    final unified = UnifiedDatabase.connect(NativeDatabase.memory());
-    setProfileDataDatabaseForTesting(unified);
-    setMarketDataDatabaseForTesting(unified);
-    addTearDown(() async {
-      setProfileDataDatabaseForTesting(null);
-      setMarketDataDatabaseForTesting(null);
-      await unified.close();
-    });
-    final preCutover = await readLegacyUnifiedSnapshot(
-      appState: appState,
-      openProfileDatabase: (name) async => profile(name),
-    );
-    await unified.migrateLegacySnapshot(preCutover);
-
     final brokerageProfile = await unified.readProfileByName('Brokerage');
     expect(brokerageProfile, isNotNull);
     await unified.addTrade(
       profileId: brokerageProfile!.id,
+      symbol: 'VTI',
+      name: 'VTI',
+      quantity: 2,
+      price: 100,
+      tradeType: 'open',
+      tradeDate: DateTime(2026),
+    );
+    await unified.addTrade(
+      profileId: brokerageProfile.id,
       symbol: 'NEW',
       name: 'Unified only',
       quantity: 4,
@@ -591,6 +574,16 @@ void main() {
       tradeType: 'open',
       tradeDate: DateTime(2026, 10, 3),
       commission: 0.75,
+    );
+    await unified.upsertCandle(
+      symbol: 'VTI',
+      date: DateTime.utc(2026, 1, 2),
+      open: 100,
+      high: 102,
+      low: 99,
+      close: 101,
+      volume: 1000,
+      adjClose: 101,
     );
     await unified.upsertCandle(
       symbol: 'NEW',
@@ -603,9 +596,9 @@ void main() {
       adjClose: 25,
     );
 
+    final originalProfileId = brokerageProfile.id;
     final exportDirectory = await directory.createTemp('export-');
     final backup = await manager.exportBackup(exportDirectory);
-    await writer.close();
 
     await unified.clearTrades(brokerageProfile.id);
     await unified.delete(unified.unifiedCandles).go();
@@ -620,7 +613,8 @@ void main() {
 
     final restoredProfile = await unified.readProfileByName('Brokerage');
     expect(restoredProfile, isNotNull);
-    final restoredUnifiedTrades = await unified.readTrades(restoredProfile!.id);
+    expect(restoredProfile!.id, originalProfileId);
+    final restoredUnifiedTrades = await unified.readTrades(restoredProfile.id);
     expect(
       restoredUnifiedTrades.map((trade) => trade.symbol).toSet(),
       {'VTI', 'NEW'},
@@ -633,15 +627,6 @@ void main() {
     );
     expect((await unified.readCandles('VTI')).single.close, 101);
     expect((await unified.readCandles('NEW')).single.volume, 123);
-
-    final restoredLegacy = profile('Brokerage');
-    final restoredLegacyTrades =
-        await restoredLegacy.select(restoredLegacy.trades).get();
-    expect(
-      restoredLegacyTrades.map((trade) => trade.symbol).toSet(),
-      {'VTI', 'NEW'},
-    );
-    await restoredLegacy.close();
 
     expect(await appState.readSetting(sqliteMigrationCompleteKey), true);
     expect((await SharedPreferences.getInstance()).getKeys(), isEmpty);

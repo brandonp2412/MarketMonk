@@ -2,8 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:drift/drift.dart' show Value;
-import 'package:drift/native.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -18,7 +16,6 @@ import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
-import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/legacy_preferences_migration.dart';
 import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/profile_data_repository.dart';
@@ -26,11 +23,10 @@ import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
 import 'package:market_monk/unified_database.dart';
-import 'package:path/path.dart' as p;
+import 'package:market_monk/unified_backup_store.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:market_monk/sqlite_settings.dart';
-import 'package:market_monk/unified_legacy_source.dart';
 
 Future<void> main() async {
   await runZonedGuarded<Future<void>>(
@@ -303,7 +299,6 @@ class AccountManager extends ChangeNotifier {
     }
   }
 
-
   Future<void> _migrateLegacyProfileState(
     String account, {
     bool replace = false,
@@ -387,6 +382,40 @@ class AccountManager extends ChangeNotifier {
       return await operation(database);
     } finally {
       await database.close();
+    }
+  }
+
+  Future<void> _prepareUnifiedBackupState(SqliteSettings prefs) async {
+    final currentProfiles = await _unifiedDatabase.readProfiles();
+    final byName = {
+      for (final profile in currentProfiles) profile.name: profile,
+    };
+
+    for (final profile in currentProfiles) {
+      if (!accounts.contains(profile.name)) {
+        await _unifiedDatabase.deleteProfile(profile.id);
+      }
+    }
+
+    final seed = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+    for (var index = 0; index < accounts.length; index++) {
+      final account = accounts[index];
+      final existing = byName[account];
+      await _unifiedDatabase.upsertProfile(
+        id: existing?.id ?? 'profile-backup-$seed-$index',
+        name: account,
+        sortOrder: index,
+      );
+    }
+
+    final active = await _unifiedDatabase.readProfileByName(activeAccount);
+    if (active == null) {
+      throw StateError('Active MarketMonk profile is missing from unified DB');
+    }
+    await _unifiedDatabase.setActiveProfileId(active.id);
+
+    for (final setting in prefs.snapshot().entries) {
+      await _unifiedDatabase.writeSetting(setting.key, setting.value);
     }
   }
 
@@ -547,64 +576,21 @@ class AccountManager extends ChangeNotifier {
       _serializeStorage(() => _importDatabase(sourceFile));
 
   Future<void> _importDatabase(File sourceFile) async {
-    final dbName = activeAccount == 'Default'
-        ? 'market-monk'
-        : 'market-monk-$activeAccount';
-    final dbFolder = await getApplicationSupportDirectory();
-    final targetFile = File(p.join(dbFolder.path, '$dbName.sqlite'));
-    final stagedFile = File('${targetFile.path}.importing');
-    final backupFile = File('${targetFile.path}.pre-import');
-    final sourcePath = p.normalize(p.absolute(sourceFile.path));
-    final targetPath = p.normalize(p.absolute(targetFile.path));
-    final sourceIsTarget = sourcePath == targetPath;
-
-    if (!sourceIsTarget) {
-      if (await stagedFile.exists()) await stagedFile.delete();
-      await sourceFile.copy(stagedFile.path);
+    final profile = await _unifiedDatabase.readProfileByName(activeAccount);
+    if (profile == null) {
+      throw StateError('Active MarketMonk profile is missing from unified DB');
     }
 
     try {
-      if (await backupFile.exists()) await backupFile.delete();
-      if (await targetFile.exists()) {
-        await targetFile.copy(backupFile.path);
-      }
-
-      if (!sourceIsTarget) {
-        await stagedFile.copy(targetFile.path);
-      }
-
-      for (final suffix in ['-wal', '-shm']) {
-        final sidecar = File('${targetFile.path}$suffix');
-        if (await sidecar.exists()) await sidecar.delete();
-      }
-
-      await _withProfileDatabase(
-        activeAccount,
-        (database) => database.customSelect('PRAGMA user_version').getSingle(),
-      );
-      await _migrateLegacyProfileState(activeAccount, replace: true);
+      await UnifiedBackupStore(_unifiedDatabase)
+          .importLegacyProfile(sourceFile: sourceFile, profileId: profile.id);
       await _loadProfileState(activeAccount);
-
       clearAllSyncCache();
       notifyListeners();
-      talker.info('Imported database for active portfolio account');
-
-      if (await backupFile.exists()) await backupFile.delete();
+      talker.info('Imported legacy database into active unified profile');
     } catch (error, stackTrace) {
-      for (final suffix in ['-wal', '-shm']) {
-        final sidecar = File('${targetFile.path}$suffix');
-        if (await sidecar.exists()) await sidecar.delete();
-      }
-      if (await backupFile.exists()) {
-        await backupFile.copy(targetFile.path);
-      }
-      await _migrateLegacyProfileState(activeAccount, replace: true);
-      await _loadProfileState(activeAccount);
       talker.handle(error, stackTrace, 'Failed to import portfolio database');
       rethrow;
-    } finally {
-      if (await stagedFile.exists()) await stagedFile.delete();
-      if (await backupFile.exists()) await backupFile.delete();
     }
   }
 
@@ -613,113 +599,10 @@ class AccountManager extends ChangeNotifier {
       _serializeStorage(() => _exportBackup(workingDirectory));
 
   Future<File> _exportBackup(Directory workingDirectory) async {
-    final snapshotDirectory = await workingDirectory.createTemp(
-      'sqlite-snapshot-',
-    );
     final prefs = await SqliteSettings.getInstance();
     await prefs.flush();
-
-    final unified = _unifiedDatabase;
-    final globalCandles = await marketDataDatabase
-        .select(marketDataDatabase.unifiedCandles)
-        .get();
-
-    try {
-      final profileDatabases = <String, File>{};
-      for (final account in accounts) {
-        final target = p.join(
-          snapshotDirectory.path,
-          databaseFileNameForAccount(account),
-        );
-        await _withProfileDatabase(account, (database) async {
-          // VACUUM INTO includes committed WAL pages in a consistent snapshot.
-          // https://www.sqlite.org/lang_vacuum.html#vacuum_with_an_into_clause
-          await database.customStatement('VACUUM INTO ?', [target]);
-        });
-
-        // During the unified cutover, profile-local SQLite still owns IBKR
-        // configuration/cache while trades and candles already live in the
-        // unified store. Hydrate the portable snapshot with the authoritative
-        // unified rows so a backup cannot silently omit post-cutover data.
-        final snapshot = Database.connect(NativeDatabase(File(target)));
-        try {
-          final unifiedProfile = await unified.readProfileByName(account);
-          if (unifiedProfile != null) {
-            final trades = await unified.readTrades(unifiedProfile.id);
-            final ibkrSettings =
-                await unified.readIbkrSettings(unifiedProfile.id);
-            final ibkrCaches = await unified.readIbkrCaches(unifiedProfile.id);
-            await snapshot.transaction(() async {
-              await snapshot.delete(snapshot.trades).go();
-              for (final trade in trades) {
-                await snapshot.into(snapshot.trades).insert(
-                      TradesCompanion.insert(
-                        symbol: trade.symbol,
-                        name: trade.name,
-                        quantity: trade.quantity,
-                        price: trade.price,
-                        tradeType: trade.tradeType,
-                        tradeDate: trade.tradeDate,
-                        realizedPL: Value(trade.realizedPL),
-                        commission: Value(trade.commission),
-                      ),
-                    );
-              }
-              await snapshot.delete(snapshot.ibkrProfileSettings).go();
-              if (ibkrSettings != null) {
-                await snapshot.writeIbkrProfileSettings(
-                  enabled: ibkrSettings.enabled,
-                  baseUrl: ibkrSettings.baseUrl,
-                  token: ibkrSettings.token,
-                );
-              }
-              await snapshot.delete(snapshot.ibkrCacheEntries).go();
-              for (final cache in ibkrCaches) {
-                await snapshot.writeIbkrCache(
-                  kind: cache.kind,
-                  cacheKey: cache.cacheKey,
-                  payloadJson: cache.payloadJson,
-                  cachedAt: cache.cachedAt,
-                );
-              }
-            });
-          }
-
-          await snapshot.delete(snapshot.candles).go();
-          if (account == 'Default') {
-            for (final candle in globalCandles) {
-              await snapshot.into(snapshot.candles).insert(
-                    CandlesCompanion.insert(
-                      symbol: candle.symbol,
-                      date: candle.date,
-                      open: Value(candle.open),
-                      high: Value(candle.high),
-                      low: Value(candle.low),
-                      close: Value(candle.close),
-                      volume: Value(candle.volume),
-                      adjClose: Value(candle.adjClose),
-                    ),
-                  );
-            }
-          }
-        } finally {
-          await snapshot.close();
-        }
-
-        profileDatabases[account] = File(target);
-      }
-      return await buildMarketMonkBackupArchive(
-        workingDirectory: workingDirectory,
-        logical: MarketMonkLogicalBackup(
-          profiles: List<String>.of(accounts),
-          activeProfile: activeAccount,
-          settings: prefs.snapshot(),
-        ),
-        storage: MarketMonkBackupStorage.profileDatabases(profileDatabases),
-      );
-    } finally {
-      await snapshotDirectory.delete(recursive: true);
-    }
+    await _prepareUnifiedBackupState(prefs);
+    return UnifiedBackupStore(_unifiedDatabase).exportArchive(workingDirectory);
   }
 
   /// Restores current or legacy backups, rolling back on restore errors.
@@ -731,125 +614,37 @@ class AccountManager extends ChangeNotifier {
     final workingDirectory = await temporaryDirectory.createTemp(
       'market-monk-restore-',
     );
+    final prefs = await SqliteSettings.getInstance();
+    final previousPreferences = prefs.snapshot();
+    final previousAccounts = List<String>.of(accounts);
+    final previousActiveAccount = activeAccount;
+    final store = UnifiedBackupStore(_unifiedDatabase);
+    final rollbackFile = File.fromUri(
+      workingDirectory.uri.resolve('pre-restore-unified.sqlite'),
+    );
+
     try {
+      await store.snapshotDatabase(rollbackFile);
+      await _prepareUnifiedBackupState(prefs);
       final restored = await extractMarketMonkBackupArchive(
         archiveFile: sourceFile,
         workingDirectory: workingDirectory,
       );
-      final rollbackDirectory = Directory(
-        p.join(workingDirectory.path, 'rollback'),
-      );
-      final databaseDirectory = await getApplicationSupportDirectory();
-      final prefs = await SqliteSettings.getInstance();
-      await _applyRestoredBackup(
-        restored,
-        rollbackDirectory: rollbackDirectory,
-        databaseDirectory: databaseDirectory,
-        prefs: prefs,
-        previousPreferences: prefs.snapshot(),
-        previousAccounts: List<String>.of(accounts),
-        previousActiveAccount: activeAccount,
-      );
-    } finally {
-      if (await workingDirectory.exists()) {
-        await workingDirectory.delete(recursive: true);
-      }
-    }
-  }
 
-  Future<void> _applyRestoredBackup(
-    MarketMonkBackupContents restored, {
-    required Directory rollbackDirectory,
-    required Directory databaseDirectory,
-    required SqliteSettings prefs,
-    required Map<String, Object?> previousPreferences,
-    required List<String> previousAccounts,
-    required String previousActiveAccount,
-  }) async {
-    if (restored.storage.layout !=
-        MarketMonkBackupStorageLayout.profileDatabases) {
-      throw UnsupportedError(
-        'This Market Monk build cannot apply a unified-database backup yet',
-      );
-    }
-
-    final logical = restored.logical;
-    final profileDatabases = restored.storage.profileDatabases;
-    await rollbackDirectory.create();
-    final existingFiles = _marketMonkDatabaseFiles(databaseDirectory);
-    var replacementStarted = false;
-
-    try {
-      for (final file in existingFiles) {
-        await file.copy(p.join(rollbackDirectory.path, p.basename(file.path)));
-      }
-      replacementStarted = true;
-      for (final file in existingFiles) {
-        if (await file.exists()) await file.delete();
-      }
-      for (final entry in profileDatabases.entries) {
-        final target = File(
-          p.join(databaseDirectory.path, databaseFileNameForAccount(entry.key)),
-        );
-        await entry.value.copy(target.path);
-      }
-      for (final profile in logical.profiles) {
-        final restoredDatabase = Database.connect(
-          NativeDatabase(
-            File(
-              p.join(
-                databaseDirectory.path,
-                databaseFileNameForAccount(profile),
-              ),
-            ),
-          ),
-        );
-        try {
-          await restoredDatabase.customSelect('PRAGMA quick_check').get();
-        } finally {
-          await restoredDatabase.close();
-        }
-      }
-
+      await store.restoreBackup(restored, workingDirectory);
       await prefs.restore(
-        logical.settings,
-        logical.profiles,
-        logical.activeProfile,
-      );
-      await seedSqliteFromLegacyValues(
-        values: {...logical.settings, 'accounts': logical.profiles},
-        appState: prefs.database,
-        profileDatabaseFactory: _profileDatabaseFactory,
-      );
-      // Backup v3 still stores per-profile databases for compatibility. Rebuild
-      // the unified store from the restored registry and database payload in one
-      // transaction so restored trades/candles cannot diverge from what the UI
-      // now reads.
-      final restoredSnapshot = await readLegacyUnifiedSnapshot(
-        appState: prefs.database,
-        openProfileDatabase: (name) async => Database.connect(
-          NativeDatabase(
-            File(
-              p.join(
-                databaseDirectory.path,
-                databaseFileNameForAccount(name),
-              ),
-            ),
-          ),
-        ),
-      );
-      await _unifiedDatabase.migrateLegacySnapshot(
-        restoredSnapshot,
-        replaceExisting: true,
+        restored.logical.settings,
+        restored.logical.profiles,
+        restored.logical.activeProfile,
       );
       await init();
 
       clearAllSyncCache();
       notifyListeners();
-      talker.info('Restored full Market Monk backup');
+      talker.info('Restored full MarketMonk backup');
     } catch (error, stackTrace) {
-      if (replacementStarted) {
-        await _restoreRollbackDatabases(rollbackDirectory, databaseDirectory);
+      if (await rollbackFile.exists()) {
+        await store.restoreUnifiedFile(rollbackFile);
       }
       await prefs.restore(
         previousPreferences,
@@ -857,36 +652,13 @@ class AccountManager extends ChangeNotifier {
         previousActiveAccount,
       );
       await init();
-      talker.handle(error, stackTrace, 'Failed to restore Market Monk backup');
+      talker.handle(error, stackTrace, 'Failed to restore MarketMonk backup');
       rethrow;
+    } finally {
+      if (await workingDirectory.exists()) {
+        await workingDirectory.delete(recursive: true);
+      }
     }
-  }
-
-  Future<void> _restoreRollbackDatabases(
-    Directory rollbackDirectory,
-    Directory databaseDirectory,
-  ) async {
-    for (final file in _marketMonkDatabaseFiles(databaseDirectory)) {
-      if (await file.exists()) await file.delete();
-    }
-    if (!await rollbackDirectory.exists()) return;
-
-    for (final entity in rollbackDirectory.listSync()) {
-      if (entity is! File) continue;
-      await entity.copy(
-        p.join(databaseDirectory.path, p.basename(entity.path)),
-      );
-    }
-  }
-
-  List<File> _marketMonkDatabaseFiles(Directory directory) {
-    if (!directory.existsSync()) return const [];
-    final pattern = RegExp(r'^market-monk(?:-.+)?.sqlite(?:-(?:wal|shm))?$');
-    return directory
-        .listSync()
-        .whereType<File>()
-        .where((file) => pattern.hasMatch(p.basename(file.path)))
-        .toList();
   }
 
   void _validateProfileName(String name) {
