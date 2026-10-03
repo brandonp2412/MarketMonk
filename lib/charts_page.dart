@@ -1863,6 +1863,7 @@ class ChartsPageState extends State<ChartsPage>
 
     final singleLine = visibleSeries.length == 1;
     final scaleForComparison = !singleLine;
+    final axisGutter = scaleForComparison ? 72.0 : 64.0;
     final lineBarsData = <LineChartBarData>[];
     for (final entry in visibleSeries.entries) {
       final idx = accounts.indexOf(entry.key);
@@ -1909,7 +1910,7 @@ class ChartsPageState extends State<ChartsPage>
     return SizedBox(
       height: height,
       child: Padding(
-        padding: const EdgeInsets.only(top: 8),
+        padding: EdgeInsets.only(top: 8, right: axisGutter),
         child: LineChart(
           LineChartData(
             clipData: const FlClipData.all(),
@@ -1924,7 +1925,7 @@ class ChartsPageState extends State<ChartsPage>
               leftTitles: AxisTitles(
                 sideTitles: SideTitles(
                   showTitles: true,
-                  reservedSize: scaleForComparison ? 72 : 64,
+                  reservedSize: axisGutter,
                   minIncluded: false,
                   maxIncluded: false,
                   getTitlesWidget: (value, meta) => SideTitleWidget(

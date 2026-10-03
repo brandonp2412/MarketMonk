@@ -61,8 +61,15 @@ class TickerLine extends StatelessWidget {
     final settings = context.watch<SettingsState>();
     final formatter = DateFormat(settings.dateFormat);
 
+    const leftOuterInset = 8.0;
+    const axisGutter = 64.0;
+
     return Padding(
-      padding: const EdgeInsets.only(left: 8.0, right: 8.0, top: 24.0),
+      padding: const EdgeInsets.only(
+        left: leftOuterInset,
+        right: leftOuterInset + axisGutter,
+        top: 24.0,
+      ),
       child: LineChart(
         LineChartData(
           borderData: FlBorderData(show: false),
@@ -77,7 +84,7 @@ class TickerLine extends StatelessWidget {
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 64,
+                reservedSize: axisGutter,
                 minIncluded: false,
                 maxIncluded: false,
                 getTitlesWidget: (value, meta) => SideTitleWidget(
