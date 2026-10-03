@@ -34,9 +34,12 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                 ),
           ]))
         .watch();
-    fetchSymbolCurrencyAndRate(widget.summary.symbol).then((_) {
-      if (mounted) setState(() {});
-    });
+    runDetachedTask(
+      fetchSymbolCurrencyAndRate(widget.summary.symbol).then((_) {
+        if (mounted) setState(() {});
+      }),
+      'Failed to refresh trade-history currency metadata',
+    );
   }
 
   @override
@@ -214,31 +217,40 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
   }
 
   void _showTradeActions(Trade trade) {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.edit),
-              title: Text(context.l10n.text('Edit trade')),
-              onTap: () {
-                Navigator.pop(ctx);
-                _editTrade(trade);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete),
-              title: Text(context.l10n.text('Delete trade')),
-              onTap: () {
-                Navigator.pop(ctx);
-                _confirmDeleteTrade(trade);
-              },
-            ),
-          ],
+    runDetachedTask(
+      showModalBottomSheet<void>(
+        context: context,
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.edit),
+                title: Text(context.l10n.text('Edit trade')),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  runDetachedTask(
+                    _editTrade(trade),
+                    'Failed to edit trade',
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete),
+                title: Text(context.l10n.text('Delete trade')),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  runDetachedTask(
+                    _confirmDeleteTrade(trade),
+                    'Failed to delete trade',
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
+      'Failed to show trade actions',
     );
   }
 

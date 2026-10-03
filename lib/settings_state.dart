@@ -59,6 +59,7 @@ const supportedCurrencies = [
 class SettingsState extends ChangeNotifier {
   final Future<http.Response> Function(Uri) _rateFetcher;
   final Future<String?> Function()? _localCurrencyDetector;
+  final Map<String, Future<void>> _rateRefreshes = {};
   late final Future<void> initialized;
 
   ThemeMode theme = ThemeMode.system;
@@ -196,7 +197,10 @@ class SettingsState extends ChangeNotifier {
     notifyListeners();
     talker.debug('Loaded application settings');
 
-    _fetchAndApplyRate(displayCurrency);
+    runDetachedTask(
+      _fetchAndApplyRate(displayCurrency),
+      'Failed to refresh initial display exchange rate',
+    );
   }
 
   void _applyRate(String currencyCode, double rate) {
@@ -204,7 +208,23 @@ class SettingsState extends ChangeNotifier {
     allRatesFromUsd[currencyCode] = rate;
   }
 
-  Future<void> _fetchAndApplyRate(String currencyCode) async {
+  Future<void> _fetchAndApplyRate(String currencyCode) {
+    final existing = _rateRefreshes[currencyCode];
+    if (existing != null) return existing;
+
+    late final Future<void> future;
+    future = _fetchAndApplyRateOnce(currencyCode).whenComplete(() {
+      if (identical(_rateRefreshes[currencyCode], future)) {
+        _rateRefreshes.removeWhere(
+          (key, value) => key == currencyCode && identical(value, future),
+        );
+      }
+    });
+    _rateRefreshes[currencyCode] = future;
+    return future;
+  }
+
+  Future<void> _fetchAndApplyRateOnce(String currencyCode) async {
     if (currencyCode == 'USD') {
       allRatesFromUsd['USD'] = 1.0;
       final prefs = await SqliteSettings.getInstance();
@@ -355,7 +375,10 @@ class SettingsState extends ChangeNotifier {
     _applyRate(code, cachedRate ?? allRatesFromUsd[code] ?? 1.0);
     notifyListeners();
     await prefs.setString('displayCurrency', code);
-    unawaited(_fetchAndApplyRate(code));
+    runDetachedTask(
+      _fetchAndApplyRate(code),
+      'Failed to refresh display exchange rate',
+    );
   }
 
   int tradesVersion = 0;

@@ -261,7 +261,8 @@ class _SettingsPageState extends State<SettingsPage> {
     for (final symbol in symbols) {
       clearSyncCache(symbol);
     }
-    unawaited(settings.syncTickers(symbols, syncCandles));
+    await settings.syncTickers(symbols, syncCandles);
+    if (!context.mounted) return;
     toast(
       context,
       context.l10n.text('Imported {count} trades', {'count': tradesCount}),
@@ -386,11 +387,11 @@ class _SettingsPageState extends State<SettingsPage> {
               child: Text(context.l10n.text('Cancel')),
             ),
             TextButton(
-              onPressed: () {
-                settings.setVisibleCurrencies(
+              onPressed: () async {
+                await settings.setVisibleCurrencies(
                   supportedCurrencies.where(selected.contains).toList(),
                 );
-                Navigator.pop(context);
+                if (context.mounted) Navigator.pop(context);
               },
               child: Text(context.l10n.text('Save')),
             ),
@@ -1095,7 +1096,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   context,
                 ).colorScheme.primary.withValues(alpha: 0.24),
                 onChanged: (value) {
-                  settings.setCurveSmoothness(value);
+                  runDetachedTask(
+                    settings.setCurveSmoothness(value),
+                    'Failed to save curve smoothness',
+                  );
                 },
               ),
             ],

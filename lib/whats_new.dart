@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
+import 'package:market_monk/utils.dart';
 
 class WhatsNew extends StatefulWidget {
   const WhatsNew({super.key});
@@ -29,7 +30,7 @@ class _WhatsNewState extends State<WhatsNew> {
   @override
   void initState() {
     super.initState();
-    _loadChangelogs();
+    runDetachedTask(_loadChangelogs(), 'Failed to load changelog');
   }
 
   Future<void> _loadChangelogs() async {
@@ -145,8 +146,8 @@ class _WhatsNewState extends State<WhatsNew> {
                     Text(
                       log.created,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
                     ),
                     const SizedBox(height: 4),
                     Text(log.content),
@@ -168,9 +169,8 @@ class _WhatsNewState extends State<WhatsNew> {
               ),
               Text('${_page + 1} / $pageCount'),
               IconButton(
-                onPressed: _page + 1 < pageCount
-                    ? () => _setPage(_page + 1)
-                    : null,
+                onPressed:
+                    _page + 1 < pageCount ? () => _setPage(_page + 1) : null,
                 icon: const Icon(Icons.chevron_right),
                 tooltip: 'Next page',
               ),

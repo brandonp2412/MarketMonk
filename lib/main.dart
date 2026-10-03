@@ -27,7 +27,7 @@ import 'package:provider/provider.dart';
 import 'package:market_monk/sqlite_settings.dart';
 
 Future<void> main() async {
-  runZonedGuarded(
+  await runZonedGuarded<Future<void>>(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
       await CrashLogger.install(fileName: 'marketmonk-crash.log');

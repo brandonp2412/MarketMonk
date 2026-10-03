@@ -54,6 +54,14 @@ String symbolCurrency(String symbol) => _symbolCurrencies[symbol] ?? 'USD';
 /// Returns the cent divisor for [symbol] (100.0 for ZAc/GBp stocks, else 1.0).
 double symbolCentDivisor(String symbol) => _symbolCentDivisors[symbol] ?? 1.0;
 
+void runDetachedTask<T>(Future<T> future, String label) {
+  unawaited(
+    future.then<void>((_) {}).catchError((Object error, StackTrace stackTrace) {
+      talker.handle(error, stackTrace, label);
+    }),
+  );
+}
+
 /// Caches [rawCurrency] (as reported by Yahoo, e.g. 'GBp') for [symbol],
 /// normalizing cent codes to their parent ISO currency (GBp → GBP ÷ 100).
 /// Returns the normalized ISO code.
@@ -686,7 +694,10 @@ Future<void> syncCandles(
         );
         if (ibkrHandled) return;
 
-        unawaited(fetchSymbolCurrencyAndRate(symbol));
+        runDetachedTask(
+          fetchSymbolCurrencyAndRate(symbol),
+          'Failed to refresh candle currency metadata',
+        );
 
         if (latest == null) {
           final response = await const YahooFinanceDailyReader().getDailyDTOs(
@@ -737,7 +748,10 @@ Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
       final savedRate = prefs.getDouble('exchangeRate_$normalized');
       if (savedRate != null) {
         allRatesFromUsd[normalized] = savedRate;
-        unawaited(_fetchAndCacheRate(normalized));
+        runDetachedTask(
+          _fetchAndCacheRate(normalized),
+          'Failed to refresh cached exchange rate',
+        );
       } else {
         await _fetchAndCacheRate(normalized);
       }
@@ -815,6 +829,7 @@ class YahooFinanceApi {
   final Future<http.Response> Function(Uri) _searchFetcher;
   Timer? _debounceTimer;
   Completer<List<StockResult>>? _pendingSearch;
+  String? _pendingQuery;
 
   YahooFinanceApi({Future<http.Response> Function(Uri)? searchFetcher})
       : _searchFetcher = searchFetcher ?? http.get;
@@ -826,9 +841,15 @@ class YahooFinanceApi {
       return Future.value([]);
     }
 
+    final pending = _pendingSearch;
+    if (_pendingQuery == trimmedQuery && pending != null) {
+      return pending.future;
+    }
+
     cancelPendingSearch();
     final completer = Completer<List<StockResult>>();
     _pendingSearch = completer;
+    _pendingQuery = trimmedQuery;
 
     _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
       try {
@@ -840,6 +861,7 @@ class YahooFinanceApi {
       } finally {
         if (identical(_pendingSearch, completer)) {
           _pendingSearch = null;
+          _pendingQuery = null;
           _debounceTimer = null;
         }
       }
@@ -886,6 +908,7 @@ class YahooFinanceApi {
     _debounceTimer = null;
     final pending = _pendingSearch;
     _pendingSearch = null;
+    _pendingQuery = null;
     if (pending != null && !pending.isCompleted) {
       pending.complete([]);
     }

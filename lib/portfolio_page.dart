@@ -37,16 +37,16 @@ class PortfolioPage extends StatefulWidget {
   final bool isActive;
   final Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? _ibkrLoader;
   final Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
-  _ibkrPerformanceLoader;
+      _ibkrPerformanceLoader;
 
   const PortfolioPage({
     super.key,
     this.isActive = true,
     Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? ibkrLoader,
     Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
-    ibkrPerformanceLoader,
-  }) : _ibkrLoader = ibkrLoader,
-       _ibkrPerformanceLoader = ibkrPerformanceLoader;
+        ibkrPerformanceLoader,
+  })  : _ibkrLoader = ibkrLoader,
+        _ibkrPerformanceLoader = ibkrPerformanceLoader;
 
   @override
   State<PortfolioPage> createState() => PortfolioPageState();
@@ -71,9 +71,10 @@ class PortfolioPageState extends State<PortfolioPage>
   int _lastIbkrRefreshVersion = -1;
   IbkrAccountConfig _lastIbkrConfig = const IbkrAccountConfig();
   final Map<(String, IbkrAccountConfig), Future<IbkrPortfolioSnapshot>>
-  _ibkrSnapshotLoads = {};
+      _ibkrSnapshotLoads = {};
   final Map<(String, IbkrAccountConfig), Future<IbkrPerformanceSeries>>
-  _ibkrPerformanceLoads = {};
+      _ibkrPerformanceLoads = {};
+  final Map<bool, Future<void>> _preloadLoads = {};
 
   @override
   void initState() {
@@ -89,7 +90,7 @@ class PortfolioPageState extends State<PortfolioPage>
 
     setState(() => _stream = _buildStream(skipInitial: widget.isActive));
     if (widget.isActive) {
-      unawaited(_preload());
+      runDetachedTask(_preload(), 'Failed to preload portfolio');
     }
   }
 
@@ -105,11 +106,10 @@ class PortfolioPageState extends State<PortfolioPage>
     final hadAccount = _lastAccount.isNotEmpty;
     final refreshRequested =
         hadAccount && refreshVersion != _lastIbkrRefreshVersion;
-    final willLoadPortfolio =
-        widget.isActive &&
+    final willLoadPortfolio = widget.isActive &&
         (ibkrConfig.enabled
             ? ibkrConfig.isConfigured &&
-                  (refreshRequested || cached == null || !cacheFresh)
+                (refreshRequested || cached == null || !cacheFresh)
             : true);
 
     if (account == _lastAccount &&
@@ -130,14 +130,17 @@ class PortfolioPageState extends State<PortfolioPage>
       touchedIndex = null;
     });
     if (widget.isActive) {
-      unawaited(_preload(forceRefresh: refreshRequested));
+      runDetachedTask(
+        _preload(forceRefresh: refreshRequested),
+        'Failed to refresh portfolio preload',
+      );
     }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && widget.isActive) {
-      unawaited(_preload());
+      runDetachedTask(_preload(), 'Failed to preload portfolio');
     }
   }
 
@@ -158,8 +161,8 @@ class PortfolioPageState extends State<PortfolioPage>
   }) async {
     if (!widget.isActive) {
       final cached = context.read<AccountManager>().portfolioCacheFor(
-        accountName,
-      );
+            accountName,
+          );
       return _LoadedPortfolio(
         positions: cached?.positions ?? _positions,
         netLiquidation: cached?.netLiquidation ?? _netLiquidation,
@@ -186,8 +189,7 @@ class PortfolioPageState extends State<PortfolioPage>
     final accounts = context.read<AccountManager>();
     final cached = accounts.portfolioCacheFor(accountName);
     final cacheFresh = accounts.isPortfolioCacheFresh(accountName);
-    final shouldUseCache =
-        cached != null &&
+    final shouldUseCache = cached != null &&
         !forceRefresh &&
         (!refreshIfStale || cacheFresh || !config.isConfigured);
     if (shouldUseCache) {
@@ -222,7 +224,7 @@ class PortfolioPageState extends State<PortfolioPage>
         return await (widget._ibkrLoader?.call(config) ??
             IbkrApiClient(config).fetchPortfolio());
       } finally {
-        _ibkrSnapshotLoads.remove(loadKey);
+        _ibkrSnapshotLoads.removeWhere((key, value) => key == loadKey);
       }
     });
     cacheIbkrAccountExchangeRate(snapshot);
@@ -277,12 +279,26 @@ class PortfolioPageState extends State<PortfolioPage>
         return await (widget._ibkrPerformanceLoader?.call(config, period) ??
             IbkrApiClient(config).fetchPerformance(period));
       } finally {
-        _ibkrPerformanceLoads.remove(loadKey);
+        _ibkrPerformanceLoads.removeWhere((key, value) => key == loadKey);
       }
     });
   }
 
-  Future<void> _preload({bool forceRefresh = false}) async {
+  Future<void> _preload({bool forceRefresh = false}) {
+    final existing = _preloadLoads[forceRefresh];
+    if (existing != null) return existing;
+
+    late final Future<void> future;
+    future = _performPreload(forceRefresh: forceRefresh).whenComplete(() {
+      _preloadLoads.removeWhere(
+        (key, value) => key == forceRefresh && identical(value, future),
+      );
+    });
+    _preloadLoads[forceRefresh] = future;
+    return future;
+  }
+
+  Future<void> _performPreload({bool forceRefresh = false}) async {
     if (!mounted || !widget.isActive) return;
     final accounts = context.read<AccountManager>();
     final accountName = accounts.activeAccount;
@@ -290,8 +306,7 @@ class PortfolioPageState extends State<PortfolioPage>
     final accountDb = db;
     final cachedBefore = accounts.portfolioCacheFor(accountName);
     final cacheWasFresh = accounts.isPortfolioCacheFresh(accountName);
-    final willFetchIbkr =
-        config.enabled &&
+    final willFetchIbkr = config.enabled &&
         config.isConfigured &&
         (forceRefresh || cachedBefore == null || !cacheWasFresh);
     final willLoadPortfolio = !config.enabled || willFetchIbkr;
@@ -522,7 +537,10 @@ class PortfolioPageState extends State<PortfolioPage>
 
   void _retryPortfolio() {
     setState(() => _stream = _buildStream(skipInitial: true));
-    unawaited(_preload(forceRefresh: true));
+    runDetachedTask(
+      _preload(forceRefresh: true),
+      'Failed to retry portfolio preload',
+    );
   }
 
   void _openSettings() {
@@ -539,9 +557,9 @@ class PortfolioPageState extends State<PortfolioPage>
         : 'Couldn’t load portfolio';
     final message = ibkrEnabled
         ? 'MarketMonk couldn’t load your portfolio from your IBKR server. '
-              'Check the server connection, then try again.'
+            'Check the server connection, then try again.'
         : 'MarketMonk couldn’t refresh your portfolio. Check your internet '
-              'connection, then try again.';
+            'connection, then try again.';
 
     return Center(
       child: Padding(
@@ -695,10 +713,8 @@ class PortfolioPageState extends State<PortfolioPage>
       });
     }
     if (positions.isEmpty) {
-      final ibkrEnabled = context
-          .watch<AccountManager>()
-          .ibkrConfigFor()
-          .enabled;
+      final ibkrEnabled =
+          context.watch<AccountManager>().ibkrConfigFor().enabled;
       return _refreshableState(
         AppEmptyState(
           icon: ibkrEnabled
@@ -717,9 +733,8 @@ class PortfolioPageState extends State<PortfolioPage>
           actionLabel: ibkrEnabled
               ? context.l10n.text('IBKR settings')
               : context.l10n.text('Import CSV'),
-          actionIcon: ibkrEnabled
-              ? Icons.settings_rounded
-              : Icons.upload_file_rounded,
+          actionIcon:
+              ibkrEnabled ? Icons.settings_rounded : Icons.upload_file_rounded,
           onAction: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const SettingsPage()),
@@ -739,12 +754,10 @@ class PortfolioPageState extends State<PortfolioPage>
     final costBasisGain = totalValue - totalCost;
     final cashOutSummary = _ibkrCashOutSummary(performance, netLiquidation);
     final totalGain = cashOutSummary?.gainUsd ?? costBasisGain;
-    final totalGainPct =
-        cashOutSummary?.gainPct ??
+    final totalGainPct = cashOutSummary?.gainPct ??
         (totalCost > 0 ? (costBasisGain / totalCost) * 100 : 0.0);
 
-    final sorted = [...positions]
-      ..sort(
+    final sorted = [...positions]..sort(
         (firstPosition, secondPosition) =>
             secondPosition.currentValue.compareTo(firstPosition.currentValue),
       );
@@ -753,18 +766,17 @@ class PortfolioPageState extends State<PortfolioPage>
     final filtered = query.isEmpty
         ? sorted
         : sorted
-              .where(
-                (position) =>
-                    position.symbol.toLowerCase().contains(query) ||
-                    position.name.toLowerCase().contains(query),
-              )
-              .toList();
+            .where(
+              (position) =>
+                  position.symbol.toLowerCase().contains(query) ||
+                  position.name.toLowerCase().contains(query),
+            )
+            .toList();
 
     final colors = _buildColors(context, sorted.length);
     // Holdings can change while this page is kept alive (for example, after
     // switching accounts). Do not use a selection from the previous list.
-    final selectedIndex =
-        touchedIndex != null &&
+    final selectedIndex = touchedIndex != null &&
             touchedIndex! >= 0 &&
             touchedIndex! < sorted.length
         ? touchedIndex
@@ -921,9 +933,8 @@ class PortfolioPageState extends State<PortfolioPage>
                   changePct: position.change,
                   isHighlighted: sortedIndex == selectedIndex,
                   onTap: () => setState(
-                    () => touchedIndex = touchedIndex == sortedIndex
-                        ? null
-                        : sortedIndex,
+                    () => touchedIndex =
+                        touchedIndex == sortedIndex ? null : sortedIndex,
                   ),
                 );
               },
@@ -947,11 +958,11 @@ class PortfolioPageState extends State<PortfolioPage>
     final colorScheme = theme.colorScheme;
     final chartSections = compact
         ? sections
-              .map(
-                (section) =>
-                    section.copyWith(radius: section.radius > 75 ? 60 : 54),
-              )
-              .toList()
+            .map(
+              (section) =>
+                  section.copyWith(radius: section.radius > 75 ? 60 : 54),
+            )
+            .toList()
         : sections;
 
     return Stack(
@@ -1029,8 +1040,7 @@ class PortfolioPageState extends State<PortfolioPage>
     final colorScheme = theme.colorScheme;
     final settings = context.watch<SettingsState>();
     final accounts = context.watch<AccountManager>();
-    final byReturn = [...positions]
-      ..sort(
+    final byReturn = [...positions]..sort(
         (firstPosition, secondPosition) =>
             secondPosition.change.compareTo(firstPosition.change),
       );
@@ -1077,11 +1087,20 @@ class PortfolioPageState extends State<PortfolioPage>
               PopupMenuButton<String>(
                 onSelected: (value) {
                   if (value == '__export__') {
-                    _exportCsv(context, positions);
+                    runDetachedTask(
+                      _exportCsv(context, positions),
+                      'Failed to export portfolio CSV',
+                    );
                   } else if (value.startsWith('cur:')) {
-                    settings.setDisplayCurrency(value.substring(4));
+                    runDetachedTask(
+                      settings.setDisplayCurrency(value.substring(4)),
+                      'Failed to change display currency',
+                    );
                   } else if (value.startsWith('acc:')) {
-                    accounts.switchAccount(value.substring(4));
+                    runDetachedTask(
+                      accounts.switchAccount(value.substring(4)),
+                      'Failed to switch account',
+                    );
                   }
                 },
                 itemBuilder: (popupContext) => [
@@ -1222,8 +1241,8 @@ class PortfolioPageState extends State<PortfolioPage>
                                       final position = sorted[index];
                                       final allocationPct = totalValue > 0
                                           ? position.currentValue /
-                                                totalValue *
-                                                100
+                                              totalValue *
+                                              100
                                           : 0.0;
                                       return _DesktopAllocationRow(
                                         color: colors[index],
@@ -1235,8 +1254,8 @@ class PortfolioPageState extends State<PortfolioPage>
                                         onTap: () => setState(
                                           () => touchedIndex =
                                               touchedIndex == index
-                                              ? null
-                                              : index,
+                                                  ? null
+                                                  : index,
                                         ),
                                       );
                                     },
@@ -1702,9 +1721,15 @@ class _SummaryCard extends StatelessWidget {
                 if (value == '__export__') {
                   onExport();
                 } else if (value.startsWith('cur:')) {
-                  settings.setDisplayCurrency(value.substring(4));
+                  runDetachedTask(
+                    settings.setDisplayCurrency(value.substring(4)),
+                    'Failed to change display currency',
+                  );
                 } else if (value.startsWith('acc:')) {
-                  accounts.switchAccount(value.substring(4));
+                  runDetachedTask(
+                    accounts.switchAccount(value.substring(4)),
+                    'Failed to switch account',
+                  );
                 }
               },
               itemBuilder: (ctx) => [

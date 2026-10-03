@@ -529,14 +529,9 @@ class _EditTickerPageState extends State<EditTickerPage> {
           );
 
           if (context.mounted) Navigator.of(context).pop();
-          unawaited(
-            syncCandles(tickerSymbol).catchError((error, stackTrace) {
-              talker.handle(
-                error,
-                stackTrace,
-                'Failed to refresh candles after saving trade',
-              );
-            }),
+          runDetachedTask(
+            syncCandles(tickerSymbol),
+            'Failed to refresh candles after saving trade',
           );
         },
         label: Text(context.l10n.text('Save')),

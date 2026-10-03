@@ -20,7 +20,9 @@ class BackgroundNetworkCoordinator {
     _inFlight[requestKey] = future;
     return future.whenComplete(() {
       if (identical(_inFlight[requestKey], future)) {
-        _inFlight.remove(requestKey);
+        _inFlight.removeWhere(
+          (key, value) => key == requestKey && identical(value, future),
+        );
       }
     });
   }

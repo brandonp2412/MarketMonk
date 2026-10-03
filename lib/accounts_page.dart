@@ -90,7 +90,7 @@ class AccountsPage extends StatelessWidget {
       builder: (_) => const _AddAccountDialog(),
     );
     if (name != null && name.isNotEmpty && !accounts.accounts.contains(name)) {
-      accounts.addAccount(name);
+      await accounts.addAccount(name);
     }
   }
 

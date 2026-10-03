@@ -138,6 +138,11 @@ void main() {
 
     expect(loads, 1);
     expect(find.bySemanticsLabel('Loading portfolio'), findsOneWidget);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    expect(loads, 1);
   });
 
   testWidgets(

@@ -15,3 +15,5 @@ linter:
   rules:
     curly_braces_in_flow_control_structures: false
     require_trailing_commas: true
+    discarded_futures: true
+    unawaited_futures: true

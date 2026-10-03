@@ -148,6 +148,70 @@ void main() {
     expect(exchangeRate, 1.7);
   });
 
+  test('display-rate refreshes coalesce duplicate callers', () async {
+    await seedTestSqlite({
+      'visibleCurrencies': ['NZD', 'USD'],
+      'displayCurrency': 'USD',
+      'exchangeRate_USD': 1.0,
+    });
+    final response = Completer<http.Response>();
+    var calls = 0;
+    final settings = SettingsState(
+      rateFetcher: (uri) {
+        if (uri.queryParameters['to'] != 'NZD') {
+          return Future.value(http.Response('{"rates":{}}', 200));
+        }
+        calls++;
+        return response.future;
+      },
+    );
+    await settings.initialized;
+
+    await Future.wait([
+      settings.setDisplayCurrency('NZD'),
+      settings.setDisplayCurrency('NZD'),
+    ]);
+
+    expect(calls, 1);
+    response.complete(http.Response('{"rates":{"NZD":1.7}}', 200));
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(allRatesFromUsd['NZD'], 1.7);
+  });
+
+  test('failed display-rate refresh can be retried', () async {
+    await seedTestSqlite({
+      'visibleCurrencies': ['NZD', 'USD'],
+      'displayCurrency': 'USD',
+      'exchangeRate_USD': 1.0,
+    });
+    var calls = 0;
+    final settings = SettingsState(
+      rateFetcher: (uri) async {
+        if (uri.queryParameters['to'] != 'NZD') {
+          return http.Response('{"rates":{}}', 200);
+        }
+        calls++;
+        if (calls == 1) throw StateError('temporary failure');
+        return http.Response('{"rates":{"NZD":1.8}}', 200);
+      },
+    );
+    await settings.initialized;
+
+    await settings.setDisplayCurrency('NZD');
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+    expect(calls, 1);
+
+    await settings.setDisplayCurrency('NZD');
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(calls, 2);
+    expect(allRatesFromUsd['NZD'], 1.8);
+  });
+
   test('ticker sync reports progress and refreshes portfolio data', () async {
     final settings = SettingsState();
     await settings.initialized;
