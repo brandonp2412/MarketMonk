@@ -440,6 +440,12 @@ class UnifiedDatabase extends _$UnifiedDatabase {
     );
   }
 
+
+  Future<int> deleteIbkrSettings(String profileId) =>
+      (delete(unifiedIbkrSettings)
+            ..where((row) => row.profileId.equals(profileId)))
+          .go();
+
   Future<UnifiedIbkrCacheEntry?> readIbkrCache(
     String profileId,
     String kind,
@@ -454,6 +460,12 @@ class UnifiedDatabase extends _$UnifiedDatabase {
           ))
         .getSingleOrNull();
   }
+
+
+  Future<List<UnifiedIbkrCacheEntry>> readIbkrCaches(String profileId) =>
+      (select(unifiedIbkrCacheEntries)
+            ..where((row) => row.profileId.equals(profileId)))
+          .get();
 
   Future<void> writeIbkrCache({
     required String profileId,

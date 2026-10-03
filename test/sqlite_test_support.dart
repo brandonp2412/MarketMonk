@@ -70,4 +70,5 @@ AccountManager testAccountManager() => AccountManager(
       profileDatabaseFactory: (name) => Database.connect(
         NativeDatabase(File('${_profileDirectory!.path}/$name.sqlite')),
       ),
+      unifiedDatabase: _profileDataTestDatabase!,
     );

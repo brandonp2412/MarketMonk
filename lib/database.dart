@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:drift/drift.dart';
 import 'package:drift/internal/versioned_schema.dart';
 import 'package:drift_dev/api/migrations_native.dart';
@@ -16,51 +14,11 @@ class Database extends _$Database {
   @override
   int get schemaVersion => 12;
 
-  // Multiple short-lived instances are opened intentionally for secondary
-  // accounts and are always closed after use.
   Database([String name = 'market-monk']) : super(_openConnection(name)) {
     driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
   }
 
   Database.connect(super.executor);
-
-  int _activeOperations = 0;
-  bool _closeRequested = false;
-  Completer<void>? _idleCompleter;
-  Future<void>? _closeFuture;
-
-  /// Prevents [close] from tearing down Drift until [operation] completes.
-  Future<T> runWhileOpen<T>(Future<T> Function() operation) async {
-    if (_closeRequested) {
-      throw StateError('Database is closing');
-    }
-
-    _activeOperations++;
-    try {
-      return await operation();
-    } finally {
-      _activeOperations--;
-      if (_activeOperations == 0) {
-        final idleCompleter = _idleCompleter;
-        _idleCompleter = null;
-        if (idleCompleter != null && !idleCompleter.isCompleted) {
-          idleCompleter.complete();
-        }
-      }
-    }
-  }
-
-  @override
-  Future<void> close() => _closeFuture ??= _closeWhenIdle();
-
-  Future<void> _closeWhenIdle() async {
-    _closeRequested = true;
-    if (_activeOperations > 0) {
-      _idleCompleter ??= Completer<void>();
-      await _idleCompleter!.future;
-    }
-    await super.close();
-  }
 
   Future<IbkrProfileSetting?> readIbkrProfileSettings() =>
       select(ibkrProfileSettings).getSingleOrNull();

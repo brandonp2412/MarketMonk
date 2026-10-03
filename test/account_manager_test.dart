@@ -6,6 +6,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/unified_database.dart';
 import 'sqlite_test_support.dart';
 
 void main() {
@@ -55,7 +56,32 @@ void main() {
     expect(prefs.getString('activeAccount'), 'Default');
   });
 
-  test('switchAccount publishes the new account before async cleanup',
+  test('rename and delete preserve stable profile identity without swapping db',
+      () async {
+    await seedTestSqlite({
+      'accounts': ['Default'],
+      'activeAccount': 'Default',
+    });
+    final manager = testAccountManager();
+    await manager.init();
+    final runtimeDatabase = db;
+
+    await manager.addAccount('Brokerage');
+    await manager.switchAccount('Brokerage');
+    final profileId = manager.activeProfileId;
+
+    await manager.renameAccount('Brokerage', 'Long Term');
+    expect(manager.activeAccount, 'Long Term');
+    expect(manager.activeProfileId, profileId);
+    expect(identical(db, runtimeDatabase), isTrue);
+
+    await manager.deleteAccount('Long Term');
+    expect(manager.accounts, ['Default']);
+    expect(manager.activeAccount, 'Default');
+    expect(identical(db, runtimeDatabase), isTrue);
+  });
+
+  test('switchAccount publishes and persists without swapping runtime database',
       () async {
     final tempDir =
         await Directory.systemTemp.createTemp('market-monk-switch-');
@@ -77,11 +103,14 @@ void main() {
         'activeAccount': 'Default',
       });
 
-      final manager = AccountManager();
+      final unifiedDatabase = UnifiedDatabase.connect(NativeDatabase.memory());
+      addTearDown(unifiedDatabase.close);
+      final manager = AccountManager(unifiedDatabase: unifiedDatabase);
       await manager.init();
       var notifications = 0;
       manager.addListener(() => notifications++);
 
+      final runtimeDatabase = db;
       final switchFuture = manager.switchAccount('Brokerage');
 
       expect(manager.activeAccount, 'Brokerage');
@@ -90,6 +119,11 @@ void main() {
       await switchFuture;
       final prefs = await SqliteSettings.getInstance();
       expect(prefs.getString('activeAccount'), 'Brokerage');
+      expect(
+        await unifiedDatabase.readActiveProfileId(),
+        manager.activeProfileId,
+      );
+      expect(identical(db, runtimeDatabase), isTrue);
     } finally {
       await db.close();
       db = Database.connect(
@@ -105,7 +139,7 @@ void main() {
     }
   });
 
-  test('importDatabase replaces the active database and notifies listeners',
+  test('importDatabase refreshes active profile state without swapping db',
       () async {
     final tempDir =
         await Directory.systemTemp.createTemp('market-monk-import-');
@@ -151,17 +185,26 @@ void main() {
     );
     await sourceDb.close();
 
-    final manager = AccountManager();
+    final unifiedDatabase = UnifiedDatabase.connect(NativeDatabase.memory());
+    addTearDown(unifiedDatabase.close);
+    final manager = AccountManager(unifiedDatabase: unifiedDatabase);
     await manager.init();
     var notifications = 0;
     manager.addListener(() => notifications++);
 
     await manager.importDatabase(sourceFile);
 
-    final importedTrades = await db.select(db.trades).get();
+    final importedDb = Database.connect(
+      DatabaseConnection(
+        NativeDatabase(File('${tempDir.path}/market-monk.sqlite')),
+        closeStreamsSynchronously: true,
+      ),
+    );
+    final importedTrades = await importedDb.select(importedDb.trades).get();
     expect(importedTrades, hasLength(1));
     expect(importedTrades.single.symbol, 'VTI');
     expect(importedTrades.single.quantity, 12);
+    await importedDb.close();
     expect(notifications, 1);
     expect(
       File('${tempDir.path}/market-monk.sqlite').existsSync(),
@@ -223,7 +266,9 @@ void main() {
       'displayCurrency': 'NZD',
     });
 
-    final manager = AccountManager();
+    final unifiedDatabase = UnifiedDatabase.connect(NativeDatabase.memory());
+    addTearDown(unifiedDatabase.close);
+    final manager = AccountManager(unifiedDatabase: unifiedDatabase);
     await manager.init();
     final exportDirectory = await tempDir.createTemp('export-');
     final backup = await manager.exportBackup(exportDirectory);
@@ -233,7 +278,13 @@ void main() {
 
     await manager.switchAccount('Default');
     await manager.deleteAccount('Brokerage');
-    await db.trades.insertOne(
+    final mutatedDefaultDb = Database.connect(
+      DatabaseConnection(
+        NativeDatabase(File('${tempDir.path}/market-monk.sqlite')),
+        closeStreamsSynchronously: true,
+      ),
+    );
+    await mutatedDefaultDb.trades.insertOne(
       TradesCompanion.insert(
         symbol: 'BND',
         name: 'BND',
@@ -243,6 +294,7 @@ void main() {
         tradeDate: DateTime(2026, 10, 2),
       ),
     );
+    await mutatedDefaultDb.close();
     final prefs = await SqliteSettings.getInstance();
     await prefs.setString('displayCurrency', 'USD');
 
@@ -252,12 +304,24 @@ void main() {
     expect(manager.activeAccount, 'Brokerage');
     expect(prefs.getString('displayCurrency'), 'NZD');
 
-    final brokerageTrades = await db.select(db.trades).get();
+    final brokerageDb = Database.connect(
+      DatabaseConnection(
+        NativeDatabase(File('${tempDir.path}/market-monk-Brokerage.sqlite')),
+        closeStreamsSynchronously: true,
+      ),
+    );
+    final brokerageTrades = await brokerageDb.select(brokerageDb.trades).get();
     expect(brokerageTrades, hasLength(1));
     expect(brokerageTrades.single.symbol, 'VXUS');
     expect(brokerageTrades.single.quantity, 20);
+    await brokerageDb.close();
 
-    final defaultDb = Database();
+    final defaultDb = Database.connect(
+      DatabaseConnection(
+        NativeDatabase(File('${tempDir.path}/market-monk.sqlite')),
+        closeStreamsSynchronously: true,
+      ),
+    );
     final defaultTrades = await defaultDb.select(defaultDb.trades).get();
     expect(defaultTrades, hasLength(1));
     expect(defaultTrades.single.symbol, 'VTI');

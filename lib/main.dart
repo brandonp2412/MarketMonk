@@ -25,6 +25,7 @@ import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
+import 'package:market_monk/unified_database.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
@@ -173,8 +174,8 @@ class CachedIbkrPerformanceData {
       );
 }
 
-/// Manages named portfolio accounts backed by separate SQLite files.
-/// Switching accounts has zero per-query overhead — only the DB file changes.
+/// Manages named portfolio profiles in the unified SQLite database.
+/// Account switches update profile identity/state without replacing the runtime database.
 class AccountManager extends ChangeNotifier {
   List<String> accounts = ['Default'];
   String activeAccount = 'Default';
@@ -195,72 +196,208 @@ class AccountManager extends ChangeNotifier {
     _ibkrConfigs.clear();
     _portfolioCache.clear();
     _ibkrPerformanceCache.clear();
-    accounts = prefs.getStringList('accounts') ?? ['Default'];
-    if (!accounts.contains('Default')) {
-      accounts = ['Default', ...accounts];
-      await prefs.setStringList('accounts', accounts);
+    _profileIdsByName.clear();
+
+    var legacyAccounts = prefs.getStringList('accounts') ?? ['Default'];
+    if (!legacyAccounts.contains('Default')) {
+      legacyAccounts = ['Default', ...legacyAccounts];
     }
-    activeAccount = prefs.getString('activeAccount') ?? 'Default';
-    if (!accounts.contains(activeAccount)) {
+    var legacyActive = prefs.getString('activeAccount') ?? 'Default';
+    if (!legacyAccounts.contains(legacyActive)) {
       talker.warning(
         'Saved active portfolio account no longer exists; using Default',
       );
-      activeAccount = 'Default';
-      await prefs.setString('activeAccount', activeAccount);
+      legacyActive = 'Default';
     }
+
+    var profiles = await _unifiedDatabase.readProfiles();
+    if (profiles.isEmpty) {
+      for (var index = 0; index < legacyAccounts.length; index++) {
+        final account = legacyAccounts[index];
+        final profileId =
+            account == 'Default' ? 'profile-default' : 'profile-legacy-$index';
+        _profileIdsByName[account] = profileId;
+        await _unifiedDatabase.upsertProfile(
+          id: profileId,
+          name: account,
+          sortOrder: index,
+        );
+      }
+      activeAccount = legacyActive;
+      await _unifiedDatabase.setActiveProfileId(activeProfileId);
+      for (final account in legacyAccounts) {
+        await _migrateLegacyProfileState(account);
+      }
+      profiles = await _unifiedDatabase.readProfiles();
+    } else if (!profiles.any((profile) => profile.name == 'Default')) {
+      await _unifiedDatabase.upsertProfile(
+        id: 'profile-default',
+        name: 'Default',
+        sortOrder: 0,
+      );
+      profiles = await _unifiedDatabase.readProfiles();
+    }
+
+    accounts = profiles.map((profile) => profile.name).toList();
+    for (final profile in profiles) {
+      _profileIdsByName[profile.name] = profile.id;
+    }
+
+    final savedProfileId = await _unifiedDatabase.readActiveProfileId();
+    activeAccount = 'Default';
+    for (final profile in profiles) {
+      if (profile.id == savedProfileId) {
+        activeAccount = profile.name;
+        break;
+      }
+    }
+    if (savedProfileId == null ||
+        _profileIdsByName[activeAccount] != savedProfileId) {
+      await _unifiedDatabase.setActiveProfileId(activeProfileId);
+    }
+
+    await prefs.setProfiles(accounts, activeAccount);
     for (final account in accounts) {
       await _loadProfileState(account);
     }
 
-    if (activeAccount != 'Default') {
-      final previousDb = db;
-      db = Database('market-monk-$activeAccount');
-      await previousDb.close();
-    }
     talker.info('Loaded ${accounts.length} portfolio accounts');
   }
 
   Future<void> _loadProfileState(String account) async {
+    final profileId = _profileIdsByName[account];
+    if (profileId == null) return;
+
     _ibkrConfigs.remove(account);
     _portfolioCache.remove(account);
     _ibkrPerformanceCache.remove(account);
+
+    final config = await _unifiedDatabase.readIbkrSettings(profileId);
+    if (config != null) {
+      _ibkrConfigs[account] = IbkrAccountConfig(
+        enabled: config.enabled,
+        baseUrl: config.baseUrl,
+        token: config.token,
+      );
+    }
+
+    final entries = await _unifiedDatabase.readIbkrCaches(profileId);
+    for (final entry in entries) {
+      try {
+        final value = json.decode(entry.payloadJson) as Map<String, dynamic>;
+        if (entry.kind == 'portfolio' && entry.cacheKey == 'snapshot') {
+          _portfolioCache[account] = CachedPortfolioData.fromJson(value);
+        } else if (entry.kind == 'performance') {
+          _ibkrPerformanceCache.putIfAbsent(
+            account,
+            () => {},
+          )[entry.cacheKey] = CachedIbkrPerformanceData.fromJson(value);
+        }
+      } catch (error, stack) {
+        talker.handle(error, stack, 'Skipped malformed SQLite IBKR cache');
+      }
+    }
+  }
+
+
+  Future<void> _migrateLegacyProfileState(
+    String account, {
+    bool replace = false,
+  }) async {
+    final profileId = _profileIdsByName[account];
+    if (profileId == null) return;
+
+    if (replace) {
+      await _unifiedDatabase.transaction(() async {
+        await _unifiedDatabase.deleteIbkrSettings(profileId);
+        await _unifiedDatabase.deleteIbkrCache(profileId);
+      });
+    }
+
     await _withProfileDatabase(account, (database) async {
       final config = await database.readIbkrProfileSettings();
       if (config != null) {
-        _ibkrConfigs[account] = IbkrAccountConfig(
+        await _unifiedDatabase.writeIbkrSettings(
+          profileId: profileId,
           enabled: config.enabled,
           baseUrl: config.baseUrl,
           token: config.token,
         );
       }
+
       final entries = await database.select(database.ibkrCacheEntries).get();
       for (final entry in entries) {
-        try {
-          final value = json.decode(entry.payloadJson) as Map<String, dynamic>;
-          if (entry.kind == 'portfolio' && entry.cacheKey == 'snapshot') {
-            _portfolioCache[account] = CachedPortfolioData.fromJson(value);
-          } else if (entry.kind == 'performance') {
-            _ibkrPerformanceCache.putIfAbsent(
-              account,
-              () => {},
-            )[entry.cacheKey] = CachedIbkrPerformanceData.fromJson(
-              value,
-            );
-          }
-        } catch (error, stack) {
-          talker.handle(error, stack, 'Skipped malformed SQLite IBKR cache');
-        }
+        await _unifiedDatabase.writeIbkrCache(
+          profileId: profileId,
+          kind: entry.kind,
+          cacheKey: entry.cacheKey,
+          payloadJson: entry.payloadJson,
+          cachedAt: entry.cachedAt,
+        );
       }
     });
   }
 
-  /// Opens profile connections independently so account switches cannot close a write.
-  AccountManager({ProfileDatabaseFactory? profileDatabaseFactory})
-      : _profileDatabaseFactory =
-            profileDatabaseFactory ?? _openProfileDatabase;
+  Future<void> _replaceUnifiedProfileRegistry(
+    List<String> profileNames,
+    String requestedActive,
+  ) async {
+    final normalized = <String>[
+      'Default',
+      ...profileNames.where((name) => name != 'Default'),
+    ];
+    final existing = await _unifiedDatabase.readProfiles();
+    final existingIds = {
+      for (final profile in existing) profile.name: profile.id,
+    };
+
+    for (final profile in existing) {
+      if (!normalized.contains(profile.name)) {
+        await _unifiedDatabase.deleteProfile(profile.id);
+      }
+    }
+
+    _profileIdsByName.clear();
+    final restoredSeed = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+    for (var index = 0; index < normalized.length; index++) {
+      final name = normalized[index];
+      final profileId = existingIds[name] ??
+          (name == 'Default'
+              ? 'profile-default'
+              : 'profile-restored-$restoredSeed-$index');
+      await _unifiedDatabase.upsertProfile(
+        id: profileId,
+        name: name,
+        sortOrder: index,
+      );
+      _profileIdsByName[name] = profileId;
+    }
+
+    accounts = normalized;
+    activeAccount =
+        accounts.contains(requestedActive) ? requestedActive : 'Default';
+    await _unifiedDatabase.setActiveProfileId(activeProfileId);
+
+    for (final account in accounts) {
+      await _migrateLegacyProfileState(account, replace: true);
+      await _loadProfileState(account);
+    }
+  }
+
+  AccountManager({
+    ProfileDatabaseFactory? profileDatabaseFactory,
+    UnifiedDatabase? unifiedDatabase,
+  })  : _profileDatabaseFactory =
+            profileDatabaseFactory ?? _openProfileDatabase,
+        _unifiedDatabase = unifiedDatabase ?? profileDataDatabase;
 
   final ProfileDatabaseFactory _profileDatabaseFactory;
+  final UnifiedDatabase _unifiedDatabase;
+  final Map<String, String> _profileIdsByName = {};
   Future<void>? _pendingStorage;
+
+  String get activeProfileId =>
+      _profileIdsByName[activeAccount] ?? 'profile-default';
 
   Future<T> _serializeStorage<T>(Future<T> Function() operation) {
     final previous = _pendingStorage;
@@ -282,12 +419,6 @@ class AccountManager extends ChangeNotifier {
 
   static Database _openProfileDatabase(String name) =>
       Database(name == 'Default' ? 'market-monk' : 'market-monk-$name');
-
-  Future<void> _closeCurrentDatabaseQuietly() async {
-    try {
-      await db.close();
-    } catch (_) {}
-  }
 
   Future<T> _withProfileDatabase<T>(
     String name,
@@ -341,19 +472,18 @@ class AccountManager extends ChangeNotifier {
     String name,
     IbkrPerformanceSeries series,
   ) async {
-    if (!accounts.contains(name)) return;
+    final profileId = _profileIdsByName[name];
+    if (profileId == null) return;
     final cached = CachedIbkrPerformanceData(
       series: series,
       cachedAt: DateTime.now(),
     );
-    await _withProfileDatabase(
-      name,
-      (database) => database.writeIbkrCache(
-        kind: 'performance',
-        cacheKey: series.period,
-        payloadJson: json.encode(cached.toJson()),
-        cachedAt: cached.cachedAt,
-      ),
+    await _unifiedDatabase.writeIbkrCache(
+      profileId: profileId,
+      kind: 'performance',
+      cacheKey: series.period,
+      payloadJson: json.encode(cached.toJson()),
+      cachedAt: cached.cachedAt,
     );
     _ibkrPerformanceCache.putIfAbsent(name, () => {})[series.period] = cached;
   }
@@ -380,21 +510,20 @@ class AccountManager extends ChangeNotifier {
     IbkrAccountValue? netLiquidation, {
     double? netLiquidationUsd,
   }) async {
-    if (!accounts.contains(name)) return;
+    final profileId = _profileIdsByName[name];
+    if (profileId == null) return;
     final cached = CachedPortfolioData(
       positions: List.unmodifiable(positions),
       netLiquidation: netLiquidation,
       netLiquidationUsd: netLiquidationUsd,
       cachedAt: DateTime.now(),
     );
-    await _withProfileDatabase(
-      name,
-      (database) => database.writeIbkrCache(
-        kind: 'portfolio',
-        cacheKey: 'snapshot',
-        payloadJson: json.encode(cached.toJson()),
-        cachedAt: cached.cachedAt,
-      ),
+    await _unifiedDatabase.writeIbkrCache(
+      profileId: profileId,
+      kind: 'portfolio',
+      cacheKey: 'snapshot',
+      payloadJson: json.encode(cached.toJson()),
+      cachedAt: cached.cachedAt,
     );
     _portfolioCache[name] = cached;
   }
@@ -404,19 +533,18 @@ class AccountManager extends ChangeNotifier {
       _serializeStorage(() => _setIbkrConfig(name, config));
 
   Future<void> _setIbkrConfig(String name, IbkrAccountConfig config) async {
-    if (!accounts.contains(name)) return;
+    final profileId = _profileIdsByName[name];
+    if (profileId == null) return;
     final changed = _ibkrConfigs[name] != config;
-    await _withProfileDatabase(
-      name,
-      (database) => database.transaction(() async {
-        await database.writeIbkrProfileSettings(
-          enabled: config.enabled,
-          baseUrl: config.baseUrl,
-          token: config.token,
-        );
-        if (changed) await database.deleteIbkrCache();
-      }),
-    );
+    await _unifiedDatabase.transaction(() async {
+      await _unifiedDatabase.writeIbkrSettings(
+        profileId: profileId,
+        enabled: config.enabled,
+        baseUrl: config.baseUrl,
+        token: config.token,
+      );
+      if (changed) await _unifiedDatabase.deleteIbkrCache(profileId);
+    });
     _ibkrConfigs[name] = config;
     if (changed) {
       _portfolioCache.remove(name);
@@ -438,24 +566,22 @@ class AccountManager extends ChangeNotifier {
 
   Future<void> _switchAccount(String name) async {
     if (name == activeAccount) return;
-    if (!accounts.contains(name)) {
+    final profileId = _profileIdsByName[name];
+    if (profileId == null) {
       talker.warning('Ignored switch to an unknown portfolio account');
       return;
     }
 
-    final previousDb = db;
     activeAccount = name;
-    db = name == 'Default' ? Database() : Database('market-monk-$name');
     clearAllSyncCache();
     notifyListeners();
     talker.info('Switched active portfolio account');
 
-    final persistFuture = SqliteSettings.getInstance().then((prefs) async {
-      if (activeAccount == name) {
-        await prefs.setString('activeAccount', name);
-      }
-    });
-    await Future.wait([previousDb.close(), persistFuture]);
+    await _unifiedDatabase.setActiveProfileId(profileId);
+    final prefs = await SqliteSettings.getInstance();
+    if (activeAccount == name) {
+      await prefs.setString('activeAccount', name);
+    }
   }
 
   /// Replaces the active profile, reloading its credentials and cached state.
@@ -479,8 +605,6 @@ class AccountManager extends ChangeNotifier {
       await sourceFile.copy(stagedFile.path);
     }
 
-    await db.close();
-
     try {
       if (await backupFile.exists()) await backupFile.delete();
       if (await targetFile.exists()) {
@@ -496,8 +620,11 @@ class AccountManager extends ChangeNotifier {
         if (await sidecar.exists()) await sidecar.delete();
       }
 
-      db = Database(dbName);
-      await db.customSelect('PRAGMA user_version').getSingle();
+      await _withProfileDatabase(
+        activeAccount,
+        (database) => database.customSelect('PRAGMA user_version').getSingle(),
+      );
+      await _migrateLegacyProfileState(activeAccount, replace: true);
       await _loadProfileState(activeAccount);
 
       clearAllSyncCache();
@@ -506,8 +633,6 @@ class AccountManager extends ChangeNotifier {
 
       if (await backupFile.exists()) await backupFile.delete();
     } catch (error, stackTrace) {
-      await _closeCurrentDatabaseQuietly();
-
       for (final suffix in ['-wal', '-shm']) {
         final sidecar = File('${targetFile.path}$suffix');
         if (await sidecar.exists()) await sidecar.delete();
@@ -515,7 +640,7 @@ class AccountManager extends ChangeNotifier {
       if (await backupFile.exists()) {
         await backupFile.copy(targetFile.path);
       }
-      db = Database(dbName);
+      await _migrateLegacyProfileState(activeAccount, replace: true);
       await _loadProfileState(activeAccount);
       talker.handle(error, stackTrace, 'Failed to import portfolio database');
       rethrow;
@@ -674,7 +799,6 @@ class AccountManager extends ChangeNotifier {
     final profileDatabases = restored.storage.profileDatabases;
     await rollbackDirectory.create();
     final existingFiles = _marketMonkDatabaseFiles(databaseDirectory);
-    await db.close();
     var replacementStarted = false;
 
     try {
@@ -702,29 +826,27 @@ class AccountManager extends ChangeNotifier {
         appState: prefs.database,
         profileDatabaseFactory: _profileDatabaseFactory,
       );
-
-      db = Database();
-      await init();
-
       // Backup v3 still stores per-profile databases for compatibility. Rebuild
       // the unified store from the restored registry and database payload in one
       // transaction so restored trades/candles cannot diverge from what the UI
-      // now reads. A failed rebuild rolls back without touching the prior
-      // unified state.
+      // now reads.
       final restoredSnapshot = await readLegacyUnifiedSnapshot(
         appState: prefs.database,
         openProfileDatabase: (name) async => _profileDatabaseFactory(name),
       );
-      await profileDataDatabase.migrateLegacySnapshot(
+      await _unifiedDatabase.migrateLegacySnapshot(
         restoredSnapshot,
         replaceExisting: true,
+      );
+      await _replaceUnifiedProfileRegistry(
+        logical.profiles,
+        logical.activeProfile,
       );
 
       clearAllSyncCache();
       notifyListeners();
       talker.info('Restored full Market Monk backup');
     } catch (error, stackTrace) {
-      await _closeCurrentDatabaseQuietly();
       if (replacementStarted) {
         await _restoreRollbackDatabases(rollbackDirectory, databaseDirectory);
       }
@@ -733,8 +855,10 @@ class AccountManager extends ChangeNotifier {
         previousAccounts,
         previousActiveAccount,
       );
-      db = Database();
-      await init();
+      await _replaceUnifiedProfileRegistry(
+        previousAccounts,
+        previousActiveAccount,
+      );
       talker.handle(error, stackTrace, 'Failed to restore Market Monk backup');
       rethrow;
     }
@@ -780,14 +904,26 @@ class AccountManager extends ChangeNotifier {
   Future<void> _addAccount(String name) async {
     if (accounts.contains(name)) return;
     _validateProfileName(name);
+
+    final seed = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+    var profileId = 'profile-$seed';
+    var suffix = 0;
+    while (_profileIdsByName.containsValue(profileId)) {
+      suffix++;
+      profileId = 'profile-$seed-$suffix';
+    }
+
     final updated = [...accounts, name];
+    await _unifiedDatabase.upsertProfile(
+      id: profileId,
+      name: name,
+      sortOrder: updated.length - 1,
+    );
+    _profileIdsByName[name] = profileId;
+
     final prefs = await SqliteSettings.getInstance();
     await prefs.setProfiles(updated, activeAccount);
     accounts = updated;
-    // Defer notification to post-frame so it fires after the current build
-    // phase completes. Without this, notifyListeners() fires as a microtask
-    // during the dialog's exit-animation frame, marking AccountsPage dirty
-    // mid-build and triggering _dependents.isEmpty assertions on the Overlay.
     WidgetsBinding.instance.addPostFrameCallback((_) => notifyListeners());
     talker.info('Added portfolio account');
   }
@@ -800,21 +936,23 @@ class AccountManager extends ChangeNotifier {
     if (oldName == 'Default' || newName.isEmpty || accounts.contains(newName)) {
       return;
     }
-    if (!accounts.contains(oldName)) return;
+    final profileId = _profileIdsByName[oldName];
+    if (profileId == null) return;
     _validateProfileName(newName);
-    final dir = await getApplicationSupportDirectory();
-    final oldFileName =
-        oldName == 'Default' ? 'market-monk' : 'market-monk-$oldName';
-    final isActive = activeAccount == oldName;
-    if (isActive) await db.close();
-    for (final suffix in ['', '-wal', '-shm']) {
-      final src = File(p.join(dir.path, '$oldFileName.sqlite$suffix'));
-      final dst = File(p.join(dir.path, 'market-monk-$newName.sqlite$suffix'));
-      if (await src.exists()) await src.rename(dst.path);
-    }
+
+    final index = accounts.indexOf(oldName);
+    await _unifiedDatabase.upsertProfile(
+      id: profileId,
+      name: newName,
+      sortOrder: index,
+    );
+
     accounts = accounts
         .map((account) => account == oldName ? newName : account)
         .toList();
+    _profileIdsByName.remove(oldName);
+    _profileIdsByName[newName] = profileId;
+
     final ibkrConfig = _ibkrConfigs.remove(oldName);
     if (ibkrConfig != null) _ibkrConfigs[newName] = ibkrConfig;
     final cachedPortfolio = _portfolioCache.remove(oldName);
@@ -823,9 +961,9 @@ class AccountManager extends ChangeNotifier {
     if (cachedPerformance != null) {
       _ibkrPerformanceCache[newName] = cachedPerformance;
     }
-    if (isActive) {
+
+    if (activeAccount == oldName) {
       activeAccount = newName;
-      db = Database('market-monk-$newName');
       clearAllSyncCache();
     }
     final prefs = await SqliteSettings.getInstance();
@@ -840,22 +978,20 @@ class AccountManager extends ChangeNotifier {
 
   Future<void> _deleteAccount(String name) async {
     if (name == 'Default') return;
+    final profileId = _profileIdsByName[name];
+    if (profileId == null) return;
+
     if (activeAccount == name) await _switchAccount('Default');
+    await _unifiedDatabase.deleteProfile(profileId);
+
     accounts = accounts.where((account) => account != name).toList();
+    _profileIdsByName.remove(name);
     _ibkrConfigs.remove(name);
     _portfolioCache.remove(name);
     _ibkrPerformanceCache.remove(name);
+
     final prefs = await SqliteSettings.getInstance();
     await prefs.setProfiles(accounts, activeAccount);
-    try {
-      final dir = await getApplicationSupportDirectory();
-      for (final suffix in ['', '-wal', '-shm']) {
-        final file = File(p.join(dir.path, 'market-monk-$name.sqlite$suffix'));
-        if (await file.exists()) await file.delete();
-      }
-    } catch (error, stackTrace) {
-      talker.handle(error, stackTrace, 'Failed to remove portfolio database');
-    }
     notifyListeners();
     talker.info('Deleted portfolio account');
   }
