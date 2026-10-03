@@ -152,7 +152,7 @@ String fmtChartAxisPercent(double value) {
   final absolute = value.abs();
   final magnitude = absolute >= 1000
       ? NumberFormat.compact().format(absolute)
-      : NumberFormat('#,##0.0').format(absolute);
+      : NumberFormat('#,##0.#').format(absolute);
   final sign = value > 0
       ? '+'
       : value < 0

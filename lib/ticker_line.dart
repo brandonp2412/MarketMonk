@@ -63,11 +63,12 @@ class TickerLine extends StatelessWidget {
 
     const leftOuterInset = 8.0;
     const axisGutter = 64.0;
+    const chartTrailingInset = 16.0;
 
     return Padding(
       padding: const EdgeInsets.only(
         left: leftOuterInset,
-        right: leftOuterInset + axisGutter,
+        right: chartTrailingInset,
         top: 24.0,
       ),
       child: LineChart(

@@ -1781,7 +1781,7 @@ class ChartsPageState extends State<ChartsPage>
     SettingsState settings,
     List<Color> accountColors,
   ) {
-    final height = MediaQuery.of(context).size.height * 0.38;
+    final height = MediaQuery.of(context).size.height * 0.34;
 
     if (_portfolioLoading) {
       return SizedBox(
@@ -1859,6 +1859,7 @@ class ChartsPageState extends State<ChartsPage>
     final singleLine = visibleSeries.length == 1;
     final scaleForComparison = !singleLine;
     final axisGutter = scaleForComparison ? 72.0 : 64.0;
+    const chartTrailingInset = 16.0;
     final lineBarsData = <LineChartBarData>[];
     for (final entry in visibleSeries.entries) {
       final idx = accounts.indexOf(entry.key);
@@ -1905,7 +1906,7 @@ class ChartsPageState extends State<ChartsPage>
     return SizedBox(
       height: height,
       child: Padding(
-        padding: EdgeInsets.only(top: 8, right: axisGutter),
+        padding: const EdgeInsets.only(top: 8, right: chartTrailingInset),
         child: LineChart(
           LineChartData(
             clipData: const FlClipData.all(),

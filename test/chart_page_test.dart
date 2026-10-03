@@ -709,7 +709,9 @@ void main() {
   });
 
   test('chart axis percentages compact values from one thousand', () {
-    expect(fmtChartAxisPercent(999), '+999.0%');
+    expect(fmtChartAxisPercent(999), '+999%');
+    expect(fmtChartAxisPercent(8), '+8%');
+    expect(fmtChartAxisPercent(8.5), '+8.5%');
     expect(fmtChartAxisPercent(1000), '+1K%');
     expect(fmtChartAxisPercent(35000), '+35K%');
     expect(fmtChartAxisPercent(350000), '+350K%');
