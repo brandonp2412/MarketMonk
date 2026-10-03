@@ -138,6 +138,13 @@ void main() {
       final listView = tester.widget<ListView>(find.byType(ListView).first);
       final padding = listView.padding! as EdgeInsets;
       expect(padding.bottom, greaterThan(92));
+
+      // Pull-to-refresh belongs to the full-height scroll view behind the
+      // floating search bar, so its indicator must start below the overlay.
+      final refreshIndicator = tester.widget<RefreshIndicator>(
+        find.byType(RefreshIndicator).first,
+      );
+      expect(refreshIndicator.edgeOffset, greaterThanOrEqualTo(searchBottom));
       expect(find.text('Refresh'), findsNothing);
 
       await tester.drag(find.byType(ListView).first, const Offset(0, 240));

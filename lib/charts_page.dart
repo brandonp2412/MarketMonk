@@ -1533,6 +1533,10 @@ class ChartsPageState extends State<ChartsPage>
   Widget _buildChartContent(SettingsState settings, List<Color> accountColors) {
     final desktop = isDesktopLayout(context);
     return RefreshIndicator(
+      // The search field is a floating overlay above this scroll view. Offset
+      // pull-to-refresh so its progress indicator is never painted underneath
+      // that overlay.
+      edgeOffset: _overlayHeight + 8,
       triggerMode: RefreshIndicatorTriggerMode.anywhere,
       onRefresh: _refreshCurrentChart,
       child: ListView(
