@@ -270,6 +270,69 @@ void main() {
     expect(await _rows(database), hasLength(2));
   });
 
+  test('empty provider response does not retry indefinitely', () async {
+    final database = UnifiedDatabase.connect(NativeDatabase.memory());
+    addTearDown(database.close);
+    final expected = _expectedMarketDay();
+    final requiredFrom = _dayOffset(expected, -30);
+    var requests = 0;
+
+    await syncCandles(
+      'AAPL',
+      database: database,
+      requiredFrom: requiredFrom,
+      yahooFetcher: (symbol, startDate) async {
+        requests++;
+        return const <YahooFinanceCandleData>[];
+      },
+    );
+
+    expect(requests, 1);
+    expect(await _rows(database), isEmpty);
+    expect(
+      backgroundNetworkCoordinator.startedCount(RequestCategory.yahooCandles),
+      1,
+    );
+  });
+
+  test('concurrent empty responses coalesce once and terminate', () async {
+    final database = UnifiedDatabase.connect(NativeDatabase.memory());
+    addTearDown(database.close);
+    final expected = _expectedMarketDay();
+    final requiredFrom = _dayOffset(expected, -30);
+    final gate = Completer<List<YahooFinanceCandleData>>();
+    var requests = 0;
+
+    Future<List<YahooFinanceCandleData>> fetch(
+      String symbol,
+      DateTime startDate,
+    ) {
+      requests++;
+      return gate.future;
+    }
+
+    final first = syncCandles(
+      'AAPL',
+      database: database,
+      requiredFrom: requiredFrom,
+      yahooFetcher: fetch,
+    );
+    await Future<void>.delayed(Duration.zero);
+    final second = syncCandles(
+      'aapl',
+      database: database,
+      requiredFrom: requiredFrom,
+      yahooFetcher: fetch,
+    );
+
+    expect(requests, 1);
+    gate.complete(const <YahooFinanceCandleData>[]);
+    await Future.wait([first, second]);
+
+    expect(requests, 1);
+    expect(await _rows(database), isEmpty);
+  });
+
   test('overlapping ranges serialize and only backfill missing coverage',
       () async {
     final database = UnifiedDatabase.connect(NativeDatabase.memory());
