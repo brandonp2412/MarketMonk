@@ -272,6 +272,12 @@ class AccountManager extends ChangeNotifier {
   static Database _openProfileDatabase(String name) =>
       Database(name == 'Default' ? 'market-monk' : 'market-monk-$name');
 
+  Future<void> _closeCurrentDatabaseQuietly() async {
+    try {
+      await db.close();
+    } catch (_) {}
+  }
+
   Future<T> _withProfileDatabase<T>(
     String name,
     Future<T> Function(Database database) operation,
@@ -489,9 +495,7 @@ class AccountManager extends ChangeNotifier {
 
       if (await backupFile.exists()) await backupFile.delete();
     } catch (error, stackTrace) {
-      try {
-        await db.close();
-      } catch (_) {}
+      await _closeCurrentDatabaseQuietly();
 
       for (final suffix in ['-wal', '-shm']) {
         final sidecar = File('${targetFile.path}$suffix');
@@ -549,94 +553,119 @@ class AccountManager extends ChangeNotifier {
     final temporaryDirectory = await getTemporaryDirectory();
     final workingDirectory =
         await temporaryDirectory.createTemp('market-monk-restore-');
-    final rollbackDirectory =
-        Directory(p.join(workingDirectory.path, 'rollback'));
-    final databaseDirectory = await getApplicationSupportDirectory();
-    final prefs = await SqliteSettings.getInstance();
-    final previousPreferences = prefs.snapshot();
-    final previousAccounts = List<String>.of(accounts);
-    final previousActiveAccount = activeAccount;
-
     try {
       final restored = await extractMarketMonkBackupArchive(
         archiveFile: sourceFile,
         workingDirectory: workingDirectory,
       );
-      await rollbackDirectory.create();
-      final existingFiles = _marketMonkDatabaseFiles(databaseDirectory);
-      await db.close();
-      var replacementStarted = false;
-      try {
-        for (final file in existingFiles) {
-          await file
-              .copy(p.join(rollbackDirectory.path, p.basename(file.path)));
-        }
-        replacementStarted = true;
-        for (final file in existingFiles) {
-          if (await file.exists()) await file.delete();
-        }
-        for (final entry in restored.databases.entries) {
-          final target = File(
-            p.join(
-              databaseDirectory.path,
-              databaseFileNameForAccount(entry.key),
-            ),
-          );
-          await entry.value.copy(target.path);
-        }
-
-        await prefs.restore(
-          restored.settings,
-          restored.accounts,
-          restored.activeAccount,
-        );
-        await seedSqliteFromLegacyValues(
-          values: {...restored.settings, 'accounts': restored.accounts},
-          appState: prefs.database,
-          profileDatabaseFactory: _profileDatabaseFactory,
-        );
-
-        db = Database();
-        await init();
-        clearAllSyncCache();
-        notifyListeners();
-        talker.info('Restored full Market Monk backup');
-      } catch (error, stackTrace) {
-        try {
-          await db.close();
-        } catch (_) {}
-        if (replacementStarted) {
-          for (final file in _marketMonkDatabaseFiles(databaseDirectory)) {
-            if (await file.exists()) await file.delete();
-          }
-          if (await rollbackDirectory.exists()) {
-            for (final entity in rollbackDirectory.listSync()) {
-              if (entity is File) {
-                await entity.copy(
-                  p.join(databaseDirectory.path, p.basename(entity.path)),
-                );
-              }
-            }
-          }
-        }
-        await prefs.restore(
-          previousPreferences,
-          previousAccounts,
-          previousActiveAccount,
-        );
-        db = Database();
-        await init();
-        talker.handle(
-          error,
-          stackTrace,
-          'Failed to restore Market Monk backup',
-        );
-        rethrow;
-      }
+      final rollbackDirectory =
+          Directory(p.join(workingDirectory.path, 'rollback'));
+      final databaseDirectory = await getApplicationSupportDirectory();
+      final prefs = await SqliteSettings.getInstance();
+      await _applyRestoredBackup(
+        restored,
+        rollbackDirectory: rollbackDirectory,
+        databaseDirectory: databaseDirectory,
+        prefs: prefs,
+        previousPreferences: prefs.snapshot(),
+        previousAccounts: List<String>.of(accounts),
+        previousActiveAccount: activeAccount,
+      );
     } finally {
       if (await workingDirectory.exists()) {
         await workingDirectory.delete(recursive: true);
       }
+    }
+  }
+
+  Future<void> _applyRestoredBackup(
+    MarketMonkBackupContents restored, {
+    required Directory rollbackDirectory,
+    required Directory databaseDirectory,
+    required SqliteSettings prefs,
+    required Map<String, Object?> previousPreferences,
+    required List<String> previousAccounts,
+    required String previousActiveAccount,
+  }) async {
+    await rollbackDirectory.create();
+    final existingFiles = _marketMonkDatabaseFiles(databaseDirectory);
+    await db.close();
+    var replacementStarted = false;
+
+    try {
+      for (final file in existingFiles) {
+        await file.copy(
+          p.join(rollbackDirectory.path, p.basename(file.path)),
+        );
+      }
+      replacementStarted = true;
+      for (final file in existingFiles) {
+        if (await file.exists()) await file.delete();
+      }
+      for (final entry in restored.databases.entries) {
+        final target = File(
+          p.join(
+            databaseDirectory.path,
+            databaseFileNameForAccount(entry.key),
+          ),
+        );
+        await entry.value.copy(target.path);
+      }
+
+      await prefs.restore(
+        restored.settings,
+        restored.accounts,
+        restored.activeAccount,
+      );
+      await seedSqliteFromLegacyValues(
+        values: {...restored.settings, 'accounts': restored.accounts},
+        appState: prefs.database,
+        profileDatabaseFactory: _profileDatabaseFactory,
+      );
+
+      db = Database();
+      await init();
+      clearAllSyncCache();
+      notifyListeners();
+      talker.info('Restored full Market Monk backup');
+    } catch (error, stackTrace) {
+      await _closeCurrentDatabaseQuietly();
+      if (replacementStarted) {
+        await _restoreRollbackDatabases(
+          rollbackDirectory,
+          databaseDirectory,
+        );
+      }
+      await prefs.restore(
+        previousPreferences,
+        previousAccounts,
+        previousActiveAccount,
+      );
+      db = Database();
+      await init();
+      talker.handle(
+        error,
+        stackTrace,
+        'Failed to restore Market Monk backup',
+      );
+      rethrow;
+    }
+  }
+
+  Future<void> _restoreRollbackDatabases(
+    Directory rollbackDirectory,
+    Directory databaseDirectory,
+  ) async {
+    for (final file in _marketMonkDatabaseFiles(databaseDirectory)) {
+      if (await file.exists()) await file.delete();
+    }
+    if (!await rollbackDirectory.exists()) return;
+
+    for (final entity in rollbackDirectory.listSync()) {
+      if (entity is! File) continue;
+      await entity.copy(
+        p.join(databaseDirectory.path, p.basename(entity.path)),
+      );
     }
   }
 
@@ -695,7 +724,9 @@ class AccountManager extends ChangeNotifier {
       final dst = File(p.join(dir.path, 'market-monk-$newName.sqlite$suffix'));
       if (await src.exists()) await src.rename(dst.path);
     }
-    accounts = accounts.map((a) => a == oldName ? newName : a).toList();
+    accounts = accounts
+        .map((account) => account == oldName ? newName : account)
+        .toList();
     final ibkrConfig = _ibkrConfigs.remove(oldName);
     if (ibkrConfig != null) _ibkrConfigs[newName] = ibkrConfig;
     final cachedPortfolio = _portfolioCache.remove(oldName);
@@ -722,7 +753,7 @@ class AccountManager extends ChangeNotifier {
   Future<void> _deleteAccount(String name) async {
     if (name == 'Default') return;
     if (activeAccount == name) await _switchAccount('Default');
-    accounts = accounts.where((a) => a != name).toList();
+    accounts = accounts.where((account) => account != name).toList();
     _ibkrConfigs.remove(name);
     _portfolioCache.remove(name);
     _ibkrPerformanceCache.remove(name);
@@ -842,8 +873,12 @@ class _MyHomePageState extends State<MyHomePage> {
               physics: desktop
                   ? const NeverScrollableScrollPhysics()
                   : const PageScrollPhysics(),
-              onPageChanged: (i) => setState(() => _currentIndex = i),
-              children: const [ChartsPage(), PortfolioPage(), HoldingsPage()],
+              onPageChanged: (index) => setState(() => _currentIndex = index),
+              children: [
+                ChartsPage(isActive: _currentIndex == 0),
+                PortfolioPage(isActive: _currentIndex == 1),
+                HoldingsPage(isActive: _currentIndex == 2),
+              ],
             );
 
             final content = Stack(

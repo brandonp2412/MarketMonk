@@ -100,7 +100,7 @@ void main() {
     return accounts;
   }
 
-  Widget app(AccountManager accounts, PortfolioPage page) => MultiProvider(
+  Widget app(AccountManager accounts, Widget page) => MultiProvider(
         providers: [
           ChangeNotifierProvider(create: (_) => SettingsState()),
           ChangeNotifierProvider.value(value: accounts),

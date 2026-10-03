@@ -122,8 +122,8 @@ class InteractiveBrokersParser extends BrokerCsvParser {
 
     final header = rows.first;
     final col = <String, int>{};
-    for (int i = 0; i < header.length; i++) {
-      col[header[i].trim()] = i;
+    for (var columnIndex = 0; columnIndex < header.length; columnIndex++) {
+      col[header[columnIndex].trim()] = columnIndex;
     }
 
     final symbolIdx = col['Symbol'];
@@ -146,7 +146,7 @@ class InteractiveBrokersParser extends BrokerCsvParser {
       commissionIdx,
       tradeDateIdx,
       levelIdx,
-    ].any((i) => i == null)) {
+    ].any((columnIndex) => columnIndex == null)) {
       return ParseResult(trades: []);
     }
 
@@ -284,14 +284,15 @@ List<List<String>> _parseCsv(String content) {
   final buffer = StringBuffer();
   var inQuotes = false;
 
-  for (int i = 0; i < text.length; i++) {
-    final char = text[i];
+  for (var characterIndex = 0; characterIndex < text.length; characterIndex++) {
+    final char = text[characterIndex];
 
     if (inQuotes) {
       if (char == '"') {
-        if (i + 1 < text.length && text[i + 1] == '"') {
+        if (characterIndex + 1 < text.length &&
+            text[characterIndex + 1] == '"') {
           buffer.write('"');
-          i++;
+          characterIndex++;
         } else {
           inQuotes = false;
         }
@@ -307,7 +308,7 @@ List<List<String>> _parseCsv(String content) {
       } else if (char == '\n') {
         currentRow.add(buffer.toString());
         buffer.clear();
-        if (currentRow.any((f) => f.isNotEmpty)) {
+        if (currentRow.any((field) => field.isNotEmpty)) {
           rows.add(List.from(currentRow));
         }
         currentRow = [];
@@ -319,7 +320,7 @@ List<List<String>> _parseCsv(String content) {
 
   if (buffer.isNotEmpty || currentRow.isNotEmpty) {
     currentRow.add(buffer.toString());
-    if (currentRow.any((f) => f.isNotEmpty)) {
+    if (currentRow.any((field) => field.isNotEmpty)) {
       rows.add(currentRow);
     }
   }

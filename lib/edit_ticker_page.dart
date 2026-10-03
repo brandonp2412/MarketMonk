@@ -364,8 +364,8 @@ class _EditTickerPageState extends State<EditTickerPage> {
                       ),
                     ],
                     selected: {_isSell},
-                    onSelectionChanged: (v) =>
-                        setState(() => _isSell = v.first),
+                    onSelectionChanged: (selection) =>
+                        setState(() => _isSell = selection.first),
                   ),
                   const SizedBox(height: 8),
                   TextField(

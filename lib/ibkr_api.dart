@@ -95,6 +95,40 @@ class IbkrPosition {
       );
 }
 
+/// One read-only broker transaction returned by the self-hosted IBKR service.
+class IbkrTrade {
+  final String symbol;
+  final String name;
+  final String currency;
+  final int conid;
+  final double quantity;
+  final double price;
+  final String tradeType;
+  final DateTime tradeDate;
+
+  const IbkrTrade({
+    required this.symbol,
+    required this.name,
+    required this.currency,
+    required this.conid,
+    required this.quantity,
+    required this.price,
+    required this.tradeType,
+    required this.tradeDate,
+  });
+
+  factory IbkrTrade.fromJson(Map<String, dynamic> json) => IbkrTrade(
+        symbol: json['symbol'] as String? ?? '',
+        name: json['name'] as String? ?? '',
+        currency: json['currency'] as String? ?? 'USD',
+        conid: (json['conid'] as num?)?.toInt() ?? 0,
+        quantity: (json['quantity'] as num?)?.toDouble() ?? 0,
+        price: (json['price'] as num?)?.toDouble() ?? 0,
+        tradeType: json['trade_type'] as String? ?? '',
+        tradeDate: _parseIbkrDate(json['trade_date']),
+      );
+}
+
 /// One daily historical candle returned by the self-hosted IBKR service.
 class IbkrHistoricalCandle {
   final DateTime date;
@@ -238,6 +272,10 @@ class IbkrPerformanceSeries {
 }
 
 DateTime _parseIbkrDate(String value) {
+  final isoDate = DateTime.tryParse(value);
+  if (isoDate != null && RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)) {
+    return DateTime(isoDate.year, isoDate.month, isoDate.day);
+  }
   if (!RegExp(r'^\d{8}$').hasMatch(value)) {
     throw FormatException('Invalid IBKR date: $value');
   }
@@ -364,6 +402,27 @@ class IbkrApiClient {
   }
 
   /// Fetches up to [years] years of daily bars for a current IBKR stock position.
+  Future<List<IbkrTrade>> fetchTrades({int days = 3650}) async {
+    if (days < 1 || days > 3650) {
+      throw RangeError.range(days, 1, 3650, 'days');
+    }
+    final response = await _request(
+      '/v1/trades',
+      queryParameters: {'days': '$days'},
+    );
+    final body = _decodeJsonObject(response, '/v1/trades');
+    return (body['trades'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(IbkrTrade.fromJson)
+        .where(
+          (trade) =>
+              trade.symbol.isNotEmpty &&
+              trade.quantity != 0 &&
+              trade.price.isFinite,
+        )
+        .toList();
+  }
+
   Future<IbkrHistoricalSeries> fetchHistoricalCandles(
     String symbol, {
     int years = 10,

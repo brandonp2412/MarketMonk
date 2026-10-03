@@ -18,7 +18,11 @@ class Trades extends Table {
   RealColumn get commission => real().withDefault(const Constant(0.0))();
 }
 
-@TableIndex(name: 'idx_candles_symbol_date', columns: {#symbol, #date})
+@TableIndex(
+  name: 'idx_candles_symbol_date',
+  columns: {#symbol, #date},
+  unique: true,
+)
 class Candles extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get symbol => text()();

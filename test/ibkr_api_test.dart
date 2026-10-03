@@ -121,6 +121,38 @@ void main() {
     expect(performance.returns.last, 0.0549);
   });
 
+  test('IBKR client parses broker transaction history', () async {
+    Uri? requestedUri;
+    final client = IbkrApiClient(
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test/base/',
+        token: 'secret-token',
+      ),
+      get: (uri, {headers}) async {
+        requestedUri = uri;
+        return http.Response(
+          '''{"read_only":true,"source":"client_portal","account":"****1234","days":3650,"includes_real_time":true,"trades":[{"symbol":"AAPL","name":"Apple Inc","currency":"USD","conid":265598,"quantity":5,"price":192.26,"trade_type":"open","trade_date":"2023-12-11"}]}''',
+          200,
+        );
+      },
+    );
+
+    final trades = await client.fetchTrades();
+
+    expect(
+      requestedUri.toString(),
+      'https://ibkr.example.test/base/v1/trades?days=3650',
+    );
+    expect(trades, hasLength(1));
+    expect(trades.single.symbol, 'AAPL');
+    expect(trades.single.name, 'Apple Inc');
+    expect(trades.single.quantity, 5);
+    expect(trades.single.price, 192.26);
+    expect(trades.single.tradeType, 'open');
+    expect(trades.single.tradeDate, DateTime(2023, 12, 11));
+  });
+
   test('IBKR historical years are bounded', () {
     final client = IbkrApiClient(
       const IbkrAccountConfig(

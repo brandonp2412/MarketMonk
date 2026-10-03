@@ -37,29 +37,18 @@ class _WhatsNewState extends State<WhatsNew> {
           .where((key) => key.startsWith('assets/changelogs/'))
           .toList();
 
-      files.sort((a, b) {
-        final aNum = int.tryParse(a.split('/').last.split('.').first) ?? 0;
-        final bNum = int.tryParse(b.split('/').last.split('.').first) ?? 0;
-        return bNum.compareTo(aNum);
+      files.sort((firstPath, secondPath) {
+        final firstTimestamp =
+            int.tryParse(firstPath.split('/').last.split('.').first) ?? 0;
+        final secondTimestamp =
+            int.tryParse(secondPath.split('/').last.split('.').first) ?? 0;
+        return secondTimestamp.compareTo(firstTimestamp);
       });
 
       final result = <_Changelog>[];
       for (final path in files) {
-        try {
-          final content = await rootBundle.loadString(path);
-          if (content.trim().isEmpty) continue;
-          final filename = path.split('/').last.replaceAll('.txt', '');
-          final timestamp = int.tryParse(filename);
-          if (timestamp == null) continue;
-          result.add(
-            _Changelog(
-              created: DateFormat.yMMMd().format(
-                DateTime.fromMillisecondsSinceEpoch(timestamp * 1000),
-              ),
-              content: content.trim(),
-            ),
-          );
-        } catch (_) {}
+        final changelog = await _loadChangelogFile(path);
+        if (changelog != null) result.add(changelog);
       }
 
       if (!mounted) return;
@@ -73,6 +62,26 @@ class _WhatsNewState extends State<WhatsNew> {
         _isLoading = false;
         _loadFailed = true;
       });
+    }
+  }
+
+  Future<_Changelog?> _loadChangelogFile(String path) async {
+    try {
+      final content = await rootBundle.loadString(path);
+      if (content.trim().isEmpty) return null;
+
+      final filename = path.split('/').last.replaceAll('.txt', '');
+      final timestamp = int.tryParse(filename);
+      if (timestamp == null) return null;
+
+      return _Changelog(
+        created: DateFormat.yMMMd().format(
+          DateTime.fromMillisecondsSinceEpoch(timestamp * 1000),
+        ),
+        content: content.trim(),
+      );
+    } catch (_) {
+      return null;
     }
   }
 

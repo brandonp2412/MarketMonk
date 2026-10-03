@@ -164,11 +164,11 @@ class _SettingsPageState extends State<SettingsPage> {
         contents.add(await File(path).readAsString());
       }
       parsed = parseBrokerCsvBatch(selectedParser!, contents);
-    } catch (e) {
+    } catch (error) {
       if (!context.mounted) return;
       toast(
         context,
-        context.l10n.text('Failed to parse CSV: {error}', {'error': e}),
+        context.l10n.text('Failed to parse CSV: {error}', {'error': error}),
       );
       return;
     }
@@ -209,14 +209,16 @@ class _SettingsPageState extends State<SettingsPage> {
             shrinkWrap: true,
             children: [
               ...parsed.trades.take(10).map(
-                    (t) => ListTile(
+                    (trade) => ListTile(
                       dense: true,
-                      title: Text('${t.symbol} — ${t.tradeType.toUpperCase()}'),
+                      title: Text(
+                        '${trade.symbol} — ${trade.tradeType.toUpperCase()}',
+                      ),
                       subtitle: Text(
-                        t.tradeDate.toIso8601String().substring(0, 10),
+                        trade.tradeDate.toIso8601String().substring(0, 10),
                       ),
                       trailing: Text(
-                        '${t.quantity.abs().toStringAsFixed(2)} @ ${nativeCurrencySymbol(symbolCurrency(t.symbol))}${t.price.toStringAsFixed(2)}',
+                        '${trade.quantity.abs().toStringAsFixed(2)} @ ${nativeCurrencySymbol(symbolCurrency(trade.symbol))}${trade.price.toStringAsFixed(2)}',
                       ),
                     ),
                   ),
@@ -358,18 +360,18 @@ class _SettingsPageState extends State<SettingsPage> {
               shrinkWrap: true,
               children: supportedCurrencies
                   .map(
-                    (c) => CheckboxListTile(
+                    (currencyCode) => CheckboxListTile(
                       dense: true,
-                      title: Text(c),
-                      value: selected.contains(c),
-                      onChanged: c == 'USD'
+                      title: Text(currencyCode),
+                      value: selected.contains(currencyCode),
+                      onChanged: currencyCode == 'USD'
                           ? null
                           : (checked) {
                               setState(() {
                                 if (checked == true) {
-                                  selected.add(c);
+                                  selected.add(currencyCode);
                                 } else {
-                                  selected.remove(c);
+                                  selected.remove(currencyCode);
                                 }
                               });
                             },
@@ -900,9 +902,9 @@ class _SettingsPageState extends State<SettingsPage> {
             : Column(
                 key: const Key('desktop-settings-single-column'),
                 children: [
-                  for (var i = 0; i < cards.length; i++) ...[
-                    cards[i],
-                    if (i != cards.length - 1) const SizedBox(height: 16),
+                  for (var index = 0; index < cards.length; index++) ...[
+                    cards[index],
+                    if (index != cards.length - 1) const SizedBox(height: 16),
                   ],
                 ],
               );

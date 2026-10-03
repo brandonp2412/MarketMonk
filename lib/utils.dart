@@ -83,7 +83,7 @@ void cacheIbkrAccountExchangeRate(IbkrPortfolioSnapshot snapshot) {
 String symbolPriceUnit(String symbol) {
   final curr = symbolCurrency(symbol);
   if (symbolCentDivisor(symbol) == 1.0) return nativeCurrencySymbol(curr);
-  return '${_yahooCentCurrencies.entries.firstWhere((e) => e.value.$1 == curr).key} ';
+  return '${_yahooCentCurrencies.entries.firstWhere((entry) => entry.value.$1 == curr).key} ';
 }
 
 /// Ensures the native currency and its exchange rate are cached for [symbol].
@@ -98,31 +98,40 @@ Future<void> fetchSymbolCurrencyAndRate(String symbol) async {
     talker.warning(
       'Symbol currency metadata timed out; using cached/default currency',
     );
+  } catch (error, stackTrace) {
+    talker.handle(
+      error,
+      stackTrace,
+      'Failed to resolve symbol currency metadata',
+    );
   }
 }
 
 /// Formats [v] (assumed to be in USD) in the user's display currency.
-String fmtCurrency(double v) => currency.format(v * exchangeRate);
+String fmtCurrency(double usdValue) => currency.format(usdValue * exchangeRate);
 
 /// Formats [v] which is denominated in [nativeCurrency], converting it to the
 /// user's chosen display currency via the cached cross-rates.
 ///
 /// Example: fmtNativeCurrency(1370.0, 'INR') with display=USD and
 /// allRatesFromUsd['INR']=84 → formats 1370/84 ≈ $16.31.
-String fmtNativeCurrency(double v, String nativeCurrency) {
+String fmtNativeCurrency(double nativeValue, String nativeCurrency) {
   final nativeRate = requireUsdRate(nativeCurrency);
-  return fmtCurrency(v / nativeRate);
+  return fmtCurrency(nativeValue / nativeRate);
 }
 
 /// Compact display-currency label for chart axes (e.g. $1.2K).
-String fmtCompactCurrency(double v) =>
+String fmtCompactCurrency(double usdValue) =>
     NumberFormat.compactCurrency(symbol: currency.currencySymbol)
-        .format(v * exchangeRate);
+        .format(usdValue * exchangeRate);
 
 /// Compact axis label for [v] denominated in [nativeCurrency].
-String fmtCompactNativeCurrency(double v, String nativeCurrency) {
+String fmtCompactNativeCurrency(
+  double nativeValue,
+  String nativeCurrency,
+) {
   final nativeRate = requireUsdRate(nativeCurrency);
-  return fmtCompactCurrency(v / nativeRate);
+  return fmtCompactCurrency(nativeValue / nativeRate);
 }
 
 /// Formats percentage axis values without letting large labels dominate the
@@ -255,12 +264,14 @@ Future<List<Position>> computeIbkrPositions(
     final firstBuyDate = buys.isEmpty
         ? now
         : buys.map((trade) => trade.tradeDate).reduce(
-              (a, b) => a.isBefore(b) ? a : b,
+              (firstDate, secondDate) =>
+                  firstDate.isBefore(secondDate) ? firstDate : secondDate,
             );
     final lastBuyDate = buys.isEmpty
         ? now
         : buys.map((trade) => trade.tradeDate).reduce(
-              (a, b) => a.isAfter(b) ? a : b,
+              (firstDate, secondDate) =>
+                  firstDate.isAfter(secondDate) ? firstDate : secondDate,
             );
     final currentPrice = broker.marketPrice ?? broker.averageCost ?? 0.0;
     final avgCost = broker.averageCost ?? currentPrice;
@@ -282,9 +293,9 @@ Future<List<Position>> computeIbkrPositions(
 
 double _averageCostForOpenPosition(List<Trade> trades) {
   final ordered = List<Trade>.from(trades)
-    ..sort((a, b) {
-      final byDate = a.tradeDate.compareTo(b.tradeDate);
-      return byDate != 0 ? byDate : a.id.compareTo(b.id);
+    ..sort((firstTrade, secondTrade) {
+      final byDate = firstTrade.tradeDate.compareTo(secondTrade.tradeDate);
+      return byDate != 0 ? byDate : firstTrade.id.compareTo(secondTrade.id);
     });
 
   var openShares = 0.0;
@@ -320,8 +331,8 @@ List<Position> computePositions(
   Map<String, double> latestPrices,
 ) {
   final Map<String, List<Trade>> bySymbol = {};
-  for (final t in trades) {
-    bySymbol.putIfAbsent(t.symbol, () => []).add(t);
+  for (final trade in trades) {
+    bySymbol.putIfAbsent(trade.symbol, () => []).add(trade);
   }
 
   final positions = <Position>[];
@@ -329,20 +340,28 @@ List<Position> computePositions(
     final symbol = entry.key;
     final symbolTrades = entry.value;
 
-    final netShares = symbolTrades.fold(0.0, (sum, t) => sum + t.quantity);
-    if (netShares <= 0) continue; // closed position
+    final netShares =
+        symbolTrades.fold(0.0, (sum, trade) => sum + trade.quantity);
+    if (netShares <= 0) continue;
 
-    final buyTrades = symbolTrades.where((t) => t.quantity > 0).toList();
+    final buyTrades =
+        symbolTrades.where((trade) => trade.quantity > 0).toList();
     final avgCost = _averageCostForOpenPosition(symbolTrades);
     final currentPrice = latestPrices[symbol] ?? avgCost;
 
     final name = symbolTrades.first.name;
-    final dates = buyTrades.map((t) => t.tradeDate);
+    final dates = buyTrades.map((trade) => trade.tradeDate);
     final firstBuyDate = buyTrades.isNotEmpty
-        ? dates.reduce((a, b) => a.isBefore(b) ? a : b)
+        ? dates.reduce(
+            (firstDate, candidateDate) =>
+                firstDate.isBefore(candidateDate) ? firstDate : candidateDate,
+          )
         : DateTime.now();
     final lastBuyDate = buyTrades.isNotEmpty
-        ? dates.reduce((a, b) => a.isAfter(b) ? a : b)
+        ? dates.reduce(
+            (lastDate, candidateDate) =>
+                lastDate.isAfter(candidateDate) ? lastDate : candidateDate,
+          )
         : DateTime.now();
 
     final centDiv = symbolCentDivisor(symbol);
@@ -372,11 +391,8 @@ Future<Map<String, double>> fetchLatestPrices(
   Database? database,
 }) async {
   if (symbols.isEmpty) return {};
-  final d = database ?? db;
+  final targetDatabase = database ?? db;
 
-  // Every computePositions caller fetches prices first, so this is the choke
-  // point that tries to load currency + cent-divisor metadata before positions
-  // are computed (GBp candles would otherwise be read as GBP, #30).
   await Future.wait(
     symbols.map((symbol) async {
       await fetchSymbolCurrencyAndRate(symbol);
@@ -388,42 +404,49 @@ Future<Map<String, double>> fetchLatestPrices(
     }),
   );
 
-  final ph = List.filled(symbols.length, '?').join(', ');
+  final placeholders = List.filled(symbols.length, '?').join(', ');
   try {
-    final rows = await d.customSelect(
-      'SELECT c.symbol, c.close '
-      'FROM candles c '
+    final rows = await targetDatabase.customSelect(
+      'SELECT candle.symbol, candle.close '
+      'FROM candles candle '
       'INNER JOIN ('
-      '  SELECT symbol, MAX(date) AS md FROM candles '
-      '  WHERE symbol IN ($ph) GROUP BY symbol'
-      ') sub ON c.symbol = sub.symbol AND c.date = sub.md '
-      'WHERE c.close > 0',
-      variables: [for (final s in symbols) Variable(s)],
-      readsFrom: {d.candles},
+      '  SELECT symbol, MAX(date) AS max_date FROM candles '
+      '  WHERE symbol IN ($placeholders) GROUP BY symbol'
+      ') latest ON candle.symbol = latest.symbol '
+      'AND candle.date = latest.max_date '
+      'WHERE candle.close > 0',
+      variables: [for (final symbol in symbols) Variable(symbol)],
+      readsFrom: {targetDatabase.candles},
     ).get();
 
     return {
       for (final row in rows)
         row.readNullable<String>('symbol') ?? '':
             row.readNullable<double>('close') ?? 0.0,
-    }..removeWhere((k, v) => k.isEmpty || v <= 0);
+    }..removeWhere(
+        (symbol, price) => symbol.isEmpty || price <= 0,
+      );
   } catch (error, stackTrace) {
-    // Fall back to N individual limit-1 queries if the JOIN fails
     talker.handle(
       error,
       stackTrace,
       'Latest-price query failed; using fallback',
     );
     final prices = <String, double>{};
-    for (final s in symbols) {
-      final c = await (d.candles.select()
-            ..where((r) => r.symbol.equals(s))
+    for (final symbol in symbols) {
+      final candle = await (targetDatabase.candles.select()
+            ..where((row) => row.symbol.equals(symbol))
             ..orderBy([
-              (r) => OrderingTerm(expression: r.date, mode: OrderingMode.desc),
+              (row) => OrderingTerm(
+                    expression: row.date,
+                    mode: OrderingMode.desc,
+                  ),
             ])
             ..limit(1))
           .getSingleOrNull();
-      if (c != null && c.close > 0) prices[s] = c.close;
+      if (candle != null && candle.close > 0) {
+        prices[symbol] = candle.close;
+      }
     }
     return prices;
   }
@@ -434,11 +457,11 @@ Future<void> insertCandles(
   String symbol, {
   Database? database,
 }) async {
-  const int batchSize = 1000;
-  final d = database ?? db;
+  const batchSize = 1000;
+  final targetDatabase = database ?? db;
 
-  for (int i = 0; i < dataList.length; i += batchSize) {
-    final batch = dataList.skip(i).take(batchSize).map((data) {
+  for (var offset = 0; offset < dataList.length; offset += batchSize) {
+    final candleBatch = dataList.skip(offset).take(batchSize).map((data) {
       return CandlesCompanion.insert(
         date: data.date,
         symbol: symbol,
@@ -451,11 +474,16 @@ Future<void> insertCandles(
       );
     }).toList();
 
-    await d.batch((batchBuilder) {
-      batchBuilder.insertAllOnConflictUpdate(d.candles, batch);
+    await targetDatabase.batch((batchBuilder) {
+      batchBuilder.insertAll(
+        targetDatabase.candles,
+        candleBatch,
+        mode: InsertMode.insertOrReplace,
+      );
     });
 
-    talker.debug('Stored ${i + batch.length} candle records');
+    final upsertedCount = offset + candleBatch.length;
+    talker.debug('Upserted $upsertedCount Yahoo candle records');
   }
 }
 
@@ -465,11 +493,11 @@ Future<void> insertIbkrCandles(
   String symbol, {
   Database? database,
 }) async {
-  const int batchSize = 1000;
-  final d = database ?? db;
+  const batchSize = 1000;
+  final targetDatabase = database ?? db;
 
-  for (int i = 0; i < dataList.length; i += batchSize) {
-    final batch = dataList.skip(i).take(batchSize).map((data) {
+  for (var offset = 0; offset < dataList.length; offset += batchSize) {
+    final candleBatch = dataList.skip(offset).take(batchSize).map((data) {
       return CandlesCompanion.insert(
         date: data.date,
         symbol: symbol,
@@ -482,11 +510,16 @@ Future<void> insertIbkrCandles(
       );
     }).toList();
 
-    await d.batch((batchBuilder) {
-      batchBuilder.insertAllOnConflictUpdate(d.candles, batch);
+    await targetDatabase.batch((batchBuilder) {
+      batchBuilder.insertAll(
+        targetDatabase.candles,
+        candleBatch,
+        mode: InsertMode.insertOrReplace,
+      );
     });
 
-    talker.debug('Stored ${i + batch.length} IBKR candle records');
+    final upsertedCount = offset + candleBatch.length;
+    talker.debug('Upserted $upsertedCount IBKR candle records');
   }
 }
 
@@ -495,10 +528,11 @@ Future<Candle?> findClosestDate(DateTime date, String symbol) {
   final timestamp = dateOnly.millisecondsSinceEpoch / 1000;
 
   return (db.candles.select()
-        ..where((u) => u.symbol.equals(symbol))
+        ..where((candle) => candle.symbol.equals(symbol))
         ..orderBy([
-          (t) =>
-              OrderingTerm.asc(CustomExpression("ABS(\"date\" - $timestamp)")),
+          (candle) => OrderingTerm.asc(
+                CustomExpression('ABS("date" - $timestamp)'),
+              ),
         ])
         ..limit(1))
       .getSingleOrNull();
@@ -506,9 +540,11 @@ Future<Candle?> findClosestDate(DateTime date, String symbol) {
 
 Future<Candle?> findClosestPrice(double price, String symbol) {
   return (db.candles.select()
-        ..where((u) => u.symbol.equals(symbol))
+        ..where((candle) => candle.symbol.equals(symbol))
         ..orderBy([
-          (t) => OrderingTerm.asc(CustomExpression("ABS(close - $price)")),
+          (candle) => OrderingTerm.asc(
+                CustomExpression('ABS(close - $price)'),
+              ),
         ])
         ..limit(1))
       .getSingleOrNull();
@@ -529,8 +565,9 @@ final Set<String> _syncedSymbols = {};
 
 /// Removes [symbol] from the sync guard for all databases so the next
 /// [syncCandles] call will actually re-check (used by pull-to-refresh).
-void clearSyncCache(String symbol) =>
-    _syncedSymbols.removeWhere((k) => k.endsWith(':$symbol'));
+void clearSyncCache(String symbol) => _syncedSymbols.removeWhere(
+      (guardKey) => guardKey.endsWith(':$symbol'),
+    );
 
 /// Removes all symbols from the sync guard (e.g. after a full manual refresh).
 void clearAllSyncCache() => _syncedSymbols.clear();
@@ -540,31 +577,96 @@ void clearAllSyncCache() => _syncedSymbols.clear();
 /// IBKR is used for current broker stock positions. If IBKR historical data is
 /// unavailable, Yahoo remains the fallback source. The first successful IBKR
 /// sync seeds up to ten years of bars; later daily refreshes request one year.
+DateTime _latestExpectedMarketDay(DateTime today) {
+  var expectedDay = today;
+  while (expectedDay.weekday == DateTime.saturday ||
+      expectedDay.weekday == DateTime.sunday) {
+    expectedDay = expectedDay.subtract(const Duration(days: 1));
+  }
+  return expectedDay;
+}
+
+Future<bool> _syncIbkrCandlesIfAvailable(
+  String symbol, {
+  required Database targetDatabase,
+  required IbkrAccountConfig? ibkrConfig,
+  required String syncNamespace,
+  required Candle? latest,
+  required DateTime? latestDay,
+  required DateTime expectedMarketDay,
+}) async {
+  if (ibkrConfig?.isConfigured != true) return false;
+
+  final prefs = await SqliteSettings.getInstance();
+  final config = ibkrConfig!;
+  final baseUrl = config.baseUrl;
+  final seedKey = 'ibkrHistorySeeded:$baseUrl:$syncNamespace:$symbol';
+  final seeded = prefs.getBool(seedKey) ?? false;
+  if (seeded && latestDay != null && !expectedMarketDay.isAfter(latestDay)) {
+    return true;
+  }
+
+  try {
+    final history = await IbkrApiClient(config).fetchHistoricalCandles(
+      symbol,
+      years: latest == null ? 10 : 1,
+    );
+    if (history.candles.isEmpty) {
+      throw StateError('IBKR returned no historical candles');
+    }
+
+    final normalizedCurrency = cacheSymbolMeta(symbol, history.currency);
+    await prefs.setString('symbolRawCurrency_$symbol', history.currency);
+    if (normalizedCurrency != 'USD' &&
+        !allRatesFromUsd.containsKey(normalizedCurrency)) {
+      await _fetchAndCacheRate(normalizedCurrency);
+    }
+    await insertIbkrCandles(
+      history.candles,
+      symbol,
+      database: targetDatabase,
+    );
+    await prefs.setBool(seedKey, true);
+    talker.info('Completed IBKR candle sync');
+    return true;
+  } catch (error) {
+    talker.warning(
+      'IBKR candle sync failed for $symbol; falling back to Yahoo: $error',
+    );
+    return false;
+  }
+}
+
 Future<void> syncCandles(
   String symbol, {
   Database? database,
   IbkrAccountConfig? ibkrConfig,
   String syncNamespace = 'Default',
 }) async {
-  final d = database ?? db;
+  final targetDatabase = database ?? db;
 
-  return d.runWhileOpen(() async {
+  return targetDatabase.runWhileOpen(() async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
+    final expectedMarketDay = _latestExpectedMarketDay(today);
     if (_syncGuardDate != today) {
       _syncedSymbols.clear();
       _syncGuardDate = today;
     }
 
-    final guardKey = '${d.hashCode}:$symbol';
+    final databaseKey = targetDatabase.hashCode;
+    final guardKey = '$databaseKey:$symbol';
     if (_syncedSymbols.contains(guardKey)) return;
     _syncedSymbols.add(guardKey);
 
     try {
-      final latest = await (d.candles.select()
-            ..where((tbl) => tbl.symbol.equals(symbol))
+      final latest = await (targetDatabase.candles.select()
+            ..where((row) => row.symbol.equals(symbol))
             ..orderBy([
-              (u) => OrderingTerm(expression: u.date, mode: OrderingMode.desc),
+              (row) => OrderingTerm(
+                    expression: row.date,
+                    mode: OrderingMode.desc,
+                  ),
             ])
             ..limit(1))
           .getSingleOrNull();
@@ -572,56 +674,43 @@ Future<void> syncCandles(
           ? null
           : DateTime(latest.date.year, latest.date.month, latest.date.day);
 
-      if (ibkrConfig?.isConfigured == true) {
-        final prefs = await SqliteSettings.getInstance();
-        final seedKey =
-            'ibkrHistorySeeded:${ibkrConfig!.baseUrl}:$syncNamespace:$symbol';
-        final seeded = prefs.getBool(seedKey) ?? false;
-        if (seeded && latestDay != null && !today.isAfter(latestDay)) return;
+      final ibkrHandled = await _syncIbkrCandlesIfAvailable(
+        symbol,
+        targetDatabase: targetDatabase,
+        ibkrConfig: ibkrConfig,
+        syncNamespace: syncNamespace,
+        latest: latest,
+        latestDay: latestDay,
+        expectedMarketDay: expectedMarketDay,
+      );
+      if (ibkrHandled) return;
 
-        try {
-          final history =
-              await IbkrApiClient(ibkrConfig).fetchHistoricalCandles(
-            symbol,
-            years: seeded && latest != null ? 1 : 10,
-          );
-          if (history.candles.isEmpty) {
-            throw StateError('IBKR returned no historical candles');
-          }
-
-          final normalizedCurrency = cacheSymbolMeta(symbol, history.currency);
-          await prefs.setString('symbolRawCurrency_$symbol', history.currency);
-          if (normalizedCurrency != 'USD' &&
-              !allRatesFromUsd.containsKey(normalizedCurrency)) {
-            await _fetchAndCacheRate(normalizedCurrency);
-          }
-          await insertIbkrCandles(history.candles, symbol, database: d);
-          await prefs.setBool(seedKey, true);
-          talker.info('Completed IBKR candle sync');
-          return;
-        } catch (error) {
-          talker.warning(
-            'IBKR candle sync failed for $symbol; falling back to Yahoo: $error',
-          );
-        }
-      }
-
-      unawaited(_fetchSymbolCurrencyAndRate(symbol));
+      unawaited(fetchSymbolCurrencyAndRate(symbol));
 
       if (latest == null) {
         final response = await const YahooFinanceDailyReader().getDailyDTOs(
           symbol,
         );
-        await insertCandles(response.candlesData, symbol, database: d);
-        talker.info('Completed initial Yahoo candle sync');
-      } else if (today.isAfter(latestDay!)) {
-        final response = await const YahooFinanceDailyReader().getDailyDTOs(
+        await insertCandles(
+          response.candlesData,
           symbol,
-          startDate: latest.date,
+          database: targetDatabase,
         );
-        await insertCandles(response.candlesData, symbol, database: d);
-        talker.info('Completed incremental Yahoo candle sync');
+        talker.info('Completed initial Yahoo candle sync');
+        return;
       }
+
+      if (!expectedMarketDay.isAfter(latestDay!)) return;
+      final response = await const YahooFinanceDailyReader().getDailyDTOs(
+        symbol,
+        startDate: latest.date,
+      );
+      await insertCandles(
+        response.candlesData,
+        symbol,
+        database: targetDatabase,
+      );
+      talker.info('Completed incremental Yahoo candle sync');
     } catch (error, stackTrace) {
       _syncedSymbols.remove(guardKey);
       talker.handle(error, stackTrace, 'Candle sync failed');

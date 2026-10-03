@@ -25,6 +25,60 @@ void main() {
     expect(small[1], closeTo(20, 1e-9));
   });
 
+  testWidgets('inactive kept-alive charts do not fetch in background',
+      (tester) async {
+    await seedTestSqlite({});
+    db = Database.connect(
+      DatabaseConnection(
+        NativeDatabase.memory(),
+        closeStreamsSynchronously: true,
+      ),
+    );
+    addTearDown(() => db.close());
+
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.setIbkrConfig(
+      'Default',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'secret-token',
+      ),
+    );
+    var portfolioLoads = 0;
+    var performanceLoads = 0;
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: ChartsPage(
+              isActive: false,
+              ibkrLoader: (_) async {
+                portfolioLoads++;
+                throw StateError('inactive chart fetched portfolio');
+              },
+              ibkrPerformanceLoader: (_, __) async {
+                performanceLoads++;
+                throw StateError('inactive chart fetched performance');
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(portfolioLoads, 0);
+    expect(performanceLoads, 0);
+  });
+
   // Regression test for issue #35: the chart page's first frame can be laid
   // out with degenerate constraints (e.g. before the Linux window reaches its
   // real size). The search-bar overlay height must be re-measured once the
@@ -213,6 +267,95 @@ void main() {
         matches(RegExp(r'^\$[\d,.]+ · \d{1,2}/\d{1,2}/\d{2}$')),
       );
       expect(tooltip.text, isNot(contains('\n')));
+
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'IBKR chart appends today from base-currency NAV when USD NAV is absent',
+    (WidgetTester tester) async {
+      await seedTestSqlite({
+        'ibkrAccountConfigs':
+            '{"Default":{"enabled":true,"baseUrl":"https://ibkr.example.test","token":"secret-token"}}',
+        'chartPeriodYears': 0,
+        'chartPeriodMonths': 0,
+        'chartPeriodDays': 5,
+      });
+      db = Database.connect(
+        DatabaseConnection(
+          NativeDatabase.memory(),
+          closeStreamsSynchronously: true,
+        ),
+      );
+      addTearDown(() => db.close());
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = const Size(1200, 1000);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+        allRatesFromUsd.remove('NZD');
+      });
+
+      allRatesFromUsd['NZD'] = 1.7;
+      final accounts = testAccountManager();
+      await accounts.init();
+      final today = DateTime.now();
+      final todayDate = DateTime(today.year, today.month, today.day);
+      await accounts.cachePortfolio(
+        'Default',
+        [
+          Position(
+            symbol: 'VOO',
+            name: 'VANGUARD S&P 500 ETF',
+            nativeCurrency: 'USD',
+            netShares: 10,
+            avgCost: 500,
+            currentPrice: 550,
+            firstBuyDate: DateTime(2025),
+            lastBuyDate: DateTime(2026),
+          ),
+        ],
+        const IbkrAccountValue(value: 10000, currency: 'NZD'),
+      );
+      await accounts.cacheIbkrPerformance(
+        'Default',
+        IbkrPerformanceSeries(
+          period: '1Y',
+          measure: 'TWR',
+          currency: 'NZD',
+          startDate: todayDate.subtract(const Duration(days: 3)),
+          startNav: 9000,
+          dates: [
+            todayDate.subtract(const Duration(days: 2)),
+            todayDate.subtract(const Duration(days: 1)),
+          ],
+          nav: const [9200, 9500],
+          returnDates: [
+            todayDate.subtract(const Duration(days: 3)),
+            todayDate.subtract(const Duration(days: 1)),
+          ],
+          returns: const [0, 0.05],
+        ),
+      );
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => SettingsState()),
+            ChangeNotifierProvider.value(value: accounts),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(body: ChartsPage()),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final chart = tester.widget<LineChart>(find.byType(LineChart));
+      final spots = chart.data.lineBarsData.single.spots;
+      expect(spots, hasLength(4));
+      expect(spots.last.y, closeTo(10000 / 1.7, 1e-6));
 
       await tester.pumpAndSettle();
     },

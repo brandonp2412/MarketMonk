@@ -1435,7 +1435,7 @@ abstract class _$Database extends GeneratedDatabase {
   late final $IbkrCacheEntriesTable ibkrCacheEntries =
       $IbkrCacheEntriesTable(this);
   late final Index idxCandlesSymbolDate = Index('idx_candles_symbol_date',
-      'CREATE INDEX idx_candles_symbol_date ON candles (symbol, date)');
+      'CREATE UNIQUE INDEX idx_candles_symbol_date ON candles (symbol, date)');
   late final Index idxTradesSymbolTradeDate = Index(
       'idx_trades_symbol_trade_date',
       'CREATE INDEX idx_trades_symbol_trade_date ON trades (symbol, trade_date)');

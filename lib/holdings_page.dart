@@ -11,6 +11,7 @@ import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/ibkr_cash_out_pnl.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
+import 'package:market_monk/logging.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/trade_history_page.dart';
 import 'package:market_monk/utils.dart';
@@ -24,12 +25,14 @@ class SymbolSummary {
   final String name;
   final Position? position; // null = fully closed position
   final List<Trade> trades;
+  final bool brokerTradeHistoryAvailable;
 
   SymbolSummary({
     required this.symbol,
     required this.name,
     required this.position,
     required this.trades,
+    this.brokerTradeHistoryAvailable = true,
   });
 
   double get totalRealizedPL =>
@@ -37,9 +40,11 @@ class SymbolSummary {
 }
 
 class HoldingsPage extends StatefulWidget {
+  final bool isActive;
   final Future<List<Position>> Function(List<Trade>)? _positionsLoader;
   const HoldingsPage({
     super.key,
+    this.isActive = true,
     Future<List<Position>> Function(List<Trade>)? positionsLoader,
   }) : _positionsLoader = positionsLoader;
 
@@ -55,6 +60,10 @@ class HoldingsPageState extends State<HoldingsPage>
   final _search = TextEditingController();
   final _desktopTableScrollController = ScrollController();
   List<SymbolSummary> _summaries = [];
+  List<Trade> _ibkrTrades = [];
+  Future<List<Trade>>? _ibkrTradesLoad;
+  String? _ibkrTradesAccount;
+  bool _ibkrTradeHistoryAvailable = true;
   late Stream<List<SymbolSummary>> _stream;
   String _lastAccount = '';
   int _lastIbkrRefreshVersion = -1;
@@ -69,7 +78,17 @@ class HoldingsPageState extends State<HoldingsPage>
   void initState() {
     super.initState();
     _stream = _buildStream();
-    _preload();
+  }
+
+  @override
+  void didUpdateWidget(covariant HoldingsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive == widget.isActive) return;
+
+    setState(() => _stream = _buildStream());
+    if (widget.isActive) {
+      unawaited(_preload());
+    }
   }
 
   @override
@@ -86,37 +105,136 @@ class HoldingsPageState extends State<HoldingsPage>
     final account = accounts.activeAccount;
     final ibkrConfig = accounts.ibkrConfigFor(account);
     final refreshVersion = accounts.ibkrRefreshVersion;
-    if (account != _lastAccount ||
-        ibkrConfig != _lastIbkrConfig ||
-        refreshVersion != _lastIbkrRefreshVersion) {
-      _lastAccount = account;
-      _lastIbkrConfig = ibkrConfig;
-      _lastIbkrRefreshVersion = refreshVersion;
-      setState(() {
-        _stream = _buildStream();
-        _summaries = [];
-      });
-      _preload();
-      _syncAllInBackground();
+    final accountChanged = _lastAccount.isNotEmpty && account != _lastAccount;
+    final refreshRequested =
+        _lastAccount.isNotEmpty && refreshVersion != _lastIbkrRefreshVersion;
+
+    if (account == _lastAccount &&
+        ibkrConfig == _lastIbkrConfig &&
+        refreshVersion == _lastIbkrRefreshVersion) {
+      return;
+    }
+
+    if (accountChanged) {
+      _ibkrTrades = [];
+      _ibkrTradesAccount = null;
+      _ibkrTradeHistoryAvailable = true;
+    }
+    _lastAccount = account;
+    _lastIbkrConfig = ibkrConfig;
+    _lastIbkrRefreshVersion = refreshVersion;
+    setState(() {
+      _stream = _buildStream();
+      _summaries = [];
+    });
+    if (widget.isActive) {
+      unawaited(
+        _preload(
+          refreshPortfolio: refreshRequested,
+          refreshTrades: refreshRequested,
+        ),
+      );
     }
   }
 
   /// Pre-loads data immediately via get() so the UI has something to show
   /// before the watch() stream emits its first value.
-  Future<void> _preload() async {
+  Future<List<Trade>> _loadTradesForHoldings({
+    bool forceRefresh = false,
+  }) async {
+    final accounts = context.read<AccountManager>();
+    final accountName = accounts.activeAccount;
+    final config = accounts.ibkrConfigFor(accountName);
+    if (!config.enabled) {
+      return db.trades.select().get();
+    }
+
+    if (!config.isConfigured) {
+      _ibkrTradeHistoryAvailable = false;
+      _ibkrTrades = [];
+      _ibkrTradesAccount = accountName;
+      return const [];
+    }
+
+    if (!forceRefresh && _ibkrTradesAccount == accountName) {
+      return _ibkrTrades;
+    }
+
+    final existingLoad = _ibkrTradesLoad;
+    if (!forceRefresh && existingLoad != null) return existingLoad;
+
+    final load = () async {
+      try {
+        final brokerTrades = await IbkrApiClient(config).fetchTrades();
+        final trades = [
+          for (var index = 0; index < brokerTrades.length; index++)
+            Trade(
+              id: -index - 1,
+              symbol: brokerTrades[index].symbol,
+              name: brokerTrades[index].name.isEmpty
+                  ? brokerTrades[index].symbol
+                  : brokerTrades[index].name,
+              quantity: brokerTrades[index].quantity,
+              price: brokerTrades[index].price,
+              tradeType: brokerTrades[index].tradeType,
+              tradeDate: brokerTrades[index].tradeDate,
+              realizedPL: 0,
+              commission: 0,
+            ),
+        ];
+        _ibkrTrades = trades;
+        _ibkrTradesAccount = accountName;
+        _ibkrTradeHistoryAvailable = true;
+        return trades;
+      } catch (error, stackTrace) {
+        _ibkrTrades = [];
+        _ibkrTradesAccount = accountName;
+        _ibkrTradeHistoryAvailable = false;
+        talker.handle(
+          error,
+          stackTrace,
+          'IBKR transaction history unavailable',
+        );
+        return const <Trade>[];
+      }
+    }();
+    _ibkrTradesLoad = load;
+    try {
+      return await load;
+    } finally {
+      if (identical(_ibkrTradesLoad, load)) _ibkrTradesLoad = null;
+    }
+  }
+
+  Future<void> _preload({
+    bool refreshPortfolio = false,
+    bool refreshTrades = false,
+  }) async {
     try {
       final accounts = context.read<AccountManager>();
-      final trades = await db.trades.select().get();
+      final trades = await _loadTradesForHoldings(
+        forceRefresh: refreshTrades,
+      );
       final cached = accounts.portfolioCacheFor();
-      if (cached != null) {
+      if (cached != null && !refreshPortfolio) {
         final result = _summariesFromPositions(trades, cached.positions);
-        if (mounted) setState(() => _summaries = result);
+        if (mounted) {
+          setState(() {
+            _summaries = result;
+            _stream = _buildStream();
+          });
+        }
         return;
       }
       final result = await _computeSummaries(trades);
-      if (mounted) setState(() => _summaries = result);
-    } catch (error, stack) {
-      _reportError(error, stack, 'preloading holdings');
+      if (mounted) {
+        setState(() {
+          _summaries = result;
+          _stream = _buildStream();
+        });
+      }
+    } catch (error, stackTrace) {
+      _reportError(error, stackTrace, 'preloading holdings');
     }
   }
 
@@ -176,28 +294,6 @@ class HoldingsPageState extends State<HoldingsPage>
 
   /// Fires candle syncs for all held symbols in the background without
   /// blocking the UI.
-  Future<void> _syncAllInBackground() async {
-    final accountName = context.read<AccountManager>().activeAccount;
-    try {
-      final useIbkr = _lastIbkrConfig.enabled;
-      final trades = await db.trades.select().get();
-      final positions = await _loadPositions(trades);
-      final symbols = useIbkr
-          ? positions.map((position) => position.symbol).toSet()
-          : trades.map((trade) => trade.symbol).toSet();
-      for (final symbol in symbols) {
-        await syncCandles(
-          symbol,
-          ibkrConfig: _lastIbkrConfig,
-          syncNamespace: accountName,
-        );
-      }
-    } catch (error, stack) {
-      _reportError(error, stack, 'syncing holdings in the background');
-    }
-    if (mounted) setState(() => _stream = _buildStream());
-  }
-
   Future<List<SymbolSummary>> _computeSummaries(List<Trade> trades) async =>
       _summariesFromPositions(trades, await _loadPositions(trades));
 
@@ -208,19 +304,21 @@ class HoldingsPageState extends State<HoldingsPage>
     final positionMap = {
       for (final position in positions) position.symbol: position,
     };
-    final q = _search.text.toLowerCase();
+    final query = _search.text.toLowerCase();
     final Map<String, List<Trade>> bySymbol = {};
-    for (final t in trades) {
-      if (q.isNotEmpty &&
-          !t.symbol.toLowerCase().contains(q) &&
-          !t.name.toLowerCase().contains(q)) continue;
-      bySymbol.putIfAbsent(t.symbol, () => []).add(t);
+    for (final trade in trades) {
+      if (query.isNotEmpty &&
+          !trade.symbol.toLowerCase().contains(query) &&
+          !trade.name.toLowerCase().contains(query)) {
+        continue;
+      }
+      bySymbol.putIfAbsent(trade.symbol, () => []).add(trade);
     }
 
     for (final position in positions) {
-      if (q.isNotEmpty &&
-          !position.symbol.toLowerCase().contains(q) &&
-          !position.name.toLowerCase().contains(q)) {
+      if (query.isNotEmpty &&
+          !position.symbol.toLowerCase().contains(query) &&
+          !position.name.toLowerCase().contains(query)) {
         continue;
       }
       bySymbol.putIfAbsent(position.symbol, () => []);
@@ -238,21 +336,26 @@ class HoldingsPageState extends State<HoldingsPage>
           name: name,
           position: position,
           trades: symbolTrades,
+          brokerTradeHistoryAvailable: _ibkrTradeHistoryAvailable,
         ),
       );
     }
 
-    summaries.sort((a, b) {
-      if (a.position != null && b.position == null) return -1;
-      if (a.position == null && b.position != null) return 1;
-      return a.symbol.compareTo(b.symbol);
+    summaries.sort((firstSummary, secondSummary) {
+      if (firstSummary.position != null && secondSummary.position == null) {
+        return -1;
+      }
+      if (firstSummary.position == null && secondSummary.position != null) {
+        return 1;
+      }
+      return firstSummary.symbol.compareTo(secondSummary.symbol);
     });
 
     return summaries;
   }
 
   Stream<List<SymbolSummary>> _buildStream() {
-    return db.trades.select().watch().asyncMap(_computeSummaries).transform(
+    return db.trades.select().watch().asyncMap(_summariesForStream).transform(
       StreamTransformer<List<SymbolSummary>, List<SymbolSummary>>.fromHandlers(
         handleError: (error, stack, sink) {
           _reportError(error, stack, 'loading holdings');
@@ -260,6 +363,19 @@ class HoldingsPageState extends State<HoldingsPage>
         },
       ),
     );
+  }
+
+  Future<List<SymbolSummary>> _summariesForStream(
+    List<Trade> localTrades,
+  ) async {
+    final accounts = context.read<AccountManager>();
+    final config = accounts.ibkrConfigFor();
+    final trades = config.enabled ? _ibkrTrades : localTrades;
+    if (widget.isActive) return _computeSummaries(trades);
+
+    final cachedPositions =
+        accounts.portfolioCacheFor()?.positions ?? const <Position>[];
+    return _summariesFromPositions(trades, cachedPositions);
   }
 
   void _exitSelecting() {
@@ -276,7 +392,7 @@ class HoldingsPageState extends State<HoldingsPage>
       } else {
         _selectedSymbols
           ..clear()
-          ..addAll(_summaries.map((s) => s.symbol));
+          ..addAll(_summaries.map((summary) => summary.symbol));
       }
     });
   }
@@ -315,7 +431,8 @@ class HoldingsPageState extends State<HoldingsPage>
     if (confirmed != true || !ctx.mounted) return;
 
     for (final symbol in _selectedSymbols) {
-      await (db.trades.delete()..where((t) => t.symbol.equals(symbol))).go();
+      await (db.trades.delete()..where((trade) => trade.symbol.equals(symbol)))
+          .go();
     }
     _exitSelecting();
     if (ctx.mounted)
@@ -1253,23 +1370,23 @@ class HoldingsPageState extends State<HoldingsPage>
         itemCount: summaries.length + 1,
         itemBuilder: (context, index) {
           if (index == 0) return const SizedBox(height: 8);
-          final s = summaries[index - 1];
+          final summary = summaries[index - 1];
           return _SymbolTile(
-            summary: s,
+            summary: summary,
             selecting: _selecting,
-            isSelected: _selectedSymbols.contains(s.symbol),
+            isSelected: _selectedSymbols.contains(summary.symbol),
             onTap: () {
               if (_selecting) {
                 setState(() {
-                  if (_selectedSymbols.contains(s.symbol)) {
-                    _selectedSymbols.remove(s.symbol);
+                  if (_selectedSymbols.contains(summary.symbol)) {
+                    _selectedSymbols.remove(summary.symbol);
                     if (_selectedSymbols.isEmpty) _selecting = false;
                   } else {
-                    _selectedSymbols.add(s.symbol);
+                    _selectedSymbols.add(summary.symbol);
                   }
                 });
               } else {
-                _openDetail(s);
+                _openDetail(summary);
               }
             },
             onLongPress: ibkrManaged
@@ -1277,7 +1394,7 @@ class HoldingsPageState extends State<HoldingsPage>
                 : () {
                     setState(() {
                       _selecting = true;
-                      _selectedSymbols.add(s.symbol);
+                      _selectedSymbols.add(summary.symbol);
                     });
                   },
           );
@@ -1300,15 +1417,22 @@ class HoldingsPageState extends State<HoldingsPage>
 
   Future<void> _refreshCandles() async {
     final accountManager = context.read<AccountManager>();
+    final config = accountManager.ibkrConfigFor();
     clearAllSyncCache();
-    await _preload();
-    final symbols = _summaries.map((summary) => summary.symbol).toSet();
-    for (final symbol in symbols) {
-      await syncCandles(
-        symbol,
-        ibkrConfig: accountManager.ibkrConfigFor(),
-        syncNamespace: accountManager.activeAccount,
-      );
+    await _preload(
+      refreshPortfolio: true,
+      refreshTrades: config.enabled,
+    );
+
+    if (!config.enabled) {
+      final symbols = _summaries.map((summary) => summary.symbol).toSet();
+      for (final symbol in symbols) {
+        await syncCandles(
+          symbol,
+          ibkrConfig: config,
+          syncNamespace: accountManager.activeAccount,
+        );
+      }
     }
     if (mounted) setState(() => _stream = _buildStream());
   }
@@ -1333,7 +1457,7 @@ class _SymbolTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final position = summary.position;
     final changePct = position?.change ?? 0.0;
-    final hasRealizedPL = summary.trades.any((t) => t.realizedPL != 0);
+    final hasRealizedPL = summary.trades.any((trade) => trade.realizedPL != 0);
     final realizedPL = summary.totalRealizedPL;
     final realizedToday = position?.realizedToday;
 

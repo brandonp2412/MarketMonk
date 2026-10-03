@@ -34,10 +34,12 @@ class _LoadedPortfolio {
 }
 
 class PortfolioPage extends StatefulWidget {
+  final bool isActive;
   final Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? _ibkrLoader;
 
   const PortfolioPage({
     super.key,
+    this.isActive = true,
     Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? ibkrLoader,
   }) : _ibkrLoader = ibkrLoader;
 
@@ -75,6 +77,17 @@ class PortfolioPageState extends State<PortfolioPage>
   }
 
   @override
+  void didUpdateWidget(covariant PortfolioPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive == widget.isActive) return;
+
+    setState(() => _stream = _buildStream());
+    if (widget.isActive) {
+      unawaited(_preload());
+    }
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final accounts = context.watch<AccountManager>();
@@ -86,31 +99,37 @@ class PortfolioPageState extends State<PortfolioPage>
     final hadAccount = _lastAccount.isNotEmpty;
     final refreshRequested =
         hadAccount && refreshVersion != _lastIbkrRefreshVersion;
-    final willLoadPortfolio = ibkrConfig.enabled
-        ? ibkrConfig.isConfigured &&
-            (refreshRequested || cached == null || !cacheFresh)
-        : true;
-    if (account != _lastAccount ||
-        ibkrConfig != _lastIbkrConfig ||
-        refreshVersion != _lastIbkrRefreshVersion) {
-      _lastAccount = account;
-      _lastIbkrConfig = ibkrConfig;
-      _lastIbkrRefreshVersion = refreshVersion;
-      setState(() {
-        _stream = _buildStream();
-        _positions = cached?.positions ?? [];
-        _netLiquidation = cached?.netLiquidation;
-        _hasCachedPortfolio = cached != null;
-        _isLoadingPortfolio = willLoadPortfolio;
-        touchedIndex = null;
-      });
+    final willLoadPortfolio = widget.isActive &&
+        (ibkrConfig.enabled
+            ? ibkrConfig.isConfigured &&
+                (refreshRequested || cached == null || !cacheFresh)
+            : true);
+
+    if (account == _lastAccount &&
+        ibkrConfig == _lastIbkrConfig &&
+        refreshVersion == _lastIbkrRefreshVersion) {
+      return;
+    }
+
+    _lastAccount = account;
+    _lastIbkrConfig = ibkrConfig;
+    _lastIbkrRefreshVersion = refreshVersion;
+    setState(() {
+      _stream = _buildStream();
+      _positions = cached?.positions ?? [];
+      _netLiquidation = cached?.netLiquidation;
+      _hasCachedPortfolio = cached != null;
+      _isLoadingPortfolio = willLoadPortfolio;
+      touchedIndex = null;
+    });
+    if (widget.isActive) {
       unawaited(_preload(forceRefresh: refreshRequested));
     }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed && widget.isActive) {
       unawaited(_preload());
     }
   }
@@ -131,7 +150,7 @@ class PortfolioPageState extends State<PortfolioPage>
     bool forceRefresh = false,
   }) async {
     if (!config.enabled) {
-      final symbols = trades.map((t) => t.symbol).toSet().toList();
+      final symbols = trades.map((trade) => trade.symbol).toSet().toList();
       final prices = await fetchLatestPrices(symbols);
       return _LoadedPortfolio(
         positions: computePositions(trades, prices),
@@ -198,16 +217,12 @@ class PortfolioPageState extends State<PortfolioPage>
       return;
     }
 
-    final loadKey = (accountName, config);
     try {
-      final performance =
-          await _ibkrPerformanceLoads.putIfAbsent(loadKey, () async {
-        try {
-          return await IbkrApiClient(config).fetchPerformance(period);
-        } finally {
-          _ibkrPerformanceLoads.remove(loadKey);
-        }
-      });
+      final performance = await _fetchIbkrPerformanceOnce(
+        accountName,
+        config,
+        period,
+      );
       await accounts.cacheIbkrPerformance(accountName, performance);
     } catch (error, stackTrace) {
       talker.handle(
@@ -216,6 +231,21 @@ class PortfolioPageState extends State<PortfolioPage>
         'Failed to load IBKR cash-out performance',
       );
     }
+  }
+
+  Future<IbkrPerformanceSeries> _fetchIbkrPerformanceOnce(
+    String accountName,
+    IbkrAccountConfig config,
+    String period,
+  ) {
+    final loadKey = (accountName, config);
+    return _ibkrPerformanceLoads.putIfAbsent(loadKey, () async {
+      try {
+        return await IbkrApiClient(config).fetchPerformance(period);
+      } finally {
+        _ibkrPerformanceLoads.remove(loadKey);
+      }
+    });
   }
 
   Future<void> _preload({bool forceRefresh = false}) async {
@@ -316,8 +346,31 @@ class PortfolioPageState extends State<PortfolioPage>
     final config = accounts.ibkrConfigFor(accountName);
     final accountDb = db;
     return accountDb.trades.select().watch().asyncMap(
-          (trades) => _loadPortfolio(accountName, trades, config),
+          (trades) => _loadPortfolioForStream(
+            accountName,
+            trades,
+            config,
+            accounts,
+          ),
         );
+  }
+
+  Future<_LoadedPortfolio> _loadPortfolioForStream(
+    String accountName,
+    List<Trade> trades,
+    IbkrAccountConfig config,
+    AccountManager accounts,
+  ) async {
+    if (widget.isActive) {
+      return _loadPortfolio(accountName, trades, config);
+    }
+
+    final cached = accounts.portfolioCacheFor(accountName);
+    return _LoadedPortfolio(
+      positions: cached?.positions ?? const [],
+      netLiquidation: cached?.netLiquidation,
+      netLiquidationUsd: cached?.netLiquidationUsd,
+    );
   }
 
   Future<void> _updateCandles() async {
@@ -336,18 +389,18 @@ class PortfolioPageState extends State<PortfolioPage>
       'Symbol,Name,Shares,Avg Cost,Current Price,Current Value,Cost Basis,Unrealized P/L,% Change,Last Purchase Date',
     );
     final dateFmt = DateFormat('yyyy-MM-dd');
-    for (final p in positions) {
+    for (final position in positions) {
       final cells = [
-        p.symbol,
-        '"${p.name.replaceAll('"', '""')}"',
-        p.netShares.toStringAsFixed(6),
-        p.avgCost.toStringAsFixed(4),
-        p.currentPrice.toStringAsFixed(4),
-        p.currentValue.toStringAsFixed(2),
-        p.costBasis.toStringAsFixed(2),
-        p.unrealizedPL.toStringAsFixed(2),
-        p.change.toStringAsFixed(2),
-        dateFmt.format(p.lastBuyDate),
+        position.symbol,
+        '"${position.name.replaceAll('"', '""')}"',
+        position.netShares.toStringAsFixed(6),
+        position.avgCost.toStringAsFixed(4),
+        position.currentPrice.toStringAsFixed(4),
+        position.currentValue.toStringAsFixed(2),
+        position.costBasis.toStringAsFixed(2),
+        position.unrealizedPL.toStringAsFixed(2),
+        position.change.toStringAsFixed(2),
+        dateFmt.format(position.lastBuyDate),
       ];
       buf.writeln(cells.join(','));
     }
@@ -610,25 +663,29 @@ class PortfolioPageState extends State<PortfolioPage>
       );
     }
 
-    final totalValue = positions.fold(0.0, (sum, p) => sum + p.currentValue);
-    final totalCost = positions.fold(0.0, (sum, p) => sum + p.costBasis);
+    final totalValue =
+        positions.fold(0.0, (sum, position) => sum + position.currentValue);
+    final totalCost =
+        positions.fold(0.0, (sum, position) => sum + position.costBasis);
     final costBasisGain = totalValue - totalCost;
     final cashOutSummary = _ibkrCashOutSummary(performance, netLiquidation);
     final totalGain = cashOutSummary?.gainUsd ?? costBasisGain;
     final totalGainPct = cashOutSummary?.gainPct ??
         (totalCost > 0 ? (costBasisGain / totalCost) * 100 : 0.0);
 
-    final sorted = [...positions]
-      ..sort((a, b) => b.currentValue.compareTo(a.currentValue));
+    final sorted = [...positions]..sort(
+        (firstPosition, secondPosition) =>
+            secondPosition.currentValue.compareTo(firstPosition.currentValue),
+      );
 
     final query = _filterText.toLowerCase();
     final filtered = query.isEmpty
         ? sorted
         : sorted
             .where(
-              (p) =>
-                  p.symbol.toLowerCase().contains(query) ||
-                  p.name.toLowerCase().contains(query),
+              (position) =>
+                  position.symbol.toLowerCase().contains(query) ||
+                  position.name.toLowerCase().contains(query),
             )
             .toList();
 
@@ -641,14 +698,14 @@ class PortfolioPageState extends State<PortfolioPage>
         ? touchedIndex
         : null;
 
-    final sections = List.generate(sorted.length, (i) {
-      final p = sorted[i];
-      final val = p.currentValue;
+    final sections = List.generate(sorted.length, (index) {
+      final position = sorted[index];
+      final val = position.currentValue;
       final pct = totalValue > 0 ? val / totalValue * 100 : 0.0;
-      final isTouched = i == selectedIndex;
+      final isTouched = index == selectedIndex;
       return PieChartSectionData(
         value: val,
-        color: colors[i],
+        color: colors[index],
         radius: isTouched ? 90 : 75,
         title: isTouched ? '${pct.toStringAsFixed(1)}%' : '',
         titleStyle: const TextStyle(
@@ -705,7 +762,8 @@ class PortfolioPageState extends State<PortfolioPage>
               child: _FilterRow(
                 controller: _filterController,
                 filterText: _filterText,
-                onChanged: (v) => setState(() => _filterText = v.trim()),
+                onChanged: (value) =>
+                    setState(() => _filterText = value.trim()),
                 onClear: () => setState(() {
                   _filterText = '';
                   _filterController.clear();
@@ -777,18 +835,18 @@ class PortfolioPageState extends State<PortfolioPage>
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverList.builder(
               itemCount: filtered.length,
-              itemBuilder: (context, i) {
-                final p = filtered[i];
-                final sortedIndex = sorted.indexOf(p);
-                final val = p.currentValue;
+              itemBuilder: (context, index) {
+                final position = filtered[index];
+                final sortedIndex = sorted.indexOf(position);
+                final val = position.currentValue;
                 final pct = totalValue > 0 ? val / totalValue * 100 : 0.0;
                 return _LegendTile(
-                  color: colors[sortedIndex >= 0 ? sortedIndex : i],
-                  symbol: p.symbol,
-                  name: p.name,
+                  color: colors[sortedIndex >= 0 ? sortedIndex : index],
+                  symbol: position.symbol,
+                  name: position.name,
                   value: val,
                   allocationPct: pct,
-                  changePct: p.change,
+                  changePct: position.change,
                   isHighlighted: sortedIndex == selectedIndex,
                   onTap: () => setState(
                     () => touchedIndex =
@@ -899,8 +957,10 @@ class PortfolioPageState extends State<PortfolioPage>
     final colorScheme = theme.colorScheme;
     final settings = context.watch<SettingsState>();
     final accounts = context.watch<AccountManager>();
-    final byReturn = [...positions]
-      ..sort((a, b) => b.change.compareTo(a.change));
+    final byReturn = [...positions]..sort(
+        (firstPosition, secondPosition) =>
+            secondPosition.change.compareTo(firstPosition.change),
+      );
     final accountValue = netLiquidation == null
         ? fmtCurrency(totalValue)
         : fmtNativeCurrency(
@@ -1224,8 +1284,8 @@ class PortfolioPageState extends State<PortfolioPage>
   List<Color> _buildColors(BuildContext context, int count) {
     final base = Theme.of(context).colorScheme.primary;
     final hsl = HSLColor.fromColor(base);
-    return List.generate(count, (i) {
-      final hue = (hsl.hue + i * (360 / count)) % 360;
+    return List.generate(count, (index) {
+      final hue = (hsl.hue + index * (360 / count)) % 360;
       return HSLColor.fromAHSL(
         1.0,
         hue,
@@ -1579,19 +1639,19 @@ class _SummaryCard extends StatelessWidget {
               },
               itemBuilder: (ctx) => [
                 ...settings.visibleCurrencies.map(
-                  (c) => CheckedPopupMenuItem(
-                    value: 'cur:$c',
-                    checked: c == settings.displayCurrency,
-                    child: Text(c),
+                  (currencyCode) => CheckedPopupMenuItem(
+                    value: 'cur:$currencyCode',
+                    checked: currencyCode == settings.displayCurrency,
+                    child: Text(currencyCode),
                   ),
                 ),
                 if (accounts.accounts.length > 1) ...[
                   const PopupMenuDivider(),
                   ...accounts.accounts.map(
-                    (a) => CheckedPopupMenuItem(
-                      value: 'acc:$a',
-                      checked: a == accounts.activeAccount,
-                      child: Text(a),
+                    (accountName) => CheckedPopupMenuItem(
+                      value: 'acc:$accountName',
+                      checked: accountName == accounts.activeAccount,
+                      child: Text(accountName),
                     ),
                   ),
                 ],

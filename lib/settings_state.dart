@@ -14,11 +14,11 @@ import 'package:market_monk/sqlite_settings.dart';
 
 const _defaultSeedColor = Color(0xFF2B7A78);
 
-int _colorToInt(Color c) =>
-    ((c.a * 255).round() << 24) |
-    ((c.r * 255).round() << 16) |
-    ((c.g * 255).round() << 8) |
-    (c.b * 255).round();
+int _colorToInt(Color color) =>
+    ((color.a * 255).round() << 24) |
+    ((color.r * 255).round() << 16) |
+    ((color.g * 255).round() << 8) |
+    (color.b * 255).round();
 
 /// Currencies supported by the Frankfurter API (ECB data).
 const supportedCurrencies = [

@@ -109,6 +109,9 @@ class IbkrError(RuntimeError):
     pass
 
 
+_PORTFOLIO_ANALYST_CACHE_SECONDS = 15 * 60 + 5
+
+
 class ClientPortalIbkrClient:
     def __init__(self, config: Config):
         self._config = config
@@ -118,6 +121,7 @@ class ClientPortalIbkrClient:
             context.verify_mode = ssl.CERT_NONE
         self._opener = build_opener(HTTPSHandler(context=context))
         self._performance_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+        self._transactions_cache: dict[int, tuple[float, dict[str, Any]]] = {}
 
     def ensure_account_visible(self) -> str:
         accounts = self._get("portfolio/accounts")
@@ -199,12 +203,35 @@ class ClientPortalIbkrClient:
     def performance(self, period: str) -> dict[str, Any]:
         cached = self._performance_cache.get(period)
         now = time.monotonic()
-        if cached is not None and now - cached[0] < 14 * 60:
+        if (
+            cached is not None
+            and now - cached[0] < _PORTFOLIO_ANALYST_CACHE_SECONDS
+        ):
             return cached[1]
         account = self.ensure_account_visible()
         raw = self._post("pa/performance", {"acctIds": [account], "period": period})
         result = _normalize_web_performance(raw, period, account)
         self._performance_cache[period] = (now, result)
+        return result
+
+    def transactions(self, days: int) -> dict[str, Any]:
+        cached = self._transactions_cache.get(days)
+        now = time.monotonic()
+        if (
+            cached is not None
+            and now - cached[0] < _PORTFOLIO_ANALYST_CACHE_SECONDS
+        ):
+            return cached[1]
+
+        account = self.ensure_account_visible()
+        raw = self._post(
+            "pa/transactions",
+            {"acctIds": [account], "currency": "USD", "days": days},
+        )
+        quoted_account = quote(account, safe="")
+        positions = self._get(f"portfolio2/{quoted_account}/positions")
+        result = _normalize_web_transactions(raw, positions, account, days)
+        self._transactions_cache[days] = (now, result)
         return result
 
     def _get(self, endpoint: str) -> Any:
@@ -269,7 +296,10 @@ class CommandPerformanceClient:
     def performance(self, period: str) -> dict[str, Any]:
         cached = self._performance_cache.get(period)
         now = time.monotonic()
-        if cached is not None and now - cached[0] < 14 * 60:
+        if (
+            cached is not None
+            and now - cached[0] < _PORTFOLIO_ANALYST_CACHE_SECONDS
+        ):
             return cached[1]
 
         command = [*self._config.performance_command, "--period", period]
@@ -413,6 +443,12 @@ class NativeIbkrClient:
     def performance(self, period: str) -> dict[str, Any]:
         return self._performance_client.performance(period)
 
+    def transactions(self, days: int) -> dict[str, Any]:
+        raise IbkrError(
+            "IBKR transaction history is not available from the native "
+            "portfolio connection"
+        )
+
     def _connect(self) -> Any:
         ib = self._ib_factory()
         try:
@@ -480,6 +516,20 @@ def make_handler(client: Any, token: str) -> type[BaseHTTPRequestHandler]:
                         self._json(400, {"error": "years must be between 1 and 10"})
                         return
                     self._json(200, client.historical(symbol, years))
+                elif parsed.path == "/v1/trades":
+                    query = parse_qs(parsed.query)
+                    try:
+                        days = int((query.get("days") or ["3650"])[0])
+                    except ValueError:
+                        self._json(400, {"error": "invalid days"})
+                        return
+                    if not 1 <= days <= 3650:
+                        self._json(
+                            400,
+                            {"error": "days must be between 1 and 3650"},
+                        )
+                        return
+                    self._json(200, client.transactions(days))
                 elif parsed.path == "/v1/performance":
                     query = parse_qs(parsed.query)
                     period = (query.get("period") or ["1M"])[0].strip().upper()
@@ -568,6 +618,104 @@ def _normalize_web_historical_bar(
         "low": _required_number(bar.get("l")),
         "close": _required_number(bar.get("c")),
         "volume": int(round((_number(bar.get("v")) or 0) * volume_factor)),
+    }
+
+
+def _normalize_transaction_date(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        raise IbkrError("IBKR transaction is missing its date")
+
+    for format_string in ("%Y-%m-%d", "%Y%m%d"):
+        try:
+            return datetime.strptime(text, format_string).date().isoformat()
+        except ValueError:
+            pass
+
+    parts = text.split()
+    if len(parts) >= 4:
+        try:
+            compact = f"{parts[1]} {parts[2]} {parts[-1]}"
+            return datetime.strptime(compact, "%b %d %Y").date().isoformat()
+        except ValueError:
+            pass
+    raise IbkrError(f"IBKR returned an invalid transaction date: {text}")
+
+
+def _normalize_web_transactions(
+    raw: Any,
+    positions: Any,
+    account: str,
+    days: int,
+) -> dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise IbkrError("IBKR returned invalid transaction history")
+    transactions = raw.get("transactions")
+    if not isinstance(transactions, list):
+        raise IbkrError("IBKR returned invalid transaction history")
+    if not isinstance(positions, list):
+        raise IbkrError("IBKR returned an invalid position list")
+
+    held_by_conid: dict[int, tuple[str, str]] = {}
+    for raw_position in positions:
+        if not isinstance(raw_position, dict):
+            continue
+        conid = _number(raw_position.get("conid"), integer=True)
+        symbol = _first_text(
+            raw_position,
+            "description",
+            "ticker",
+            "contractDesc",
+        )
+        if conid is None or conid <= 0 or not symbol:
+            continue
+        name = _first_text(raw_position, "name") or symbol
+        held_by_conid[int(conid)] = (symbol, name)
+
+    normalized: list[dict[str, Any]] = []
+    for transaction in transactions:
+        if not isinstance(transaction, dict):
+            continue
+        conid = _number(transaction.get("conid"), integer=True)
+        quantity = _number(transaction.get("qty"))
+        price = _number(transaction.get("pr"))
+        if (
+            conid is None
+            or int(conid) not in held_by_conid
+            or quantity is None
+            or quantity == 0
+            or price is None
+        ):
+            continue
+
+        transaction_type = _first_text(transaction, "type").lower()
+        if transaction_type not in {"buy", "sell"}:
+            continue
+
+        symbol, position_name = held_by_conid[int(conid)]
+        description = _first_text(transaction, "desc") or position_name
+        signed_quantity = abs(quantity) if transaction_type == "buy" else -abs(quantity)
+        normalized.append(
+            {
+                "symbol": symbol,
+                "name": description,
+                "currency": _first_text(transaction, "cur") or "USD",
+                "conid": int(conid),
+                "quantity": signed_quantity,
+                "price": price,
+                "trade_type": "open" if signed_quantity > 0 else "close",
+                "trade_date": _normalize_transaction_date(transaction.get("date")),
+            }
+        )
+
+    normalized.sort(key=lambda trade: trade["trade_date"], reverse=True)
+    return {
+        "read_only": True,
+        "source": "client_portal",
+        "account": _mask_account(account),
+        "days": days,
+        "includes_real_time": raw.get("includesRealTime") is True,
+        "trades": normalized,
     }
 
 

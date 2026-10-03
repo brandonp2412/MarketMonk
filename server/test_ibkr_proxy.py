@@ -95,6 +95,27 @@ class FakeClient:
             ],
         }
 
+    def transactions(self, days):
+        return {
+            "read_only": True,
+            "source": "client_portal",
+            "account": "****1234",
+            "days": days,
+            "includes_real_time": True,
+            "trades": [
+                {
+                    "symbol": "AAPL",
+                    "name": "Apple Inc",
+                    "currency": "USD",
+                    "conid": 265598,
+                    "quantity": 5,
+                    "price": 192.26,
+                    "trade_type": "open",
+                    "trade_date": "2023-12-11",
+                }
+            ],
+        }
+
     def performance(self, period):
         return {
             "read_only": True,
@@ -131,6 +152,7 @@ class RecordingIbkrClient(ClientPortalIbkrClient):
         self.endpoints = []
         self.posts = []
         self._performance_cache = {}
+        self._transactions_cache = {}
 
     def _get(self, endpoint):
         self.endpoints.append(endpoint)
@@ -173,6 +195,23 @@ class RecordingIbkrClient(ClientPortalIbkrClient):
 
     def _post(self, endpoint, body):
         self.posts.append((endpoint, body))
+        if endpoint == "pa/transactions":
+            return {
+                "includesRealTime": True,
+                "transactions": [
+                    {
+                        "date": "Mon Dec 11 00:00:00 EST 2023",
+                        "cur": "USD",
+                        "pr": 192.26,
+                        "qty": 5,
+                        "acctid": "U1234567",
+                        "amt": -961.3,
+                        "conid": 265598,
+                        "type": "Buy",
+                        "desc": "Apple Inc",
+                    }
+                ],
+            }
         return {
             "nav": {
                 "dates": ["20260818", "20260916"],
@@ -333,6 +372,29 @@ class ProxyTests(unittest.TestCase):
         self.assertTrue(
             any(endpoint.startswith("iserver/marketdata/history?") for endpoint in client.endpoints)
         )
+
+    def test_client_portal_returns_current_position_trade_history(self):
+        client = RecordingIbkrClient()
+
+        history = client.transactions(3650)
+
+        self.assertTrue(history["includes_real_time"])
+        self.assertEqual(history["trades"][0]["symbol"], "AAPL")
+        self.assertEqual(history["trades"][0]["name"], "Apple Inc")
+        self.assertEqual(history["trades"][0]["quantity"], 5)
+        self.assertEqual(history["trades"][0]["price"], 192.26)
+        self.assertEqual(history["trades"][0]["trade_date"], "2023-12-11")
+        expected_call = (
+            "pa/transactions",
+            {
+                "acctIds": ["U1234567"],
+                "currency": "USD",
+                "days": 3650,
+            },
+        )
+        self.assertIn(expected_call, client.posts)
+        client.transactions(3650)
+        self.assertEqual(client.posts.count(expected_call), 1)
 
     def test_client_portal_returns_broker_twr_and_nav_history(self):
         client = RecordingIbkrClient()
@@ -527,6 +589,16 @@ class ProxyTests(unittest.TestCase):
         historical_body = json.loads(historical.read())
         self.assertEqual(historical_body["symbol"], "AAPL")
         self.assertEqual(historical_body["candles"][0]["close"], 200)
+
+        connection.request(
+            "GET",
+            "/v1/trades?days=3650",
+            headers={"Authorization": f"Bearer {'x' * 32}"},
+        )
+        trades = connection.getresponse()
+        self.assertEqual(trades.status, 200)
+        trades_body = json.loads(trades.read())
+        self.assertEqual(trades_body["trades"][0]["symbol"], "AAPL")
 
         connection.request(
             "GET",

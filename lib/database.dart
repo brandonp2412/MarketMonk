@@ -14,7 +14,7 @@ part 'database.g.dart';
 @DriftDatabase(tables: [Candles, Trades, IbkrProfileSettings, IbkrCacheEntries])
 class Database extends _$Database {
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   // Multiple short-lived instances are opened intentionally for secondary
   // accounts and are always closed after use.
@@ -149,7 +149,7 @@ class Database extends _$Database {
           ).get();
           assert(
             wrongForeignKeys.isEmpty,
-            '${wrongForeignKeys.map((e) => e.data)}',
+            '${wrongForeignKeys.map((foreignKey) => foreignKey.data)}',
           );
         }
 
@@ -290,6 +290,20 @@ class Database extends _$Database {
     from10To11: (Migrator m, Schema11 schema) async {
       await m.createTable(schema.ibkrProfileSettings);
       await m.createTable(schema.ibkrCacheEntries);
+    },
+    from11To12: (Migrator migrator, Schema12 schema) async {
+      await migrator.database.customStatement(
+        'DELETE FROM candles WHERE id NOT IN ('
+        'SELECT MAX(id) FROM candles GROUP BY symbol, date'
+        ')',
+      );
+      await migrator.database.customStatement(
+        'DROP INDEX IF EXISTS idx_candles_symbol_date',
+      );
+      await migrator.database.customStatement(
+        'CREATE UNIQUE INDEX idx_candles_symbol_date '
+        'ON candles (symbol, date)',
+      );
     },
   );
 }

@@ -26,10 +26,10 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
   void initState() {
     super.initState();
     _tradesStream = (db.trades.select()
-          ..where((t) => t.symbol.equals(widget.summary.symbol))
+          ..where((trade) => trade.symbol.equals(widget.summary.symbol))
           ..orderBy([
-            (t) => OrderingTerm(
-                  expression: t.tradeDate,
+            (trade) => OrderingTerm(
+                  expression: trade.tradeDate,
                   mode: OrderingMode.desc,
                 ),
           ]))
@@ -45,10 +45,11 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
     final ibkrManaged = context.watch<AccountManager>().ibkrConfigFor().enabled;
 
     return StreamBuilder<List<Trade>>(
-      stream: _tradesStream,
+      stream: ibkrManaged ? Stream.value(widget.summary.trades) : _tradesStream,
       builder: (context, snap) {
         final trades = snap.data ?? widget.summary.trades;
-        final totalRealized = trades.fold(0.0, (sum, t) => sum + t.realizedPL);
+        final totalRealized =
+            trades.fold(0.0, (sum, trade) => sum + trade.realizedPL);
         final symbol = widget.summary.symbol;
         final nativeCurr = symbolCurrency(symbol);
         final centDiv = symbolCentDivisor(symbol);
@@ -135,7 +136,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                                 ? Colors.green
                                 : Colors.redAccent,
                           ),
-                        if (trades.any((t) => t.realizedPL != 0)) ...[
+                        if (trades.any((trade) => trade.realizedPL != 0)) ...[
                           _SummaryRow(
                             label: context.l10n.text('Imported realized P/L'),
                             value:
@@ -167,11 +168,11 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                   ),
                   const SizedBox(height: 8),
                   ...trades.map(
-                    (t) => _TradeTile(
-                      trade: t,
+                    (trade) => _TradeTile(
+                      trade: trade,
                       centDiv: centDiv,
                       onLongPress:
-                          ibkrManaged ? null : () => _showTradeActions(t),
+                          ibkrManaged ? null : () => _showTradeActions(trade),
                     ),
                   ),
                 ] else
@@ -182,7 +183,9 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                       title: context.l10n.text('No trade history yet'),
                       message: ibkrManaged
                           ? context.l10n.text(
-                              'No completed trades were returned by Interactive Brokers.',
+                              widget.summary.brokerTradeHistoryAvailable
+                                  ? 'No completed IBKR trades were found in the available transaction history.'
+                                  : 'This IBKR connection provides live positions but does not currently provide transaction history.',
                             )
                           : context.l10n.text(
                               'Add a trade to start building this ticker’s history.',
@@ -267,7 +270,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
       ),
     );
     if (confirmed != true) return;
-    await (db.trades.delete()..where((t) => t.id.equals(trade.id))).go();
+    await (db.trades.delete()..where((row) => row.id.equals(trade.id))).go();
   }
 }
 
@@ -414,7 +417,7 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
     final realizedPL = double.tryParse(_realizedPL.text) ?? 0.0;
     if (qty == null || qty <= 0 || price == null || price <= 0) return;
 
-    await (db.trades.update()..where((t) => t.id.equals(widget.trade.id)))
+    await (db.trades.update()..where((row) => row.id.equals(widget.trade.id)))
         .write(
       TradesCompanion(
         quantity: Value(_isBuy ? qty : -qty),
@@ -450,7 +453,8 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
                 ),
               ],
               selected: {_isBuy},
-              onSelectionChanged: (s) => setState(() => _isBuy = s.first),
+              onSelectionChanged: (selection) =>
+                  setState(() => _isBuy = selection.first),
             ),
             const SizedBox(height: 16),
             TextField(

@@ -37,12 +37,14 @@ class _LoadedChartPortfolio {
 }
 
 class ChartsPage extends StatefulWidget {
+  final bool isActive;
   final Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? _ibkrLoader;
   final Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
       _ibkrPerformanceLoader;
 
   const ChartsPage({
     super.key,
+    this.isActive = true,
     Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? ibkrLoader,
     Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
         ibkrPerformanceLoader,
@@ -109,31 +111,45 @@ class ChartsPageState extends State<ChartsPage>
     WidgetsBinding.instance.addPostFrameCallback((_) => _measureOverlay());
   }
 
+  @override
+  void didUpdateWidget(covariant ChartsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.isActive && widget.isActive && _chartPeriodLoaded) {
+      final accountManager = context.read<AccountManager>();
+      _hydratePortfolioSeriesFromCache(accountManager);
+      unawaited(_syncCandlesInBackground(refreshPerformance: true));
+    }
+  }
+
   void _setColors() {}
 
   void _measureOverlay() {
     final box = _overlayKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null || !mounted) return;
-    final h = box.size.height;
-    if (h != _overlayHeight) setState(() => _overlayHeight = h);
+    final measuredHeight = box.size.height;
+    if (measuredHeight != _overlayHeight) {
+      setState(() => _overlayHeight = measuredHeight);
+    }
   }
 
   Future<void> _loadPeriodThenPortfolios() async {
     final prefs = await SqliteSettings.getInstance();
-    final y = prefs.getInt('chartPeriodYears') ?? 1;
-    final m = prefs.getInt('chartPeriodMonths') ?? 0;
-    final d = prefs.getInt('chartPeriodDays') ?? 0;
-    if (mounted) {
-      setState(() {
-        years = y;
-        months = m;
-        days = d;
-        _chartPeriodLoaded = true;
-      });
-      final accountManager = context.read<AccountManager>();
-      _hydratePortfolioSeriesFromCache(accountManager);
-      unawaited(_loadAllPortfolios(refreshIbkrPerformance: true));
-      unawaited(_syncCandlesInBackground(refreshIbkr: true));
+    final periodYears = prefs.getInt('chartPeriodYears') ?? 1;
+    final periodMonths = prefs.getInt('chartPeriodMonths') ?? 0;
+    final periodDays = prefs.getInt('chartPeriodDays') ?? 0;
+    if (!mounted) return;
+
+    setState(() {
+      years = periodYears;
+      months = periodMonths;
+      days = periodDays;
+      _chartPeriodLoaded = true;
+    });
+
+    final accountManager = context.read<AccountManager>();
+    _hydratePortfolioSeriesFromCache(accountManager);
+    if (widget.isActive) {
+      unawaited(_syncCandlesInBackground(refreshPerformance: true));
     }
   }
 
@@ -243,7 +259,7 @@ class ChartsPageState extends State<ChartsPage>
         throw StateError('IBKR portfolio source is not fully configured');
       }
 
-      final loadKey = '$accountName|\${ibkrConfig.hashCode}';
+      final loadKey = '$accountName|${ibkrConfig.hashCode}';
       return _ibkrLoads.putIfAbsent(loadKey, () async {
         try {
           final snapshot = await (widget._ibkrLoader?.call(ibkrConfig) ??
@@ -281,61 +297,76 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   Future<void> _syncCandlesInBackground({
-    bool refreshIbkr = false,
-    bool forceIbkrRefresh = false,
+    bool refreshPerformance = false,
+    bool forcePerformanceRefresh = false,
   }) async {
-    if (!mounted) return;
+    if (!mounted || !widget.isActive) return;
+
     final accountManager = context.read<AccountManager>();
-    try {
-      for (final accountName in accountManager.accounts) {
-        final isActive = accountName == accountManager.activeAccount;
-        final accountDb = isActive
-            ? db
-            : (accountName == 'Default'
-                ? Database()
-                : Database('market-monk-$accountName'));
-        try {
-          final ibkrConfig = accountManager.ibkrConfigFor(accountName);
-          final loaded = await _portfolioForAccount(
-            accountName,
-            accountDb,
-            ibkrConfig,
-            accountManager,
-            refreshIbkr: refreshIbkr,
-            forceIbkrRefresh: forceIbkrRefresh,
+    for (final accountName in accountManager.accounts) {
+      final ibkrConfig = accountManager.ibkrConfigFor(accountName);
+      if (ibkrConfig.enabled) continue;
+      await _syncLocalAccountCandles(accountName, ibkrConfig);
+    }
+
+    if (!mounted || !widget.isActive) return;
+    await _loadAllPortfolios(
+      refreshIbkrPerformance: refreshPerformance,
+      forceIbkrPerformanceRefresh: forcePerformanceRefresh,
+      refreshIbkrPortfolio: refreshPerformance,
+      forceIbkrPortfolioRefresh: forcePerformanceRefresh,
+    );
+  }
+
+  Future<void> _syncLocalAccountCandles(
+    String accountName,
+    IbkrAccountConfig ibkrConfig,
+  ) async {
+    final accountManager = context.read<AccountManager>();
+    final isActiveAccount = accountName == accountManager.activeAccount;
+    final accountDatabase = isActiveAccount
+        ? db
+        : Database(
+            accountName == 'Default'
+                ? 'market-monk'
+                : 'market-monk-$accountName',
           );
-          final trades = await accountDb.trades.select().get();
-          final symbols = {
-            ...loaded.positions.map((position) => position.symbol),
-            ...trades.map((trade) => trade.symbol),
-          };
-          for (final symbol in symbols) {
-            await syncCandles(
-              symbol,
-              database: accountDb,
-              ibkrConfig: ibkrConfig,
-              syncNamespace: accountName,
-            );
-          }
-        } finally {
-          if (!isActive) await accountDb.close();
-        }
+
+    try {
+      final trades = await accountDatabase.trades.select().get();
+      final symbols = trades.map((trade) => trade.symbol).toSet();
+      for (final symbol in symbols) {
+        await syncCandles(
+          symbol,
+          database: accountDatabase,
+          ibkrConfig: ibkrConfig,
+          syncNamespace: accountName,
+        );
       }
-    } catch (_) {}
-    if (mounted) {
-      _loadAllPortfolios(
-        refreshIbkrPerformance: refreshIbkr,
-        forceIbkrPerformanceRefresh: forceIbkrRefresh,
+    } catch (error, stackTrace) {
+      talker.handle(
+        error,
+        stackTrace,
+        'Background candle sync failed for $accountName',
       );
+    } finally {
+      if (!isActiveAccount) await accountDatabase.close();
     }
   }
 
   void _handleAccountManagerChanged() {
     final accountManager = _accountManager;
-    if (!mounted || accountManager == null || !_chartPeriodLoaded) return;
+    if (!mounted ||
+        !widget.isActive ||
+        accountManager == null ||
+        !_chartPeriodLoaded) {
+      return;
+    }
 
-    final accountsKey =
-        '${accountManager.activeAccount}|${accountManager.accounts.join(',')}';
+    final accountsKey = [
+      accountManager.activeAccount,
+      accountManager.accounts.join(','),
+    ].join('|');
     final ibkrRefreshVersion = accountManager.ibkrRefreshVersion;
     final accountsChanged = accountsKey != _lastAccountsKey;
     final ibkrChanged = ibkrRefreshVersion != _lastIbkrRefreshVersion;
@@ -343,19 +374,12 @@ class ChartsPageState extends State<ChartsPage>
 
     _lastAccountsKey = accountsKey;
     _lastIbkrRefreshVersion = ibkrRefreshVersion;
-    if (accountsChanged || ibkrChanged) {
-      if (ibkrChanged) clearAllSyncCache();
-      unawaited(
-        _syncCandlesInBackground(
-          refreshIbkr: true,
-          forceIbkrRefresh: ibkrChanged,
-        ),
-      );
-    }
+    if (ibkrChanged) clearAllSyncCache();
+
     unawaited(
-      _loadAllPortfolios(
-        refreshIbkrPerformance: true,
-        forceIbkrPerformanceRefresh: ibkrChanged,
+      _syncCandlesInBackground(
+        refreshPerformance: true,
+        forcePerformanceRefresh: ibkrChanged,
       ),
     );
     if (_selectedSymbol != null) _setStockStream(_selectedSymbol!);
@@ -367,7 +391,7 @@ class ChartsPageState extends State<ChartsPage>
     final version = context.watch<SettingsState>().tradesVersion;
     if (version != _lastTradesVersion) {
       _lastTradesVersion = version;
-      if (version > 0) unawaited(_loadAllPortfolios());
+      if (version > 0 && widget.isActive) unawaited(_loadAllPortfolios());
     }
 
     final accountManager = context.read<AccountManager>();
@@ -396,14 +420,10 @@ class ChartsPageState extends State<ChartsPage>
   Future<void> _refreshAllPortfolioCandles() async {
     final accountManager = context.read<AccountManager>();
 
-    final tasks = <({
-      Database db,
-      bool isActive,
-      String accountName,
-      IbkrAccountConfig ibkrConfig,
-      List<String> symbols,
-    })>[];
     for (final accountName in accountManager.accounts) {
+      final ibkrConfig = accountManager.ibkrConfigFor(accountName);
+      if (ibkrConfig.enabled) continue;
+
       final isActive = accountName == accountManager.activeAccount;
       final accountDb = isActive
           ? db
@@ -411,45 +431,23 @@ class ChartsPageState extends State<ChartsPage>
               ? Database()
               : Database('market-monk-$accountName'));
       try {
-        final ibkrConfig = accountManager.ibkrConfigFor(accountName);
-        final loaded = await _portfolioForAccount(
-          accountName,
-          accountDb,
-          ibkrConfig,
-          accountManager,
-          refreshIbkr: true,
-          forceIbkrRefresh: true,
-        );
         final trades = await accountDb.trades.select().get();
-        final task = (
-          db: accountDb,
-          isActive: isActive,
-          accountName: accountName,
-          ibkrConfig: ibkrConfig,
-          symbols: {
-            ...loaded.positions.map((position) => position.symbol),
-            ...trades.map((trade) => trade.symbol),
-          }.toList(),
-        );
-        tasks.add(task);
-      } catch (_) {
-        if (!isActive) await accountDb.close();
-      }
-    }
-
-    for (final task in tasks) {
-      try {
-        for (final symbol in task.symbols) {
+        for (final symbol in trades.map((trade) => trade.symbol).toSet()) {
           await syncCandles(
             symbol,
-            database: task.db,
-            ibkrConfig: task.ibkrConfig,
-            syncNamespace: task.accountName,
+            database: accountDb,
+            ibkrConfig: ibkrConfig,
+            syncNamespace: accountName,
           );
         }
-      } catch (_) {
+      } catch (error, stackTrace) {
+        talker.handle(
+          error,
+          stackTrace,
+          'Portfolio candle refresh failed for $accountName',
+        );
       } finally {
-        if (!task.isActive) await task.db.close();
+        if (!isActive) await accountDb.close();
       }
     }
   }
@@ -476,10 +474,13 @@ class ChartsPageState extends State<ChartsPage>
         );
         if (mounted) _setStockStream(_selectedSymbol!);
       } else {
+        clearAllSyncCache();
         await _refreshAllPortfolioCandles();
         await _loadAllPortfolios(
           refreshIbkrPerformance: true,
           forceIbkrPerformanceRefresh: true,
+          refreshIbkrPortfolio: true,
+          forceIbkrPortfolioRefresh: true,
         );
       }
     } catch (error, stackTrace) {
@@ -502,20 +503,29 @@ class ChartsPageState extends State<ChartsPage>
       if (legacy != null) await prefs.remove('favoriteStock');
     }
     if (mounted) setState(() => _favoriteStocks = favorites!);
-    unawaited(_syncFavoriteCandles());
+    if (widget.isActive) unawaited(_syncFavoriteCandles());
   }
 
   Future<void> _syncFavoriteCandles() async {
-    final accountManager = context.read<AccountManager>();
-    final ibkrConfig = accountManager.ibkrConfigFor();
     for (final symbol in _favoriteStocks) {
-      try {
-        await syncCandles(
-          symbol,
-          ibkrConfig: ibkrConfig,
-          syncNamespace: accountManager.activeAccount,
-        );
-      } catch (_) {}
+      await _syncFavoriteCandle(symbol);
+    }
+  }
+
+  Future<void> _syncFavoriteCandle(String symbol) async {
+    try {
+      final accountManager = context.read<AccountManager>();
+      await syncCandles(
+        symbol,
+        ibkrConfig: accountManager.ibkrConfigFor(),
+        syncNamespace: accountManager.activeAccount,
+      );
+    } catch (error, stackTrace) {
+      talker.handle(
+        error,
+        stackTrace,
+        'Favorite ticker candle sync failed',
+      );
     }
   }
 
@@ -537,14 +547,7 @@ class ChartsPageState extends State<ChartsPage>
       toast(ctx, ctx.l10n.text('Removed as favorite'));
       return;
     }
-    final accountManager = ctx.read<AccountManager>();
-    unawaited(
-      syncCandles(
-        symbol,
-        ibkrConfig: accountManager.ibkrConfigFor(),
-        syncNamespace: accountManager.activeAccount,
-      ),
-    );
+    unawaited(_syncFavoriteCandle(symbol));
     toast(ctx, ctx.l10n.text('Set as favorite'));
   }
 
@@ -571,7 +574,7 @@ class ChartsPageState extends State<ChartsPage>
       throw StateError('IBKR performance source is not fully configured');
     }
 
-    final loadKey = '$accountName|$period|\${config.hashCode}';
+    final loadKey = '$accountName|$period|${config.hashCode}';
     return _ibkrPerformanceLoads.putIfAbsent(loadKey, () async {
       try {
         final performance =
@@ -585,9 +588,44 @@ class ChartsPageState extends State<ChartsPage>
     });
   }
 
+  Future<
+      ({
+        List<_DateValue> series,
+        double twrPercent,
+        double returnAmount,
+      })?> _loadBrokerPerformanceSeries(
+    String accountName,
+    IbkrAccountConfig ibkrConfig,
+    AccountManager accountManager,
+    _LoadedChartPortfolio loaded, {
+    required bool refreshIfStale,
+    required bool forceRefresh,
+  }) async {
+    try {
+      final performance = await _performanceForAccount(
+        accountName,
+        ibkrConfig,
+        accountManager,
+        '1Y',
+        refreshIfStale: refreshIfStale,
+        forceRefresh: forceRefresh,
+      );
+      final brokerSeries = _buildBrokerPerformanceSeries(performance, loaded);
+      return brokerSeries.series.isEmpty ? null : brokerSeries;
+    } catch (error) {
+      talker.warning(
+        'IBKR performance history unavailable; '
+        'showing current broker value only: $error',
+      );
+      return null;
+    }
+  }
+
   Future<void> _loadAllPortfolios({
     bool refreshIbkrPerformance = false,
     bool forceIbkrPerformanceRefresh = false,
+    bool refreshIbkrPortfolio = false,
+    bool forceIbkrPortfolioRefresh = false,
   }) async {
     if (!mounted || !_chartPeriodLoaded) return;
     final generation = ++_portfolioLoadGeneration;
@@ -618,31 +656,23 @@ class ChartsPageState extends State<ChartsPage>
           accountDb,
           ibkrConfig,
           accountManager,
+          refreshIbkr: refreshIbkrPortfolio,
+          forceIbkrRefresh: forceIbkrPortfolioRefresh,
         );
         if (ibkrConfig.isConfigured && years <= 1) {
-          try {
-            final performance = await _performanceForAccount(
-              accountName,
-              ibkrConfig,
-              accountManager,
-              '1Y',
-              refreshIfStale: refreshIbkrPerformance,
-              forceRefresh: forceIbkrPerformanceRefresh,
-            );
-            final brokerSeries = _buildBrokerPerformanceSeries(
-              performance,
-              loaded,
-            );
-            if (brokerSeries.series.isNotEmpty) {
-              newSeries[accountName] = brokerSeries.series;
-              newReturns[accountName] = brokerSeries.twrPercent;
-              newReturnAmounts[accountName] = brokerSeries.returnAmount;
-              continue;
-            }
-          } catch (error) {
-            talker.warning(
-              'IBKR performance history unavailable; showing current broker value only: $error',
-            );
+          final brokerSeries = await _loadBrokerPerformanceSeries(
+            accountName,
+            ibkrConfig,
+            accountManager,
+            loaded,
+            refreshIfStale: refreshIbkrPerformance,
+            forceRefresh: forceIbkrPerformanceRefresh,
+          );
+          if (brokerSeries != null) {
+            newSeries[accountName] = brokerSeries.series;
+            newReturns[accountName] = brokerSeries.twrPercent;
+            newReturnAmounts[accountName] = brokerSeries.returnAmount;
+            continue;
           }
         }
         if (ibkrConfig.enabled) {
@@ -666,9 +696,9 @@ class ChartsPageState extends State<ChartsPage>
           accountDb,
         );
         newSeries[accountName] = fallback.series;
-      } catch (e) {
+      } catch (error) {
         newSeries[accountName] = [];
-        firstError ??= e.toString();
+        firstError ??= error.toString();
       } finally {
         if (!isActive) await accountDb.close();
       }
@@ -725,18 +755,21 @@ class ChartsPageState extends State<ChartsPage>
     for (final symbol in symbols) {
       final rows = await (accountDb.candles.select()
             ..where(
-              (c) => c.symbol.equals(symbol) & c.date.isBiggerThanValue(after),
+              (candle) =>
+                  candle.symbol.equals(symbol) &
+                  candle.date.isBiggerThanValue(after),
             )
             ..orderBy([
-              (c) => OrderingTerm(expression: c.date, mode: OrderingMode.asc),
+              (candle) =>
+                  OrderingTerm(expression: candle.date, mode: OrderingMode.asc),
             ]))
           .get();
       final centDiv = symbolCentDivisor(symbol);
       final nativeRate = allRatesFromUsd[symbolCurrency(symbol)] ?? 1.0;
       pricesBySymbol[symbol] = {
-        for (final c in rows)
-          DateTime(c.date.year, c.date.month, c.date.day):
-              c.close / centDiv / nativeRate,
+        for (final candle in rows)
+          DateTime(candle.date.year, candle.date.month, candle.date.day):
+              candle.close / centDiv / nativeRate,
       };
     }
 
@@ -796,9 +829,12 @@ class ChartsPageState extends State<ChartsPage>
     }
 
     var series = valueByDate.entries
-        .map((e) => _DateValue(e.key, e.value))
+        .map((entry) => _DateValue(entry.key, entry.value))
         .toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
+      ..sort(
+        (firstPoint, secondPoint) =>
+            firstPoint.date.compareTo(secondPoint.date),
+      );
 
     if (days > 0 && series.length > days) {
       series = series.sublist(series.length - days);
@@ -811,7 +847,11 @@ class ChartsPageState extends State<ChartsPage>
           byWeek[key] = dv;
         }
       }
-      series = byWeek.values.toList()..sort((a, b) => a.date.compareTo(b.date));
+      series = byWeek.values.toList()
+        ..sort(
+          (firstPoint, secondPoint) =>
+              firstPoint.date.compareTo(secondPoint.date),
+        );
     }
 
     return (series: series, currentHoldingsReplay: currentHoldingsReplay);
@@ -828,14 +868,23 @@ class ChartsPageState extends State<ChartsPage>
 
     var basePerUsd = allRatesFromUsd[performance.currency] ?? 1.0;
     final currentValue = loaded.currentValue;
-    final currentValueUsd = loaded.currentValueUsd;
+    final exactCurrentValueUsd = loaded.currentValueUsd;
     if (currentValue != null &&
-        currentValueUsd != null &&
-        currentValueUsd > 0 &&
+        exactCurrentValueUsd != null &&
+        exactCurrentValueUsd > 0 &&
         currentValue.currency == performance.currency) {
-      basePerUsd = currentValue.value / currentValueUsd;
+      basePerUsd = currentValue.value / exactCurrentValueUsd;
     }
     if (!basePerUsd.isFinite || basePerUsd <= 0) basePerUsd = 1.0;
+
+    final currentValueUsd = exactCurrentValueUsd ??
+        (currentValue == null
+            ? null
+            : currentValue.currency == 'USD'
+                ? currentValue.value
+                : currentValue.currency == performance.currency
+                    ? currentValue.value / basePerUsd
+                    : null);
 
     final points = <_DateValue>[];
     final fundedFirstNav = performance.nav.first != 0;
@@ -854,7 +903,9 @@ class ChartsPageState extends State<ChartsPage>
         ),
       );
     }
-    points.sort((a, b) => a.date.compareTo(b.date));
+    points.sort(
+      (firstPoint, secondPoint) => firstPoint.date.compareTo(secondPoint.date),
+    );
     if (points.isEmpty) {
       return (series: const [], twrPercent: 0, returnAmount: 0);
     }
@@ -1046,11 +1097,15 @@ class ChartsPageState extends State<ChartsPage>
     setState(() {});
   }
 
-  void _onPeriodSelected({int y = 0, int m = 0, int d = 0}) {
+  void _onPeriodSelected({
+    int selectedYears = 0,
+    int selectedMonths = 0,
+    int selectedDays = 0,
+  }) {
     setState(() {
-      years = y;
-      months = m;
-      days = d;
+      years = selectedYears;
+      months = selectedMonths;
+      days = selectedDays;
     });
     _savePeriod();
     if (_mode == _ChartMode.stock && _selectedSymbol != null) {
@@ -1231,22 +1286,23 @@ class ChartsPageState extends State<ChartsPage>
         itemCount: _searchLoading || _searchResults.isEmpty
             ? 1
             : _searchResults.length + 1,
-        itemBuilder: (context, i) {
+        itemBuilder: (context, index) {
           if (_searchLoading ||
               _searchResults.isEmpty ||
-              i == _searchResults.length) {
+              index == _searchResults.length) {
             return useAnywayTile;
           }
-          final r = _searchResults[i];
-          final name = r.longname.isNotEmpty ? r.longname : r.shortname;
+          final result = _searchResults[index];
+          final name =
+              result.longname.isNotEmpty ? result.longname : result.shortname;
           return ListTile(
-            title: Text(r.symbol),
+            title: Text(result.symbol),
             subtitle: Text(name),
             trailing: Text(
-              r.exchange,
+              result.exchange,
               style: Theme.of(context).textTheme.bodySmall,
             ),
-            onTap: () => _selectStock(r),
+            onTap: () => _selectStock(result),
           );
         },
       ),
@@ -1350,13 +1406,20 @@ class ChartsPageState extends State<ChartsPage>
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Row(
           children: [
-            for (final (label, y, m, d) in options)
+            for (final (label, optionYears, optionMonths, optionDays)
+                in options)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 3),
                 child: _PeriodChip(
                   label: label,
-                  selected: y == years && m == months && d == days,
-                  onTap: () => _onPeriodSelected(y: y, m: m, d: d),
+                  selected: optionYears == years &&
+                      optionMonths == months &&
+                      optionDays == days,
+                  onTap: () => _onPeriodSelected(
+                    selectedYears: optionYears,
+                    selectedMonths: optionMonths,
+                    selectedDays: optionDays,
+                  ),
                 ),
               ),
           ],
@@ -1400,14 +1463,17 @@ class ChartsPageState extends State<ChartsPage>
 
     final candles = snapshot.data!.map((tc) => tc.candle).toList();
     final spots = <FlSpot>[
-      for (var i = 0; i < candles.length; i++)
-        FlSpot(i.toDouble(), candles[i].close.value / _centDivisor),
+      for (var index = 0; index < candles.length; index++)
+        FlSpot(
+          index.toDouble(),
+          candles[index].close.value / _centDivisor,
+        ),
     ];
 
     return SizedBox(
       height: height,
       child: TickerLine(
-        dates: candles.map((c) => c.date.value),
+        dates: candles.map((candle) => candle.date.value),
         spots: spots,
         nativeCurrency: _nativeCurrency,
       ),
@@ -1580,7 +1646,8 @@ class ChartsPageState extends State<ChartsPage>
     };
 
     if (visibleSeries.isEmpty) {
-      final allEmpty = _portfolioSeriesByAccount.values.every((s) => s.isEmpty);
+      final allEmpty =
+          _portfolioSeriesByAccount.values.every((series) => series.isEmpty);
       return SizedBox(
         height: height,
         child: AppEmptyState(
@@ -1620,7 +1687,8 @@ class ChartsPageState extends State<ChartsPage>
     }
     final sortedDates = allDates.toList()..sort();
     final dateIndex = <DateTime, int>{
-      for (var i = 0; i < sortedDates.length; i++) sortedDates[i]: i,
+      for (var index = 0; index < sortedDates.length; index++)
+        sortedDates[index]: index,
     };
 
     final singleLine = visibleSeries.length == 1;
@@ -1635,8 +1703,11 @@ class ChartsPageState extends State<ChartsPage>
             )
           : entry.value.map((point) => point.value).toList(growable: false);
       final spots = [
-        for (var i = 0; i < entry.value.length; i++)
-          FlSpot(dateIndex[entry.value[i].date]!.toDouble(), displayValues[i]),
+        for (var index = 0; index < entry.value.length; index++)
+          FlSpot(
+            dateIndex[entry.value[index].date]!.toDouble(),
+            displayValues[index],
+          ),
       ];
       lineBarsData.add(
         LineChartBarData(
@@ -1705,22 +1776,27 @@ class ChartsPageState extends State<ChartsPage>
                   reservedSize: 27,
                   interval: 1,
                   getTitlesWidget: (value, meta) {
-                    final i = value.toInt();
-                    if (i < 0 || i >= sortedDates.length) {
+                    final dateIndexValue = value.toInt();
+                    if (dateIndexValue < 0 ||
+                        dateIndexValue >= sortedDates.length) {
                       return const SizedBox();
                     }
                     final screenWidth = MediaQuery.of(context).size.width;
                     final labelCount = (screenWidth / 120).floor();
-                    final indices = List.generate(labelCount, (n) {
-                      return ((sortedDates.length - 1) * n / (labelCount - 1))
+                    final indices = List.generate(labelCount, (labelIndex) {
+                      return ((sortedDates.length - 1) *
+                              labelIndex /
+                              (labelCount - 1))
                           .round();
                     });
-                    if (!indices.contains(i)) return const SizedBox();
+                    if (!indices.contains(dateIndexValue)) {
+                      return const SizedBox();
+                    }
                     return SideTitleWidget(
                       meta: meta,
                       fitInside: SideTitleFitInsideData.fromTitleMeta(meta),
                       child: Text(
-                        formatter.format(sortedDates[i]),
+                        formatter.format(sortedDates[dateIndexValue]),
                         style: const TextStyle(fontSize: 12),
                       ),
                     );
@@ -1740,10 +1816,11 @@ class ChartsPageState extends State<ChartsPage>
                 ).colorScheme.surface.withValues(alpha: 0.9),
                 getTooltipItems: (touchedSpots) {
                   return touchedSpots.map((spot) {
-                    final i = spot.x.toInt();
-                    final date = (i >= 0 && i < sortedDates.length)
-                        ? formatter.format(sortedDates[i])
-                        : '';
+                    final touchedIndex = spot.x.toInt();
+                    final date =
+                        (touchedIndex >= 0 && touchedIndex < sortedDates.length)
+                            ? formatter.format(sortedDates[touchedIndex])
+                            : '';
                     final accountName = spot.barIndex < visibleKeys.length
                         ? visibleKeys[spot.barIndex]
                         : '';
@@ -1753,10 +1830,11 @@ class ChartsPageState extends State<ChartsPage>
                       accountColors.length - 1,
                     )];
                     double? actualValue;
-                    if (i >= 0 && i < sortedDates.length) {
+                    if (touchedIndex >= 0 &&
+                        touchedIndex < sortedDates.length) {
                       for (final point in visibleSeries[accountName] ??
                           const <_DateValue>[]) {
-                        if (point.date == sortedDates[i]) {
+                        if (point.date == sortedDates[touchedIndex]) {
                           actualValue = point.value;
                           break;
                         }
@@ -1818,7 +1896,12 @@ class ChartsPageState extends State<ChartsPage>
                 isDense: true,
                 underline: const SizedBox(),
                 items: settings.visibleCurrencies
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                    .map(
+                      (currencyCode) => DropdownMenuItem(
+                        value: currencyCode,
+                        child: Text(currencyCode),
+                      ),
+                    )
                     .toList(),
                 onChanged: (value) {
                   if (value != null) settings.setDisplayCurrency(value);
@@ -1925,18 +2008,25 @@ class ChartsPageState extends State<ChartsPage>
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Expanded(child: accountLabel()),
+                        Flexible(child: accountLabel()),
                         const SizedBox(width: 12),
-                        Flexible(child: valueText),
+                        Flexible(
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: valueText,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 2),
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Flexible(child: returnLabel()),
                         const SizedBox(width: 12),
-                        Expanded(
+                        Flexible(
                           child: Align(
                             alignment: Alignment.centerRight,
                             child: changeText,
@@ -1948,22 +2038,26 @@ class ChartsPageState extends State<ChartsPage>
                 );
               }
 
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(child: accountLabel()),
-                      returnLabel(),
-                      const SizedBox(width: 12),
-                      valueText,
-                    ],
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
+                  Expanded(
                     child: Align(
-                      alignment: Alignment.centerRight,
-                      child: changeText,
+                      alignment: Alignment.centerLeft,
+                      child: accountLabel(),
+                    ),
+                  ),
+                  Expanded(
+                    child: Center(child: returnLabel()),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        valueText,
+                        const SizedBox(height: 2),
+                        changeText,
+                      ],
                     ),
                   ),
                 ],
@@ -2111,9 +2205,12 @@ class _FavoriteCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final stream = (db.candles.select()
-          ..where((c) => c.symbol.equals(symbol))
+          ..where((candle) => candle.symbol.equals(symbol))
           ..orderBy([
-            (c) => OrderingTerm(expression: c.date, mode: OrderingMode.desc),
+            (candle) => OrderingTerm(
+                  expression: candle.date,
+                  mode: OrderingMode.desc,
+                ),
           ])
           ..limit(2))
         .watch();

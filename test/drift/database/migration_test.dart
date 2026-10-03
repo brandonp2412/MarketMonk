@@ -13,6 +13,7 @@ import 'generated/schema_v8.dart' as v8;
 import 'generated/schema_v9.dart' as v9;
 import 'generated/schema_v10.dart' as v10;
 import 'generated/schema_v11.dart' as v11;
+import 'generated/schema_v12.dart' as v12;
 
 void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
@@ -51,5 +52,51 @@ void main() {
     );
 
     await database.close();
+  });
+
+  test('v11 deduplicates candles and enforces one row per symbol/date',
+      () async {
+    final verifier = SchemaVerifier(GeneratedHelper());
+    final duplicateDate = DateTime.utc(2026, 10, 1);
+
+    await verifier.testWithDataIntegrity(
+      oldVersion: 11,
+      newVersion: 12,
+      createOld: v11.DatabaseAtV11.new,
+      createNew: v12.DatabaseAtV12.new,
+      openTestedDatabase: Database.connect,
+      createItems: (batch, oldDatabase) {
+        batch.insertAll(oldDatabase.candles, [
+          v11.CandlesData(
+            id: 1,
+            symbol: 'VTI',
+            date: duplicateDate.millisecondsSinceEpoch ~/ 1000,
+            open: 100,
+            high: 101,
+            low: 99,
+            close: 100,
+            volume: 10,
+            adjClose: 100,
+          ),
+          v11.CandlesData(
+            id: 2,
+            symbol: 'VTI',
+            date: duplicateDate.millisecondsSinceEpoch ~/ 1000,
+            open: 110,
+            high: 111,
+            low: 109,
+            close: 110,
+            volume: 20,
+            adjClose: 110,
+          ),
+        ]);
+      },
+      validateItems: (newDatabase) async {
+        final rows = await newDatabase.select(newDatabase.candles).get();
+        expect(rows, hasLength(1));
+        expect(rows.single.id, 2);
+        expect(rows.single.close, 110);
+      },
+    );
   });
 }
