@@ -55,11 +55,12 @@ Official IBKR documentation:
 
 ## Run
 
-Create a virtual environment and install the pinned dependency:
+Install uv, then create a virtual environment and install the pinned dependency:
 
 ```bash
-python3 -m venv venv
-venv/bin/pip install -r requirements.txt
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv venv venv
+uv pip install --python venv/bin/python -r requirements.txt
 ```
 
 When deploying the example systemd unit under `/opt/market-monk-ibkr`, make the virtualenv readable by its dedicated service account after installing or copying dependencies:
