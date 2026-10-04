@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -202,7 +204,11 @@ BuildContext getBuildContext(WidgetTester tester, TabBarState? tabBarState) {
 }
 
 void navigateTo({required BuildContext context, required Widget page}) {
-  Navigator.of(context).push(MaterialPageRoute(builder: (context) => page));
+  unawaited(
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => page),
+    ),
+  );
 }
 
 Future<void> generateScreenshot({

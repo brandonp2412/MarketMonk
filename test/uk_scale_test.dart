@@ -3,6 +3,7 @@ import 'package:drift/native.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/utils.dart';
 import 'package:test/test.dart';
+import 'test_log_support.dart';
 
 Trade _trade({
   int id = 1,
@@ -75,6 +76,7 @@ void main() {
 
     test('fetchLatestPrices + computePositions end-to-end with pence candles',
         () async {
+      allowMultipleDriftDatabasesForTest();
       cacheSymbolMeta('AZN.L', 'GBp');
       final testDb = Database.connect(NativeDatabase.memory());
       addTearDown(testDb.close);

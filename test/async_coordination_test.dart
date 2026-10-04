@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:market_monk/utils.dart';
 
+import 'test_log_support.dart';
+
 void main() {
   test('identical ticker searches share one request', () async {
     final response = Completer<http.Response>();
@@ -29,6 +31,7 @@ void main() {
   });
 
   test('ticker search failure does not poison a later retry', () async {
+    silenceTalkerForTest();
     var calls = 0;
     final api = YahooFinanceApi(
       searchFetcher: (_) async {
@@ -45,6 +48,7 @@ void main() {
   });
 
   test('detached task failures are contained', () async {
+    silenceTalkerForTest();
     Object? uncaught;
 
     await runZonedGuarded<Future<void>>(

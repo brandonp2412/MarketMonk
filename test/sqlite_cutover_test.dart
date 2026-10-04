@@ -5,6 +5,7 @@ import 'package:market_monk/legacy_database_source.dart';
 import 'package:market_monk/legacy_preferences_migration.dart';
 import 'package:market_monk/legacy_profile_database.dart' as legacy;
 import 'package:market_monk/sqlite_settings.dart';
+import 'test_log_support.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -98,6 +99,7 @@ void main() {
   });
 
   test('legacy profile files migrate into the single database', () async {
+    allowMultipleDriftDatabasesForTest();
     final legacyDefault =
         legacy.LegacyProfileDatabase.connect(NativeDatabase.memory());
     final legacyBrokerage =

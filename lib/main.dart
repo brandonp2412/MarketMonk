@@ -1084,10 +1084,12 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _selectPage(int index) {
     if (_pageController.hasClients) {
-      _pageController.animateToPage(
-        index,
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOutCubic,
+      unawaited(
+        _pageController.animateToPage(
+          index,
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOutCubic,
+        ),
       );
     }
     setState(() => _currentIndex = index);

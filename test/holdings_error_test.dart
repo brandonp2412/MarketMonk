@@ -13,6 +13,7 @@ import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 
 import 'sqlite_test_support.dart';
+import 'test_log_support.dart';
 
 class _FailedCacheAccountManager extends AccountManager {
   final failure = StateError('database is locked; private cache payload');
@@ -51,6 +52,7 @@ void main() {
   testWidgets(
       'load errors reach Flutter, Talker and crash log without exposing SQL',
       (tester) async {
+    silenceTalkerForTest();
     await prepare(tester);
     final logDirectory = Directory.systemTemp.createTempSync('monk-error-log-');
     const channel = MethodChannel('plugins.flutter.io/path_provider');
@@ -70,7 +72,12 @@ void main() {
         previousFlutterOnError?.call(details);
       }
     };
-    await tester.runAsync(() => CrashLogger.install(fileName: 'holdings.log'));
+    await tester.runAsync(
+      () => CrashLogger.install(
+        fileName: 'holdings.log',
+        emitConsoleOutput: false,
+      ),
+    );
     installTalkerErrorHandlers();
     addTearDown(() {
       FlutterError.onError = previousFlutterOnError;

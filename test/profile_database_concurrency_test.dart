@@ -5,6 +5,7 @@ import 'package:drift/drift.dart' hide isNotNull;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/database.dart';
+import 'test_log_support.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -17,6 +18,7 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 
   setUp(() async {
+    allowMultipleDriftDatabasesForTest();
     directory = await Directory.systemTemp.createTemp('monk-concurrency-');
     messenger.setMockMethodCallHandler(channel, (_) async => directory.path);
     writer = Database();

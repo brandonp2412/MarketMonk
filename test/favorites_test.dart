@@ -34,6 +34,11 @@ void main() {
 
       final today = DateTime.now();
       final yesterday = today.subtract(const Duration(days: 1));
+      await seedTestCandle(
+        'AAPL',
+        DateTime(today.year - 1, today.month, today.day - 1),
+        170,
+      );
       await seedTestCandle('AAPL', yesterday, 180);
       await seedTestCandle('AAPL', today, 190);
 
@@ -78,7 +83,13 @@ void main() {
       cacheSymbolMeta('MSFT', 'USD');
       final accounts = testAccountManager();
 
-      await seedTestCandle('MSFT', DateTime.now(), 400);
+      final today = DateTime.now();
+      await seedTestCandle(
+        'MSFT',
+        DateTime(today.year - 1, today.month, today.day - 1),
+        390,
+      );
+      await seedTestCandle('MSFT', today, 400);
 
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(800, 600);

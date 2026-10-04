@@ -545,9 +545,11 @@ class PortfolioPageState extends State<PortfolioPage>
   }
 
   void _openSettings() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const SettingsPage()),
+    unawaited(
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const SettingsPage()),
+      ),
     );
   }
 

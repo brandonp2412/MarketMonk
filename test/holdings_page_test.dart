@@ -249,7 +249,9 @@ void main() {
     expect(find.text('Brokerage'), findsOneWidget);
     expect(find.byType(CheckedPopupMenuItem<String>), findsNWidgets(2));
 
-    await tester.tap(find.text('Brokerage'));
+    await tester.tap(
+      find.widgetWithText(CheckedPopupMenuItem<String>, 'Brokerage'),
+    );
     await tester.pumpAndSettle();
     expect(accounts.activeAccount, 'Brokerage');
   });

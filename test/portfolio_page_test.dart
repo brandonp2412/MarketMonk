@@ -12,6 +12,7 @@ import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 import 'sqlite_test_support.dart';
+import 'test_log_support.dart';
 
 IbkrPortfolioSnapshot snapshotFor(String account, String symbol) =>
     IbkrPortfolioSnapshot(
@@ -71,6 +72,32 @@ Future<void> seedCurrentCandle(String symbol) async {
       );
 }
 
+Future<IbkrPerformanceSeries> _performanceLoader(
+  IbkrAccountConfig _,
+  String period,
+) async =>
+    IbkrPerformanceSeries(
+      period: period,
+      measure: 'TWR',
+      currency: 'USD',
+      startDate: DateTime(2026, 1, 1),
+      startNav: 100,
+      dates: [DateTime(2026, 1, 1), DateTime(2026, 10, 1)],
+      nav: const [100, 100],
+      returnDates: [DateTime(2026, 1, 1), DateTime(2026, 10, 1)],
+      returns: const [0, 0],
+    );
+
+PortfolioPage _portfolioPage({
+  Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? ibkrLoader,
+  Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
+      ibkrPerformanceLoader,
+}) =>
+    PortfolioPage(
+      ibkrLoader: ibkrLoader,
+      ibkrPerformanceLoader: ibkrPerformanceLoader ?? _performanceLoader,
+    );
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -118,7 +145,7 @@ void main() {
     await tester.pumpWidget(
       app(
         accounts,
-        PortfolioPage(
+        _portfolioPage(
           ibkrLoader: (_) {
             loads++;
             return pending.future;
@@ -152,7 +179,7 @@ void main() {
       final pending = Completer<IbkrPortfolioSnapshot>();
 
       await tester.pumpWidget(
-        app(accounts, PortfolioPage(ibkrLoader: (_) => pending.future)),
+        app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
       );
       await tester.pump();
 
@@ -211,7 +238,8 @@ void main() {
         return Future.value(snapshotFor('*****6552', 'VOO'));
       }
 
-      await tester.pumpWidget(app(accounts, PortfolioPage(ibkrLoader: loader)));
+      await tester
+          .pumpWidget(app(accounts, _portfolioPage(ibkrLoader: loader)));
       await tester.pumpAndSettle();
 
       expect(find.text('VOO'), findsWidgets);
@@ -243,7 +271,8 @@ void main() {
         return defaultPending.future;
       }
 
-      await tester.pumpWidget(app(accounts, PortfolioPage(ibkrLoader: loader)));
+      await tester
+          .pumpWidget(app(accounts, _portfolioPage(ibkrLoader: loader)));
       await tester.pump();
 
       accounts.activeAccount = 'IBKR Bot';
@@ -266,6 +295,7 @@ void main() {
   testWidgets(
     'portfolio shows a friendly IBKR error instead of exception text',
     (tester) async {
+      silenceTalkerForTest();
       await seedTestSqlite({});
 
       final accounts = await configuredAccounts();
@@ -273,7 +303,7 @@ void main() {
       await tester.pumpWidget(
         app(
           accounts,
-          PortfolioPage(
+          _portfolioPage(
             ibkrLoader: (_) async =>
                 throw StateError('secret technical failure'),
           ),
@@ -315,7 +345,7 @@ void main() {
     final pending = Completer<IbkrPortfolioSnapshot>();
 
     await tester.pumpWidget(
-      app(accounts, PortfolioPage(ibkrLoader: (_) => pending.future)),
+      app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
     );
     await tester.pump();
 
@@ -374,7 +404,7 @@ void main() {
     final pending = Completer<IbkrPortfolioSnapshot>();
 
     await tester.pumpWidget(
-      app(accounts, PortfolioPage(ibkrLoader: (_) => pending.future)),
+      app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
     );
     await tester.pump();
 
@@ -415,7 +445,7 @@ void main() {
       final pending = Completer<IbkrPortfolioSnapshot>();
 
       await tester.pumpWidget(
-        app(accounts, PortfolioPage(ibkrLoader: (_) => pending.future)),
+        app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
       );
       await tester.pump();
 

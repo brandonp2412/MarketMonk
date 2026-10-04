@@ -8,6 +8,7 @@ import 'package:market_monk/database.dart';
 import 'package:market_monk/legacy_profile_database.dart' as legacy;
 import 'package:market_monk/main.dart';
 import 'sqlite_test_support.dart';
+import 'test_log_support.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -33,6 +34,7 @@ void main() {
 
   test('does not switch to an account outside the saved account list',
       () async {
+    silenceTalkerForTest();
     await seedTestSqlite({
       'accounts': ['Default', 'Brokerage'],
       'activeAccount': 'Default',
@@ -50,6 +52,21 @@ void main() {
   test(
       'rename and delete preserve stable profile identity without swapping testDatabase',
       () async {
+    final tempDir =
+        await Directory.systemTemp.createTemp('market-monk-delete-');
+    const pathProviderChannel =
+        MethodChannel('plugins.flutter.io/path_provider');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(
+      pathProviderChannel,
+      (_) async => tempDir.path,
+    );
+    addTearDown(() async {
+      messenger.setMockMethodCallHandler(pathProviderChannel, null);
+      if (await tempDir.exists()) await tempDir.delete(recursive: true);
+    });
+
     await seedTestSqlite({
       'accounts': ['Default'],
       'activeAccount': 'Default',

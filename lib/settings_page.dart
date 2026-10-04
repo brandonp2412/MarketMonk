@@ -319,9 +319,11 @@ class _SettingsPageState extends State<SettingsPage> {
             : 'Database imported into the active profile',
       ),
     );
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const MyHomePage()),
-      (_) => false,
+    unawaited(
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const MyHomePage()),
+        (_) => false,
+      ),
     );
   }
 
