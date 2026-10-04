@@ -257,9 +257,6 @@ void main() {
       expect(cachedSpots, hasLength(5));
       expect(cachedSpots.first.y, closeTo(9400 / (10000 / 5750), 1e-6));
       expect(find.bySemanticsLabel('Loading portfolio'), findsNothing);
-      final cachedSpots = chart.series.single.points;
-      expect(cachedSpots, hasLength(6));
-      expect(find.bySemanticsLabel('Loading portfolio'), findsNothing);
 
       final lastSpot = cachedSpots.last;
       final tooltip = chart.tooltipRowLabel(
