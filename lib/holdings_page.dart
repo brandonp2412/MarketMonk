@@ -42,11 +42,19 @@ class SymbolSummary {
 class HoldingsPage extends StatefulWidget {
   final bool isActive;
   final Future<List<Position>> Function(List<Trade>)? _positionsLoader;
+  final Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? _ibkrLoader;
+  final Future<IbkrTradeHistory> Function(IbkrAccountConfig)?
+      _ibkrTradeHistoryLoader;
   const HoldingsPage({
     super.key,
     this.isActive = true,
     Future<List<Position>> Function(List<Trade>)? positionsLoader,
-  }) : _positionsLoader = positionsLoader;
+    Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? ibkrLoader,
+    Future<IbkrTradeHistory> Function(IbkrAccountConfig)?
+        ibkrTradeHistoryLoader,
+  })  : _positionsLoader = positionsLoader,
+        _ibkrLoader = ibkrLoader,
+        _ibkrTradeHistoryLoader = ibkrTradeHistoryLoader;
 
   @override
   State<HoldingsPage> createState() => HoldingsPageState();
@@ -170,7 +178,9 @@ class HoldingsPageState extends State<HoldingsPage>
 
     final load = () async {
       try {
-        final tradeHistory = await IbkrApiClient(config).fetchTradeHistory();
+        final tradeHistory =
+            await (widget._ibkrTradeHistoryLoader?.call(config) ??
+                IbkrApiClient(config).fetchTradeHistory());
         final brokerTrades = tradeHistory.trades;
         final trades = [
           for (var index = 0; index < brokerTrades.length; index++)
@@ -305,6 +315,7 @@ class HoldingsPageState extends State<HoldingsPage>
 
     final config = accounts.ibkrConfigFor();
     final accountName = accounts.activeAccount;
+    final cached = accounts.portfolioCacheFor(accountName);
     if (!config.enabled) {
       final symbols = trades.map((trade) => trade.symbol).toSet().toList();
       if (!widget.isActive) {
@@ -317,32 +328,49 @@ class HoldingsPageState extends State<HoldingsPage>
       return positions;
     }
     if (!config.isConfigured) {
+      if (cached != null) return cached.positions;
       throw StateError('IBKR portfolio source is not fully configured');
     }
     if (!widget.isActive) {
       return accounts.portfolioCacheFor(accountName)?.positions ??
           const <Position>[];
     }
-    final snapshot = await IbkrApiClient(config).fetchPortfolio();
-    cacheIbkrAccountExchangeRate(snapshot);
-    final positions = await computeIbkrPositions(snapshot.positions, trades);
-    await _cachePortfolio(
-      accounts,
-      accountName,
-      positions,
-      snapshot.netLiquidation,
-    );
-    return positions;
+    try {
+      final snapshot = await (widget._ibkrLoader?.call(config) ??
+          IbkrApiClient(config).fetchPortfolio());
+      cacheIbkrAccountExchangeRate(snapshot);
+      final positions = await computeIbkrPositions(snapshot.positions, trades);
+      await _cachePortfolio(
+        accounts,
+        accountName,
+        positions,
+        snapshot.netLiquidation,
+        netLiquidationUsd: snapshot.netLiquidationUsd?.value,
+      );
+      return positions;
+    } catch (error) {
+      if (cached != null) {
+        talker.warning('IBKR portfolio unavailable; using cached holdings');
+        return cached.positions;
+      }
+      rethrow;
+    }
   }
 
   Future<void> _cachePortfolio(
     AccountManager accounts,
     String accountName,
     List<Position> positions,
-    IbkrAccountValue? netLiquidation,
-  ) async {
+    IbkrAccountValue? netLiquidation, {
+    double? netLiquidationUsd,
+  }) async {
     try {
-      await accounts.cachePortfolio(accountName, positions, netLiquidation);
+      await accounts.cachePortfolio(
+        accountName,
+        positions,
+        netLiquidation,
+        netLiquidationUsd: netLiquidationUsd,
+      );
     } catch (error, stack) {
       _reportError(error, stack, 'saving the holdings cache');
     }

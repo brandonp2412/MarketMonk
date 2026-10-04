@@ -255,4 +255,65 @@ void main() {
     await tester.pumpAndSettle();
     expect(accounts.activeAccount, 'Brokerage');
   });
+
+  testWidgets('IBKR holdings stay visible when a refresh fails',
+      (tester) async {
+    await seedTestSqlite({});
+
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.setIbkrConfig(
+      'Default',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'secret-token',
+      ),
+    );
+    final position = Position(
+      symbol: 'VOO',
+      name: 'VANGUARD S&P 500 ETF',
+      nativeCurrency: 'USD',
+      netShares: 10,
+      avgCost: 500,
+      currentPrice: 550,
+      firstBuyDate: DateTime(2025),
+      lastBuyDate: DateTime(2026),
+    );
+    await accounts.cachePortfolio(
+      'Default',
+      [position],
+      const IbkrAccountValue(value: 5500, currency: 'USD'),
+      netLiquidationUsd: 5500,
+    );
+
+    var portfolioLoads = 0;
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: HoldingsPage(
+            ibkrLoader: (_) async {
+              portfolioLoads++;
+              throw StateError('backend offline');
+            },
+            ibkrTradeHistoryLoader: (_) async =>
+                const IbkrTradeHistory(available: false, trades: []),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('VOO'), findsOneWidget);
+
+    accounts.requestIbkrRefresh();
+    await tester.pumpAndSettle();
+
+    expect(portfolioLoads, 1);
+    expect(find.text('VOO'), findsOneWidget);
+  });
 }
