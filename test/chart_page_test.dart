@@ -250,7 +250,9 @@ void main() {
       await tester.pump();
 
       final chart = tester.widget<LineChart>(find.byType(LineChart));
-      expect(chart.data.lineBarsData.single.spots, hasLength(6));
+      final cachedSpots = chart.data.lineBarsData.single.spots;
+      expect(cachedSpots, hasLength(5));
+      expect(cachedSpots.first.y, closeTo(9400 / (10000 / 5750), 1e-6));
       expect(find.bySemanticsLabel('Loading portfolio'), findsNothing);
       expect(
         chart.data.lineTouchData.touchTooltipData.maxContentWidth,
@@ -273,7 +275,7 @@ void main() {
   );
 
   testWidgets(
-    'IBKR chart appends today from base-currency NAV when USD NAV is absent',
+    'IBKR chart does not synthesize a current-day point from live NAV',
     (WidgetTester tester) async {
       await seedTestSqlite({
         'ibkrAccountConfigs':
@@ -300,8 +302,7 @@ void main() {
       allRatesFromUsd['NZD'] = 1.7;
       final accounts = testAccountManager();
       await accounts.init();
-      final today = DateTime.now();
-      final todayDate = DateTime(today.year, today.month, today.day);
+      final historyStart = DateTime(2026, 9, 23);
       await accounts.cachePortfolio(
         'Default',
         [
@@ -324,17 +325,11 @@ void main() {
           period: '1Y',
           measure: 'TWR',
           currency: 'NZD',
-          startDate: todayDate.subtract(const Duration(days: 3)),
+          startDate: historyStart,
           startNav: 9000,
-          dates: [
-            todayDate.subtract(const Duration(days: 2)),
-            todayDate.subtract(const Duration(days: 1)),
-          ],
+          dates: [DateTime(2026, 9, 24), DateTime(2026, 9, 25)],
           nav: const [9200, 9500],
-          returnDates: [
-            todayDate.subtract(const Duration(days: 3)),
-            todayDate.subtract(const Duration(days: 1)),
-          ],
+          returnDates: [historyStart, DateTime(2026, 9, 25)],
           returns: const [0, 0.05],
         ),
       );
@@ -354,8 +349,8 @@ void main() {
 
       final chart = tester.widget<LineChart>(find.byType(LineChart));
       final spots = chart.data.lineBarsData.single.spots;
-      expect(spots, hasLength(4));
-      expect(spots.last.y, closeTo(10000 / 1.7, 1e-6));
+      expect(spots, hasLength(3));
+      expect(spots.last.y, closeTo(9500 / 1.7, 1e-6));
 
       await tester.pumpAndSettle();
     },
@@ -405,20 +400,16 @@ void main() {
       netLiquidationUsd: 5750,
     );
     final now = DateTime.now();
-    await db.into(db.candles).insert(
-          CandlesCompanion.insert(
-            symbol: 'VOO',
-            date: DateTime(now.year, now.month, now.day - 20),
-            close: const Value(500),
-          ),
-        );
-    await db.into(db.candles).insert(
-          CandlesCompanion.insert(
-            symbol: 'VOO',
-            date: DateTime(now.year, now.month, now.day),
-            close: const Value(550),
-          ),
-        );
+    await seedTestCandle(
+      'VOO',
+      DateTime(now.year, now.month, now.day - 20),
+      500,
+    );
+    await seedTestCandle(
+      'VOO',
+      DateTime(now.year, now.month, now.day),
+      550,
+    );
 
     var ibkrLoads = 0;
     Future<IbkrPortfolioSnapshot> loader(IbkrAccountConfig _) async {
@@ -568,13 +559,11 @@ void main() {
       netLiquidationUsd: 196500,
     );
     final now = DateTime.now();
-    await db.into(db.candles).insert(
-          CandlesCompanion.insert(
-            symbol: 'VOO',
-            date: DateTime(now.year, now.month, now.day),
-            close: const Value(550),
-          ),
-        );
+    await seedTestCandle(
+      'VOO',
+      DateTime(now.year, now.month, now.day),
+      550,
+    );
 
     var performanceLoads = 0;
     Future<IbkrPerformanceSeries> performanceLoader(

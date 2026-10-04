@@ -163,23 +163,15 @@ void main() {
     };
     addTearDown(() => FlutterError.onError = previousOnError);
     cacheSymbolMeta('VTI', 'USD');
-    await db.trades.insertOne(
-      TradesCompanion.insert(
-        symbol: 'VTI',
-        name: 'Vanguard',
-        quantity: 2,
-        price: 100,
-        tradeType: 'open',
-        tradeDate: DateTime(2026),
-      ),
+    await seedTestTrade(
+      symbol: 'VTI',
+      name: 'Vanguard',
+      quantity: 2,
+      price: 100,
+      tradeType: 'open',
+      tradeDate: DateTime(2026),
     );
-    await db.candles.insertOne(
-      CandlesCompanion.insert(
-        symbol: 'VTI',
-        date: DateTime.now(),
-        close: const Value(120),
-      ),
-    );
+    await seedTestCandle('VTI', DateTime.now(), 120);
     await tester.pumpWidget(app(accounts, const HoldingsPage()));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));

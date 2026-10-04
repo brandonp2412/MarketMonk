@@ -225,7 +225,8 @@ void main() {
     expect(find.text(r'+$500.00'), findsOneWidget);
   });
 
-  testWidgets('desktop holdings exposes account picker', (tester) async {
+  testWidgets('holdings menu exposes account picker on desktop',
+      (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1400, 900);
     addTearDown(() {
@@ -268,13 +269,20 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(
+    expect(
       find.byKey(const Key('desktop-holdings-account-picker')),
+      findsNothing,
     );
+
+    await tester.tap(find.byKey(const Key('holdings-menu-button')));
     await tester.pumpAndSettle();
 
     expect(accounts.activeAccount, 'Default');
     expect(find.text('Brokerage'), findsOneWidget);
     expect(find.byType(CheckedPopupMenuItem<String>), findsNWidgets(2));
+
+    await tester.tap(find.text('Brokerage'));
+    await tester.pumpAndSettle();
+    expect(accounts.activeAccount, 'Brokerage');
   });
 }

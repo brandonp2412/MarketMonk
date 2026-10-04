@@ -2,12 +2,13 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 import 'package:market_monk/database.dart';
+import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/unified_database.dart';
 
 UnifiedDatabase? _marketDataDatabase;
 
 UnifiedDatabase get marketDataDatabase =>
-    _marketDataDatabase ??= UnifiedDatabase();
+    _marketDataDatabase ?? profileDataDatabase;
 
 void setMarketDataDatabaseForTesting(UnifiedDatabase? database) {
   _marketDataDatabase = database;
@@ -19,10 +20,10 @@ DateTime _canonicalDay(DateTime date) =>
     DateTime(date.year, date.month, date.day);
 
 String _normalizedCurrency(String rawCurrency) => switch (rawCurrency) {
-  'GBp' => 'GBP',
-  'ZAc' => 'ZAR',
-  _ => rawCurrency,
-};
+      'GBp' => 'GBP',
+      'ZAc' => 'ZAR',
+      _ => rawCurrency,
+    };
 
 String? rawCurrencyFromMetadata(UnifiedSymbolMetadataData? metadata) {
   if (metadata == null) return null;
@@ -94,15 +95,15 @@ class _CandleCandidate {
   });
 
   factory _CandleCandidate.fromLegacy(Candle candle) => _CandleCandidate(
-    symbol: _canonicalSymbol(candle.symbol),
-    date: _canonicalDay(candle.date),
-    open: candle.open,
-    high: candle.high,
-    low: candle.low,
-    close: candle.close,
-    volume: candle.volume,
-    adjClose: candle.adjClose,
-  );
+        symbol: _canonicalSymbol(candle.symbol),
+        date: _canonicalDay(candle.date),
+        open: candle.open,
+        high: candle.high,
+        low: candle.low,
+        close: candle.close,
+        volume: candle.volume,
+        adjClose: candle.adjClose,
+      );
 
   factory _CandleCandidate.fromUnified(UnifiedCandle candle) =>
       _CandleCandidate(
@@ -135,15 +136,15 @@ class _CandleCandidate {
   }
 
   UnifiedCandlesCompanion toCompanion() => UnifiedCandlesCompanion.insert(
-    symbol: symbol,
-    date: date,
-    open: Value(open),
-    high: Value(high),
-    low: Value(low),
-    close: Value(close),
-    volume: Value(volume),
-    adjClose: Value(adjClose),
-  );
+        symbol: symbol,
+        date: date,
+        open: Value(open),
+        high: Value(high),
+        low: Value(low),
+        close: Value(close),
+        volume: Value(volume),
+        adjClose: Value(adjClose),
+      );
 }
 
 Future<LegacyMarketDataMergeResult> mergeLegacyCandlesIntoUnified({

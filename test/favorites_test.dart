@@ -43,20 +43,8 @@ void main() {
 
       final today = DateTime.now();
       final yesterday = today.subtract(const Duration(days: 1));
-      await db.candles.insertOne(
-        CandlesCompanion.insert(
-          symbol: 'AAPL',
-          date: yesterday,
-          close: const Value(180.0),
-        ),
-      );
-      await db.candles.insertOne(
-        CandlesCompanion.insert(
-          symbol: 'AAPL',
-          date: today,
-          close: const Value(190.0),
-        ),
-      );
+      await seedTestCandle('AAPL', yesterday, 180);
+      await seedTestCandle('AAPL', today, 190);
 
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(800, 600);
@@ -107,13 +95,7 @@ void main() {
       );
       final accounts = testAccountManager();
 
-      await db.candles.insertOne(
-        CandlesCompanion.insert(
-          symbol: 'MSFT',
-          date: DateTime.now(),
-          close: const Value(400.0),
-        ),
-      );
+      await seedTestCandle('MSFT', DateTime.now(), 400);
 
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(800, 600);

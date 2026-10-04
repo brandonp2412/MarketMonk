@@ -408,8 +408,7 @@ void main() {
 
     final accounts = testAccountManager();
     await accounts.init();
-    accounts.accounts = ['Default', 'Bot'];
-    await ensureTestProfile('Bot');
+    await accounts.addAccount('Bot');
     await accounts.setIbkrConfig(
       'Default',
       const IbkrAccountConfig(

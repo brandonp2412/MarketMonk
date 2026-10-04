@@ -7,9 +7,11 @@ import 'package:market_monk/app_state_database.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/legacy_preferences_migration.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/sqlite_settings.dart';
 import 'package:market_monk/unified_database.dart';
+import 'package:market_monk/unified_legacy_source.dart';
 
 export 'package:market_monk/sqlite_settings.dart';
 
@@ -22,27 +24,18 @@ Future<void> seedTestSqlite(Map<String, Object?> values) async {
   final directory = Directory.systemTemp.createTempSync('monk-test-profiles-');
   _profileDirectory = directory;
   final database = AppStateDatabase.connect(NativeDatabase.memory());
-  final profileData = UnifiedDatabase.connect(NativeDatabase.memory());
+  final profileData = UnifiedDatabase.connect(
+    DatabaseConnection(
+      NativeDatabase.memory(),
+      closeStreamsSynchronously: true,
+    ),
+  );
   _profileDataTestDatabase = profileData;
   setProfileDataDatabaseForTesting(profileData);
-  final accountNames = ((values['accounts'] as List?) ?? const ['Default'])
-      .cast<String>()
-      .toList();
-  if (!accountNames.contains('Default')) accountNames.insert(0, 'Default');
-  for (var index = 0; index < accountNames.length; index++) {
-    await profileData.upsertProfile(
-      id: 'test-profile-' + index.toString(),
-      name: accountNames[index],
-      sortOrder: index,
-    );
-  }
-  final requestedActive = values['activeAccount'] as String?;
-  final activeIndex = accountNames.indexOf(requestedActive ?? 'Default');
-  await profileData.setActiveProfileId(
-    'test-profile-' + (activeIndex < 0 ? 0 : activeIndex).toString(),
-  );
+  setMarketDataDatabaseForTesting(profileData);
   addTearDown(() async {
     setProfileDataDatabaseForTesting(null);
+    setMarketDataDatabaseForTesting(null);
     _profileDataTestDatabase = null;
     await profileData.close();
     await database.close();
@@ -57,6 +50,13 @@ Future<void> seedTestSqlite(Map<String, Object?> values) async {
       ),
     );
     await database.writeSetting(sqliteMigrationCompleteKey, true);
+    final snapshot = await readLegacyUnifiedSnapshot(
+      appState: database,
+      openProfileDatabase: (name) async => Database.connect(
+        NativeDatabase(File('${directory.path}/$name.sqlite')),
+      ),
+    );
+    await profileData.migrateLegacySnapshot(snapshot, replaceExisting: true);
     return SqliteSettings.load(database);
   }();
   await SqliteSettings.useInstance(loaded);
@@ -73,6 +73,59 @@ Future<void> ensureTestProfile(String name) async {
     id: ['test-profile', profiles.length + 1].join('-'),
     name: name,
     sortOrder: profiles.length,
+  );
+}
+
+Future<void> seedTestCandle(
+  String symbol,
+  DateTime date,
+  double close,
+) async {
+  final database = _profileDataTestDatabase;
+  if (database == null) {
+    throw StateError('seedTestSqlite must be called first');
+  }
+  await database.upsertCandle(
+    symbol: symbol,
+    date: date,
+    open: close,
+    high: close,
+    low: close,
+    close: close,
+    volume: 0,
+    adjClose: close,
+  );
+}
+
+Future<void> seedTestTrade({
+  String accountName = 'Default',
+  required String symbol,
+  required String name,
+  required double quantity,
+  required double price,
+  required String tradeType,
+  required DateTime tradeDate,
+  double realizedPL = 0,
+  double commission = 0,
+}) async {
+  final database = _profileDataTestDatabase;
+  if (database == null) {
+    throw StateError('seedTestSqlite must be called first');
+  }
+  final profile = await database.readProfileByName(accountName);
+  if (profile == null) {
+    throw StateError('Unknown test profile: $accountName');
+  }
+  await database.addTrade(
+    profileId: profile.id,
+    symbol: symbol,
+    name: name,
+    quantity: quantity,
+    price: price,
+    tradeType: tradeType,
+    tradeDate: tradeDate,
+    realizedPL: realizedPL,
+    commission: commission,
   );
 }
 

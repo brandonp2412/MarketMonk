@@ -564,8 +564,28 @@ Future<int> insertIbkrCandles(
   final canonicalSymbol = canonicalMarketSymbol(symbol);
   final byDay = <int, IbkrHistoricalCandle>{};
 
+  final existingRows = await (targetDatabase.unifiedCandles.select()
+        ..where((candle) => candle.symbol.equals(canonicalSymbol)))
+      .get();
+  for (final row in existingRows) {
+    if (row.date.weekday != DateTime.saturday &&
+        row.date.weekday != DateTime.sunday) {
+      continue;
+    }
+    await (targetDatabase.delete(targetDatabase.unifiedCandles)
+          ..where(
+            (candle) =>
+                candle.symbol.equals(canonicalSymbol) &
+                candle.date.equals(row.date),
+          ))
+        .go();
+  }
+
   for (final data in dataList) {
     final day = canonicalMarketDay(data.date);
+    if (day.weekday == DateTime.saturday || day.weekday == DateTime.sunday) {
+      continue;
+    }
     final dayKey = day.year * 10000 + day.month * 100 + day.day;
     byDay[dayKey] = IbkrHistoricalCandle(
       date: day,

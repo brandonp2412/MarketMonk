@@ -88,7 +88,7 @@ class PortfolioPageState extends State<PortfolioPage>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isActive == widget.isActive) return;
 
-    setState(() => _stream = _buildStream(skipInitial: widget.isActive));
+    setState(() => _stream = _buildStream());
     if (widget.isActive) {
       runDetachedTask(_preload(), 'Failed to preload portfolio');
     }
@@ -653,7 +653,7 @@ class PortfolioPageState extends State<PortfolioPage>
       onRefresh: _updateCandles,
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [SliverFillRemaining(hasScrollBody: false, child: child)],
+        slivers: [SliverFillRemaining(child: child)],
       ),
     );
   }
@@ -1235,6 +1235,7 @@ class PortfolioPageState extends State<PortfolioPage>
                                   controller: _allocationScrollController,
                                   child: ListView.separated(
                                     controller: _allocationScrollController,
+                                    padding: const EdgeInsets.only(right: 12),
                                     itemCount: sorted.length,
                                     separatorBuilder: (_, __) =>
                                         const SizedBox(height: 14),

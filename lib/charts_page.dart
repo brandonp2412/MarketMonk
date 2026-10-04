@@ -152,6 +152,10 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   Future<void> _loadPeriodThenPortfolios() async {
+    final settings = context.read<SettingsState>();
+    await settings.initialized;
+    if (!mounted) return;
+
     final prefs = await SqliteSettings.getInstance();
     final periodYears = prefs.getInt('chartPeriodYears') ?? 1;
     final periodMonths = prefs.getInt('chartPeriodMonths') ?? 0;
@@ -990,28 +994,26 @@ class ChartsPageState extends State<ChartsPage>
     }
     if (!basePerUsd.isFinite || basePerUsd <= 0) basePerUsd = 1.0;
 
-    final currentValueUsd = exactCurrentValueUsd ??
-        (currentValue == null
-            ? null
-            : currentValue.currency == 'USD'
-                ? currentValue.value
-                : currentValue.currency == performance.currency
-                    ? currentValue.value / basePerUsd
-                    : null);
-
     final points = <_DateValue>[];
     final fundedFirstNav = performance.nav.first != 0;
     if (performance.startDate != null &&
         performance.startNav != null &&
+        performance.startDate!.weekday != DateTime.saturday &&
+        performance.startDate!.weekday != DateTime.sunday &&
         !(performance.startNav == 0 && fundedFirstNav)) {
       points.add(
         _DateValue(performance.startDate!, performance.startNav! / basePerUsd),
       );
     }
     for (var index = 0; index < performance.dates.length; index++) {
+      final date = performance.dates[index];
+      if (date.weekday == DateTime.saturday ||
+          date.weekday == DateTime.sunday) {
+        continue;
+      }
       points.add(
         _DateValue(
-          performance.dates[index],
+          date,
           performance.nav[index] / basePerUsd,
         ),
       );
@@ -1057,17 +1059,7 @@ class ChartsPageState extends State<ChartsPage>
         historicalSeries.first.value -
         externalFlowsUsd;
 
-    var series = historicalSeries;
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    if (currentValueUsd != null && currentValueUsd.isFinite) {
-      final livePoint = _DateValue(today, currentValueUsd);
-      if (series.isNotEmpty && series.last.date == today) {
-        series = [...series.sublist(0, series.length - 1), livePoint];
-      } else {
-        series = [...series, livePoint];
-      }
-    }
+    final series = historicalSeries;
 
     var startReturn = 0.0;
     var endReturn = 0.0;
@@ -2110,6 +2102,24 @@ class ChartsPageState extends State<ChartsPage>
     final change =
         brokerReturnAmount ?? (series.last.value - series.first.value);
     final isHidden = _hiddenAccounts.contains(accountName);
+    final accountManager = context.read<AccountManager>();
+    final cachedPortfolio = accountManager.portfolioCacheFor(accountName);
+    var currentValueUsd = cachedPortfolio?.netLiquidationUsd;
+    final netLiquidation = cachedPortfolio?.netLiquidation;
+    if ((currentValueUsd == null || !currentValueUsd.isFinite) &&
+        netLiquidation != null) {
+      if (netLiquidation.currency == 'USD') {
+        currentValueUsd = netLiquidation.value;
+      } else {
+        final basePerUsd = allRatesFromUsd[netLiquidation.currency];
+        if (basePerUsd != null && basePerUsd.isFinite && basePerUsd > 0) {
+          currentValueUsd = netLiquidation.value / basePerUsd;
+        }
+      }
+    }
+    final summaryValue = currentValueUsd != null && currentValueUsd.isFinite
+        ? currentValueUsd
+        : series.last.value;
     final theme = Theme.of(context);
 
     Widget accountLabel() => Row(
@@ -2142,7 +2152,7 @@ class ChartsPageState extends State<ChartsPage>
         );
 
     final valueText = Text(
-      fmtCurrency(series.last.value),
+      fmtCurrency(summaryValue),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       textAlign: TextAlign.right,

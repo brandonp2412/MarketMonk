@@ -69,6 +69,7 @@ class HoldingsPageState extends State<HoldingsPage>
   int _lastIbkrRefreshVersion = -1;
   IbkrAccountConfig _lastIbkrConfig = const IbkrAccountConfig();
   final Map<(bool, bool), Future<void>> _preloadLoads = {};
+  Object? _preloadError;
 
   bool _selecting = false;
   final Set<String> _selectedSymbols = {};
@@ -127,6 +128,7 @@ class HoldingsPageState extends State<HoldingsPage>
     setState(() {
       _stream = _buildStream(skipInitial: widget.isActive);
       _summaries = [];
+      _preloadError = null;
     });
     if (widget.isActive) {
       runDetachedTask(
@@ -231,6 +233,18 @@ class HoldingsPageState extends State<HoldingsPage>
     return future;
   }
 
+  @visibleForTesting
+  static bool shouldUsePortfolioCache({
+    required bool hasCache,
+    required bool refreshPortfolio,
+    required bool ibkrEnabled,
+    required bool ibkrConfigured,
+    required bool cacheFresh,
+  }) =>
+      hasCache &&
+      !refreshPortfolio &&
+      (!ibkrEnabled || cacheFresh || !ibkrConfigured);
+
   Future<void> _performPreload({
     bool refreshPortfolio = false,
     bool refreshTrades = false,
@@ -246,11 +260,21 @@ class HoldingsPageState extends State<HoldingsPage>
         return;
       }
       final cached = accounts.portfolioCacheFor(accountName);
-      if (cached != null && !refreshPortfolio) {
-        final result = _summariesFromPositions(trades, cached.positions);
+      final cacheFresh = accounts.isPortfolioCacheFresh(accountName);
+      final config = accounts.ibkrConfigFor(accountName);
+      final shouldUseCache = shouldUsePortfolioCache(
+        hasCache: cached != null,
+        refreshPortfolio: refreshPortfolio,
+        ibkrEnabled: config.enabled,
+        ibkrConfigured: config.isConfigured,
+        cacheFresh: cacheFresh,
+      );
+      if (shouldUseCache) {
+        final result = _summariesFromPositions(trades, cached!.positions);
         if (mounted) {
           setState(() {
             _summaries = result;
+            _preloadError = null;
           });
         }
         return;
@@ -259,9 +283,13 @@ class HoldingsPageState extends State<HoldingsPage>
       if (mounted && widget.isActive && accounts.activeAccount == accountName) {
         setState(() {
           _summaries = result;
+          _preloadError = null;
         });
       }
     } catch (error, stackTrace) {
+      if (mounted) {
+        setState(() => _preloadError = error);
+      }
       _reportError(error, stackTrace, 'preloading holdings');
     }
   }
@@ -497,16 +525,19 @@ class HoldingsPageState extends State<HoldingsPage>
     super.build(context);
 
     final desktop = isDesktopLayout(context);
-    final ibkrManaged = context.watch<AccountManager>().ibkrConfigFor().enabled;
+    final accounts = context.watch<AccountManager>();
+    final ibkrManaged = accounts.ibkrConfigFor().enabled;
     final allSelected =
         _summaries.isNotEmpty && _selectedSymbols.length == _summaries.length;
 
-    final menuButton = PopupMenuButton(
+    final menuButton = PopupMenuButton<String>(
+      key: const Key('holdings-menu-button'),
       icon: const Icon(Icons.more_vert),
       tooltip: context.l10n.text('Show menu'),
-      itemBuilder: (context) => [
+      onSelected: accounts.switchAccount,
+      itemBuilder: (context) => <PopupMenuEntry<String>>[
         if (_selecting) ...[
-          PopupMenuItem(
+          PopupMenuItem<String>(
             onTap: _toggleSelectAll,
             child: ListTile(
               leading: Icon(allSelected ? Icons.deselect : Icons.select_all),
@@ -517,14 +548,14 @@ class HoldingsPageState extends State<HoldingsPage>
               ),
             ),
           ),
-          PopupMenuItem(
+          PopupMenuItem<String>(
             onTap: () => _deleteSelected(context),
             child: ListTile(
               leading: const Icon(Icons.delete),
               title: Text(context.l10n.text('Delete selected')),
             ),
           ),
-          PopupMenuItem(
+          PopupMenuItem<String>(
             onTap: _exitSelecting,
             child: ListTile(
               leading: const Icon(Icons.close),
@@ -532,7 +563,17 @@ class HoldingsPageState extends State<HoldingsPage>
             ),
           ),
         ] else ...[
-          PopupMenuItem(
+          if (accounts.accounts.length > 1) ...[
+            ...accounts.accounts.map(
+              (account) => CheckedPopupMenuItem<String>(
+                value: account,
+                checked: account == accounts.activeAccount,
+                child: Text(account),
+              ),
+            ),
+            const PopupMenuDivider(),
+          ],
+          PopupMenuItem<String>(
             child: ListTile(
               leading: const Icon(Icons.settings),
               title: Text(context.l10n.text('Settings')),
@@ -566,7 +607,6 @@ class HoldingsPageState extends State<HoldingsPage>
           );
 
     if (desktop) {
-      final accounts = context.watch<AccountManager>();
       final openCount =
           _summaries.where((summary) => summary.position != null).length;
       return Scaffold(
@@ -602,51 +642,6 @@ class HoldingsPageState extends State<HoldingsPage>
                       ],
                     ),
                   ),
-                  if (accounts.accounts.length > 1) ...[
-                    PopupMenuButton<String>(
-                      key: const Key('desktop-holdings-account-picker'),
-                      tooltip: context.l10n.text('Switch account'),
-                      onSelected: accounts.switchAccount,
-                      itemBuilder: (popupContext) => accounts.accounts
-                          .map(
-                            (account) => CheckedPopupMenuItem(
-                              value: account,
-                              checked: account == accounts.activeAccount,
-                              child: Text(account),
-                            ),
-                          )
-                          .toList(),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.account_balance_outlined,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              accounts.activeAccount,
-                              style: Theme.of(context).textTheme.labelLarge,
-                            ),
-                            const SizedBox(width: 6),
-                            const Icon(Icons.expand_more_rounded, size: 20),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
                   if (_selecting) ...[
                     TextButton.icon(
                       onPressed: _toggleSelectAll,
@@ -694,6 +689,10 @@ class HoldingsPageState extends State<HoldingsPage>
                       icon: const Icon(Icons.add),
                       label: Text(context.l10n.text('Add trade')),
                     ),
+                  ],
+                  if (!_selecting) ...[
+                    const SizedBox(width: 8),
+                    menuButton,
                   ],
                 ],
               ),
@@ -1305,7 +1304,7 @@ class HoldingsPageState extends State<HoldingsPage>
       onRefresh: _refreshCandles,
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [SliverFillRemaining(hasScrollBody: false, child: child)],
+        slivers: [SliverFillRemaining(child: child)],
       ),
     );
   }
@@ -1314,7 +1313,7 @@ class HoldingsPageState extends State<HoldingsPage>
     BuildContext context,
     AsyncSnapshot<List<SymbolSummary>> snap,
   ) {
-    if (snap.hasError) {
+    if (snap.hasError || _preloadError != null) {
       return _refreshableState(
         Center(
           child: Column(
@@ -1452,7 +1451,10 @@ class HoldingsPageState extends State<HoldingsPage>
   }
 
   void _retryHoldings() {
-    setState(() => _stream = _buildStream(skipInitial: true));
+    setState(() {
+      _preloadError = null;
+      _stream = _buildStream(skipInitial: true);
+    });
     runDetachedTask(_preload(), 'Failed to retry holdings preload');
   }
 

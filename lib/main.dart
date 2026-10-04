@@ -41,11 +41,19 @@ Future<void> main() async {
       talker.info('Starting Market Monk');
 
       final sqliteSettings = await SqliteSettings.getInstance();
+      final unifiedDatabase = profileDataDatabase;
+      await unifiedDatabase.migrateLegacyDatabases(
+        snapshotLoader: () => readLegacyUnifiedSnapshot(
+          appState: sqliteSettings.database,
+          openProfileDatabase: (name) async =>
+              AccountManager._openProfileDatabase(name),
+        ),
+      );
       final settings = SettingsState();
-      final accounts = AccountManager();
+      final accounts = AccountManager(unifiedDatabase: unifiedDatabase);
       await Future.wait([settings.initialized, accounts.init()]);
       await sqliteSettings.cleanupLegacyAppStateAfterUnifiedMigration(
-        profileDataDatabase,
+        unifiedDatabase,
       );
       talker.info('Account manager initialized');
 
@@ -302,7 +310,6 @@ class AccountManager extends ChangeNotifier {
       }
     }
   }
-
 
   Future<void> _migrateLegacyProfileState(
     String account, {
@@ -889,6 +896,23 @@ class AccountManager extends ChangeNotifier {
         .toList();
   }
 
+  Future<void> _deleteLegacyProfileDatabase(String name) async {
+    try {
+      final directory = await getApplicationSupportDirectory();
+      final path = p.join(directory.path, databaseFileNameForAccount(name));
+      for (final suffix in ['', '-wal', '-shm']) {
+        final file = File('$path$suffix');
+        if (await file.exists()) await file.delete();
+      }
+    } catch (error, stackTrace) {
+      talker.handle(
+        error,
+        stackTrace,
+        'Failed to remove retired profile database for $name',
+      );
+    }
+  }
+
   void _validateProfileName(String name) {
     if (name.isEmpty || name.contains('/') || name.contains(r'\')) {
       throw ArgumentError.value(name, 'name', 'Invalid profile name');
@@ -981,6 +1005,7 @@ class AccountManager extends ChangeNotifier {
 
     if (activeAccount == name) await _switchAccount('Default');
     await _unifiedDatabase.deleteProfile(profileId);
+    await _deleteLegacyProfileDatabase(name);
 
     accounts = accounts.where((account) => account != name).toList();
     _profileIdsByName.remove(name);

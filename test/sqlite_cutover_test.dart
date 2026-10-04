@@ -54,12 +54,14 @@ void main() {
     db = Database();
     unifiedData = UnifiedDatabase.connect(NativeDatabase.memory());
     setProfileDataDatabaseForTesting(unifiedData);
+    setMarketDataDatabaseForTesting(unifiedData);
     SharedPreferences.setMockInitialValues({});
   });
 
   tearDown(() async {
     await db.close();
     setProfileDataDatabaseForTesting(null);
+    setMarketDataDatabaseForTesting(null);
     await unifiedData.close();
     await appState.close();
     messenger.setMockMethodCallHandler(channel, null);
@@ -322,10 +324,15 @@ void main() {
     expect(await appState.readProfiles(), ['Default', 'IBKR Bot']);
     expect(await appState.readActiveProfile(), 'IBKR Bot');
     expect(await appState.readSetting('theme'), 'ThemeMode.light');
-    expect(
-      File('${directory.path}/market-monk-app-state.sqlite').existsSync(),
-      isFalse,
+    final legacyAppStateFile =
+        File('${directory.path}/market-monk-app-state.sqlite');
+    expect(legacyAppStateFile.existsSync(), isTrue);
+    await unifiedData.writeSetting(
+      UnifiedDatabase.legacyMigrationCompleteKey,
+      true,
     );
+    await loaded.cleanupLegacyAppStateAfterUnifiedMigration(unifiedData);
+    expect(legacyAppStateFile.existsSync(), isFalse);
     final manager = AccountManager();
     await manager.init();
     expect(manager.ibkrConfigFor('IBKR Bot').token, 'bot-token');
@@ -545,45 +552,19 @@ void main() {
     await manager.cachePortfolio('Brokerage', [], null, netLiquidationUsd: 987);
     await settings.setStringList('favoriteStocks', ['VTI']);
 
-    final writer = profile('Brokerage');
-    await writer.customStatement('PRAGMA journal_mode=WAL');
-    await writer.customStatement('PRAGMA wal_autocheckpoint=0');
-    await writer.trades.insertOne(
-      TradesCompanion.insert(
-        symbol: 'VTI',
-        name: 'VTI',
-        quantity: 2,
-        price: 100,
-        tradeType: 'open',
-        tradeDate: DateTime(2026),
-      ),
-    );
-    await writer.candles.insertOne(
-      CandlesCompanion.insert(
-        symbol: 'VTI',
-        date: DateTime(2026, 1, 2),
-        close: const Value(101),
-      ),
-    );
-
-    final unified = UnifiedDatabase.connect(NativeDatabase.memory());
-    setProfileDataDatabaseForTesting(unified);
-    setMarketDataDatabaseForTesting(unified);
-    addTearDown(() async {
-      setProfileDataDatabaseForTesting(null);
-      setMarketDataDatabaseForTesting(null);
-      await unified.close();
-    });
-    final preCutover = await readLegacyUnifiedSnapshot(
-      appState: appState,
-      openProfileDatabase: (name) async => profile(name),
-    );
-    await unified.migrateLegacySnapshot(preCutover);
-
-    final brokerageProfile = await unified.readProfileByName('Brokerage');
+    final brokerageProfile = await unifiedData.readProfileByName('Brokerage');
     expect(brokerageProfile, isNotNull);
-    await unified.addTrade(
+    await unifiedData.addTrade(
       profileId: brokerageProfile!.id,
+      symbol: 'VTI',
+      name: 'VTI',
+      quantity: 2,
+      price: 100,
+      tradeType: 'open',
+      tradeDate: DateTime(2026),
+    );
+    await unifiedData.addTrade(
+      profileId: brokerageProfile.id,
       symbol: 'NEW',
       name: 'Unified only',
       quantity: 4,
@@ -592,7 +573,17 @@ void main() {
       tradeDate: DateTime(2026, 10, 3),
       commission: 0.75,
     );
-    await unified.upsertCandle(
+    await unifiedData.upsertCandle(
+      symbol: 'VTI',
+      date: DateTime.utc(2026, 1, 2),
+      open: 101,
+      high: 101,
+      low: 101,
+      close: 101,
+      volume: 0,
+      adjClose: 101,
+    );
+    await unifiedData.upsertCandle(
       symbol: 'NEW',
       date: DateTime.utc(2026, 10, 3),
       open: 24,
@@ -605,10 +596,8 @@ void main() {
 
     final exportDirectory = await directory.createTemp('export-');
     final backup = await manager.exportBackup(exportDirectory);
-    await writer.close();
-
-    await unified.clearTrades(brokerageProfile.id);
-    await unified.delete(unified.unifiedCandles).go();
+    await unifiedData.clearTrades(brokerageProfile.id);
+    await unifiedData.delete(unifiedData.unifiedCandles).go();
     await manager.deleteAccount('Brokerage');
     await settings.remove('favoriteStocks');
 
@@ -618,9 +607,10 @@ void main() {
     expect(manager.ibkrConfigFor('Brokerage').token, 'backup-token');
     expect(manager.portfolioCacheFor('Brokerage')!.netLiquidationUsd, 987);
 
-    final restoredProfile = await unified.readProfileByName('Brokerage');
+    final restoredProfile = await unifiedData.readProfileByName('Brokerage');
     expect(restoredProfile, isNotNull);
-    final restoredUnifiedTrades = await unified.readTrades(restoredProfile!.id);
+    final restoredUnifiedTrades =
+        await unifiedData.readTrades(restoredProfile!.id);
     expect(
       restoredUnifiedTrades.map((trade) => trade.symbol).toSet(),
       {'VTI', 'NEW'},
@@ -631,8 +621,8 @@ void main() {
           .commission,
       0.75,
     );
-    expect((await unified.readCandles('VTI')).single.close, 101);
-    expect((await unified.readCandles('NEW')).single.volume, 123);
+    expect((await unifiedData.readCandles('VTI')).single.close, 101);
+    expect((await unifiedData.readCandles('NEW')).single.volume, 123);
 
     final restoredLegacy = profile('Brokerage');
     final restoredLegacyTrades =
