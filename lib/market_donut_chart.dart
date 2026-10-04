@@ -46,13 +46,6 @@ class MarketDonutChart extends StatelessWidget {
           if (slices.isEmpty) return null;
           final delta = position - center;
           final distance = delta.distance;
-          final availableOuter =
-              math.min(selectedRadius, size.shortestSide / 2);
-          final availableInner =
-              math.min(centerSpaceRadius, availableOuter - 1);
-          if (distance < availableInner || distance > availableOuter) {
-            return null;
-          }
 
           var angle = math.atan2(delta.dy, delta.dx) + math.pi / 2;
           if (angle < 0) angle += math.pi * 2;
@@ -63,11 +56,29 @@ class MarketDonutChart extends StatelessWidget {
           if (total <= 0) return null;
 
           var cursor = 0.0;
+          var hitIndex = slices.length - 1;
           for (var index = 0; index < slices.length; index++) {
             cursor += math.max(0, slices[index].value) / total * math.pi * 2;
-            if (angle <= cursor) return index;
+            if (angle <= cursor) {
+              hitIndex = index;
+              break;
+            }
           }
-          return slices.length - 1;
+
+          final sectionRadius =
+              hitIndex == selectedIndex ? selectedRadius : radius;
+          final availableOuter = math.min(
+            centerSpaceRadius + sectionRadius,
+            size.shortestSide / 2,
+          );
+          final availableInner = math.min(
+            centerSpaceRadius,
+            math.max(0, availableOuter - 1),
+          );
+          if (distance < availableInner || distance > availableOuter) {
+            return null;
+          }
+          return hitIndex;
         }
 
         void select(Offset position) => onSelectionChanged(hitTest(position));
@@ -138,9 +149,12 @@ class _MarketDonutRenderer extends ChartRenderer {
     for (var index = 0; index < slices.length; index++) {
       final slice = slices[index];
       final sweep = math.max(0, slice.value) / total * math.pi * 2 * progress;
-      final requestedOuter = index == selectedIndex ? selectedRadius : radius;
-      final outer = math.min(requestedOuter, maxOuter);
-      final inner = math.min(centerSpaceRadius, outer - 1);
+      final sectionRadius = index == selectedIndex ? selectedRadius : radius;
+      final outer = math.min(centerSpaceRadius + sectionRadius, maxOuter);
+      final inner = math.min(
+        centerSpaceRadius,
+        math.max(0, outer - 1),
+      );
       final strokeWidth = math.max(1.0, outer - inner);
       final ringRadius = inner + strokeWidth / 2;
 
