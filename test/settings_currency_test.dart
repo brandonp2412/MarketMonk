@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
 import 'sqlite_test_support.dart';
+import 'test_log_support.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -181,6 +182,7 @@ void main() {
   });
 
   test('failed display-rate refresh can be retried', () async {
+    silenceTalkerForTest();
     await seedTestSqlite({
       'visibleCurrencies': ['NZD', 'USD'],
       'displayCurrency': 'USD',
@@ -233,6 +235,7 @@ void main() {
   });
 
   test('ticker sync continues after an individual ticker fails', () async {
+    silenceTalkerForTest();
     final settings = SettingsState();
     await settings.initialized;
     final synced = <String>[];

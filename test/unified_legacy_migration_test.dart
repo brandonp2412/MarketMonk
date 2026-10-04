@@ -5,8 +5,10 @@ import 'package:market_monk/legacy_app_state_database.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/legacy_database_source.dart';
 import 'package:market_monk/legacy_profile_database.dart' as legacy;
+import 'test_log_support.dart';
 
 void main() {
+  setUp(allowMultipleDriftDatabasesForTest);
   test(
     'migrates populated Default and IBKR Bot profiles atomically and retry-safe',
     () async {

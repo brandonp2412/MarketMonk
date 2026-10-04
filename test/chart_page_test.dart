@@ -10,6 +10,7 @@ import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 import 'sqlite_test_support.dart';
+import 'test_log_support.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -433,6 +434,7 @@ void main() {
       );
     }
 
+    silenceTalkerForTest();
     var performanceLoads = 0;
     var performanceAvailable = false;
     Future<IbkrPerformanceSeries> performanceLoader(
@@ -678,7 +680,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Search stocks'));
+    await tester.tap(find.byType(SearchBar));
     await tester.pump();
 
     expect(find.text('Use "" anyway'), findsNothing);

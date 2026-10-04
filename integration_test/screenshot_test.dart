@@ -205,7 +205,9 @@ BuildContext getBuildContext(WidgetTester tester, TabBarState? tabBarState) {
 
 void navigateTo({required BuildContext context, required Widget page}) {
   unawaited(
-    Navigator.of(context).push(MaterialPageRoute(builder: (context) => page)),
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => page),
+    ),
   );
 }
 

@@ -6,19 +6,27 @@ import 'package:path_provider/path_provider.dart';
 
 /// Persists uncaught Flutter, platform, and zone errors for this app.
 class CrashLogger {
-  CrashLogger._(this._file);
+  CrashLogger._(this._file, {required bool emitConsoleOutput})
+      : _emitConsoleOutput = emitConsoleOutput;
 
   final File? _file;
+  final bool _emitConsoleOutput;
   static CrashLogger? _instance;
 
-  static Future<CrashLogger> install({String fileName = 'crash.log'}) async {
+  static Future<CrashLogger> install({
+    String fileName = 'crash.log',
+    bool emitConsoleOutput = true,
+  }) async {
     File? file;
     if (!kIsWeb) {
       final dir = await getApplicationSupportDirectory();
       file = File(p.join(dir.path, fileName));
     }
 
-    final logger = CrashLogger._(file);
+    final logger = CrashLogger._(
+      file,
+      emitConsoleOutput: emitConsoleOutput,
+    );
     _instance = logger;
 
     final previousFlutterOnError = FlutterError.onError;
@@ -32,7 +40,9 @@ class CrashLogger {
       return true;
     };
 
-    if (file != null) debugPrint('Crash log: ${file.path}');
+    if (file != null && emitConsoleOutput) {
+      debugPrint('Crash log: ${file.path}');
+    }
     return logger;
   }
 
@@ -44,7 +54,7 @@ class CrashLogger {
     if (stack != null) entry.writeln(stack.toString().trimRight());
     entry.writeln();
 
-    debugPrint(entry.toString());
+    if (_emitConsoleOutput) debugPrint(entry.toString());
     final file = _file;
     if (file == null) return;
 

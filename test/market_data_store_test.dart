@@ -7,6 +7,7 @@ import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/legacy_profile_database.dart' as legacy;
 import 'package:market_monk/utils.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
+import 'test_log_support.dart';
 
 YahooFinanceCandleData _yahooCandle(DateTime date, {double close = 100}) {
   return YahooFinanceCandleData(
@@ -33,6 +34,7 @@ void main() {
 
   test('legacy profile candles merge globally by canonical symbol and day',
       () async {
+    allowMultipleDriftDatabasesForTest();
     final target = Database.connect(NativeDatabase.memory());
     final defaultProfile =
         legacy.LegacyProfileDatabase.connect(NativeDatabase.memory());
