@@ -300,32 +300,47 @@ class ChartsPageState extends State<ChartsPage>
       }
 
       final loadKey = [accountName, ibkrConfig.hashCode].join('|');
-      return _ibkrLoads.putIfAbsent(loadKey, () async {
-        try {
-          final snapshot = await (widget._ibkrLoader?.call(ibkrConfig) ??
-              IbkrApiClient(ibkrConfig).fetchPortfolio());
-          cacheIbkrAccountExchangeRate(snapshot);
-          final positions = await computeIbkrPositions(
-            snapshot.positions,
-            trades,
-          );
-          final currentValue = snapshot.netLiquidation;
-          final currentValueUsd = snapshot.netLiquidationUsd?.value;
-          await accountManager.cachePortfolio(
-            accountName,
-            positions,
-            snapshot.netLiquidation,
-            netLiquidationUsd: currentValueUsd,
+      try {
+        return await _ibkrLoads.putIfAbsent(loadKey, () async {
+          try {
+            final snapshot = await (widget._ibkrLoader?.call(ibkrConfig) ??
+                IbkrApiClient(ibkrConfig).fetchPortfolio());
+            cacheIbkrAccountExchangeRate(snapshot);
+            final positions = await computeIbkrPositions(
+              snapshot.positions,
+              trades,
+            );
+            final currentValue = snapshot.netLiquidation;
+            final currentValueUsd = snapshot.netLiquidationUsd?.value;
+            await accountManager.cachePortfolio(
+              accountName,
+              positions,
+              snapshot.netLiquidation,
+              netLiquidationUsd: currentValueUsd,
+            );
+            return _LoadedChartPortfolio(
+              positions: positions,
+              currentValue: currentValue,
+              currentValueUsd: currentValueUsd,
+            );
+          } finally {
+            _ibkrLoads.removeWhere((key, value) => key == loadKey);
+          }
+        });
+      } catch (error) {
+        if (cached != null) {
+          talker.warning(
+            'IBKR portfolio unavailable for $accountName; using cached data: '
+            '$error',
           );
           return _LoadedChartPortfolio(
-            positions: positions,
-            currentValue: currentValue,
-            currentValueUsd: currentValueUsd,
+            positions: cached.positions,
+            currentValue: cached.netLiquidation,
+            currentValueUsd: cached.netLiquidationUsd,
           );
-        } finally {
-          _ibkrLoads.removeWhere((key, value) => key == loadKey);
         }
-      });
+        rethrow;
+      }
     }
     if (!widget.isActive) {
       return const _LoadedChartPortfolio(
@@ -659,17 +674,25 @@ class ChartsPageState extends State<ChartsPage>
     }
 
     final loadKey = '$accountName|$period|${config.hashCode}';
-    return _ibkrPerformanceLoads.putIfAbsent(loadKey, () async {
-      try {
-        final performance =
-            await (widget._ibkrPerformanceLoader?.call(config, period) ??
-                IbkrApiClient(config).fetchPerformance(period));
-        await accountManager.cacheIbkrPerformance(accountName, performance);
-        return performance;
-      } finally {
-        _ibkrPerformanceLoads.removeWhere((key, value) => key == loadKey);
+    try {
+      return await _ibkrPerformanceLoads.putIfAbsent(loadKey, () async {
+        try {
+          final performance =
+              await (widget._ibkrPerformanceLoader?.call(config, period) ??
+                  IbkrApiClient(config).fetchPerformance(period));
+          await accountManager.cacheIbkrPerformance(accountName, performance);
+          return performance;
+        } finally {
+          _ibkrPerformanceLoads.removeWhere((key, value) => key == loadKey);
+        }
+      });
+    } catch (error) {
+      if (cached != null) {
+        talker.warning('IBKR performance unavailable; using cached data');
+        return cached;
       }
-    });
+      rethrow;
+    }
   }
 
   Future<({List<_DateValue> series, double twrPercent, double returnAmount})?>

@@ -736,4 +736,88 @@ void main() {
     );
     expect(tester.takeException(), null);
   });
+
+  testWidgets('IBKR chart keeps cached account when forced refresh fails',
+      (tester) async {
+    await seedTestSqlite({});
+
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.setIbkrConfig(
+      'Default',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'secret-token',
+      ),
+    );
+    await accounts.cachePortfolio(
+      'Default',
+      [
+        Position(
+          symbol: 'VOO',
+          name: 'VANGUARD S&P 500 ETF',
+          nativeCurrency: 'USD',
+          netShares: 10,
+          avgCost: 500,
+          currentPrice: 550,
+          firstBuyDate: DateTime(2025),
+          lastBuyDate: DateTime(2026),
+        ),
+      ],
+      const IbkrAccountValue(value: 5500, currency: 'USD'),
+      netLiquidationUsd: 5500,
+    );
+    await accounts.cacheIbkrPerformance(
+      'Default',
+      IbkrPerformanceSeries(
+        period: '1Y',
+        measure: 'TWR',
+        currency: 'USD',
+        startDate: DateTime(2025, 10, 1),
+        startNav: 5000,
+        dates: [DateTime(2026, 9, 1), DateTime(2026, 10, 1)],
+        nav: const [5250, 5500],
+        returnDates: [DateTime(2025, 10, 1), DateTime(2026, 10, 1)],
+        returns: const [0, 0.10],
+      ),
+    );
+
+    var portfolioLoads = 0;
+    var performanceLoads = 0;
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: ChartsPage(
+              ibkrLoader: (_) async {
+                portfolioLoads++;
+                throw StateError('backend offline');
+              },
+              ibkrPerformanceLoader: (_, __) async {
+                performanceLoads++;
+                throw StateError('backend offline');
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(MarketLineChart), findsOneWidget);
+    expect(find.text('Default'), findsOneWidget);
+
+    accounts.requestIbkrRefresh();
+    await tester.pumpAndSettle();
+
+    expect(portfolioLoads, 1);
+    expect(performanceLoads, 1);
+    expect(find.byType(MarketLineChart), findsOneWidget);
+    expect(find.text('Default'), findsOneWidget);
+  });
 }
