@@ -132,7 +132,7 @@ void main() {
       get: (uri, {headers}) async {
         requestedUri = uri;
         return http.Response(
-          '''{"read_only":true,"source":"client_portal","account":"****1234","days":3650,"includes_real_time":true,"trades":[{"symbol":"AAPL","name":"Apple Inc","currency":"USD","conid":265598,"quantity":5,"price":192.26,"trade_type":"open","trade_date":"2023-12-11"}]}''',
+          '''{"read_only":true,"source":"client_portal","account":"****1234","days":3650,"includes_real_time":true,"trades":[{"symbol":"AAPL","name":"Apple Inc","currency":"USD","conid":265598,"quantity":5,"price":192.26,"trade_type":"open","trade_date":"2023-12-11","realized_pnl":12.34,"commission":-1.25}]}''',
           200,
         );
       },
@@ -151,6 +151,27 @@ void main() {
     expect(trades.single.price, 192.26);
     expect(trades.single.tradeType, 'open');
     expect(trades.single.tradeDate, DateTime(2023, 12, 11));
+    expect(trades.single.realizedPnl, 12.34);
+    expect(trades.single.commission, 1.25);
+  });
+
+  test('IBKR client reports unavailable broker transaction history', () async {
+    final client = IbkrApiClient(
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'secret-token',
+      ),
+      get: (uri, {headers}) async => http.Response(
+        '{"read_only":true,"source":"native","days":3650,"available":false,"trades":[]}',
+        200,
+      ),
+    );
+
+    final history = await client.fetchTradeHistory();
+
+    expect(history.available, false);
+    expect(history.trades, isEmpty);
   });
 
   test('IBKR historical years are bounded', () {

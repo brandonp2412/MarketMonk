@@ -168,7 +168,8 @@ class HoldingsPageState extends State<HoldingsPage>
 
     final load = () async {
       try {
-        final brokerTrades = await IbkrApiClient(config).fetchTrades();
+        final tradeHistory = await IbkrApiClient(config).fetchTradeHistory();
+        final brokerTrades = tradeHistory.trades;
         final trades = [
           for (var index = 0; index < brokerTrades.length; index++)
             Trade(
@@ -181,13 +182,13 @@ class HoldingsPageState extends State<HoldingsPage>
               price: brokerTrades[index].price,
               tradeType: brokerTrades[index].tradeType,
               tradeDate: brokerTrades[index].tradeDate,
-              realizedPL: 0,
-              commission: 0,
+              realizedPL: brokerTrades[index].realizedPnl,
+              commission: brokerTrades[index].commission,
             ),
         ];
         _ibkrTrades = trades;
         _ibkrTradesAccount = accountName;
-        _ibkrTradeHistoryAvailable = true;
+        _ibkrTradeHistoryAvailable = tradeHistory.available;
         return trades;
       } catch (error, stackTrace) {
         _ibkrTrades = [];

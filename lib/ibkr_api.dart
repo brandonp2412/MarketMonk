@@ -106,6 +106,8 @@ class IbkrTrade {
   final double price;
   final String tradeType;
   final DateTime tradeDate;
+  final double realizedPnl;
+  final double commission;
 
   const IbkrTrade({
     required this.symbol,
@@ -116,6 +118,8 @@ class IbkrTrade {
     required this.price,
     required this.tradeType,
     required this.tradeDate,
+    required this.realizedPnl,
+    required this.commission,
   });
 
   factory IbkrTrade.fromJson(Map<String, dynamic> json) => IbkrTrade(
@@ -127,6 +131,31 @@ class IbkrTrade {
         price: (json['price'] as num?)?.toDouble() ?? 0,
         tradeType: json['trade_type'] as String? ?? '',
         tradeDate: _parseIbkrDate(json['trade_date']),
+        realizedPnl: (json['realized_pnl'] as num?)?.toDouble() ?? 0,
+        commission: (json['commission'] as num?)?.toDouble().abs() ?? 0,
+      );
+}
+
+/// Broker transaction-history payload, which may be unavailable for some IBKR backends.
+class IbkrTradeHistory {
+  final bool available;
+  final List<IbkrTrade> trades;
+
+  const IbkrTradeHistory({required this.available, required this.trades});
+
+  factory IbkrTradeHistory.fromJson(Map<String, dynamic> json) =>
+      IbkrTradeHistory(
+        available: json['available'] as bool? ?? true,
+        trades: (json['trades'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(IbkrTrade.fromJson)
+            .where(
+              (trade) =>
+                  trade.symbol.isNotEmpty &&
+                  trade.quantity != 0 &&
+                  trade.price.isFinite,
+            )
+            .toList(),
       );
 }
 
@@ -413,12 +442,12 @@ class IbkrApiClient {
     );
   }
 
-  /// Fetches up to [years] years of daily bars for a current IBKR stock position.
-  Future<List<IbkrTrade>> fetchTrades({int days = 3650}) {
+  /// Fetches broker transaction history and reports whether this backend provides it.
+  Future<IbkrTradeHistory> fetchTradeHistory({int days = 3650}) {
     if (days < 1 || days > 3650) {
       throw RangeError.range(days, 1, 3650, 'days');
     }
-    return backgroundNetworkCoordinator.coalesce<List<IbkrTrade>>(
+    return backgroundNetworkCoordinator.coalesce<IbkrTradeHistory>(
       'ibkr.trades',
       (config, days),
       () async {
@@ -426,20 +455,15 @@ class IbkrApiClient {
           '/v1/trades',
           queryParameters: {'days': '$days'},
         );
-        final body = _decodeJsonObject(response, '/v1/trades');
-        return (body['trades'] as List<dynamic>? ?? const [])
-            .whereType<Map<String, dynamic>>()
-            .map(IbkrTrade.fromJson)
-            .where(
-              (trade) =>
-                  trade.symbol.isNotEmpty &&
-                  trade.quantity != 0 &&
-                  trade.price.isFinite,
-            )
-            .toList();
+        return IbkrTradeHistory.fromJson(
+          _decodeJsonObject(response, '/v1/trades'),
+        );
       },
     );
   }
+
+  Future<List<IbkrTrade>> fetchTrades({int days = 3650}) async =>
+      (await fetchTradeHistory(days: days)).trades;
 
   Future<IbkrHistoricalSeries> fetchHistoricalCandles(
     String symbol, {

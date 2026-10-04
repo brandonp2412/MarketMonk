@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from ibkr_proxy import (
     ClientPortalIbkrClient,
     CommandPerformanceClient,
+    CommandTransactionsClient,
     Config,
     IbkrError,
     NativeIbkrClient,
@@ -31,6 +32,7 @@ def config(**overrides):
         "tws_port": 4001,
         "tws_client_id": 97,
         "performance_command": None,
+        "transactions_command": None,
     }
     values.update(overrides)
     return Config(**values)
@@ -61,6 +63,33 @@ def raw_performance(account_id="U1234567"):
             ],
         },
         "pm": "TWR",
+    }
+
+
+def raw_trades(account_id="U1234567"):
+    return {
+        "read_only": True,
+        "source": "flex",
+        "account_id": account_id,
+        "account": "****4567",
+        "days": 3650,
+        "available": True,
+        "available_from": "2022-01-01",
+        "includes_real_time": False,
+        "trades": [
+            {
+                "symbol": "AAPL",
+                "name": "APPLE INC",
+                "currency": "USD",
+                "conid": 265598,
+                "quantity": -5,
+                "price": 192.26,
+                "trade_type": "close",
+                "trade_date": "2026-09-30",
+                "realized_pnl": 123.45,
+                "commission": 1.25,
+            }
+        ],
     }
 
 
@@ -378,6 +407,7 @@ class ProxyTests(unittest.TestCase):
 
         history = client.transactions(3650)
 
+        self.assertTrue(history["available"])
         self.assertTrue(history["includes_real_time"])
         self.assertEqual(history["trades"][0]["symbol"], "AAPL")
         self.assertEqual(history["trades"][0]["name"], "Apple Inc")
@@ -388,6 +418,7 @@ class ProxyTests(unittest.TestCase):
             "pa/transactions",
             {
                 "acctIds": ["U1234567"],
+                "conids": [265598],
                 "currency": "USD",
                 "days": 3650,
             },
@@ -395,6 +426,28 @@ class ProxyTests(unittest.TestCase):
         self.assertIn(expected_call, client.posts)
         client.transactions(3650)
         self.assertEqual(client.posts.count(expected_call), 1)
+
+    def test_client_portal_prefers_command_backed_trade_history(self):
+        calls = []
+        transactions_client = SimpleNamespace(
+            transactions=lambda days: calls.append(days) or raw_trades()
+        )
+        client = ClientPortalIbkrClient(
+            config(
+                transactions_command=(
+                    "/opt/ibkrbot/market-monk/bin/ibkr-daily-bot",
+                    "web-trades",
+                )
+            ),
+            transactions_client=transactions_client,
+        )
+
+        history = client.transactions(3650)
+
+        self.assertEqual(calls, [3650])
+        self.assertEqual(history["source"], "flex")
+        self.assertTrue(history["available"])
+        self.assertEqual(history["trades"][0]["symbol"], "AAPL")
 
     def test_client_portal_returns_broker_twr_and_nav_history(self):
         client = RecordingIbkrClient()
@@ -469,6 +522,54 @@ class ProxyTests(unittest.TestCase):
         ):
             client.performance("1Y")
 
+    def test_command_transactions_client_returns_helper_history(self):
+        calls = []
+
+        def runner(command, **kwargs):
+            calls.append((command, kwargs))
+            return SimpleNamespace(
+                returncode=0,
+                stdout=json.dumps(raw_trades()),
+                stderr="",
+            )
+
+        client = CommandTransactionsClient(
+            config(
+                backend="native",
+                transactions_command=("ibkr-daily-bot", "web-trades"),
+            ),
+            runner=runner,
+        )
+
+        history = client.transactions(3650)
+
+        self.assertTrue(history["available"])
+        self.assertEqual(history["source"], "flex")
+        self.assertEqual(history["trades"][0]["realized_pnl"], 123.45)
+        self.assertEqual(
+            calls[0][0],
+            ["ibkr-daily-bot", "web-trades", "--days", "3650"],
+        )
+        self.assertEqual(calls[0][1]["timeout"], 180)
+        client.transactions(3650)
+        self.assertEqual(len(calls), 1)
+
+    def test_command_transactions_client_rejects_wrong_account(self):
+        client = CommandTransactionsClient(
+            config(
+                backend="native",
+                transactions_command=("ibkr-daily-bot", "web-trades"),
+            ),
+            runner=lambda *args, **kwargs: SimpleNamespace(
+                returncode=0,
+                stdout=json.dumps(raw_trades("U9999999")),
+                stderr="",
+            ),
+        )
+
+        with self.assertRaisesRegex(IbkrError, "wrong account"):
+            client.transactions(3650)
+
     def test_native_backend_prefers_configured_performance_command(self):
         client = NativeIbkrClient(
             config(
@@ -519,6 +620,31 @@ class ProxyTests(unittest.TestCase):
         self.assertEqual(performance["source"], "client_portal")
         self.assertEqual(performance["period"], "1Y")
         self.assertEqual(performance["returns"][-1], 0.0549)
+        self.assertFalse(fake.connected)
+
+    def test_native_backend_prefers_configured_transactions_command(self):
+        client = NativeIbkrClient(
+            config(
+                backend="native",
+                transactions_command=("ibkr-daily-bot", "web-trades"),
+            ),
+            ib_factory=FakeNativeIb,
+        )
+
+        self.assertIsInstance(client._transactions_client, CommandTransactionsClient)
+
+    def test_native_backend_marks_transaction_history_unavailable(self):
+        fake = FakeNativeIb()
+        client = NativeIbkrClient(
+            config(backend="native", tws_port=4003), ib_factory=lambda: fake
+        )
+
+        history = client.transactions(3650)
+
+        self.assertEqual(history["source"], "native")
+        self.assertEqual(history["days"], 3650)
+        self.assertFalse(history["available"])
+        self.assertEqual(history["trades"], [])
         self.assertFalse(fake.connected)
 
     def test_native_backend_reads_historical_candles_for_held_stock(self):

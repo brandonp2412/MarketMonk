@@ -35,6 +35,7 @@ class Config:
     tws_port: int
     tws_client_id: int
     performance_command: tuple[str, ...] | None
+    transactions_command: tuple[str, ...] | None
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -60,6 +61,14 @@ class Config:
             if performance_command_raw
             else None
         )
+        transactions_command_raw = os.getenv(
+            "MARKET_MONK_IBKR_TRADES_COMMAND", ""
+        ).strip()
+        transactions_command = (
+            tuple(shlex.split(transactions_command_raw))
+            if transactions_command_raw
+            else None
+        )
 
         if len(token) < 32:
             raise ValueError("MARKET_MONK_IBKR_TOKEN must be at least 32 characters")
@@ -74,6 +83,10 @@ class Config:
         if performance_command == ():
             raise ValueError(
                 "MARKET_MONK_IBKR_PERFORMANCE_COMMAND must contain an executable"
+            )
+        if transactions_command == ():
+            raise ValueError(
+                "MARKET_MONK_IBKR_TRADES_COMMAND must contain an executable"
             )
 
         parsed = urlparse(gateway_url)
@@ -102,6 +115,7 @@ class Config:
             tws_port=tws_port,
             tws_client_id=tws_client_id,
             performance_command=performance_command,
+            transactions_command=transactions_command,
         )
 
 
@@ -113,7 +127,7 @@ _PORTFOLIO_ANALYST_CACHE_SECONDS = 15 * 60 + 5
 
 
 class ClientPortalIbkrClient:
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, transactions_client: Any | None = None):
         self._config = config
         context = ssl.create_default_context()
         if not config.verify_gateway_tls:
@@ -122,6 +136,12 @@ class ClientPortalIbkrClient:
         self._opener = build_opener(HTTPSHandler(context=context))
         self._performance_cache: dict[str, tuple[float, dict[str, Any]]] = {}
         self._transactions_cache: dict[int, tuple[float, dict[str, Any]]] = {}
+        if transactions_client is not None:
+            self._transactions_client = transactions_client
+        elif config.transactions_command:
+            self._transactions_client = CommandTransactionsClient(config)
+        else:
+            self._transactions_client = None
 
     def ensure_account_visible(self) -> str:
         accounts = self._get("portfolio/accounts")
@@ -215,6 +235,10 @@ class ClientPortalIbkrClient:
         return result
 
     def transactions(self, days: int) -> dict[str, Any]:
+        transactions_client = getattr(self, "_transactions_client", None)
+        if transactions_client is not None:
+            return transactions_client.transactions(days)
+
         cached = self._transactions_cache.get(days)
         now = time.monotonic()
         if (
@@ -224,13 +248,52 @@ class ClientPortalIbkrClient:
             return cached[1]
 
         account = self.ensure_account_visible()
-        raw = self._post(
-            "pa/transactions",
-            {"acctIds": [account], "currency": "USD", "days": days},
-        )
         quoted_account = quote(account, safe="")
         positions = self._get(f"portfolio2/{quoted_account}/positions")
-        result = _normalize_web_transactions(raw, positions, account, days)
+        if not isinstance(positions, list):
+            raise IbkrError("IBKR returned an invalid position list")
+
+        conids: list[int] = []
+        for raw_position in positions:
+            if not isinstance(raw_position, dict):
+                continue
+            conid = _number(raw_position.get("conid"), integer=True)
+            if conid is None or conid <= 0:
+                continue
+            value = int(conid)
+            if value not in conids:
+                conids.append(value)
+
+        transactions: list[Any] = []
+        includes_real_time = True
+        for conid in conids:
+            raw = self._post(
+                "pa/transactions",
+                {
+                    "acctIds": [account],
+                    "conids": [conid],
+                    "currency": "USD",
+                    "days": days,
+                },
+            )
+            if not isinstance(raw, dict) or not isinstance(
+                raw.get("transactions"), list
+            ):
+                raise IbkrError("IBKR returned invalid transaction history")
+            transactions.extend(raw["transactions"])
+            includes_real_time = (
+                includes_real_time and raw.get("includesRealTime") is True
+            )
+
+        result = _normalize_web_transactions(
+            {
+                "transactions": transactions,
+                "includesRealTime": includes_real_time,
+            },
+            positions,
+            account,
+            days,
+        )
         self._transactions_cache[days] = (now, result)
         return result
 
@@ -332,12 +395,73 @@ class CommandPerformanceClient:
         return result
 
 
+class CommandTransactionsClient:
+    def __init__(
+        self,
+        config: Config,
+        runner: Callable[..., Any] = subprocess.run,
+    ):
+        if not config.transactions_command:
+            raise ValueError("MARKET_MONK_IBKR_TRADES_COMMAND is not configured")
+        if not config.account_id:
+            raise ValueError(
+                "IBKR_ACCOUNT_ID is required for command-backed transaction history"
+            )
+        self._config = config
+        self._runner = runner
+        self._transactions_cache: dict[int, tuple[float, dict[str, Any]]] = {}
+
+    def transactions(self, days: int) -> dict[str, Any]:
+        cached = self._transactions_cache.get(days)
+        now = time.monotonic()
+        if (
+            cached is not None
+            and now - cached[0] < _PORTFOLIO_ANALYST_CACHE_SECONDS
+        ):
+            return cached[1]
+
+        command = [*self._config.transactions_command, "--days", str(days)]
+        try:
+            completed = self._runner(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=180,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise IbkrError("Cannot run IBKR historical trades helper") from error
+        if completed.returncode != 0:
+            raise IbkrError(
+                "IBKR historical trades helper failed "
+                f"with exit status {completed.returncode}"
+            )
+        try:
+            raw = json.loads(completed.stdout)
+        except (json.JSONDecodeError, TypeError) as error:
+            raise IbkrError("IBKR historical trades helper returned invalid JSON") from error
+        if not isinstance(raw, dict):
+            raise IbkrError("IBKR historical trades helper returned invalid JSON")
+        helper_account = raw.pop("account_id", None)
+        if helper_account != self._config.account_id:
+            raise IbkrError(
+                "IBKR historical trades helper returned data for the wrong account"
+            )
+        raw["account"] = _mask_account(self._config.account_id)
+        if raw.get("available") is not True or not isinstance(raw.get("trades"), list):
+            raise IbkrError("IBKR historical trades helper returned incomplete data")
+
+        self._transactions_cache[days] = (now, raw)
+        return raw
+
+
 class NativeIbkrClient:
     def __init__(
         self,
         config: Config,
         ib_factory: Callable[[], Any] | None = None,
         performance_client: Any | None = None,
+        transactions_client: Any | None = None,
     ):
         self._config = config
         if performance_client is not None:
@@ -346,6 +470,12 @@ class NativeIbkrClient:
             self._performance_client = CommandPerformanceClient(config)
         else:
             self._performance_client = ClientPortalIbkrClient(config)
+        if transactions_client is not None:
+            self._transactions_client = transactions_client
+        elif config.transactions_command:
+            self._transactions_client = CommandTransactionsClient(config)
+        else:
+            self._transactions_client = None
         if ib_factory is None:
             try:
                 from ib_async import IB
@@ -444,10 +574,17 @@ class NativeIbkrClient:
         return self._performance_client.performance(period)
 
     def transactions(self, days: int) -> dict[str, Any]:
-        raise IbkrError(
-            "IBKR transaction history is not available from the native "
-            "portfolio connection"
-        )
+        if self._transactions_client is not None:
+            return self._transactions_client.transactions(days)
+        return {
+            "read_only": True,
+            "source": "native",
+            "account": _mask_account(self._config.account_id or ""),
+            "days": days,
+            "available": False,
+            "includes_real_time": False,
+            "trades": [],
+        }
 
     def _connect(self) -> Any:
         ib = self._ib_factory()
@@ -714,6 +851,7 @@ def _normalize_web_transactions(
         "source": "client_portal",
         "account": _mask_account(account),
         "days": days,
+        "available": True,
         "includes_real_time": raw.get("includesRealTime") is True,
         "trades": normalized,
     }
