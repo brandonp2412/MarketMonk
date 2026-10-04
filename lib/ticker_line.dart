@@ -1,14 +1,15 @@
 // ignore_for_file: prefer_interpolation_to_compose_strings
 
-import 'package:fl_chart/fl_chart.dart';
+import 'package:drafter/drafter.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 
 class TickerLine extends StatelessWidget {
-  final List<FlSpot> spots;
+  final List<MarketLineChartPoint> spots;
   final Iterable<DateTime> dates;
 
   /// ISO 4217 currency the [spots] values are denominated in.
@@ -21,139 +22,42 @@ class TickerLine extends StatelessWidget {
     this.nativeCurrency = 'USD',
   });
 
-  Widget getBottomTitles(
-    double value,
-    TitleMeta meta,
-    BuildContext context,
-    DateFormat formatter,
-  ) {
-    const style = TextStyle(fontSize: 12);
-    Widget text;
-
-    double screenWidth = MediaQuery.of(context).size.width;
-    double labelWidth = 120;
-    int labelCount = (screenWidth / labelWidth).floor();
-    List<int> indices = List.generate(labelCount, (index) {
-      return ((spots.length - 1) * index / (labelCount - 1)).round();
-    });
-
-    if (indices.contains(value.toInt())) {
-      DateTime date = dates.elementAt(value.toInt());
-      text = Text(formatter.format(date), style: style);
-    } else {
-      text = const Text('', style: style);
-    }
-
-    return SideTitleWidget(
-      meta: meta,
-      fitInside: SideTitleFitInsideData.fromTitleMeta(meta),
-      child: text,
-    );
+  String tooltipTextAt(int index, DateFormat formatter) {
+    if (index < 0 || index >= spots.length) return '';
+    final date = dates.elementAtOrNull(index);
+    if (date == null) return '';
+    final price = fmtNativeCurrency(spots[index].y, nativeCurrency);
+    return '$price · ${formatter.format(date)}';
   }
 
   @override
   Widget build(BuildContext context) {
-    List<Color> gradientColors = [
-      Theme.of(context).colorScheme.primary,
-      Theme.of(context).colorScheme.surface,
-    ];
-
     final settings = context.watch<SettingsState>();
     final formatter = DateFormat(settings.dateFormat);
+    final colorScheme = Theme.of(context).colorScheme;
+    final labels = [for (final date in dates) formatter.format(date)];
 
-    const leftOuterInset = 8.0;
-    const axisGutter = 64.0;
-    const chartTrailingInset = 16.0;
-
-    return Padding(
-      padding: const EdgeInsets.only(
-        left: leftOuterInset,
-        right: chartTrailingInset,
-        top: 24.0,
-      ),
-      child: LineChart(
-        LineChartData(
-          borderData: FlBorderData(show: false),
-          clipData: const FlClipData.all(),
-          titlesData: FlTitlesData(
-            topTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            rightTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: axisGutter,
-                minIncluded: false,
-                maxIncluded: false,
-                getTitlesWidget: (value, meta) => SideTitleWidget(
-                  meta: meta,
-                  child: Text(
-                    fmtCompactNativeCurrency(value, nativeCurrency),
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                ),
-              ),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 27,
-                interval: 1,
-                getTitlesWidget: (value, meta) =>
-                    getBottomTitles(value, meta, context, formatter),
-              ),
-            ),
-          ),
-          lineBarsData: [
-            LineChartBarData(
-              spots: spots,
-              color: Theme.of(context).colorScheme.primary,
-              isCurved: settings.curveLines,
-              curveSmoothness: settings.curveSmoothness,
-              preventCurveOverShooting: true,
-              barWidth: 3,
-              dotData: const FlDotData(show: false),
-              belowBarData: BarAreaData(
-                show: true,
-                gradient: LinearGradient(
-                  colors: gradientColors
-                      .map((color) => color.withValues(alpha: 0.3))
-                      .toList(),
-                ),
-              ),
-            ),
-          ],
-          gridData: const FlGridData(show: false),
-          lineTouchData: LineTouchData(
-            touchTooltipData: LineTouchTooltipData(
-              fitInsideHorizontally: true,
-              fitInsideVertically: true,
-              getTooltipColor: (touchedSpot) =>
-                  Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
-              getTooltipItems: (touchedSpots) =>
-                  getTooltip(touchedSpots, context, formatter),
-            ),
-          ),
+    return MarketLineChart(
+      series: [
+        MarketLineChartSeries(
+          points: spots,
+          color: colorScheme.primary,
+          name: nativeCurrency,
+          fill: true,
+          strokeWidth: 3,
         ),
-      ),
+      ],
+      xLabels: labels,
+      pointCount: spots.length,
+      yLabelFormatter: (value) =>
+          fmtCompactNativeCurrency(value, nativeCurrency),
+      tooltipRowLabel: (PlotMark mark) => tooltipTextAt(mark.index, formatter),
+      curveLines: settings.curveLines,
+      curveSmoothness: settings.curveSmoothness,
+      leftInset: 64,
+      accessibilityLabel: 'Price history',
+      accessibilityValue:
+          spots.isEmpty ? 'No prices' : '${spots.length} price points',
     );
-  }
-
-  List<LineTooltipItem> getTooltip(
-    List<LineBarSpot> touchedSpots,
-    BuildContext context,
-    DateFormat formatter,
-  ) {
-    final price = fmtNativeCurrency(touchedSpots.first.y, nativeCurrency);
-    final dateStr = dates.elementAtOrNull(touchedSpots.first.x.toInt());
-    if (dateStr == null) return [];
-    final date = formatter.format(dateStr);
-
-    return [
-      LineTooltipItem('$price · $date', Theme.of(context).textTheme.bodyLarge!),
-    ];
   }
 }

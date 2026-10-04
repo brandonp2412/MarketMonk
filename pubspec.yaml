@@ -12,7 +12,7 @@ dependencies:
   archive: ^4.0.9
   cupertino_icons: ^1.0.8
   yahoo_finance_data_reader: ^1.0.11
-  fl_chart: ^1.2.0
+  drafter: ^0.3.0
   intl: ^0.20.1
   drift: 2.34.0
   drift_flutter: ^0.3.0

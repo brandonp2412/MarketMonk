@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/adaptive_layout.dart';
@@ -11,6 +10,7 @@ import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/ibkr_cash_out_pnl.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/market_donut_chart.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
@@ -785,30 +785,21 @@ class PortfolioPageState extends State<PortfolioPage>
         ? touchedIndex
         : null;
 
-    final sections = List.generate(sorted.length, (index) {
-      final position = sorted[index];
-      final val = position.currentValue;
-      final pct = totalValue > 0 ? val / totalValue * 100 : 0.0;
-      final isTouched = index == selectedIndex;
-      return PieChartSectionData(
-        value: val,
+    final slices = List.generate(
+      sorted.length,
+      (index) => MarketDonutSlice(
+        value: sorted[index].currentValue,
         color: colors[index],
-        radius: isTouched ? 90 : 75,
-        title: isTouched ? '${pct.toStringAsFixed(1)}%' : '',
-        titleStyle: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
-      );
-    });
+        label: sorted[index].symbol,
+      ),
+    );
 
     if (isDesktopLayout(context)) {
       return _buildDesktopPortfolio(
         positions: positions,
         sorted: sorted,
         colors: colors,
-        sections: sections,
+        slices: slices,
         selectedIndex: selectedIndex,
         totalValue: totalValue,
         netLiquidation: netLiquidation,
@@ -866,27 +857,16 @@ class PortfolioPageState extends State<PortfolioPage>
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  PieChart(
-                    PieChartData(
-                      sections: sections,
-                      centerSpaceRadius: 55,
-                      sectionsSpace: 0,
-                      pieTouchData: PieTouchData(
-                        touchCallback: (event, response) {
-                          setState(() {
-                            if (!event.isInterestedForInteractions ||
-                                response == null ||
-                                response.touchedSection == null) {
-                              touchedIndex = null;
-                              return;
-                            }
-                            final idx =
-                                response.touchedSection!.touchedSectionIndex;
-                            touchedIndex = idx >= 0 ? idx : null;
-                          });
-                        },
-                      ),
-                    ),
+                  MarketDonutChart(
+                    slices: slices,
+                    selectedIndex: selectedIndex,
+                    onSelectionChanged: (index) {
+                      if (index == touchedIndex) return;
+                      setState(() => touchedIndex = index);
+                    },
+                    centerSpaceRadius: 55,
+                    radius: 75,
+                    selectedRadius: 90,
                   ),
                   if (selectedIndex != null)
                     IgnorePointer(
@@ -952,45 +932,27 @@ class PortfolioPageState extends State<PortfolioPage>
   }
 
   Widget _buildDesktopAllocationChart({
-    required List<PieChartSectionData> sections,
+    required List<MarketDonutSlice> slices,
     required List<Position> sorted,
     required int? selectedIndex,
     required bool compact,
   }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final chartSections = compact
-        ? sections
-            .map(
-              (section) =>
-                  section.copyWith(radius: section.radius > 75 ? 60 : 54),
-            )
-            .toList()
-        : sections;
 
     return Stack(
       alignment: Alignment.center,
       children: [
-        PieChart(
-          PieChartData(
-            sections: chartSections,
-            centerSpaceRadius: compact ? 48 : 72,
-            sectionsSpace: 0,
-            pieTouchData: PieTouchData(
-              touchCallback: (event, response) {
-                setState(() {
-                  if (!event.isInterestedForInteractions ||
-                      response == null ||
-                      response.touchedSection == null) {
-                    touchedIndex = null;
-                    return;
-                  }
-                  final index = response.touchedSection!.touchedSectionIndex;
-                  touchedIndex = index >= 0 ? index : null;
-                });
-              },
-            ),
-          ),
+        MarketDonutChart(
+          slices: slices,
+          selectedIndex: selectedIndex,
+          onSelectionChanged: (index) {
+            if (index == touchedIndex) return;
+            setState(() => touchedIndex = index);
+          },
+          centerSpaceRadius: compact ? 48 : 72,
+          radius: compact ? 54 : 75,
+          selectedRadius: compact ? 60 : 90,
         ),
         IgnorePointer(
           child: SizedBox(
@@ -1031,7 +993,7 @@ class PortfolioPageState extends State<PortfolioPage>
     required List<Position> positions,
     required List<Position> sorted,
     required List<Color> colors,
-    required List<PieChartSectionData> sections,
+    required List<MarketDonutSlice> slices,
     required int? selectedIndex,
     required double totalValue,
     required IbkrAccountValue? netLiquidation,
@@ -1270,7 +1232,7 @@ class PortfolioPageState extends State<PortfolioPage>
                                   child: AspectRatio(
                                     aspectRatio: 1,
                                     child: _buildDesktopAllocationChart(
-                                      sections: sections,
+                                      slices: slices,
                                       sorted: sorted,
                                       selectedIndex: selectedIndex,
                                       compact: compact,

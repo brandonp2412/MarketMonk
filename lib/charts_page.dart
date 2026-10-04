@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:drift/drift.dart' hide Column;
-import 'package:fl_chart/fl_chart.dart';
+import 'package:drafter/drafter.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/candle_ticker.dart';
@@ -13,6 +13,7 @@ import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/portfolio_chart_scale.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
@@ -1299,10 +1300,8 @@ class ChartsPageState extends State<ChartsPage>
     ];
     final hasText = _searchController.text.isNotEmpty;
 
-    // Stack layout: the chart fills the full height so fl_chart's tooltip
-    // canvas extends behind the search bar, letting tooltips render above
-    // their data points without being obscured. The search bar floats on top
-    // as the last-painted child (highest z-order).
+    // The chart fills the available height so the Drafter tooltip overlay can
+    // render above its data points without being obscured by the search bar.
     return PopScope<void>(
       canPop: !hasText,
       onPopInvokedWithResult: (didPop, result) {
@@ -1624,9 +1623,13 @@ class ChartsPageState extends State<ChartsPage>
     }
 
     final candles = snapshot.data!.map((tc) => tc.candle).toList();
-    final spots = <FlSpot>[
+    final spots = <MarketLineChartPoint>[
       for (var index = 0; index < candles.length; index++)
-        FlSpot(index.toDouble(), candles[index].close.value / _centDivisor),
+        MarketLineChartPoint(
+          index.toDouble(),
+          candles[index].close.value / _centDivisor,
+          column: index,
+        ),
     ];
 
     return SizedBox(
@@ -1777,7 +1780,7 @@ class ChartsPageState extends State<ChartsPage>
     SettingsState settings,
     List<Color> accountColors,
   ) {
-    final height = MediaQuery.of(context).size.height * 0.34;
+    final height = MediaQuery.of(context).size.height * 0.30;
 
     if (_portfolioLoading) {
       return SizedBox(
@@ -1844,7 +1847,9 @@ class ChartsPageState extends State<ChartsPage>
 
     final allDates = <DateTime>{};
     for (final series in visibleSeries.values) {
-      for (final dv in series) allDates.add(dv.date);
+      for (final point in series) {
+        allDates.add(point.date);
+      }
     }
     final sortedDates = allDates.toList()..sort();
     final dateIndex = <DateTime, int>{
@@ -1854,44 +1859,30 @@ class ChartsPageState extends State<ChartsPage>
 
     final singleLine = visibleSeries.length == 1;
     final scaleForComparison = !singleLine;
-    final axisGutter = scaleForComparison ? 72.0 : 64.0;
-    const chartTrailingInset = 16.0;
-    final lineBarsData = <LineChartBarData>[];
+    final chartSeries = <MarketLineChartSeries>[];
     for (final entry in visibleSeries.entries) {
-      final idx = accounts.indexOf(entry.key);
-      final color = accountColors[idx.clamp(0, accountColors.length - 1)];
+      final accountIndex = accounts.indexOf(entry.key);
+      final color =
+          accountColors[accountIndex.clamp(0, accountColors.length - 1)];
       final displayValues = scaleForComparison
           ? scalePortfolioSeriesForComparison(
               entry.value.map((point) => point.value),
             )
           : entry.value.map((point) => point.value).toList(growable: false);
-      final spots = [
-        for (var index = 0; index < entry.value.length; index++)
-          FlSpot(
-            dateIndex[entry.value[index].date]!.toDouble(),
-            displayValues[index],
-          ),
-      ];
-      lineBarsData.add(
-        LineChartBarData(
-          spots: spots,
+      chartSeries.add(
+        MarketLineChartSeries(
+          name: entry.key,
           color: color,
-          isCurved: settings.curveLines,
-          curveSmoothness: settings.curveSmoothness,
-          preventCurveOverShooting: true,
-          barWidth: 2.5,
-          dotData: const FlDotData(show: false),
-          belowBarData: BarAreaData(
-            show: true,
-            gradient: LinearGradient(
-              colors: [
-                color.withValues(alpha: 0.3),
-                Theme.of(context).colorScheme.surface.withValues(alpha: 0.0),
-              ],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-          ),
+          strokeWidth: 2.5,
+          fill: true,
+          points: [
+            for (var index = 0; index < entry.value.length; index++)
+              MarketLineChartPoint(
+                dateIndex[entry.value[index].date]!.toDouble(),
+                displayValues[index],
+                column: dateIndex[entry.value[index].date]!,
+              ),
+          ],
         ),
       );
     }
@@ -1901,123 +1892,40 @@ class ChartsPageState extends State<ChartsPage>
 
     return SizedBox(
       height: height,
-      child: Padding(
-        padding: const EdgeInsets.only(top: 8, right: chartTrailingInset),
-        child: LineChart(
-          LineChartData(
-            clipData: const FlClipData.all(),
-            borderData: FlBorderData(show: false),
-            titlesData: FlTitlesData(
-              topTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: false),
-              ),
-              rightTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: false),
-              ),
-              leftTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  reservedSize: axisGutter,
-                  minIncluded: false,
-                  maxIncluded: false,
-                  getTitlesWidget: (value, meta) => SideTitleWidget(
-                    meta: meta,
-                    child: Text(
-                      scaleForComparison
-                          ? fmtChartAxisPercent(value)
-                          : fmtCompactCurrency(value),
-                      maxLines: 1,
-                      softWrap: false,
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ),
-                ),
-              ),
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  reservedSize: 27,
-                  interval: 1,
-                  getTitlesWidget: (value, meta) {
-                    final dateIndexValue = value.toInt();
-                    if (dateIndexValue < 0 ||
-                        dateIndexValue >= sortedDates.length) {
-                      return const SizedBox();
-                    }
-                    final screenWidth = MediaQuery.of(context).size.width;
-                    final labelCount = (screenWidth / 120).floor();
-                    final indices = List.generate(labelCount, (labelIndex) {
-                      return ((sortedDates.length - 1) *
-                              labelIndex /
-                              (labelCount - 1))
-                          .round();
-                    });
-                    if (!indices.contains(dateIndexValue)) {
-                      return const SizedBox();
-                    }
-                    return SideTitleWidget(
-                      meta: meta,
-                      fitInside: SideTitleFitInsideData.fromTitleMeta(meta),
-                      child: Text(
-                        formatter.format(sortedDates[dateIndexValue]),
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-            lineBarsData: lineBarsData,
-            gridData: const FlGridData(show: false),
-            lineTouchData: LineTouchData(
-              touchTooltipData: LineTouchTooltipData(
-                fitInsideHorizontally: true,
-                fitInsideVertically: true,
-                maxContentWidth: 240,
-                getTooltipColor: (_) => Theme.of(context)
-                    .colorScheme
-                    .surface
-                    .withValues(alpha: 0.9),
-                getTooltipItems: (touchedSpots) {
-                  return touchedSpots.map((spot) {
-                    final touchedIndex = spot.x.toInt();
-                    final date =
-                        (touchedIndex >= 0 && touchedIndex < sortedDates.length)
-                            ? formatter.format(sortedDates[touchedIndex])
-                            : '';
-                    final accountName = spot.barIndex < visibleKeys.length
-                        ? visibleKeys[spot.barIndex]
-                        : '';
-                    final accountIdx = accounts.indexOf(accountName);
-                    final spotColor = accountColors[accountIdx.clamp(
-                      0,
-                      accountColors.length - 1,
-                    )];
-                    double? actualValue;
-                    if (touchedIndex >= 0 &&
-                        touchedIndex < sortedDates.length) {
-                      for (final point in visibleSeries[accountName] ??
-                          const <_DateValue>[]) {
-                        if (point.date == sortedDates[touchedIndex]) {
-                          actualValue = point.value;
-                          break;
-                        }
-                      }
-                    }
-                    final valueLabel = fmtCurrency(actualValue ?? spot.y);
-                    return LineTooltipItem(
-                      '$valueLabel · $date',
-                      Theme.of(context)
-                          .textTheme
-                          .bodySmall!
-                          .copyWith(color: spotColor),
-                    );
-                  }).toList();
-                },
-              ),
-            ),
-          ),
-        ),
+      child: MarketLineChart(
+        series: chartSeries,
+        xLabels: [for (final date in sortedDates) formatter.format(date)],
+        pointCount: sortedDates.length,
+        yLabelFormatter: (value) => scaleForComparison
+            ? fmtChartAxisPercent(value)
+            : fmtCompactCurrency(value),
+        tooltipRowLabel: (PlotMark mark) {
+          final accountName = mark.seriesIndex < visibleKeys.length
+              ? visibleKeys[mark.seriesIndex]
+              : '';
+          final date = mark.index >= 0 && mark.index < sortedDates.length
+              ? sortedDates[mark.index]
+              : null;
+          double? actualValue;
+          if (date != null) {
+            for (final point
+                in visibleSeries[accountName] ?? const <_DateValue>[]) {
+              if (point.date == date) {
+                actualValue = point.value;
+                break;
+              }
+            }
+          }
+          final valueLabel = fmtCurrency(actualValue ?? mark.value);
+          final dateLabel = date == null ? '' : formatter.format(date);
+          return dateLabel.isEmpty ? valueLabel : '$valueLabel · $dateLabel';
+        },
+        curveLines: settings.curveLines,
+        curveSmoothness: settings.curveSmoothness,
+        leftInset: scaleForComparison ? 72 : 64,
+        accessibilityLabel: context.l10n.text('Portfolio performance'),
+        accessibilityValue:
+            '${chartSeries.length} ${context.l10n.text('portfolios')}',
       ),
     );
   }

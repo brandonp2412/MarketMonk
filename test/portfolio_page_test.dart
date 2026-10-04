@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/market_donut_chart.dart';
 import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
@@ -410,9 +410,9 @@ void main() {
       ),
     );
     expect(allocationList.padding, const EdgeInsets.only(right: 12));
-    final pieFinder = find.byType(PieChart).first;
-    final pie = tester.widget<PieChart>(pieFinder);
-    expect(pie.data.sectionsSpace, 0);
+    final pieFinder = find.byType(MarketDonutChart).first;
+    final pie = tester.widget<MarketDonutChart>(pieFinder);
+    expect(pie.radius, 75);
     final subtitleBottom = tester
         .getBottomLeft(find.text('How your stock portfolio is distributed'))
         .dy;
@@ -459,15 +459,13 @@ void main() {
     final subtitleBottom = tester
         .getBottomLeft(find.text('How your stock portfolio is distributed'))
         .dy;
-    final compactPieFinder = find.byType(PieChart).first;
+    final compactPieFinder = find.byType(MarketDonutChart).first;
     final pieTop = tester.getTopLeft(compactPieFinder).dy;
     expect(pieTop - subtitleBottom, greaterThanOrEqualTo(28));
-    final compactPie = tester.widget<PieChart>(compactPieFinder);
-    expect(compactPie.data.centerSpaceRadius, 48);
-    expect(
-      compactPie.data.sections.every((section) => section.radius <= 60),
-      isTrue,
-    );
+    final compactPie = tester.widget<MarketDonutChart>(compactPieFinder);
+    expect(compactPie.centerSpaceRadius, 48);
+    expect(compactPie.radius, 54);
+    expect(compactPie.selectedRadius, 60);
     expect(tester.takeException(), null);
   });
 
@@ -507,7 +505,7 @@ void main() {
         find.byKey(const Key('desktop-allocation-compact')),
         findsOneWidget,
       );
-      expect(find.byType(PieChart), findsOneWidget);
+      expect(find.byType(MarketDonutChart), findsOneWidget);
       expect(find.text('VOO'), findsNWidgets(2));
       expect(tester.takeException(), null);
     },
