@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'sqlite_test_support.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
@@ -86,9 +88,11 @@ void main() {
       // real scenario: AccountsPage is a child route inside the same Overlay
       // that MyApp's MaterialApp owns.
       final navContext = tester.element(find.byType(MyHomePage));
-      Navigator.of(
-        navContext,
-      ).push(MaterialPageRoute(builder: (_) => const AccountsPage()));
+      unawaited(
+        Navigator.of(
+          navContext,
+        ).push(MaterialPageRoute(builder: (_) => const AccountsPage())),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.byTooltip('Add account'));

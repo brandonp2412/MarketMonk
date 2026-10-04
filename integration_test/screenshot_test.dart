@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -198,7 +200,9 @@ BuildContext getBuildContext(WidgetTester tester, TabBarState? tabBarState) {
 }
 
 void navigateTo({required BuildContext context, required Widget page}) {
-  Navigator.of(context).push(MaterialPageRoute(builder: (context) => page));
+  unawaited(
+    Navigator.of(context).push(MaterialPageRoute(builder: (context) => page)),
+  );
 }
 
 Future<void> generateScreenshot({

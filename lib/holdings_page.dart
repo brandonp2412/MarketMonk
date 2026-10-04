@@ -1487,9 +1487,11 @@ class HoldingsPageState extends State<HoldingsPage>
   }
 
   void _openDetail(SymbolSummary s) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => TradeHistoryPage(summary: s)),
+    unawaited(
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => TradeHistoryPage(summary: s)),
+      ),
     );
   }
 
