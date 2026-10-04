@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:drift/drift.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -9,6 +8,7 @@ import 'package:market_monk/candle_ticker.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
@@ -89,14 +89,20 @@ class _EditTickerPageState extends State<EditTickerPage> {
     const weekExpression = CustomExpression<String>(
       "STRFTIME('%Y-%m-%W', DATE(\"date\", 'unixepoch', 'localtime'))",
     );
-    Iterable<Expression<Object>> groupBy = [marketDataDatabase.unifiedCandles.date];
+    Iterable<Expression<Object>> groupBy = [
+      marketDataDatabase.unifiedCandles.date,
+    ];
     if (years > 0 || months > 5) groupBy = [weekExpression];
 
     stream = (marketDataDatabase.selectOnly(marketDataDatabase.unifiedCandles)
-          ..addColumns([marketDataDatabase.unifiedCandles.date, marketDataDatabase.unifiedCandles.close])
+          ..addColumns([
+            marketDataDatabase.unifiedCandles.date,
+            marketDataDatabase.unifiedCandles.close,
+          ])
           ..where(
             marketDataDatabase.unifiedCandles.symbol.equals(marketSymbol) &
-                marketDataDatabase.unifiedCandles.date.isBiggerOrEqualValue(after),
+                marketDataDatabase.unifiedCandles.date
+                    .isBiggerOrEqualValue(after),
           )
           ..orderBy([
             OrderingTerm(
@@ -111,8 +117,12 @@ class _EditTickerPageState extends State<EditTickerPage> {
               .map(
                 (result) => CandleTicker(
                   candle: CandlesCompanion(
-                    date: Value(result.read(marketDataDatabase.unifiedCandles.date)!),
-                    close: Value(result.read(marketDataDatabase.unifiedCandles.close)!),
+                    date: Value(
+                      result.read(marketDataDatabase.unifiedCandles.date)!,
+                    ),
+                    close: Value(
+                      result.read(marketDataDatabase.unifiedCandles.close)!,
+                    ),
                   ),
                 ),
               )
@@ -144,9 +154,15 @@ class _EditTickerPageState extends State<EditTickerPage> {
         snapshot.data!.map((tickerCandle) => tickerCandle.candle).toList();
     if (candles.isEmpty) return const SizedBox();
     final centDiv = symbolCentDivisor(symbol.text.split(' ').first);
-    List<FlSpot> spots = [];
+    List<MarketLineChartPoint> spots = [];
     for (var index = 0; index < candles.length; index++) {
-      spots.add(FlSpot(index.toDouble(), candles[index].close.value / centDiv));
+      spots.add(
+        MarketLineChartPoint(
+          index.toDouble(),
+          candles[index].close.value / centDiv,
+          column: index,
+        ),
+      );
     }
 
     var percentChange = safePercentChange(

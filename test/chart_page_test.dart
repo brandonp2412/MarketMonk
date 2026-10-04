@@ -1,12 +1,13 @@
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
-import 'package:fl_chart/fl_chart.dart';
+import 'package:drafter/drafter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/portfolio_chart_scale.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
@@ -244,31 +245,40 @@ void main() {
         ),
       );
 
-      expect(find.byType(LineChart), findsNothing);
+      expect(find.byType(MarketLineChart), findsNothing);
       expect(find.bySemanticsLabel('Loading portfolio'), findsOneWidget);
 
       await tester.pump();
 
-      final chart = tester.widget<LineChart>(find.byType(LineChart));
-      final cachedSpots = chart.data.lineBarsData.single.spots;
+      final chart = tester.widget<MarketLineChart>(
+        find.byType(MarketLineChart),
+      );
+      final cachedSpots = chart.series.single.points;
       expect(cachedSpots, hasLength(5));
       expect(cachedSpots.first.y, closeTo(9400 / (10000 / 5750), 1e-6));
       expect(find.bySemanticsLabel('Loading portfolio'), findsNothing);
-      expect(
-        chart.data.lineTouchData.touchTooltipData.maxContentWidth,
-        240,
-      );
+      final cachedSpots = chart.series.single.points;
+      expect(cachedSpots, hasLength(6));
+      expect(find.bySemanticsLabel('Loading portfolio'), findsNothing);
 
-      final bar = chart.data.lineBarsData.single;
-      final tooltipItems = chart.data.lineTouchData.touchTooltipData
-          .getTooltipItems([LineBarSpot(bar, 0, bar.spots.last)]);
-      final tooltip = tooltipItems.single;
-      expect(tooltip, isA<LineTooltipItem>());
+      final lastSpot = cachedSpots.last;
+      final tooltip = chart.tooltipRowLabel(
+        PlotMark(
+          index: lastSpot.column!,
+          seriesIndex: 0,
+          seriesName: chart.series.single.name,
+          label: '',
+          value: lastSpot.y,
+          center: Offset.zero,
+          region: Rect.zero,
+          color: chart.series.single.color,
+        ),
+      );
       expect(
-        tooltip!.text,
+        tooltip,
         matches(RegExp(r'^\$[\d,.]+ · \d{1,2}/\d{1,2}/\d{2}$')),
       );
-      expect(tooltip.text, isNot(contains('\n')));
+      expect(tooltip, isNot(contains('\n')));
 
       await tester.pumpAndSettle();
     },
@@ -347,8 +357,9 @@ void main() {
       );
       await tester.pump();
 
-      final chart = tester.widget<LineChart>(find.byType(LineChart));
-      final spots = chart.data.lineBarsData.single.spots;
+      final chart =
+          tester.widget<MarketLineChart>(find.byType(MarketLineChart));
+      final spots = chart.series.single.points;
       expect(spots, hasLength(3));
       expect(spots.last.y, closeTo(9500 / 1.7, 1e-6));
 

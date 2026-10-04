@@ -8,7 +8,7 @@ const _uiTimeout = Duration(seconds: 15);
 const _nativeTimeout = Duration(seconds: 15);
 
 Future<void> openSettings(PatrolIntegrationTester $) async {
-  app.main();
+  await app.main();
   await $(Icons.settings).waitUntilVisible(timeout: _uiTimeout).tap();
   await $('Settings').waitUntilVisible(timeout: _uiTimeout);
 }

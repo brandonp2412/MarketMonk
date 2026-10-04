@@ -1,6 +1,5 @@
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -10,6 +9,7 @@ import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/main.dart' as app;
 import 'package:market_monk/main.dart';
+import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
@@ -232,11 +232,11 @@ Future<void> generateScreenshot({
   await tester.pumpAndSettle();
 
   if (tabBarState == TabBarState.chart && navigateToPage == null) {
-    final chartFinder = find.byType(LineChart);
+    final chartFinder = find.byType(MarketLineChart);
     expect(chartFinder, findsWidgets);
-    final chart = tester.widget<LineChart>(chartFinder.first);
+    final chart = tester.widget<MarketLineChart>(chartFinder.first);
     expect(
-      chart.data.lineBarsData.any((bar) => bar.spots.length > 1),
+      chart.series.any((line) => line.points.length > 1),
       isTrue,
       reason: 'The README chart screenshot must contain a visible data series.',
     );

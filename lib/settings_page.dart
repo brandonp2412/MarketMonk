@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/accounts_page.dart';
@@ -13,6 +12,7 @@ import 'package:market_monk/csv_import.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/settings_state.dart';
@@ -649,11 +649,11 @@ class _SettingsPageState extends State<SettingsPage> {
           height: 180,
           child: TickerLine(
             spots: const [
-              FlSpot(0, 0.13),
-              FlSpot(1, 5),
-              FlSpot(2, 2),
-              FlSpot(3, 10),
-              FlSpot(4, 5),
+              MarketLineChartPoint(0.0, 0.13, column: 0),
+              MarketLineChartPoint(1.0, 5, column: 1),
+              MarketLineChartPoint(2.0, 2, column: 2),
+              MarketLineChartPoint(3.0, 10, column: 3),
+              MarketLineChartPoint(4.0, 5, column: 4),
             ],
             dates: [
               DateTime.now().subtract(const Duration(days: 4)),
@@ -1124,11 +1124,11 @@ class _SettingsPageState extends State<SettingsPage> {
             height: MediaQuery.of(context).size.height * 0.3,
             child: TickerLine(
               spots: const [
-                FlSpot(0, 0.13),
-                FlSpot(1, 5),
-                FlSpot(2, 2),
-                FlSpot(3, 10),
-                FlSpot(4, 5),
+                MarketLineChartPoint(0.0, 0.13, column: 0),
+                MarketLineChartPoint(1.0, 5, column: 1),
+                MarketLineChartPoint(2.0, 2, column: 2),
+                MarketLineChartPoint(3.0, 10, column: 3),
+                MarketLineChartPoint(4.0, 5, column: 4),
               ],
               dates: [
                 DateTime.now().subtract(const Duration(days: 4)),
