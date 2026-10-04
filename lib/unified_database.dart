@@ -7,8 +7,6 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'unified_legacy_source.dart';
-import 'unified_legacy_source_stub.dart'
-    if (dart.library.io) 'unified_legacy_source_io.dart' as legacy_source;
 import 'unified_tables.dart';
 
 part 'unified_database.g.dart';
@@ -33,7 +31,7 @@ class UnifiedDatabase extends _$UnifiedDatabase {
   final Future<LegacyUnifiedSnapshot?> Function()? _legacySnapshotLoader;
 
   UnifiedDatabase()
-      : _legacySnapshotLoader = legacy_source.loadLegacyUnifiedSnapshot,
+      : _legacySnapshotLoader = null,
         super(_openConnection());
 
   UnifiedDatabase.connect(
@@ -56,6 +54,15 @@ class UnifiedDatabase extends _$UnifiedDatabase {
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (migrator) async {
+          await customStatement(
+            'DROP INDEX IF EXISTS idx_unified_profiles_sort_order',
+          );
+          await customStatement(
+            'DROP INDEX IF EXISTS idx_unified_trades_profile_symbol_date',
+          );
+          await migrator.createAll();
+        },
         beforeOpen: (_) async {
           await customStatement('PRAGMA foreign_keys = ON');
           final loader = _legacySnapshotLoader;
@@ -196,17 +203,32 @@ class UnifiedDatabase extends _$UnifiedDatabase {
         }
       }
 
-      for (final candle in bestCandles.values) {
-        await upsertCandle(
-          symbol: candle.symbol,
-          date: candle.date,
-          open: candle.open,
-          high: candle.high,
-          low: candle.low,
-          close: candle.close,
-          volume: candle.volume,
-          adjClose: candle.adjClose,
-        );
+      const candleBatchSize = 1000;
+      final candles = bestCandles.values.toList(growable: false);
+      for (var offset = 0; offset < candles.length; offset += candleBatchSize) {
+        final rows = candles
+            .skip(offset)
+            .take(candleBatchSize)
+            .map(
+              (candle) => UnifiedCandlesCompanion.insert(
+                symbol: candle.symbol,
+                date: candle.date,
+                open: Value(candle.open),
+                high: Value(candle.high),
+                low: Value(candle.low),
+                close: Value(candle.close),
+                volume: Value(candle.volume),
+                adjClose: Value(candle.adjClose),
+              ),
+            )
+            .toList(growable: false);
+        await batch((batch) {
+          batch.insertAll(
+            unifiedCandles,
+            rows,
+            mode: InsertMode.insertOrReplace,
+          );
+        });
       }
 
       await writeSetting(legacyMigrationCompleteKey, true);
@@ -461,7 +483,6 @@ class UnifiedDatabase extends _$UnifiedDatabase {
     );
   }
 
-
   Future<int> deleteIbkrSettings(String profileId) =>
       (delete(unifiedIbkrSettings)
             ..where((row) => row.profileId.equals(profileId)))
@@ -481,7 +502,6 @@ class UnifiedDatabase extends _$UnifiedDatabase {
           ))
         .getSingleOrNull();
   }
-
 
   Future<List<UnifiedIbkrCacheEntry>> readIbkrCaches(String profileId) =>
       (select(unifiedIbkrCacheEntries)

@@ -195,7 +195,7 @@ class RecordingIbkrClient(ClientPortalIbkrClient):
                         "l": 197,
                         "c": 200,
                         "v": 12.34,
-                        "t": 1787875200000,
+                        "t": 1787961600000,
                     }
                 ],
             }
@@ -396,6 +396,7 @@ class ProxyTests(unittest.TestCase):
 
         self.assertEqual(history["source"], "client_portal")
         self.assertEqual(history["currency"], "USD")
+        self.assertEqual(history["candles"][0]["date"], "2026-08-28")
         self.assertEqual(history["candles"][0]["close"], 200)
         self.assertEqual(history["candles"][0]["volume"], 1234)
         self.assertTrue(

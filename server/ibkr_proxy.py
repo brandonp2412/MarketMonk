@@ -15,6 +15,7 @@ import subprocess
 import time
 from dataclasses import dataclass
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
@@ -747,7 +748,11 @@ def _normalize_web_historical_bar(
     timestamp = _number(bar.get("t"))
     if timestamp is None or timestamp <= 0:
         raise IbkrError("IBKR returned an invalid historical candle date")
-    day = datetime.fromtimestamp(timestamp / 1000).date().isoformat()
+    day = (
+        datetime.fromtimestamp(timestamp / 1000, tz=ZoneInfo("America/New_York"))
+        .date()
+        .isoformat()
+    )
     return {
         "date": day,
         "open": _required_number(bar.get("o")),

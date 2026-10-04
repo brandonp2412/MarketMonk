@@ -22,8 +22,7 @@ YahooFinanceCandleData _yahooCandle(DateTime date, {double close = 100}) {
 
 DateTime _expectedMarketDay() {
   var day = canonicalMarketDay(DateTime.now());
-  while (day.weekday == DateTime.saturday ||
-      day.weekday == DateTime.sunday) {
+  while (day.weekday == DateTime.saturday || day.weekday == DateTime.sunday) {
     day = day.subtract(const Duration(days: 1));
   }
   return day;
@@ -174,6 +173,51 @@ void main() {
       },
     );
     expect(localRequests, 0);
+  });
+
+  test('IBKR candle import removes closed-weekend rows', () async {
+    final target = UnifiedDatabase.connect(NativeDatabase.memory());
+    addTearDown(target.close);
+
+    await target.upsertCandle(
+      symbol: 'AVUV',
+      date: DateTime(2026, 10, 3),
+      open: 100,
+      high: 101,
+      low: 99,
+      close: 100,
+      volume: 10,
+      adjClose: 100,
+    );
+
+    final stored = await insertIbkrCandles(
+      [
+        IbkrHistoricalCandle(
+          date: DateTime(2026, 10, 2),
+          open: 101,
+          high: 103,
+          low: 100,
+          close: 102,
+          volume: 1000,
+        ),
+        IbkrHistoricalCandle(
+          date: DateTime(2026, 10, 3),
+          open: 102,
+          high: 104,
+          low: 101,
+          close: 103,
+          volume: 1000,
+        ),
+      ],
+      'AVUV',
+      database: target,
+    );
+
+    final rows = await target.readCandles('AVUV');
+    expect(stored, 1);
+    expect(rows, hasLength(1));
+    expect(rows.single.date, DateTime(2026, 10, 2));
+    expect(rows.single.close, 102);
   });
 
   test('sync coalescing ignores account namespace for shared market data',

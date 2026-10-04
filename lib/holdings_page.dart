@@ -42,11 +42,19 @@ class SymbolSummary {
 class HoldingsPage extends StatefulWidget {
   final bool isActive;
   final Future<List<Position>> Function(List<Trade>)? _positionsLoader;
+  final Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? _ibkrLoader;
+  final Future<IbkrTradeHistory> Function(IbkrAccountConfig)?
+      _ibkrTradeHistoryLoader;
   const HoldingsPage({
     super.key,
     this.isActive = true,
     Future<List<Position>> Function(List<Trade>)? positionsLoader,
-  }) : _positionsLoader = positionsLoader;
+    Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? ibkrLoader,
+    Future<IbkrTradeHistory> Function(IbkrAccountConfig)?
+        ibkrTradeHistoryLoader,
+  })  : _positionsLoader = positionsLoader,
+        _ibkrLoader = ibkrLoader,
+        _ibkrTradeHistoryLoader = ibkrTradeHistoryLoader;
 
   @override
   State<HoldingsPage> createState() => HoldingsPageState();
@@ -69,7 +77,7 @@ class HoldingsPageState extends State<HoldingsPage>
   int _lastIbkrRefreshVersion = -1;
   IbkrAccountConfig _lastIbkrConfig = const IbkrAccountConfig();
   final Map<(bool, bool), Future<void>> _preloadLoads = {};
-  bool _preloadFailed = false;
+  Object? _preloadError;
 
   bool _selecting = false;
   final Set<String> _selectedSymbols = {};
@@ -87,10 +95,7 @@ class HoldingsPageState extends State<HoldingsPage>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isActive == widget.isActive) return;
 
-    setState(() {
-      _preloadFailed = false;
-      _stream = _buildStream(skipInitial: widget.isActive);
-    });
+    setState(() => _stream = _buildStream(skipInitial: widget.isActive));
     if (widget.isActive) {
       runDetachedTask(_preload(), 'Failed to preload holdings');
     }
@@ -124,16 +129,14 @@ class HoldingsPageState extends State<HoldingsPage>
       _ibkrTrades = [];
       _ibkrTradesAccount = null;
       _ibkrTradeHistoryAvailable = true;
-      _selecting = false;
-      _selectedSymbols.clear();
     }
     _lastAccount = account;
     _lastIbkrConfig = ibkrConfig;
     _lastIbkrRefreshVersion = refreshVersion;
     setState(() {
-      _preloadFailed = false;
       _stream = _buildStream(skipInitial: widget.isActive);
       _summaries = [];
+      _preloadError = null;
     });
     if (widget.isActive) {
       runDetachedTask(
@@ -175,7 +178,9 @@ class HoldingsPageState extends State<HoldingsPage>
 
     final load = () async {
       try {
-        final tradeHistory = await IbkrApiClient(config).fetchTradeHistory();
+        final tradeHistory =
+            await (widget._ibkrTradeHistoryLoader?.call(config) ??
+                IbkrApiClient(config).fetchTradeHistory());
         final brokerTrades = tradeHistory.trades;
         final trades = [
           for (var index = 0; index < brokerTrades.length; index++)
@@ -238,6 +243,18 @@ class HoldingsPageState extends State<HoldingsPage>
     return future;
   }
 
+  @visibleForTesting
+  static bool shouldUsePortfolioCache({
+    required bool hasCache,
+    required bool refreshPortfolio,
+    required bool ibkrEnabled,
+    required bool ibkrConfigured,
+    required bool cacheFresh,
+  }) =>
+      hasCache &&
+      !refreshPortfolio &&
+      (!ibkrEnabled || cacheFresh || !ibkrConfigured);
+
   Future<void> _performPreload({
     bool refreshPortfolio = false,
     bool refreshTrades = false,
@@ -253,16 +270,21 @@ class HoldingsPageState extends State<HoldingsPage>
         return;
       }
       final cached = accounts.portfolioCacheFor(accountName);
-      final config = accounts.ibkrConfigFor(accountName);
       final cacheFresh = accounts.isPortfolioCacheFresh(accountName);
-      if (cached != null &&
-          !refreshPortfolio &&
-          (cacheFresh || (config.enabled && !config.isConfigured))) {
-        final result = _summariesFromPositions(trades, cached.positions);
+      final config = accounts.ibkrConfigFor(accountName);
+      final shouldUseCache = shouldUsePortfolioCache(
+        hasCache: cached != null,
+        refreshPortfolio: refreshPortfolio,
+        ibkrEnabled: config.enabled,
+        ibkrConfigured: config.isConfigured,
+        cacheFresh: cacheFresh,
+      );
+      if (shouldUseCache) {
+        final result = _summariesFromPositions(trades, cached!.positions);
         if (mounted) {
           setState(() {
-            _preloadFailed = false;
             _summaries = result;
+            _preloadError = null;
           });
         }
         return;
@@ -270,15 +292,15 @@ class HoldingsPageState extends State<HoldingsPage>
       final result = await _computeSummaries(trades);
       if (mounted && widget.isActive && accounts.activeAccount == accountName) {
         setState(() {
-          _preloadFailed = false;
           _summaries = result;
+          _preloadError = null;
         });
       }
     } catch (error, stackTrace) {
-      _reportError(error, stackTrace, 'preloading holdings');
-      if (mounted && widget.isActive) {
-        setState(() => _preloadFailed = true);
+      if (mounted) {
+        setState(() => _preloadError = error);
       }
+      _reportError(error, stackTrace, 'preloading holdings');
     }
   }
 
@@ -293,6 +315,7 @@ class HoldingsPageState extends State<HoldingsPage>
 
     final config = accounts.ibkrConfigFor();
     final accountName = accounts.activeAccount;
+    final cached = accounts.portfolioCacheFor(accountName);
     if (!config.enabled) {
       final symbols = trades.map((trade) => trade.symbol).toSet().toList();
       if (!widget.isActive) {
@@ -305,32 +328,49 @@ class HoldingsPageState extends State<HoldingsPage>
       return positions;
     }
     if (!config.isConfigured) {
+      if (cached != null) return cached.positions;
       throw StateError('IBKR portfolio source is not fully configured');
     }
     if (!widget.isActive) {
       return accounts.portfolioCacheFor(accountName)?.positions ??
           const <Position>[];
     }
-    final snapshot = await IbkrApiClient(config).fetchPortfolio();
-    cacheIbkrAccountExchangeRate(snapshot);
-    final positions = await computeIbkrPositions(snapshot.positions, trades);
-    await _cachePortfolio(
-      accounts,
-      accountName,
-      positions,
-      snapshot.netLiquidation,
-    );
-    return positions;
+    try {
+      final snapshot = await (widget._ibkrLoader?.call(config) ??
+          IbkrApiClient(config).fetchPortfolio());
+      cacheIbkrAccountExchangeRate(snapshot);
+      final positions = await computeIbkrPositions(snapshot.positions, trades);
+      await _cachePortfolio(
+        accounts,
+        accountName,
+        positions,
+        snapshot.netLiquidation,
+        netLiquidationUsd: snapshot.netLiquidationUsd?.value,
+      );
+      return positions;
+    } catch (error) {
+      if (cached != null) {
+        talker.warning('IBKR portfolio unavailable; using cached holdings');
+        return cached.positions;
+      }
+      rethrow;
+    }
   }
 
   Future<void> _cachePortfolio(
     AccountManager accounts,
     String accountName,
     List<Position> positions,
-    IbkrAccountValue? netLiquidation,
-  ) async {
+    IbkrAccountValue? netLiquidation, {
+    double? netLiquidationUsd,
+  }) async {
     try {
-      await accounts.cachePortfolio(accountName, positions, netLiquidation);
+      await accounts.cachePortfolio(
+        accountName,
+        positions,
+        netLiquidation,
+        netLiquidationUsd: netLiquidationUsd,
+      );
     } catch (error, stack) {
       _reportError(error, stack, 'saving the holdings cache');
     }
@@ -518,12 +558,14 @@ class HoldingsPageState extends State<HoldingsPage>
     final allSelected =
         _summaries.isNotEmpty && _selectedSymbols.length == _summaries.length;
 
-    final menuButton = PopupMenuButton(
+    final menuButton = PopupMenuButton<String>(
+      key: const Key('holdings-menu-button'),
       icon: const Icon(Icons.more_vert),
       tooltip: context.l10n.text('Show menu'),
-      itemBuilder: (context) => [
+      onSelected: accounts.switchAccount,
+      itemBuilder: (context) => <PopupMenuEntry<String>>[
         if (_selecting) ...[
-          PopupMenuItem(
+          PopupMenuItem<String>(
             onTap: _toggleSelectAll,
             child: ListTile(
               leading: Icon(allSelected ? Icons.deselect : Icons.select_all),
@@ -534,14 +576,14 @@ class HoldingsPageState extends State<HoldingsPage>
               ),
             ),
           ),
-          PopupMenuItem(
+          PopupMenuItem<String>(
             onTap: () => _deleteSelected(context),
             child: ListTile(
               leading: const Icon(Icons.delete),
               title: Text(context.l10n.text('Delete selected')),
             ),
           ),
-          PopupMenuItem(
+          PopupMenuItem<String>(
             onTap: _exitSelecting,
             child: ListTile(
               leading: const Icon(Icons.close),
@@ -549,43 +591,31 @@ class HoldingsPageState extends State<HoldingsPage>
             ),
           ),
         ] else ...[
-          PopupMenuItem(
+          if (accounts.accounts.length > 1) ...[
+            ...accounts.accounts.map(
+              (account) => CheckedPopupMenuItem<String>(
+                value: account,
+                checked: account == accounts.activeAccount,
+                child: Text(account),
+              ),
+            ),
+            const PopupMenuDivider(),
+          ],
+          PopupMenuItem<String>(
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsPage()),
+              );
+            },
             child: ListTile(
               leading: const Icon(Icons.settings),
               title: Text(context.l10n.text('Settings')),
-              onTap: () async {
-                Navigator.pop(context);
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingsPage()),
-                );
-              },
             ),
           ),
         ],
       ],
     );
-
-    final accountPicker = accounts.accounts.length > 1
-        ? PopupMenuButton<String>(
-            key: const Key('holdings-account-picker'),
-            tooltip: context.l10n.text('Switch account'),
-            onSelected: (account) => runDetachedTask(
-              accounts.switchAccount(account),
-              'Failed to switch account',
-            ),
-            itemBuilder: (popupContext) => accounts.accounts
-                .map(
-                  (account) => CheckedPopupMenuItem<String>(
-                    value: account,
-                    checked: account == accounts.activeAccount,
-                    child: Text(account),
-                  ),
-                )
-                .toList(),
-            icon: const Icon(Icons.account_balance_outlined),
-          )
-        : null;
 
     final leading = _search.text.isEmpty
         ? const Padding(
@@ -639,51 +669,6 @@ class HoldingsPageState extends State<HoldingsPage>
                       ],
                     ),
                   ),
-                  if (accounts.accounts.length > 1) ...[
-                    PopupMenuButton<String>(
-                      key: const Key('desktop-holdings-account-picker'),
-                      tooltip: context.l10n.text('Switch account'),
-                      onSelected: accounts.switchAccount,
-                      itemBuilder: (popupContext) => accounts.accounts
-                          .map(
-                            (account) => CheckedPopupMenuItem(
-                              value: account,
-                              checked: account == accounts.activeAccount,
-                              child: Text(account),
-                            ),
-                          )
-                          .toList(),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.account_balance_outlined,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              accounts.activeAccount,
-                              style: Theme.of(context).textTheme.labelLarge,
-                            ),
-                            const SizedBox(width: 6),
-                            const Icon(Icons.expand_more_rounded, size: 20),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
                   if (_selecting) ...[
                     TextButton.icon(
                       onPressed: _toggleSelectAll,
@@ -732,6 +717,10 @@ class HoldingsPageState extends State<HoldingsPage>
                       label: Text(context.l10n.text('Add trade')),
                     ),
                   ],
+                  if (!_selecting) ...[
+                    const SizedBox(width: 8),
+                    menuButton,
+                  ],
                 ],
               ),
               const SizedBox(height: 20),
@@ -769,7 +758,6 @@ class HoldingsPageState extends State<HoldingsPage>
               const SizedBox(height: 16),
               Expanded(
                 child: StreamBuilder<List<SymbolSummary>>(
-                  key: ObjectKey(_stream),
                   stream: _stream,
                   builder: _buildList,
                 ),
@@ -805,15 +793,11 @@ class HoldingsPageState extends State<HoldingsPage>
                 onChanged: (_) => setState(() {
                   _stream = _buildStream();
                 }),
-                trailing: [
-                  if (accountPicker != null) accountPicker,
-                  menuButton,
-                ],
+                trailing: [menuButton],
               ),
             ),
             Expanded(
               child: StreamBuilder<List<SymbolSummary>>(
-                key: ObjectKey(_stream),
                 stream: _stream,
                 builder: _buildList,
               ),
@@ -1347,7 +1331,7 @@ class HoldingsPageState extends State<HoldingsPage>
       onRefresh: _refreshCandles,
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [SliverFillRemaining(hasScrollBody: false, child: child)],
+        slivers: [SliverFillRemaining(child: child)],
       ),
     );
   }
@@ -1356,7 +1340,7 @@ class HoldingsPageState extends State<HoldingsPage>
     BuildContext context,
     AsyncSnapshot<List<SymbolSummary>> snap,
   ) {
-    if (snap.hasError || _preloadFailed) {
+    if (snap.hasError || _preloadError != null) {
       return _refreshableState(
         Center(
           child: Column(
@@ -1497,7 +1481,7 @@ class HoldingsPageState extends State<HoldingsPage>
 
   void _retryHoldings() {
     setState(() {
-      _preloadFailed = false;
+      _preloadError = null;
       _stream = _buildStream(skipInitial: true);
     });
     runDetachedTask(_preload(), 'Failed to retry holdings preload');

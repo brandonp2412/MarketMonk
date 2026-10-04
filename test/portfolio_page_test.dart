@@ -403,6 +403,13 @@ void main() {
     final scrollbar = tester.widget<Scrollbar>(find.byType(Scrollbar));
     expect(scrollbar.controller == null, false);
     expect(scrollbar.controller!.hasClients, true);
+    final allocationList = tester.widget<ListView>(
+      find.descendant(
+        of: find.byType(Scrollbar),
+        matching: find.byType(ListView),
+      ),
+    );
+    expect(allocationList.padding, const EdgeInsets.only(right: 12));
     final pieFinder = find.byType(PieChart).first;
     final pie = tester.widget<PieChart>(pieFinder);
     expect(pie.data.sectionsSpace, 0);

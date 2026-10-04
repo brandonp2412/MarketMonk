@@ -1,29 +1,11 @@
-import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:market_monk/database.dart';
 import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/ibkr_api.dart';
-import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 import 'sqlite_test_support.dart';
-
-class _StalePortfolioAccountManager extends AccountManager {
-  @override
-  bool isPortfolioCacheFresh(
-    String name, {
-    Duration maxAge = AccountManager.ibkrPortfolioCacheMaxAge,
-  }) =>
-      false;
-}
-
-Future<void> _disposeTestApp(WidgetTester tester) async {
-  await tester.pumpWidget(const SizedBox.shrink());
-  await tester.pump(const Duration(milliseconds: 1));
-}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -37,13 +19,6 @@ void main() {
     });
 
     await seedTestSqlite({});
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
 
     final accounts = testAccountManager();
     await accounts.init();
@@ -61,11 +36,7 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(
-            create: (_) => SettingsState(
-              localCurrencyDetector: () async => 'USD',
-            ),
-          ),
+          ChangeNotifierProvider(create: (_) => SettingsState()),
           ChangeNotifierProvider.value(value: accounts),
         ],
         child: MaterialApp(
@@ -102,7 +73,6 @@ void main() {
     await tester.pump();
 
     expect(tester.takeException(), null);
-    await _disposeTestApp(tester);
   });
 
   testWidgets('compact desktop holdings fits half-width content',
@@ -115,13 +85,6 @@ void main() {
     });
 
     await seedTestSqlite({});
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
 
     final accounts = testAccountManager();
     await accounts.init();
@@ -139,11 +102,7 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(
-            create: (_) => SettingsState(
-              localCurrencyDetector: () async => 'USD',
-            ),
-          ),
+          ChangeNotifierProvider(create: (_) => SettingsState()),
           ChangeNotifierProvider.value(value: accounts),
         ],
         child: MaterialApp(
@@ -168,7 +127,6 @@ void main() {
     await tester.tap(find.text('Return'));
     await tester.pump();
     expect(tester.takeException(), null);
-    await _disposeTestApp(tester);
   });
 
   testWidgets('desktop holdings matches portfolio cash-out P/L',
@@ -183,13 +141,6 @@ void main() {
     allRatesFromUsd
       ..clear()
       ..['USD'] = 1;
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
 
     final accounts = testAccountManager();
     await accounts.init();
@@ -235,11 +186,7 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(
-            create: (_) => SettingsState(
-              localCurrencyDetector: () async => 'USD',
-            ),
-          ),
+          ChangeNotifierProvider(create: (_) => SettingsState()),
           ChangeNotifierProvider.value(value: accounts),
         ],
         child: MaterialApp(
@@ -251,10 +198,10 @@ void main() {
 
     expect(find.text(r'+$939.36'), findsOneWidget);
     expect(find.text(r'+$500.00'), findsOneWidget);
-    await _disposeTestApp(tester);
   });
 
-  testWidgets('desktop holdings exposes account picker', (tester) async {
+  testWidgets('holdings menu exposes account picker on desktop',
+      (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1400, 900);
     addTearDown(() {
@@ -264,13 +211,6 @@ void main() {
     await seedTestSqlite({
       'accounts': ['Default', 'Brokerage'],
     });
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
 
     final accounts = testAccountManager();
     await accounts.init();
@@ -287,11 +227,7 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(
-            create: (_) => SettingsState(
-              localCurrencyDetector: () async => 'USD',
-            ),
-          ),
+          ChangeNotifierProvider(create: (_) => SettingsState()),
           ChangeNotifierProvider.value(value: accounts),
         ],
         child: MaterialApp(
@@ -301,100 +237,39 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(
+    expect(
       find.byKey(const Key('desktop-holdings-account-picker')),
+      findsNothing,
     );
+
+    await tester.tap(find.byKey(const Key('holdings-menu-button')));
     await tester.pumpAndSettle();
 
     expect(accounts.activeAccount, 'Default');
-    expect(find.text('Brokerage'), findsOneWidget);
-    expect(find.byType(CheckedPopupMenuItem<String>), findsNWidgets(2));
-    await _disposeTestApp(tester);
-  });
-
-  testWidgets('mobile holdings exposes account picker and switches account',
-      (tester) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(390, 844);
-    addTearDown(() {
-      tester.view.resetPhysicalSize();
-      tester.view.resetDevicePixelRatio();
-    });
-    await seedTestSqlite({
-      'accounts': ['Default', 'Brokerage'],
-    });
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
-
-    final accounts = testAccountManager();
-    await accounts.init();
-    final position = Position(
-      symbol: 'VOO',
-      name: 'VANGUARD S&P 500 ETF',
-      nativeCurrency: 'USD',
-      netShares: 10,
-      avgCost: 500,
-      currentPrice: 550,
-      firstBuyDate: DateTime(2025),
-      lastBuyDate: DateTime(2026),
-    );
-
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider(
-            create: (_) => SettingsState(
-              localCurrencyDetector: () async => 'USD',
-            ),
-          ),
-          ChangeNotifierProvider.value(value: accounts),
-        ],
-        child: MaterialApp(
-          home: HoldingsPage(positionsLoader: (_) async => [position]),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(accounts.activeAccount, 'Default');
-    await tester.tap(find.byKey(const Key('holdings-account-picker')));
-    await tester.pumpAndSettle();
-
     expect(find.text('Brokerage'), findsOneWidget);
     expect(find.byType(CheckedPopupMenuItem<String>), findsNWidgets(2));
 
     await tester.tap(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is CheckedPopupMenuItem<String> &&
-            widget.value == 'Brokerage',
-      ),
+      find.widgetWithText(CheckedPopupMenuItem<String>, 'Brokerage'),
     );
     await tester.pumpAndSettle();
-
     expect(accounts.activeAccount, 'Brokerage');
-    await _disposeTestApp(tester);
   });
 
-  testWidgets('stale empty portfolio cache does not hide refreshed holdings',
+  testWidgets('IBKR holdings stay visible when a refresh fails',
       (tester) async {
     await seedTestSqlite({});
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
+
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.setIbkrConfig(
+      'Default',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'secret-token',
       ),
     );
-    addTearDown(() => db.close());
-
-    final AccountManager accounts = _StalePortfolioAccountManager();
-    await accounts.init();
-    await accounts.cachePortfolio('Default', const [], null);
     final position = Position(
       symbol: 'VOO',
       name: 'VANGUARD S&P 500 ETF',
@@ -405,33 +280,40 @@ void main() {
       firstBuyDate: DateTime(2025),
       lastBuyDate: DateTime(2026),
     );
-    var positionLoads = 0;
+    await accounts.cachePortfolio(
+      'Default',
+      [position],
+      const IbkrAccountValue(value: 5500, currency: 'USD'),
+      netLiquidationUsd: 5500,
+    );
 
+    var portfolioLoads = 0;
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(
-            create: (_) => SettingsState(
-              localCurrencyDetector: () async => 'USD',
-            ),
-          ),
-          ChangeNotifierProvider<AccountManager>.value(value: accounts),
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
         ],
         child: MaterialApp(
           home: HoldingsPage(
-            positionsLoader: (_) async {
-              positionLoads++;
-              return [position];
+            ibkrLoader: (_) async {
+              portfolioLoads++;
+              throw StateError('backend offline');
             },
+            ibkrTradeHistoryLoader: (_) async =>
+                const IbkrTradeHistory(available: false, trades: []),
           ),
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(positionLoads, 1);
     expect(find.text('VOO'), findsOneWidget);
-    expect(find.text('No IBKR stocks found'), findsNothing);
-    await _disposeTestApp(tester);
+
+    accounts.requestIbkrRefresh();
+    await tester.pumpAndSettle();
+
+    expect(portfolioLoads, 1);
+    expect(find.text('VOO'), findsOneWidget);
   });
 }

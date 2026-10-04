@@ -1,29 +1,16 @@
-import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 import 'sqlite_test_support.dart';
 
-Future<void> _disposeTestApp(WidgetTester tester) async {
-  await tester.pumpWidget(const SizedBox.shrink());
-  await tester.pump(const Duration(milliseconds: 1));
-}
-
 Future<void> _pumpApp(WidgetTester tester, AccountManager accounts) async {
-  await accounts.init();
   await tester.pumpWidget(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(
-          create: (_) => SettingsState(
-            localCurrencyDetector: () async => 'USD',
-          ),
-        ),
+        ChangeNotifierProvider(create: (_) => SettingsState()),
         ChangeNotifierProvider.value(value: accounts),
       ],
       child: const MyApp(),
@@ -43,18 +30,17 @@ void main() {
       // Pre-seed the currency cache so syncCandles doesn't fire a real
       // network request for it (there's no network in the test sandbox).
       cacheSymbolMeta('AAPL', 'USD');
-      db = Database.connect(
-        DatabaseConnection(
-          NativeDatabase.memory(),
-          closeStreamsSynchronously: true,
-        ),
-      );
       final accounts = testAccountManager();
 
       final today = DateTime.now();
-      final oldest = today.subtract(defaultMarketCandleLookback);
-      await seedTestCandle(symbol: 'AAPL', date: oldest, close: 180);
-      await seedTestCandle(symbol: 'AAPL', date: today, close: 190);
+      final yesterday = today.subtract(const Duration(days: 1));
+      await seedTestCandle(
+        'AAPL',
+        DateTime(today.year - 1, today.month, today.day - 1),
+        170,
+      );
+      await seedTestCandle('AAPL', yesterday, 180);
+      await seedTestCandle('AAPL', today, 190);
 
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(800, 600);
@@ -87,9 +73,6 @@ void main() {
       // actually persisted, not just reflected in transient widget state.
       await _pumpApp(tester, testAccountManager());
       expect(find.text('AAPL'), findsNothing);
-
-      await _disposeTestApp(tester);
-      await db.close();
     },
   );
 
@@ -98,21 +81,15 @@ void main() {
     (WidgetTester tester) async {
       await seedTestSqlite({'favoriteStock': 'MSFT'});
       cacheSymbolMeta('MSFT', 'USD');
-      db = Database.connect(
-        DatabaseConnection(
-          NativeDatabase.memory(),
-          closeStreamsSynchronously: true,
-        ),
-      );
       final accounts = testAccountManager();
 
       final today = DateTime.now();
       await seedTestCandle(
-        symbol: 'MSFT',
-        date: today.subtract(defaultMarketCandleLookback),
-        close: 390,
+        'MSFT',
+        DateTime(today.year - 1, today.month, today.day - 1),
+        390,
       );
-      await seedTestCandle(symbol: 'MSFT', date: today, close: 400);
+      await seedTestCandle('MSFT', today, 400);
 
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(800, 600);
@@ -128,9 +105,6 @@ void main() {
       final prefs = await SqliteSettings.getInstance();
       expect(prefs.getStringList('favoriteStocks'), ['MSFT']);
       expect(prefs.getString('favoriteStock'), null);
-
-      await _disposeTestApp(tester);
-      await db.close();
     },
   );
 }

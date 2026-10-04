@@ -1,12 +1,13 @@
 import 'dart:io';
 
-import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:market_monk/accounts_page.dart';
 import 'package:market_monk/charts_page.dart';
-import 'package:market_monk/database.dart';
+import 'package:market_monk/market_data_store.dart';
+import 'package:market_monk/profile_data_repository.dart';
+import 'package:market_monk/unified_database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/main.dart' as app;
@@ -57,7 +58,9 @@ Future<void> _pumpUntilGone(
 Future<void> _waitForTradeCount(int count) async {
   final deadline = DateTime.now().add(const Duration(seconds: 45));
   while (DateTime.now().isBefore(deadline)) {
-    final trades = await app.db.select(app.db.trades).get();
+    final prefs = await SqliteSettings.getInstance();
+    final account = prefs.getString('activeAccount') ?? 'Default';
+    final trades = await profileDataRepository.readTradesForAccount(account);
     if (trades.length == count) return;
     await Future<void>.delayed(const Duration(milliseconds: 200));
   }
@@ -65,31 +68,23 @@ Future<void> _waitForTradeCount(int count) async {
 }
 
 Future<void> _seedCandlesIfMissing(String symbol, double price) async {
-  final existing = await (app.db.select(app.db.candles)
-        ..where((row) => row.symbol.equals(symbol))
-        ..limit(1))
-      .getSingleOrNull();
-  if (existing != null) return;
+  final existing = await marketDataDatabase.readCandles(symbol);
+  if (existing.isNotEmpty) return;
 
   final today = DateTime.now();
-  await app.db.batch((batch) {
-    batch.insertAll(
-      app.db.candles,
-      List.generate(40, (index) {
-        final close = price + index * 0.25;
-        return CandlesCompanion.insert(
-          symbol: symbol,
-          date: today.subtract(Duration(days: 39 - index)),
-          open: Value(close - 0.2),
-          high: Value(close + 0.4),
-          low: Value(close - 0.4),
-          close: Value(close),
-          adjClose: Value(close),
-          volume: Value(1000000 + index),
-        );
-      }),
+  for (var index = 0; index < 40; index++) {
+    final close = price + index * 0.25;
+    await marketDataDatabase.upsertCandle(
+      symbol: symbol,
+      date: today.subtract(Duration(days: 39 - index)),
+      open: close - 0.2,
+      high: close + 0.4,
+      low: close - 0.4,
+      close: close,
+      adjClose: close,
+      volume: 1000000 + index,
     );
-  });
+  }
 }
 
 Future<void> _scrollTo(
@@ -159,12 +154,21 @@ void main() {
     final prefs = await SqliteSettings.getInstance();
     await prefs.restore({}, ['Default'], 'Default');
 
-    try {
-      await app.db.close();
-    } catch (_) {}
-    app.db = Database();
-    await app.db.delete(app.db.trades).go();
-    await app.db.delete(app.db.candles).go();
+    final unified = profileDataDatabase;
+    await unified.transaction(() async {
+      await unified.delete(unified.unifiedIbkrCacheEntries).go();
+      await unified.delete(unified.unifiedIbkrSettings).go();
+      await unified.delete(unified.unifiedTrades).go();
+      await unified.delete(unified.unifiedAppState).go();
+      await unified.delete(unified.unifiedProfiles).go();
+      await unified.delete(unified.unifiedAppSettings).go();
+      await unified.delete(unified.unifiedCandles).go();
+      await unified.delete(unified.unifiedSymbolMetadata).go();
+      await unified.writeSetting(
+        UnifiedDatabase.legacyMigrationCompleteKey,
+        true,
+      );
+    });
 
     final settings = SettingsState();
     await settings.initialized;
@@ -225,7 +229,10 @@ void main() {
     );
     final nzd = find.widgetWithText(CheckboxListTile, 'NZD');
     expect(nzd, findsOneWidget);
-    await tester.tap(nzd);
+    final nzdTile = tester.widget<CheckboxListTile>(nzd);
+    if (nzdTile.value != true) {
+      await tester.tap(nzd);
+    }
     await tester.tap(find.widgetWithText(TextButton, 'Save'));
     await tester.pumpAndSettle();
     expect(settings.visibleCurrencies, contains('NZD'));
@@ -288,7 +295,10 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Save'));
     await _pumpUntilGone(tester, find.text('Edit trade'));
 
-    var storedTrade = (await app.db.select(app.db.trades).get()).single;
+    var storedTrade = (await profileDataRepository.readTradesForAccount(
+      accounts.activeAccount,
+    ))
+        .single;
     expect(storedTrade.quantity, 3);
     expect(storedTrade.price, 110);
 
@@ -417,7 +427,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(TextButton, 'Delete'));
     await _waitForTradeCount(0);
-    expect(await app.db.select(app.db.candles).get(), isEmpty);
+    expect(
+      await marketDataDatabase.select(marketDataDatabase.unifiedCandles).get(),
+      isEmpty,
+    );
     await _pumpUntilGone(
       tester,
       find.byType(SnackBar),
@@ -453,6 +466,11 @@ void main() {
     expect(reloadedAccounts.accounts, ['Default']);
     expect(reloadedAccounts.activeAccount, 'Default');
 
-    expect(await app.db.select(app.db.trades).get(), isEmpty);
+    expect(
+      await profileDataRepository.readTradesForAccount(
+        reloadedAccounts.activeAccount,
+      ),
+      isEmpty,
+    );
   });
 }
