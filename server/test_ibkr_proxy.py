@@ -450,6 +450,38 @@ class ProxyTests(unittest.TestCase):
         self.assertTrue(history["available"])
         self.assertEqual(history["trades"][0]["symbol"], "AAPL")
 
+    def test_client_portal_prefers_configured_performance_command(self):
+        calls = []
+        performance_client = SimpleNamespace(
+            performance=lambda period: calls.append(period)
+            or {
+                "read_only": True,
+                "source": "flex",
+                "period": period,
+                "measure": "TWR",
+                "currency": "NZD",
+                "dates": ["20260930"],
+                "nav": [333000],
+                "return_dates": ["20260930"],
+                "returns": [0.0549],
+            }
+        )
+        client = ClientPortalIbkrClient(
+            config(
+                performance_command=(
+                    "/opt/ibkrbot/lumibot/bin/ibkr-lumibot",
+                    "web-performance",
+                )
+            ),
+            performance_client=performance_client,
+        )
+
+        performance = client.performance("1Y")
+
+        self.assertEqual(calls, ["1Y"])
+        self.assertEqual(performance["source"], "flex")
+        self.assertEqual(performance["returns"][-1], 0.0549)
+
     def test_client_portal_returns_broker_twr_and_nav_history(self):
         client = RecordingIbkrClient()
 

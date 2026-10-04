@@ -128,7 +128,12 @@ _PORTFOLIO_ANALYST_CACHE_SECONDS = 15 * 60 + 5
 
 
 class ClientPortalIbkrClient:
-    def __init__(self, config: Config, transactions_client: Any | None = None):
+    def __init__(
+        self,
+        config: Config,
+        performance_client: Any | None = None,
+        transactions_client: Any | None = None,
+    ):
         self._config = config
         context = ssl.create_default_context()
         if not config.verify_gateway_tls:
@@ -137,6 +142,12 @@ class ClientPortalIbkrClient:
         self._opener = build_opener(HTTPSHandler(context=context))
         self._performance_cache: dict[str, tuple[float, dict[str, Any]]] = {}
         self._transactions_cache: dict[int, tuple[float, dict[str, Any]]] = {}
+        if performance_client is not None:
+            self._performance_client = performance_client
+        elif config.performance_command:
+            self._performance_client = CommandPerformanceClient(config)
+        else:
+            self._performance_client = None
         if transactions_client is not None:
             self._transactions_client = transactions_client
         elif config.transactions_command:
@@ -222,6 +233,10 @@ class ClientPortalIbkrClient:
         }
 
     def performance(self, period: str) -> dict[str, Any]:
+        performance_client = getattr(self, "_performance_client", None)
+        if performance_client is not None:
+            return performance_client.performance(period)
+
         cached = self._performance_cache.get(period)
         now = time.monotonic()
         if (
