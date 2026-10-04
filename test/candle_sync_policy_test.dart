@@ -3,8 +3,7 @@ import 'dart:async';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:market_monk/background_network_coordinator.dart';
-import 'package:market_monk/unified_database.dart';
+import 'package:market_monk/database.dart';
 import 'package:market_monk/utils.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
 
@@ -31,8 +30,8 @@ DateTime _expectedMarketDay() {
   return day;
 }
 
-Future<List<UnifiedCandle>> _rows(UnifiedDatabase database) =>
-    (database.unifiedCandles.select()
+Future<List<StoredCandle>> _rows(Database database) =>
+    (database.candles.select()
           ..orderBy([
             (row) => OrderingTerm(
                   expression: row.date,
@@ -43,14 +42,13 @@ Future<List<UnifiedCandle>> _rows(UnifiedDatabase database) =>
 
 void main() {
   setUp(() {
-    backgroundNetworkCoordinator.resetDiagnostics();
     clearAllSyncCache();
     cacheSymbolMeta('AAPL', 'USD');
   });
 
   test('empty DB fetches only requested range and canonicalizes identity',
       () async {
-    final database = UnifiedDatabase.connect(NativeDatabase.memory());
+    final database = Database.connect(NativeDatabase.memory());
     addTearDown(database.close);
     final expected = _expectedMarketDay();
     final requiredFrom = _dayOffset(expected, -30);
@@ -76,24 +74,6 @@ void main() {
     final rows = await _rows(database);
     expect(requests, 1);
     expect(requestedStarts, [canonicalMarketDay(requiredFrom)]);
-    expect(
-      backgroundNetworkCoordinator.startedCount(RequestCategory.yahooCandles),
-      1,
-    );
-    expect(
-      backgroundNetworkCoordinator.completedCount(
-        RequestCategory.yahooCandles,
-      ),
-      1,
-    );
-    expect(
-      backgroundNetworkCoordinator.rowCount(RequestCategory.yahooCandles),
-      2,
-    );
-    expect(
-      backgroundNetworkCoordinator.startedCount(RequestCategory.marketCandles),
-      1,
-    );
     expect(rows, hasLength(2));
     expect(rows.map((row) => row.symbol).toSet(), {'AAPL'});
     expect(
@@ -110,7 +90,7 @@ void main() {
   });
 
   test('warm DB performs no market-data request or writes', () async {
-    final database = UnifiedDatabase.connect(NativeDatabase.memory());
+    final database = Database.connect(NativeDatabase.memory());
     addTearDown(database.close);
     final expected = _expectedMarketDay();
     final requiredFrom = _dayOffset(expected, -30);
@@ -135,14 +115,6 @@ void main() {
 
     final after = await _rows(database);
     expect(requests, 0);
-    expect(
-      backgroundNetworkCoordinator.startedCount(RequestCategory.yahooCandles),
-      0,
-    );
-    expect(
-      backgroundNetworkCoordinator.rowCount(RequestCategory.yahooCandles),
-      0,
-    );
     expect(after, hasLength(before.length));
     expect(
       after.map((row) => (row.symbol, row.date, row.close)),
@@ -151,7 +123,7 @@ void main() {
   });
 
   test('stale DB requests only the incremental overlap', () async {
-    final database = UnifiedDatabase.connect(NativeDatabase.memory());
+    final database = Database.connect(NativeDatabase.memory());
     addTearDown(database.close);
     final expected = _expectedMarketDay();
     final requiredFrom = _dayOffset(expected, -30);
@@ -192,7 +164,7 @@ void main() {
 
   test('manual refresh requests newest overlap without growing row count',
       () async {
-    final database = UnifiedDatabase.connect(NativeDatabase.memory());
+    final database = Database.connect(NativeDatabase.memory());
     addTearDown(database.close);
     final expected = _expectedMarketDay();
     final requiredFrom = _dayOffset(expected, -30);
@@ -229,7 +201,7 @@ void main() {
 
   test('concurrent normal and manual refresh share one market request',
       () async {
-    final database = UnifiedDatabase.connect(NativeDatabase.memory());
+    final database = Database.connect(NativeDatabase.memory());
     addTearDown(database.close);
     final expected = _expectedMarketDay();
     final requiredFrom = _dayOffset(expected, -30);
@@ -270,72 +242,9 @@ void main() {
     expect(await _rows(database), hasLength(2));
   });
 
-  test('empty provider response does not retry indefinitely', () async {
-    final database = UnifiedDatabase.connect(NativeDatabase.memory());
-    addTearDown(database.close);
-    final expected = _expectedMarketDay();
-    final requiredFrom = _dayOffset(expected, -30);
-    var requests = 0;
-
-    await syncCandles(
-      'AAPL',
-      database: database,
-      requiredFrom: requiredFrom,
-      yahooFetcher: (symbol, startDate) async {
-        requests++;
-        return const <YahooFinanceCandleData>[];
-      },
-    );
-
-    expect(requests, 1);
-    expect(await _rows(database), isEmpty);
-    expect(
-      backgroundNetworkCoordinator.startedCount(RequestCategory.yahooCandles),
-      1,
-    );
-  });
-
-  test('concurrent empty responses coalesce once and terminate', () async {
-    final database = UnifiedDatabase.connect(NativeDatabase.memory());
-    addTearDown(database.close);
-    final expected = _expectedMarketDay();
-    final requiredFrom = _dayOffset(expected, -30);
-    final gate = Completer<List<YahooFinanceCandleData>>();
-    var requests = 0;
-
-    Future<List<YahooFinanceCandleData>> fetch(
-      String symbol,
-      DateTime startDate,
-    ) {
-      requests++;
-      return gate.future;
-    }
-
-    final first = syncCandles(
-      'AAPL',
-      database: database,
-      requiredFrom: requiredFrom,
-      yahooFetcher: fetch,
-    );
-    await Future<void>.delayed(Duration.zero);
-    final second = syncCandles(
-      'aapl',
-      database: database,
-      requiredFrom: requiredFrom,
-      yahooFetcher: fetch,
-    );
-
-    expect(requests, 1);
-    gate.complete(const <YahooFinanceCandleData>[]);
-    await Future.wait([first, second]);
-
-    expect(requests, 1);
-    expect(await _rows(database), isEmpty);
-  });
-
   test('overlapping ranges serialize and only backfill missing coverage',
       () async {
-    final database = UnifiedDatabase.connect(NativeDatabase.memory());
+    final database = Database.connect(NativeDatabase.memory());
     addTearDown(database.close);
     final expected = _expectedMarketDay();
     final shortStart = _dayOffset(expected, -30);

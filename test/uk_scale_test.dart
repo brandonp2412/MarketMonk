@@ -1,7 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:market_monk/database.dart';
-import 'package:market_monk/unified_database.dart';
 import 'package:market_monk/utils.dart';
 import 'package:test/test.dart';
 
@@ -79,11 +78,17 @@ void main() {
       cacheSymbolMeta('AZN.L', 'GBp');
       final testDb = Database.connect(NativeDatabase.memory());
       addTearDown(testDb.close);
-      final marketDb = UnifiedDatabase.connect(NativeDatabase.memory());
+      final marketDb = Database.connect(NativeDatabase.memory());
       addTearDown(marketDb.close);
 
+      await testDb.upsertProfile(
+        id: 'profile-default',
+        name: 'Default',
+        sortOrder: 0,
+      );
       await testDb.trades.insertOne(
         TradesCompanion.insert(
+          profileId: 'profile-default',
           symbol: 'AZN.L',
           name: 'AstraZeneca',
           quantity: 10,
@@ -92,15 +97,30 @@ void main() {
           tradeDate: DateTime(2025, 3, 1),
         ),
       );
-      await marketDb.unifiedCandles.insertOne(
-        UnifiedCandlesCompanion.insert(
+      await marketDb.candles.insertOne(
+        CandlesCompanion.insert(
           symbol: 'AZN.L',
           date: DateTime(2025, 3, 10),
           close: const Value(3400.0),
         ),
       );
 
-      final trades = await testDb.trades.select().get();
+      final storedTrades = await testDb.trades.select().get();
+      final trades = storedTrades
+          .map(
+            (row) => Trade(
+              id: row.id,
+              symbol: row.symbol,
+              name: row.name,
+              quantity: row.quantity,
+              price: row.price,
+              tradeType: row.tradeType,
+              tradeDate: row.tradeDate,
+              realizedPL: row.realizedPL,
+              commission: row.commission,
+            ),
+          )
+          .toList();
       final prices = await fetchLatestPrices(['AZN.L'], database: marketDb);
       expect(prices['AZN.L'], closeTo(3400.0, 0.0001));
 

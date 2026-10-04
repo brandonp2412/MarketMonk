@@ -1,10 +1,7 @@
-import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 import 'package:drafter/drafter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/charts_page.dart';
-import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/market_line_chart.dart';
@@ -29,13 +26,6 @@ void main() {
   testWidgets('inactive kept-alive charts do not fetch in background',
       (tester) async {
     await seedTestSqlite({});
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
 
     final accounts = testAccountManager();
     await accounts.init();
@@ -92,12 +82,6 @@ void main() {
     'time chips stay below the search bar after a degenerate first frame',
     (WidgetTester tester) async {
       await seedTestSqlite({});
-      db = Database.connect(
-        DatabaseConnection(
-          NativeDatabase.memory(),
-          closeStreamsSynchronously: true,
-        ),
-      );
       final accounts = testAccountManager();
 
       tester.view.devicePixelRatio = 1.0;
@@ -166,13 +150,6 @@ void main() {
         'chartPeriodMonths': 0,
         'chartPeriodDays': 5,
       });
-      db = Database.connect(
-        DatabaseConnection(
-          NativeDatabase.memory(),
-          closeStreamsSynchronously: true,
-        ),
-      );
-      addTearDown(() => db.close());
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(1200, 1000);
       addTearDown(() {
@@ -310,13 +287,6 @@ void main() {
         'chartPeriodMonths': 0,
         'chartPeriodDays': 5,
       });
-      db = Database.connect(
-        DatabaseConnection(
-          NativeDatabase.memory(),
-          closeStreamsSynchronously: true,
-        ),
-      );
-      addTearDown(() => db.close());
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(1200, 1000);
       addTearDown(() {
@@ -398,13 +368,6 @@ void main() {
       'visibleCurrencies': ['NZD'],
       'exchangeRate_NZD': 1.7,
     });
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
     tester.view.devicePixelRatio = 1.0;
     tester.view.physicalSize = const Size(1200, 1000);
     addTearDown(() {
@@ -561,13 +524,6 @@ void main() {
       'chartPeriodMonths': 1,
       'chartPeriodDays': 0,
     });
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
     tester.view.devicePixelRatio = 1.0;
     tester.view.physicalSize = const Size(879, 1000);
     addTearDown(() {
@@ -670,12 +626,6 @@ void main() {
     WidgetTester tester,
   ) async {
     await seedTestSqlite({});
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
     final accounts = testAccountManager();
 
     await tester.pumpWidget(
@@ -705,20 +655,12 @@ void main() {
     await tester.tap(find.byTooltip('Back'));
     await tester.pump();
     expect(find.text('Use "GLD" anyway'), findsNothing);
-
-    await db.close();
   });
 
   testWidgets('empty ticker fallback stays hidden before typing', (
     WidgetTester tester,
   ) async {
     await seedTestSqlite({});
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
     final accounts = testAccountManager();
 
     await tester.pumpWidget(
@@ -740,8 +682,6 @@ void main() {
     await tester.pump();
 
     expect(find.text('Use "" anyway'), findsNothing);
-
-    await db.close();
   });
 
   test('chart axis percentages compact values from one thousand', () {
@@ -762,14 +702,6 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
     await seedTestSqlite({});
-
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
 
     final accounts = testAccountManager();
     await accounts.init();

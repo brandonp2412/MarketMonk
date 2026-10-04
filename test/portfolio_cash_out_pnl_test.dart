@@ -1,10 +1,6 @@
-import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
-import 'package:market_monk/main.dart';
 import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
@@ -32,14 +28,6 @@ void main() {
     allRatesFromUsd
       ..clear()
       ..['USD'] = 1;
-
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
 
     final accounts = testAccountManager();
     await accounts.init();

@@ -1,12 +1,9 @@
 import 'dart:async';
 
-import 'package:drift/drift.dart' show DatabaseConnection;
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/charts_page.dart';
-import 'package:market_monk/database.dart';
 import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
@@ -181,13 +178,6 @@ void main() {
     tester,
   ) async {
     await seedTestSqlite({});
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
 
     final accounts = await _configuredAccount();
     var chartPortfolioLoads = 0;
@@ -256,13 +246,6 @@ void main() {
 
   testWidgets('inactive portfolio ignores app resume', (tester) async {
     await seedTestSqlite({});
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
 
     final accounts = await _configuredAccount();
     await accounts.cachePortfolio(
@@ -592,13 +575,6 @@ void main() {
 
   testWidgets('holdings reactivation performs one preload', (tester) async {
     await seedTestSqlite({});
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
 
     final accounts = testAccountManager();
     await accounts.init();
@@ -637,13 +613,6 @@ void main() {
     tester,
   ) async {
     await seedTestSqlite({});
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
 
     final accounts = testAccountManager();
     await accounts.init();
@@ -708,13 +677,6 @@ void main() {
   testWidgets('fresh chart startup stays within the IBKR request budget',
       (tester) async {
     await seedTestSqlite({});
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
 
     final accounts = testAccountManager();
     await accounts.init();

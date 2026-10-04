@@ -1,10 +1,10 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:market_monk/app_state_database.dart';
+import 'package:market_monk/legacy_app_state_database.dart';
 import 'package:market_monk/database.dart';
-import 'package:market_monk/unified_database.dart';
-import 'package:market_monk/unified_legacy_source.dart';
+import 'package:market_monk/legacy_database_source.dart';
+import 'package:market_monk/legacy_profile_database.dart' as legacy;
 
 void main() {
   test(
@@ -13,14 +13,16 @@ void main() {
       final fixture = await _createLegacyFixture();
       addTearDown(fixture.close);
 
-      final snapshot = await readLegacyUnifiedSnapshot(
-        appState: fixture.appState,
+      final snapshot = await readLegacyDatabaseSnapshot(
+        readSettings: fixture.appState.readSettings,
+        readProfileNames: fixture.appState.readProfiles,
+        readActiveProfile: fixture.appState.readActiveProfile,
         openProfileDatabase: (name) async => fixture.profileDatabases[name],
         closeProfileDatabases: false,
       );
 
       var loadCount = 0;
-      final target = UnifiedDatabase.connect(
+      final target = Database.connect(
         NativeDatabase.memory(),
         legacySnapshotLoader: () async {
           loadCount++;
@@ -51,7 +53,7 @@ void main() {
       expect(metadata?.currency, 'GBP');
       expect(metadata?.payloadJson, contains('GBp'));
       expect(
-        await target.readSetting(UnifiedDatabase.legacyMigrationCompleteKey),
+        await target.readSetting(Database.legacyMigrationCompleteKey),
         isTrue,
       );
 
@@ -108,8 +110,9 @@ void main() {
 
   test('current single-profile settings migrate without losing trade data',
       () async {
-    final appState = AppStateDatabase.connect(NativeDatabase.memory());
-    final profile = Database.connect(NativeDatabase.memory());
+    final appState = LegacyAppStateDatabase.connect(NativeDatabase.memory());
+    final profile =
+        legacy.LegacyProfileDatabase.connect(NativeDatabase.memory());
     addTearDown(appState.close);
     addTearDown(profile.close);
 
@@ -117,7 +120,7 @@ void main() {
     await appState.setActiveProfile('Default');
     await appState.writeSetting('displayCurrency', 'NZD');
     await profile.into(profile.trades).insert(
-          TradesCompanion.insert(
+          legacy.TradesCompanion.insert(
             symbol: 'VOO',
             name: 'Vanguard S&P 500 ETF',
             quantity: 3,
@@ -128,12 +131,14 @@ void main() {
           ),
         );
 
-    final snapshot = await readLegacyUnifiedSnapshot(
-      appState: appState,
+    final snapshot = await readLegacyDatabaseSnapshot(
+      readSettings: appState.readSettings,
+      readProfileNames: appState.readProfiles,
+      readActiveProfile: appState.readActiveProfile,
       openProfileDatabase: (_) async => profile,
       closeProfileDatabases: false,
     );
-    final target = UnifiedDatabase.connect(NativeDatabase.memory());
+    final target = Database.connect(NativeDatabase.memory());
     addTearDown(target.close);
     await target.migrateLegacySnapshot(snapshot);
 
@@ -149,11 +154,15 @@ void main() {
 
   test('profile registry prevents renamed or deleted profile resurrection',
       () async {
-    final appState = AppStateDatabase.connect(NativeDatabase.memory());
-    final defaultDatabase = Database.connect(NativeDatabase.memory());
-    final renamedDatabase = Database.connect(NativeDatabase.memory());
-    final staleOldDatabase = Database.connect(NativeDatabase.memory());
-    final deletedDatabase = Database.connect(NativeDatabase.memory());
+    final appState = LegacyAppStateDatabase.connect(NativeDatabase.memory());
+    final defaultDatabase =
+        legacy.LegacyProfileDatabase.connect(NativeDatabase.memory());
+    final renamedDatabase =
+        legacy.LegacyProfileDatabase.connect(NativeDatabase.memory());
+    final staleOldDatabase =
+        legacy.LegacyProfileDatabase.connect(NativeDatabase.memory());
+    final deletedDatabase =
+        legacy.LegacyProfileDatabase.connect(NativeDatabase.memory());
     addTearDown(() async {
       await appState.close();
       await defaultDatabase.close();
@@ -165,7 +174,7 @@ void main() {
     await appState.replaceProfiles(['Default', 'Renamed']);
     await appState.setActiveProfile('Renamed');
     await renamedDatabase.into(renamedDatabase.trades).insert(
-          TradesCompanion.insert(
+          legacy.TradesCompanion.insert(
             symbol: 'KEEP',
             name: 'Keep',
             quantity: 1,
@@ -175,7 +184,7 @@ void main() {
           ),
         );
     await deletedDatabase.into(deletedDatabase.trades).insert(
-          TradesCompanion.insert(
+          legacy.TradesCompanion.insert(
             symbol: 'GHOST',
             name: 'Deleted',
             quantity: 1,
@@ -185,15 +194,17 @@ void main() {
           ),
         );
 
-    final databases = <String, Database>{
+    final databases = <String, legacy.LegacyProfileDatabase>{
       'Default': defaultDatabase,
       'Renamed': renamedDatabase,
       'Old Name': staleOldDatabase,
       'Deleted': deletedDatabase,
     };
     final opened = <String>[];
-    final snapshot = await readLegacyUnifiedSnapshot(
-      appState: appState,
+    final snapshot = await readLegacyDatabaseSnapshot(
+      readSettings: appState.readSettings,
+      readProfileNames: appState.readProfiles,
+      readActiveProfile: appState.readActiveProfile,
       openProfileDatabase: (name) async {
         opened.add(name);
         return databases[name];
@@ -207,7 +218,7 @@ void main() {
       ['Default', 'Renamed'],
     );
 
-    final target = UnifiedDatabase.connect(NativeDatabase.memory());
+    final target = Database.connect(NativeDatabase.memory());
     addTearDown(target.close);
     await target.migrateLegacySnapshot(snapshot);
 
@@ -224,7 +235,7 @@ void main() {
 
   test('failed migration rolls back and a corrected snapshot can recover',
       () async {
-    final target = UnifiedDatabase.connect(NativeDatabase.memory());
+    final target = Database.connect(NativeDatabase.memory());
     addTearDown(target.close);
 
     await target.upsertProfile(
@@ -235,7 +246,7 @@ void main() {
     await target.setActiveProfileId('incomplete-existing');
     await target.writeSetting('existingSetting', 'keep-me-on-rollback');
 
-    final badSnapshot = LegacyUnifiedSnapshot(
+    final badSnapshot = LegacyDatabaseSnapshot(
       settings: {
         'displayCurrency': 'NZD',
         'unsupported': DateTime.utc(2026, 10, 3),
@@ -259,11 +270,11 @@ void main() {
       'keep-me-on-rollback',
     );
     expect(
-      await target.readSetting(UnifiedDatabase.legacyMigrationCompleteKey),
+      await target.readSetting(Database.legacyMigrationCompleteKey),
       isNull,
     );
 
-    const recoveredSnapshot = LegacyUnifiedSnapshot(
+    const recoveredSnapshot = LegacyDatabaseSnapshot(
       settings: {'displayCurrency': 'USD'},
       profiles: [LegacyProfileSnapshot(name: 'Default')],
       activeProfileName: 'Default',
@@ -276,7 +287,7 @@ void main() {
     );
     expect(await target.readSetting('displayCurrency'), 'USD');
     expect(
-      await target.readSetting(UnifiedDatabase.legacyMigrationCompleteKey),
+      await target.readSetting(Database.legacyMigrationCompleteKey),
       isTrue,
     );
   });
@@ -289,11 +300,11 @@ class _LegacyFixture {
     required this.botDatabase,
   });
 
-  final AppStateDatabase appState;
-  final Database defaultDatabase;
-  final Database botDatabase;
+  final LegacyAppStateDatabase appState;
+  final legacy.LegacyProfileDatabase defaultDatabase;
+  final legacy.LegacyProfileDatabase botDatabase;
 
-  Map<String, Database> get profileDatabases => {
+  Map<String, legacy.LegacyProfileDatabase> get profileDatabases => {
         'Default': defaultDatabase,
         'IBKR Bot': botDatabase,
       };
@@ -308,9 +319,11 @@ class _LegacyFixture {
 }
 
 Future<_LegacyFixture> _createLegacyFixture() async {
-  final appState = AppStateDatabase.connect(NativeDatabase.memory());
-  final defaultDatabase = Database.connect(NativeDatabase.memory());
-  final botDatabase = Database.connect(NativeDatabase.memory());
+  final appState = LegacyAppStateDatabase.connect(NativeDatabase.memory());
+  final defaultDatabase =
+      legacy.LegacyProfileDatabase.connect(NativeDatabase.memory());
+  final botDatabase =
+      legacy.LegacyProfileDatabase.connect(NativeDatabase.memory());
 
   await appState.replaceProfiles(['Default', 'IBKR Bot']);
   await appState.setActiveProfile('IBKR Bot');
@@ -319,7 +332,7 @@ Future<_LegacyFixture> _createLegacyFixture() async {
   await appState.writeSetting('symbolRawCurrency_VOD.L', 'GBp');
 
   await defaultDatabase.into(defaultDatabase.trades).insert(
-        TradesCompanion.insert(
+        legacy.TradesCompanion.insert(
           symbol: 'VTI',
           name: 'Vanguard Total Stock Market ETF',
           quantity: 2,
@@ -330,7 +343,7 @@ Future<_LegacyFixture> _createLegacyFixture() async {
         ),
       );
   await defaultDatabase.into(defaultDatabase.candles).insert(
-        CandlesCompanion.insert(
+        legacy.CandlesCompanion.insert(
           symbol: ' aapl ',
           date: DateTime.utc(2026, 10, 2, 8),
           open: const Value(-1),
@@ -343,7 +356,7 @@ Future<_LegacyFixture> _createLegacyFixture() async {
       );
 
   await botDatabase.into(botDatabase.trades).insert(
-        TradesCompanion.insert(
+        legacy.TradesCompanion.insert(
           symbol: 'AAPL',
           name: 'Apple Inc.',
           quantity: -1,
@@ -366,7 +379,7 @@ Future<_LegacyFixture> _createLegacyFixture() async {
     cachedAt: DateTime.utc(2026, 10, 3, 5),
   );
   await botDatabase.into(botDatabase.candles).insert(
-        CandlesCompanion.insert(
+        legacy.CandlesCompanion.insert(
           symbol: 'AAPL',
           date: DateTime.utc(2026, 10, 2, 18),
           open: const Value(248.2),

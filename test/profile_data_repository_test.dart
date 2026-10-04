@@ -1,14 +1,14 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/profile_data_repository.dart';
-import 'package:market_monk/unified_database.dart';
+import 'package:market_monk/database.dart';
 
 void main() {
-  late UnifiedDatabase database;
+  late Database database;
   late ProfileDataRepository repository;
 
   setUp(() async {
-    database = UnifiedDatabase.connect(NativeDatabase.memory());
+    database = Database.connect(NativeDatabase.memory());
     repository = ProfileDataRepository(database);
     await database.upsertProfile(
       id: 'profile-default',

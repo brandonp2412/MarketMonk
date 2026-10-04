@@ -816,9 +816,7 @@ class _SettingsPageState extends State<SettingsPage> {
             final profileId = await profileDataRepository
                 .profileIdForName(accounts.activeAccount);
             await profileDataRepository.clearTrades(profileId);
-            await marketDataDatabase
-                .delete(marketDataDatabase.unifiedCandles)
-                .go();
+            await marketDataDatabase.delete(marketDataDatabase.candles).go();
             clearAllSyncCache();
             if (!mounted) return;
             toast(context, context.l10n.text('All data deleted'));
@@ -1283,7 +1281,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     .profileIdForName(accounts.activeAccount);
                 await profileDataRepository.clearTrades(profileId);
                 await marketDataDatabase
-                    .delete(marketDataDatabase.unifiedCandles)
+                    .delete(marketDataDatabase.candles)
                     .go();
                 clearAllSyncCache();
                 if (!context.mounted) return;

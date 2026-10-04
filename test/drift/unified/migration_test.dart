@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:market_monk/unified_database.dart';
+import 'package:market_monk/database.dart';
 
 import 'generated/schema.dart';
 
@@ -12,7 +12,7 @@ void main() {
     final schema = await verifier.schemaAt(1);
     addTearDown(schema.close);
 
-    final database = UnifiedDatabase.connect(schema.newConnection());
+    final database = Database.connect(schema.newConnection());
     addTearDown(database.close);
 
     await database.validateDatabaseSchema();

@@ -1,12 +1,11 @@
-import 'package:market_monk/app_state_database.dart';
-import 'package:market_monk/database.dart';
+import 'package:market_monk/legacy_profile_database.dart';
 
-typedef LegacyProfileDatabaseOpener = Future<Database?> Function(
+typedef LegacyProfileDatabaseOpener = Future<LegacyProfileDatabase?> Function(
   String profileName,
 );
 
-class LegacyUnifiedSnapshot {
-  const LegacyUnifiedSnapshot({
+class LegacyDatabaseSnapshot {
+  const LegacyDatabaseSnapshot({
     required this.settings,
     required this.profiles,
     required this.activeProfileName,
@@ -103,20 +102,22 @@ class LegacyCandleSnapshot {
   final double adjClose;
 }
 
-Future<LegacyUnifiedSnapshot> readLegacyUnifiedSnapshot({
-  required AppStateDatabase appState,
+Future<LegacyDatabaseSnapshot> readLegacyDatabaseSnapshot({
+  required Future<Map<String, Object?>> Function() readSettings,
+  required Future<List<String>> Function() readProfileNames,
+  required Future<String?> Function() readActiveProfile,
   required LegacyProfileDatabaseOpener openProfileDatabase,
   bool closeProfileDatabases = true,
 }) async {
-  final settings = Map<String, Object?>.from(await appState.readSettings())
-    ..remove(AppStateDatabase.activeProfileSettingKey);
+  final settings = Map<String, Object?>.from(await readSettings())
+    ..remove('activeProfile');
 
-  var profileNames = await appState.readProfiles();
+  var profileNames = await readProfileNames();
   if (profileNames.isEmpty) {
     profileNames = const ['Default'];
   }
 
-  final savedActiveProfile = await appState.readActiveProfile();
+  final savedActiveProfile = await readActiveProfile();
   final activeProfileName =
       savedActiveProfile != null && profileNames.contains(savedActiveProfile)
           ? savedActiveProfile
@@ -192,7 +193,7 @@ Future<LegacyUnifiedSnapshot> readLegacyUnifiedSnapshot({
     }
   }
 
-  return LegacyUnifiedSnapshot(
+  return LegacyDatabaseSnapshot(
     settings: settings,
     profiles: profiles,
     activeProfileName: activeProfileName,

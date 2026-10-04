@@ -11,7 +11,6 @@ import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/sqlite_settings.dart';
-import 'package:market_monk/unified_database.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
 
 var currency = NumberFormat.simpleCurrency();
@@ -104,7 +103,7 @@ Future<void> fetchSymbolCurrencyAndRate(String symbol) async {
   if (canonicalSymbol.isEmpty) return;
   try {
     await backgroundNetworkCoordinator.coalesce<void>(
-      RequestCategory.yahooSymbolMetadata,
+      'yahoo.symbolMetadata',
       canonicalSymbol,
       () => _fetchSymbolCurrencyAndRate(canonicalSymbol)
           .timeout(const Duration(seconds: 2)),
@@ -399,7 +398,7 @@ List<Position> computePositions(
 /// one row per symbol instead of all historical candles.
 Future<Map<String, double>> fetchLatestPrices(
   List<String> symbols, {
-  UnifiedDatabase? database,
+  Database? database,
 }) async {
   if (symbols.isEmpty) return {};
   final targetDatabase = database ?? marketDataDatabase;
@@ -435,7 +434,7 @@ Future<Map<String, double>> fetchLatestPrices(
       variables: [
         for (final symbol in canonicalSymbols) Variable(symbol),
       ],
-      readsFrom: {targetDatabase.unifiedCandles},
+      readsFrom: {targetDatabase.candles},
     ).get();
 
     return {
@@ -451,7 +450,7 @@ Future<Map<String, double>> fetchLatestPrices(
     );
     final prices = <String, double>{};
     for (final symbol in canonicalSymbols) {
-      final candle = await (targetDatabase.unifiedCandles.select()
+      final candle = await (targetDatabase.candles.select()
             ..where((row) => row.symbol.equals(symbol))
             ..orderBy([
               (row) => OrderingTerm(
@@ -505,7 +504,7 @@ int _ibkrYearsForRange(DateTime from, DateTime through) {
 Future<int> insertCandles(
   List<YahooFinanceCandleData> dataList,
   String symbol, {
-  UnifiedDatabase? database,
+  Database? database,
 }) async {
   const batchSize = 1000;
   final targetDatabase = database ?? marketDataDatabase;
@@ -523,7 +522,7 @@ Future<int> insertCandles(
 
   for (var offset = 0; offset < normalized.length; offset += batchSize) {
     final candleBatch = normalized.skip(offset).take(batchSize).map((data) {
-      return UnifiedCandlesCompanion.insert(
+      return CandlesCompanion.insert(
         date: data.date,
         symbol: canonicalSymbol,
         open: Value(data.open),
@@ -537,7 +536,7 @@ Future<int> insertCandles(
 
     await targetDatabase.batch((batchBuilder) {
       batchBuilder.insertAll(
-        targetDatabase.unifiedCandles,
+        targetDatabase.candles,
         candleBatch,
         mode: InsertMode.insertOrReplace,
       );
@@ -557,14 +556,14 @@ Future<int> insertCandles(
 Future<int> insertIbkrCandles(
   List<IbkrHistoricalCandle> dataList,
   String symbol, {
-  UnifiedDatabase? database,
+  Database? database,
 }) async {
   const batchSize = 1000;
   final targetDatabase = database ?? marketDataDatabase;
   final canonicalSymbol = canonicalMarketSymbol(symbol);
   final byDay = <int, IbkrHistoricalCandle>{};
 
-  final existingRows = await (targetDatabase.unifiedCandles.select()
+  final existingRows = await (targetDatabase.candles.select()
         ..where((candle) => candle.symbol.equals(canonicalSymbol)))
       .get();
   for (final row in existingRows) {
@@ -572,7 +571,7 @@ Future<int> insertIbkrCandles(
         row.date.weekday != DateTime.sunday) {
       continue;
     }
-    await (targetDatabase.delete(targetDatabase.unifiedCandles)
+    await (targetDatabase.delete(targetDatabase.candles)
           ..where(
             (candle) =>
                 candle.symbol.equals(canonicalSymbol) &
@@ -602,7 +601,7 @@ Future<int> insertIbkrCandles(
 
   for (var offset = 0; offset < normalized.length; offset += batchSize) {
     final candleBatch = normalized.skip(offset).take(batchSize).map((data) {
-      return UnifiedCandlesCompanion.insert(
+      return CandlesCompanion.insert(
         date: data.date,
         symbol: canonicalSymbol,
         open: Value(data.open),
@@ -616,7 +615,7 @@ Future<int> insertIbkrCandles(
 
     await targetDatabase.batch((batchBuilder) {
       batchBuilder.insertAll(
-        targetDatabase.unifiedCandles,
+        targetDatabase.candles,
         candleBatch,
         mode: InsertMode.insertOrReplace,
       );
@@ -633,13 +632,13 @@ Future<int> insertIbkrCandles(
   return normalized.length;
 }
 
-Future<UnifiedCandle?> findClosestDate(DateTime date, String symbol) {
+Future<StoredCandle?> findClosestDate(DateTime date, String symbol) {
   final canonicalSymbol = canonicalMarketSymbol(symbol);
   final dateOnly = canonicalMarketDay(date);
   final timestamp = dateOnly.millisecondsSinceEpoch / 1000;
   final targetDatabase = marketDataDatabase;
 
-  return (targetDatabase.unifiedCandles.select()
+  return (targetDatabase.candles.select()
         ..where((candle) => candle.symbol.equals(canonicalSymbol))
         ..orderBy([
           (candle) =>
@@ -649,10 +648,10 @@ Future<UnifiedCandle?> findClosestDate(DateTime date, String symbol) {
       .getSingleOrNull();
 }
 
-Future<UnifiedCandle?> findClosestPrice(double price, String symbol) {
+Future<StoredCandle?> findClosestPrice(double price, String symbol) {
   final canonicalSymbol = canonicalMarketSymbol(symbol);
   final targetDatabase = marketDataDatabase;
-  return (targetDatabase.unifiedCandles.select()
+  return (targetDatabase.candles.select()
         ..where((candle) => candle.symbol.equals(canonicalSymbol))
         ..orderBy([
           (candle) => OrderingTerm.asc(CustomExpression('ABS(close - $price)')),
@@ -676,14 +675,14 @@ double safePercentChange(double oldValue, double newValue) {
 void clearSyncCache(String symbol) {
   final canonicalSymbol = canonicalMarketSymbol(symbol);
   backgroundNetworkCoordinator.clearFreshness(
-    RequestCategory.marketCandles,
+    'market.candles',
     where: (key) => key is (String, int, bool) && key.$1 == canonicalSymbol,
   );
 }
 
 /// Removes all symbols from the sync guard (e.g. after a full manual refresh).
 void clearAllSyncCache() =>
-    backgroundNetworkCoordinator.clearFreshness(RequestCategory.marketCandles);
+    backgroundNetworkCoordinator.clearFreshness('market.candles');
 
 DateTime _latestExpectedMarketDay(DateTime today) {
   var expectedDay = today;
@@ -696,7 +695,7 @@ DateTime _latestExpectedMarketDay(DateTime today) {
 
 Future<bool> _syncIbkrCandlesIfAvailable(
   String symbol, {
-  required UnifiedDatabase targetDatabase,
+  required Database targetDatabase,
   required IbkrAccountConfig? ibkrConfig,
   required DateTime requestFrom,
   required DateTime expectedMarketDay,
@@ -709,10 +708,7 @@ Future<bool> _syncIbkrCandlesIfAvailable(
 
   try {
     final history = ibkrFetcher != null
-        ? await backgroundNetworkCoordinator.observe<IbkrHistoricalSeries>(
-            RequestCategory.ibkrHistorical,
-            () => ibkrFetcher(symbol, years),
-          )
+        ? await ibkrFetcher(symbol, years)
         : await IbkrApiClient(config)
             .fetchHistoricalCandles(symbol, years: years);
     if (history.candles.isEmpty) {
@@ -743,10 +739,6 @@ Future<bool> _syncIbkrCandlesIfAvailable(
       symbol,
       database: targetDatabase,
     );
-    backgroundNetworkCoordinator.recordRows(
-      RequestCategory.ibkrHistorical,
-      stored,
-    );
     talker.info(
       'Completed IBKR candle sync for $symbol: $stored rows from '
       '${requestFrom.toIso8601String()}',
@@ -770,7 +762,7 @@ Future<bool> _syncIbkrCandlesIfAvailable(
 
 Future<void> syncCandles(
   String symbol, {
-  UnifiedDatabase? database,
+  Database? database,
   IbkrAccountConfig? ibkrConfig,
   String syncNamespace = 'Default',
   DateTime? requiredFrom,
@@ -789,16 +781,15 @@ Future<void> syncCandles(
     expectedMarketDay,
   );
 
-  Future<({bool covered, DateTime? oldestDay, DateTime? latestDay})>
-      readCoverage() async {
-    final oldest = await (targetDatabase.unifiedCandles.select()
+  Future<({bool covered, DateTime? latestDay})> readCoverage() async {
+    final oldest = await (targetDatabase.candles.select()
           ..where((row) => row.symbol.equals(canonicalSymbol))
           ..orderBy([
             (row) => OrderingTerm(expression: row.date, mode: OrderingMode.asc),
           ])
           ..limit(1))
         .getSingleOrNull();
-    final latest = await (targetDatabase.unifiedCandles.select()
+    final latest = await (targetDatabase.candles.select()
           ..where((row) => row.symbol.equals(canonicalSymbol))
           ..orderBy([
             (row) =>
@@ -813,22 +804,29 @@ Future<void> syncCandles(
         !oldestDay.isAfter(requiredStart) &&
         latestDay != null &&
         !expectedMarketDay.isAfter(latestDay);
-    return (covered: covered, oldestDay: oldestDay, latestDay: latestDay);
+    return (covered: covered, latestDay: latestDay);
   }
 
-  Future<({bool requested, bool progressed})> performSync() async {
+  Future<bool> performSync() async {
     final coverage = await readCoverage();
-    if (!forceRefresh && coverage.covered) {
-      return (requested: false, progressed: false);
-    }
+    if (!forceRefresh && coverage.covered) return false;
 
     var requestFrom = coverage.latestDay == null
         ? requiredStart
         : _offsetMarketDay(coverage.latestDay!, -1);
-    if (!coverage.covered &&
-        (coverage.oldestDay == null ||
-            coverage.oldestDay!.isAfter(requiredStart))) {
-      requestFrom = requiredStart;
+    if (!coverage.covered) {
+      final oldest = await (targetDatabase.candles.select()
+            ..where((row) => row.symbol.equals(canonicalSymbol))
+            ..orderBy([
+              (row) =>
+                  OrderingTerm(expression: row.date, mode: OrderingMode.asc),
+            ])
+            ..limit(1))
+          .getSingleOrNull();
+      final oldestDay = oldest == null ? null : canonicalMarketDay(oldest.date);
+      if (oldestDay == null || oldestDay.isAfter(requiredStart)) {
+        requestFrom = requiredStart;
+      }
     }
     if (requestFrom.isBefore(requiredStart)) {
       requestFrom = requiredStart;
@@ -842,12 +840,7 @@ Future<void> syncCandles(
       expectedMarketDay: expectedMarketDay,
       ibkrFetcher: ibkrFetcher,
     );
-    if (ibkrHandled) {
-      final after = await readCoverage();
-      final progressed = coverage.oldestDay != after.oldestDay ||
-          coverage.latestDay != after.latestDay;
-      return (requested: true, progressed: progressed);
-    }
+    if (ibkrHandled) return true;
 
     runDetachedTask(
       fetchSymbolCurrencyAndRate(canonicalSymbol),
@@ -862,11 +855,7 @@ Future<void> syncCandles(
           );
           return response.candlesData;
         };
-    final response = await backgroundNetworkCoordinator
-        .observe<List<YahooFinanceCandleData>>(
-      RequestCategory.yahooCandles,
-      () => fetch(canonicalSymbol, requestFrom),
-    );
+    final response = await fetch(canonicalSymbol, requestFrom);
     final requestedCandles = response.where((candle) {
       final day = canonicalMarketDay(candle.date);
       return !day.isBefore(requestFrom) && !day.isAfter(expectedMarketDay);
@@ -876,37 +865,28 @@ Future<void> syncCandles(
       canonicalSymbol,
       database: targetDatabase,
     );
-    backgroundNetworkCoordinator.recordRows(
-      RequestCategory.yahooCandles,
-      stored,
-    );
     talker.info(
       'Completed Yahoo candle sync for $canonicalSymbol: $stored rows '
       'from ${requestFrom.toIso8601String()}',
     );
-    final after = await readCoverage();
-    final progressed = coverage.oldestDay != after.oldestDay ||
-        coverage.latestDay != after.latestDay;
-    return (requested: true, progressed: progressed);
+    return true;
   }
 
   try {
     while (true) {
-      final syncResult = await backgroundNetworkCoordinator
-          .coalesce<({bool requested, bool progressed})>(
-        RequestCategory.marketCandles,
+      final networkRequested =
+          await backgroundNetworkCoordinator.coalesce<bool>(
+        'market.candles',
         canonicalSymbol,
         performSync,
       );
 
       if (forceRefresh) {
-        if (syncResult.requested) return;
+        if (networkRequested) return;
         continue;
       }
 
       if ((await readCoverage()).covered) return;
-      if (!syncResult.requested) continue;
-      if (!syncResult.progressed) return;
     }
   } catch (error, stackTrace) {
     talker.handle(error, stackTrace, 'Candle sync failed');
@@ -981,7 +961,7 @@ Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
 Future<void> _fetchAndCacheRate(String currencyCode) async {
   try {
     final rate = await backgroundNetworkCoordinator.coalesce<double?>(
-      RequestCategory.fxRate,
+      'fx.rate',
       currencyCode,
       () async {
         final uri = Uri.parse(
@@ -1056,7 +1036,7 @@ class YahooFinanceApi {
 
   Future<List<StockResult>> _performSearch(String query) =>
       backgroundNetworkCoordinator.coalesce<List<StockResult>>(
-        RequestCategory.yahooSearch,
+        'yahoo.search',
         query,
         () async {
           try {

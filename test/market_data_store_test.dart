@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/market_data_store.dart';
-import 'package:market_monk/unified_database.dart';
+import 'package:market_monk/legacy_profile_database.dart' as legacy;
 import 'package:market_monk/utils.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
 
@@ -33,15 +33,17 @@ void main() {
 
   test('legacy profile candles merge globally by canonical symbol and day',
       () async {
-    final target = UnifiedDatabase.connect(NativeDatabase.memory());
-    final defaultProfile = Database.connect(NativeDatabase.memory());
-    final secondProfile = Database.connect(NativeDatabase.memory());
+    final target = Database.connect(NativeDatabase.memory());
+    final defaultProfile =
+        legacy.LegacyProfileDatabase.connect(NativeDatabase.memory());
+    final secondProfile =
+        legacy.LegacyProfileDatabase.connect(NativeDatabase.memory());
     addTearDown(target.close);
     addTearDown(defaultProfile.close);
     addTearDown(secondProfile.close);
 
-    await target.unifiedCandles.insertOne(
-      UnifiedCandlesCompanion.insert(
+    await target.candles.insertOne(
+      CandlesCompanion.insert(
         symbol: 'MSFT',
         date: DateTime(2026, 1, 2),
         open: const Value(200),
@@ -54,21 +56,21 @@ void main() {
     );
 
     await defaultProfile.candles.insertOne(
-      CandlesCompanion.insert(
+      legacy.CandlesCompanion.insert(
         symbol: ' aapl ',
         date: DateTime(2026, 1, 2, 15),
         close: const Value(100),
       ),
     );
     await defaultProfile.candles.insertOne(
-      CandlesCompanion.insert(
+      legacy.CandlesCompanion.insert(
         symbol: 'msft',
         date: DateTime(2026, 1, 2, 8),
         close: const Value(199),
       ),
     );
     await secondProfile.candles.insertOne(
-      CandlesCompanion.insert(
+      legacy.CandlesCompanion.insert(
         symbol: 'AAPL',
         date: DateTime(2026, 1, 2, 7),
         open: const Value(99),
@@ -80,12 +82,12 @@ void main() {
       ),
     );
 
-    final result = await mergeLegacyCandlesIntoUnified(
+    final result = await mergeLegacyCandles(
       target: target,
       legacyDatabases: [defaultProfile, secondProfile],
     );
 
-    final rows = await (target.unifiedCandles.select()
+    final rows = await (target.candles.select()
           ..orderBy([(row) => OrderingTerm.asc(row.symbol)]))
         .get();
 
@@ -101,17 +103,17 @@ void main() {
       reason: 'a weaker legacy row must not overwrite better global data',
     );
 
-    final secondPass = await mergeLegacyCandlesIntoUnified(
+    final secondPass = await mergeLegacyCandles(
       target: target,
       legacyDatabases: [defaultProfile, secondProfile],
     );
     expect(secondPass.writtenRows, 0);
-    expect(await target.select(target.unifiedCandles).get(), hasLength(2));
+    expect(await target.select(target.candles).get(), hasLength(2));
   });
 
   test('raw and normalized symbol currency metadata share the global store',
       () async {
-    final target = UnifiedDatabase.connect(NativeDatabase.memory());
+    final target = Database.connect(NativeDatabase.memory());
     addTearDown(target.close);
 
     await upsertSymbolCurrencyMetadata(
@@ -129,7 +131,7 @@ void main() {
 
   test('IBKR-populated candles satisfy local chart reads from the same cache',
       () async {
-    final target = UnifiedDatabase.connect(NativeDatabase.memory());
+    final target = Database.connect(NativeDatabase.memory());
     addTearDown(target.close);
     cacheSymbolMeta('AAPL', 'USD');
 
@@ -176,7 +178,7 @@ void main() {
   });
 
   test('IBKR candle import removes closed-weekend rows', () async {
-    final target = UnifiedDatabase.connect(NativeDatabase.memory());
+    final target = Database.connect(NativeDatabase.memory());
     addTearDown(target.close);
 
     await target.upsertCandle(
@@ -222,7 +224,7 @@ void main() {
 
   test('sync coalescing ignores account namespace for shared market data',
       () async {
-    final target = UnifiedDatabase.connect(NativeDatabase.memory());
+    final target = Database.connect(NativeDatabase.memory());
     addTearDown(target.close);
     cacheSymbolMeta('AAPL', 'USD');
 
@@ -260,6 +262,6 @@ void main() {
     ]);
 
     expect(requests, 1);
-    expect(await target.select(target.unifiedCandles).get(), hasLength(2));
+    expect(await target.select(target.candles).get(), hasLength(2));
   });
 }

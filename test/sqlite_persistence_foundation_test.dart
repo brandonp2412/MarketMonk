@@ -1,56 +1,72 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:market_monk/app_state_database.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/legacy_preferences_migration.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('app-state SQLite stores profiles, active profile, and typed settings',
+  test('Database stores profiles, active profile, and typed settings',
       () async {
-    final appState = AppStateDatabase.connect(NativeDatabase.memory());
-    addTearDown(appState.close);
+    final database = Database.connect(NativeDatabase.memory());
+    addTearDown(database.close);
 
-    await appState.replaceProfiles(['Default', 'Brokerage']);
-    await appState.setActiveProfile('Brokerage');
-    await appState.writeSetting('pureBlack', true);
-    await appState.writeSetting('seedColor', 123);
-    await appState.writeSetting('exchangeRate_NZD', 1.73);
-    await appState.writeSetting('visibleCurrencies', ['NZD', 'USD']);
+    await database.upsertProfile(
+      id: 'profile-default',
+      name: 'Default',
+      sortOrder: 0,
+    );
+    await database.upsertProfile(
+      id: 'profile-brokerage',
+      name: 'Brokerage',
+      sortOrder: 1,
+    );
+    await database.setActiveProfile('Brokerage');
+    await database.writeSetting('pureBlack', true);
+    await database.writeSetting('seedColor', 123);
+    await database.writeSetting('exchangeRate_NZD', 1.73);
+    await database.writeSetting('visibleCurrencies', ['NZD', 'USD']);
 
-    expect(await appState.readProfiles(), ['Default', 'Brokerage']);
-    expect(await appState.readActiveProfile(), 'Brokerage');
-    expect(await appState.readSetting('pureBlack'), isTrue);
-    expect(await appState.readSetting('seedColor'), 123);
-    expect(await appState.readSetting('exchangeRate_NZD'), 1.73);
+    expect(await database.readProfileNames(), ['Default', 'Brokerage']);
+    expect(await database.readActiveProfile(), 'Brokerage');
+    expect(await database.readSetting('pureBlack'), isTrue);
+    expect(await database.readSetting('seedColor'), 123);
+    expect(await database.readSetting('exchangeRate_NZD'), 1.73);
     expect(
-      await appState.readSetting('visibleCurrencies'),
+      await database.readSetting('visibleCurrencies'),
       ['NZD', 'USD'],
     );
   });
 
-  test('profile SQLite stores IBKR config and keyed cache entries', () async {
-    final profile = Database.connect(NativeDatabase.memory());
-    addTearDown(profile.close);
+  test('Database stores profile-scoped IBKR config and cache entries',
+      () async {
+    final database = Database.connect(NativeDatabase.memory());
+    addTearDown(database.close);
+    const profileId = 'profile-default';
 
-    await profile.writeIbkrProfileSettings(
+    await database.upsertProfile(
+      id: profileId,
+      name: 'Default',
+      sortOrder: 0,
+    );
+    await database.writeIbkrSettings(
+      profileId: profileId,
       enabled: true,
       baseUrl: 'https://ibkr.example.test',
       token: 'secret',
     );
-    await profile.writeIbkrCache(
+    await database.writeIbkrCache(
+      profileId: profileId,
       kind: 'performance',
       cacheKey: '1y',
       payloadJson: '{"period":"1y"}',
       cachedAt: DateTime.utc(2026, 10, 2),
     );
 
-    final config = await profile.readIbkrProfileSettings();
-    final cache = await profile.readIbkrCache('performance', '1y');
+    final config = await database.readIbkrSettings(profileId);
+    final cache = await database.readIbkrCache(profileId, 'performance', '1y');
 
     expect(config?.enabled, isTrue);
     expect(config?.baseUrl, 'https://ibkr.example.test');
@@ -59,13 +75,10 @@ void main() {
     expect(cache?.cachedAt.isAtSameMomentAs(DateTime.utc(2026, 10, 2)), isTrue);
   });
 
-  test('legacy preference values copy state without mutating the source',
+  test('legacy preference values seed the one database without mutating source',
       () async {
-    final tempDir = await Directory.systemTemp.createTemp(
-      'market-monk-sqlite-foundation-',
-    );
-    addTearDown(() => tempDir.delete(recursive: true));
-
+    final database = Database.connect(NativeDatabase.memory());
+    addTearDown(database.close);
     final cachedAt = DateTime.utc(2026, 10, 2, 1, 2, 3);
     final legacyValues = <String, Object?>{
       'accounts': ['Default', 'Brokerage'],
@@ -90,43 +103,30 @@ void main() {
       'ibkrPerformanceCacheV1': jsonEncode({
         'Brokerage': {
           '1y': {
-            'series': {
-              'period': '1y',
-              'points': <Object?>[],
-            },
+            'series': {'period': '1y', 'points': <Object?>[]},
             'cachedAt': cachedAt.toIso8601String(),
           },
         },
       }),
     };
-    final appState = AppStateDatabase.connect(NativeDatabase.memory());
-    addTearDown(appState.close);
 
-    Database factory(String profile) => Database.connect(
-          NativeDatabase(
-            File('${tempDir.path}/$profile.sqlite'),
-          ),
-        );
-
-    await seedSqliteFromLegacyValues(
+    await seedDatabaseFromLegacyValues(
       values: legacyValues,
-      appState: appState,
-      profileDatabaseFactory: factory,
+      database: database,
     );
 
-    expect(await appState.readProfiles(), ['Default', 'Brokerage']);
-    expect(await appState.readActiveProfile(), 'Brokerage');
-    expect(await appState.readSetting('pureBlack'), isTrue);
-    expect(
-      await appState.readSetting('visibleCurrencies'),
-      ['NZD', 'USD'],
-    );
+    expect(await database.readProfileNames(), ['Default', 'Brokerage']);
+    expect(await database.readActiveProfile(), 'Brokerage');
+    expect(await database.readSetting('pureBlack'), isTrue);
+    expect(await database.readSetting('visibleCurrencies'), ['NZD', 'USD']);
 
-    final brokerage = factory('Brokerage');
-    addTearDown(brokerage.close);
-    final config = await brokerage.readIbkrProfileSettings();
-    final portfolio = await brokerage.readIbkrCache('portfolio', 'snapshot');
-    final performance = await brokerage.readIbkrCache('performance', '1y');
+    final brokerage = await database.readProfileByName('Brokerage');
+    expect(brokerage, isNotNull);
+    final config = await database.readIbkrSettings(brokerage!.id);
+    final portfolio =
+        await database.readIbkrCache(brokerage.id, 'portfolio', 'snapshot');
+    final performance =
+        await database.readIbkrCache(brokerage.id, 'performance', '1y');
 
     expect(config?.baseUrl, 'https://ibkr.example.test');
     expect(config?.token, 'legacy-token');
@@ -138,57 +138,50 @@ void main() {
     expect(legacyValues['ibkrAccountConfigs'], isNotNull);
   });
 
-  test('legacy preference values never overwrite newer SQLite state', () async {
-    final tempDir = await Directory.systemTemp.createTemp(
-      'market-monk-sqlite-foundation-existing-',
+  test('legacy preference values never overwrite newer database state',
+      () async {
+    final database = Database.connect(NativeDatabase.memory());
+    addTearDown(database.close);
+
+    await database.upsertProfile(
+      id: 'profile-default',
+      name: 'Default',
+      sortOrder: 0,
     );
-    addTearDown(() => tempDir.delete(recursive: true));
-
-    final legacyValues = <String, Object?>{
-      'accounts': ['Default'],
-      'activeAccount': 'Default',
-      'theme': 'ThemeMode.light',
-      'ibkrAccountConfigs': jsonEncode({
-        'Default': {
-          'enabled': true,
-          'baseUrl': 'https://legacy.example.test',
-          'token': 'legacy-token',
-        },
-      }),
-    };
-    final appState = AppStateDatabase.connect(NativeDatabase.memory());
-    addTearDown(appState.close);
-    await appState.replaceProfiles(['Default', 'Existing']);
-    await appState.setActiveProfile('Existing');
-    await appState.writeSetting('theme', 'ThemeMode.dark');
-
-    Database factory(String profile) => Database.connect(
-          NativeDatabase(
-            File('${tempDir.path}/$profile.sqlite'),
-          ),
-        );
-
-    final initialDefault = factory('Default');
-    await initialDefault.writeIbkrProfileSettings(
+    await database.upsertProfile(
+      id: 'profile-existing',
+      name: 'Existing',
+      sortOrder: 1,
+    );
+    await database.setActiveProfile('Existing');
+    await database.writeSetting('theme', 'ThemeMode.dark');
+    await database.writeIbkrSettings(
+      profileId: 'profile-default',
       enabled: true,
       baseUrl: 'https://new.example.test',
       token: 'new-token',
     );
-    await initialDefault.close();
 
-    await seedSqliteFromLegacyValues(
-      values: legacyValues,
-      appState: appState,
-      profileDatabaseFactory: factory,
+    await seedDatabaseFromLegacyValues(
+      values: {
+        'accounts': ['Default'],
+        'activeAccount': 'Default',
+        'theme': 'ThemeMode.light',
+        'ibkrAccountConfigs': jsonEncode({
+          'Default': {
+            'enabled': true,
+            'baseUrl': 'https://legacy.example.test',
+            'token': 'legacy-token',
+          },
+        }),
+      },
+      database: database,
     );
 
-    expect(await appState.readProfiles(), ['Default', 'Existing']);
-    expect(await appState.readActiveProfile(), 'Existing');
-    expect(await appState.readSetting('theme'), 'ThemeMode.dark');
-
-    final migratedDefault = factory('Default');
-    addTearDown(migratedDefault.close);
-    final config = await migratedDefault.readIbkrProfileSettings();
+    expect(await database.readProfileNames(), ['Default', 'Existing']);
+    expect(await database.readActiveProfile(), 'Existing');
+    expect(await database.readSetting('theme'), 'ThemeMode.dark');
+    final config = await database.readIbkrSettings('profile-default');
     expect(config?.baseUrl, 'https://new.example.test');
     expect(config?.token, 'new-token');
   });

@@ -505,10 +505,10 @@ class DatabaseAtV1 extends GeneratedDatabase {
   late final IbkrCacheEntries ibkrCacheEntries = IbkrCacheEntries(this);
   late final Candles candles = Candles(this);
   late final SymbolMetadata symbolMetadata = SymbolMetadata(this);
-  late final Index idxUnifiedProfilesSortOrder = Index(
+  late final Index idxStoredProfilesSortOrder = Index(
       'idx_unified_profiles_sort_order',
       'CREATE INDEX idx_unified_profiles_sort_order ON profiles (sort_order)');
-  late final Index idxUnifiedTradesProfileSymbolDate = Index(
+  late final Index idxStoredTradesProfileSymbolDate = Index(
       'idx_unified_trades_profile_symbol_date',
       'CREATE INDEX idx_unified_trades_profile_symbol_date ON trades (profile_id, symbol, trade_date)');
   @override
@@ -524,8 +524,8 @@ class DatabaseAtV1 extends GeneratedDatabase {
         ibkrCacheEntries,
         candles,
         symbolMetadata,
-        idxUnifiedProfilesSortOrder,
-        idxUnifiedTradesProfileSymbolDate
+        idxStoredProfilesSortOrder,
+        idxStoredTradesProfileSymbolDate
       ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules(

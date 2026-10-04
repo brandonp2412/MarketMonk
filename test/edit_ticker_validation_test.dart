@@ -1,23 +1,14 @@
-import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
-import 'package:market_monk/main.dart';
+import 'sqlite_test_support.dart';
 
 void main() {
-  setUp(() {
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-  });
-
-  tearDown(() async {
-    await db.close();
+  setUp(() async {
+    await seedTestSqlite({
+      'accounts': ['Default'],
+      'activeAccount': 'Default',
+    });
   });
 
   testWidgets('invalid trade amount is rejected without throwing',
@@ -37,7 +28,7 @@ void main() {
       find.text('Enter a valid amount greater than zero.'),
       findsOneWidget,
     );
-    expect(await db.select(db.trades).get(), isEmpty);
+    expect(await testDatabase.select(testDatabase.trades).get(), isEmpty);
     expect(tester.takeException(), null);
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
@@ -60,7 +51,7 @@ void main() {
       find.text('Enter a valid price greater than zero.'),
       findsOneWidget,
     );
-    expect(await db.select(db.trades).get(), isEmpty);
+    expect(await testDatabase.select(testDatabase.trades).get(), isEmpty);
     expect(tester.takeException(), null);
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();

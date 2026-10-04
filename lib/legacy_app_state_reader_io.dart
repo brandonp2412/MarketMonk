@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:drift/native.dart';
-import 'package:market_monk/app_state_database.dart';
+import 'package:market_monk/legacy_app_state_database.dart';
 import 'package:path_provider/path_provider.dart';
 
 const _legacyAppStateFileName = 'market-monk-app-state.sqlite';
@@ -15,7 +15,7 @@ Future<Map<String, Object?>?> readLegacyAppStateFile() async {
   final file = await _legacyAppStateFile();
   if (!await file.exists()) return null;
 
-  final database = AppStateDatabase.connect(NativeDatabase(file));
+  final database = LegacyAppStateDatabase.connect(NativeDatabase(file));
   try {
     final values = await database.readSettings();
     final profiles = await database.readProfiles();

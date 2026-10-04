@@ -1,16 +1,16 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:market_monk/unified_database.dart';
+import 'package:market_monk/database.dart';
 
 import 'dart:io';
 
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 void main() {
-  late UnifiedDatabase database;
+  late Database database;
 
   setUp(() {
-    database = UnifiedDatabase.connect(NativeDatabase.memory());
+    database = Database.connect(NativeDatabase.memory());
   });
 
   tearDown(() async {
@@ -191,7 +191,7 @@ void main() {
     final file =
         File.fromUri(directory.uri.resolve('market-monk.unified.sqlite'));
 
-    database = UnifiedDatabase.connect(NativeDatabase(file));
+    database = Database.connect(NativeDatabase(file));
     await database.upsertProfile(
       id: 'profile-default',
       name: 'Default',
@@ -212,7 +212,7 @@ void main() {
     );
     raw.close();
 
-    database = UnifiedDatabase.connect(NativeDatabase(file));
+    database = Database.connect(NativeDatabase(file));
 
     final profiles = await database.readProfiles();
     expect(profiles, hasLength(1));
