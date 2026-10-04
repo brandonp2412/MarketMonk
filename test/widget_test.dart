@@ -1,11 +1,8 @@
 import 'sqlite_test_support.dart';
-import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/accounts_page.dart';
 import 'package:market_monk/bottom_nav.dart';
-import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:provider/provider.dart';
@@ -14,12 +11,6 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   testWidgets('App renders tab navigation', (WidgetTester tester) async {
     await seedTestSqlite({});
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
     final accounts = testAccountManager();
     await tester.pumpWidget(
       MultiProvider(
@@ -58,12 +49,6 @@ void main() {
     'adding account does not cause overlay assertion while MyApp rebuilds',
     (WidgetTester tester) async {
       await seedTestSqlite({});
-      db = Database.connect(
-        DatabaseConnection(
-          NativeDatabase.memory(),
-          closeStreamsSynchronously: true,
-        ),
-      );
       final accounts = testAccountManager();
 
       await tester.pumpWidget(
@@ -102,14 +87,6 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1400, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
-
     final accounts = testAccountManager();
     await tester.pumpWidget(
       MultiProvider(
@@ -147,14 +124,6 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1400, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
-
     final accounts = testAccountManager();
     await tester.pumpWidget(
       MultiProvider(
@@ -188,14 +157,6 @@ void main() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
     });
-
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
 
     final accounts = testAccountManager();
     await tester.pumpWidget(

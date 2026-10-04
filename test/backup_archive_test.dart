@@ -6,7 +6,7 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/backup_archive.dart';
-import 'package:market_monk/database.dart';
+import 'package:market_monk/legacy_profile_database.dart' as legacy;
 
 void main() {
   late Directory directory;
@@ -27,9 +27,9 @@ void main() {
     String symbol = 'VTI',
   }) async {
     final file = File('${directory.path}/$fileName');
-    final database = Database.connect(NativeDatabase(file));
+    final database = legacy.LegacyProfileDatabase.connect(NativeDatabase(file));
     await database.trades.insertOne(
-      TradesCompanion.insert(
+      legacy.TradesCompanion.insert(
         symbol: symbol,
         name: symbol,
         quantity: 2,
@@ -39,7 +39,7 @@ void main() {
       ),
     );
     await database.candles.insertOne(
-      CandlesCompanion.insert(
+      legacy.CandlesCompanion.insert(
         symbol: symbol,
         date: DateTime(2026, 10, 3),
         close: const Value(101),
@@ -102,7 +102,7 @@ void main() {
       MarketMonkBackupStorageLayout.profileDatabases,
     );
 
-    final restoredDb = Database.connect(
+    final restoredDb = legacy.LegacyProfileDatabase.connect(
       NativeDatabase(restored.storage.profileDatabases['Brokerage']!),
     );
     expect(
@@ -156,7 +156,7 @@ void main() {
       restored.storage.layout,
       MarketMonkBackupStorageLayout.profileDatabases,
     );
-    final restoredDb = Database.connect(
+    final restoredDb = legacy.LegacyProfileDatabase.connect(
       NativeDatabase(restored.storage.profileDatabases['Default']!),
     );
     expect(

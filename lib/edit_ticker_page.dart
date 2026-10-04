@@ -90,23 +90,22 @@ class _EditTickerPageState extends State<EditTickerPage> {
       "STRFTIME('%Y-%m-%W', DATE(\"date\", 'unixepoch', 'localtime'))",
     );
     Iterable<Expression<Object>> groupBy = [
-      marketDataDatabase.unifiedCandles.date,
+      marketDataDatabase.candles.date,
     ];
     if (years > 0 || months > 5) groupBy = [weekExpression];
 
-    stream = (marketDataDatabase.selectOnly(marketDataDatabase.unifiedCandles)
+    stream = (marketDataDatabase.selectOnly(marketDataDatabase.candles)
           ..addColumns([
-            marketDataDatabase.unifiedCandles.date,
-            marketDataDatabase.unifiedCandles.close,
+            marketDataDatabase.candles.date,
+            marketDataDatabase.candles.close,
           ])
           ..where(
-            marketDataDatabase.unifiedCandles.symbol.equals(marketSymbol) &
-                marketDataDatabase.unifiedCandles.date
-                    .isBiggerOrEqualValue(after),
+            marketDataDatabase.candles.symbol.equals(marketSymbol) &
+                marketDataDatabase.candles.date.isBiggerOrEqualValue(after),
           )
           ..orderBy([
             OrderingTerm(
-              expression: marketDataDatabase.unifiedCandles.date,
+              expression: marketDataDatabase.candles.date,
               mode: OrderingMode.asc,
             ),
           ])
@@ -118,10 +117,10 @@ class _EditTickerPageState extends State<EditTickerPage> {
                 (result) => CandleTicker(
                   candle: CandlesCompanion(
                     date: Value(
-                      result.read(marketDataDatabase.unifiedCandles.date)!,
+                      result.read(marketDataDatabase.candles.date)!,
                     ),
                     close: Value(
-                      result.read(marketDataDatabase.unifiedCandles.close)!,
+                      result.read(marketDataDatabase.candles.close)!,
                     ),
                   ),
                 ),

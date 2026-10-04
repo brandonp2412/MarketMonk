@@ -2,15 +2,14 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 import 'package:market_monk/database.dart';
+import 'package:market_monk/legacy_profile_database.dart' as legacy;
 import 'package:market_monk/profile_data_repository.dart';
-import 'package:market_monk/unified_database.dart';
 
-UnifiedDatabase? _marketDataDatabase;
+Database? _marketDataDatabase;
 
-UnifiedDatabase get marketDataDatabase =>
-    _marketDataDatabase ?? profileDataDatabase;
+Database get marketDataDatabase => _marketDataDatabase ?? profileDataDatabase;
 
-void setMarketDataDatabaseForTesting(UnifiedDatabase? database) {
+void setMarketDataDatabaseForTesting(Database? database) {
   _marketDataDatabase = database;
 }
 
@@ -25,7 +24,7 @@ String _normalizedCurrency(String rawCurrency) => switch (rawCurrency) {
       _ => rawCurrency,
     };
 
-String? rawCurrencyFromMetadata(UnifiedSymbolMetadataData? metadata) {
+String? rawCurrencyFromMetadata(StoredSymbolMetadata? metadata) {
   if (metadata == null) return null;
   final payload = metadata.payloadJson;
   if (payload != null && payload.isNotEmpty) {
@@ -43,7 +42,7 @@ String? rawCurrencyFromMetadata(UnifiedSymbolMetadataData? metadata) {
 Future<void> upsertSymbolCurrencyMetadata(
   String symbol,
   String rawCurrency, {
-  UnifiedDatabase? database,
+  Database? database,
   DateTime? cachedAt,
 }) async {
   final target = database ?? marketDataDatabase;
@@ -94,7 +93,7 @@ class _CandleCandidate {
     required this.adjClose,
   });
 
-  factory _CandleCandidate.fromLegacy(Candle candle) => _CandleCandidate(
+  factory _CandleCandidate.fromLegacy(legacy.Candle candle) => _CandleCandidate(
         symbol: _canonicalSymbol(candle.symbol),
         date: _canonicalDay(candle.date),
         open: candle.open,
@@ -105,8 +104,7 @@ class _CandleCandidate {
         adjClose: candle.adjClose,
       );
 
-  factory _CandleCandidate.fromUnified(UnifiedCandle candle) =>
-      _CandleCandidate(
+  factory _CandleCandidate.fromUnified(StoredCandle candle) => _CandleCandidate(
         symbol: _canonicalSymbol(candle.symbol),
         date: _canonicalDay(candle.date),
         open: candle.open,
@@ -135,7 +133,7 @@ class _CandleCandidate {
     return score;
   }
 
-  UnifiedCandlesCompanion toCompanion() => UnifiedCandlesCompanion.insert(
+  CandlesCompanion toCompanion() => CandlesCompanion.insert(
         symbol: symbol,
         date: date,
         open: Value(open),
@@ -147,14 +145,14 @@ class _CandleCandidate {
       );
 }
 
-Future<LegacyMarketDataMergeResult> mergeLegacyCandlesIntoUnified({
-  required UnifiedDatabase target,
-  required Iterable<Database> legacyDatabases,
+Future<LegacyMarketDataMergeResult> mergeLegacyCandles({
+  required Database target,
+  required Iterable<legacy.LegacyProfileDatabase> legacyDatabases,
 }) async {
   final selected = <(String, int), _CandleCandidate>{};
   final existingQuality = <(String, int), int>{};
 
-  final existing = await target.select(target.unifiedCandles).get();
+  final existing = await target.select(target.candles).get();
   for (final candle in existing) {
     final candidate = _CandleCandidate.fromUnified(candle);
     final key = (candidate.symbol, candidate.date.millisecondsSinceEpoch);
@@ -194,7 +192,7 @@ Future<LegacyMarketDataMergeResult> mergeLegacyCandlesIntoUnified({
         .toList();
     await target.batch((batch) {
       batch.insertAll(
-        target.unifiedCandles,
+        target.candles,
         rows,
         mode: InsertMode.insertOrReplace,
       );

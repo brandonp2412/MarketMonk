@@ -1,5 +1,4 @@
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -22,6 +21,7 @@ final DateTime _mockToday = DateTime.now();
 
 List<TradesCompanion> mockTrades = [
   TradesCompanion.insert(
+    profileId: 'profile-default',
     quantity: 5,
     tradeDate: _mockToday.subtract(const Duration(days: 210)),
     tradeType: 'open',
@@ -30,6 +30,7 @@ List<TradesCompanion> mockTrades = [
     price: 30.25,
   ),
   TradesCompanion.insert(
+    profileId: 'profile-default',
     quantity: 10,
     tradeDate: _mockToday.subtract(const Duration(days: 196)),
     tradeType: 'open',
@@ -38,6 +39,7 @@ List<TradesCompanion> mockTrades = [
     price: 176.75,
   ),
   TradesCompanion.insert(
+    profileId: 'profile-default',
     quantity: 3,
     tradeDate: _mockToday.subtract(const Duration(days: 182)),
     tradeType: 'open',
@@ -46,6 +48,7 @@ List<TradesCompanion> mockTrades = [
     price: 243.00,
   ),
   TradesCompanion.insert(
+    profileId: 'profile-default',
     quantity: 15,
     tradeDate: _mockToday.subtract(const Duration(days: 168)),
     tradeType: 'open',
@@ -54,6 +57,7 @@ List<TradesCompanion> mockTrades = [
     price: 337.35,
   ),
   TradesCompanion.insert(
+    profileId: 'profile-default',
     quantity: 8,
     tradeDate: _mockToday.subtract(const Duration(days: 154)),
     tradeType: 'open',
@@ -252,13 +256,16 @@ void main() {
       IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(() async {
-    app.db = Database.connect(NativeDatabase.memory());
+    await seedTestSqlite({
+      'accounts': ['Default'],
+      'activeAccount': 'Default',
+    });
     for (final symbol in ['GME', 'AAPL', 'TSLA', 'MSFT', 'AMZN']) {
       cacheSymbolMeta(symbol, 'USD');
     }
     allRatesFromUsd['USD'] = 1.0;
-    await app.db.candles.insertAll(mockCandles);
-    await app.db.trades.insertAll(mockTrades);
+    await testDatabase.candles.insertAll(mockCandles);
+    await testDatabase.trades.insertAll(mockTrades);
   });
 
   group("Generate default screenshots ", () {

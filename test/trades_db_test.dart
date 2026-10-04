@@ -6,7 +6,7 @@ import 'package:test/test.dart';
 Database _openDb() => Database.connect(NativeDatabase.memory());
 
 /// Inserts a trade row and returns it.
-Future<Trade> _insertTrade(
+Future<StoredTrade> _insertTrade(
   Database db, {
   String symbol = 'AAPL',
   String name = 'Apple',
@@ -19,6 +19,7 @@ Future<Trade> _insertTrade(
 }) =>
     db.trades.insertReturning(
       TradesCompanion.insert(
+        profileId: 'profile-default',
         symbol: symbol,
         name: name,
         quantity: quantity,
@@ -34,7 +35,19 @@ void main() {
   // ─── Basic CRUD ────────────────────────────────────────────────────────────
   group('Trades table — basic CRUD', () {
     late Database db;
-    setUp(() => db = _openDb());
+    setUp(() async {
+      db = _openDb();
+      await db.upsertProfile(
+        id: 'profile-default',
+        name: 'Default',
+        sortOrder: 0,
+      );
+      await db.upsertProfile(
+        id: 'profile-default',
+        name: 'Default',
+        sortOrder: 0,
+      );
+    });
     tearDown(() => db.close());
 
     test('insert and retrieve a trade', () async {
@@ -52,6 +65,7 @@ void main() {
       () async {
         final inserted = await db.trades.insertReturning(
           TradesCompanion.insert(
+            profileId: 'profile-default',
             symbol: 'GOOG',
             name: 'Alphabet',
             quantity: 1,
@@ -115,6 +129,11 @@ void main() {
 
     setUp(() async {
       db = _openDb();
+      await db.upsertProfile(
+        id: 'profile-default',
+        name: 'Default',
+        sortOrder: 0,
+      );
       await _insertTrade(
         db,
         symbol: 'AAPL',
@@ -177,7 +196,19 @@ void main() {
   // ─── Trades table independence (no FK requirement) ─────────────────────────
   group('Trades table — no FK constraints', () {
     late Database db;
-    setUp(() => db = _openDb());
+    setUp(() async {
+      db = _openDb();
+      await db.upsertProfile(
+        id: 'profile-default',
+        name: 'Default',
+        sortOrder: 0,
+      );
+      await db.upsertProfile(
+        id: 'profile-default',
+        name: 'Default',
+        sortOrder: 0,
+      );
+    });
     tearDown(() => db.close());
 
     test(
@@ -205,7 +236,19 @@ void main() {
   // ─── Realized P/L calculations ─────────────────────────────────────────────
   group('Realized P/L arithmetic', () {
     late Database db;
-    setUp(() => db = _openDb());
+    setUp(() async {
+      db = _openDb();
+      await db.upsertProfile(
+        id: 'profile-default',
+        name: 'Default',
+        sortOrder: 0,
+      );
+      await db.upsertProfile(
+        id: 'profile-default',
+        name: 'Default',
+        sortOrder: 0,
+      );
+    });
     tearDown(() => db.close());
 
     test(

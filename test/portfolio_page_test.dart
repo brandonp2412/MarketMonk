@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/database.dart';
@@ -63,7 +62,7 @@ Future<AccountManager> configuredTwoAccounts() async {
 
 Future<void> seedCurrentCandle(String symbol) async {
   final now = DateTime.now();
-  await db.into(db.candles).insert(
+  await testDatabase.into(testDatabase.candles).insert(
         CandlesCompanion.insert(
           symbol: symbol,
           date: DateTime(now.year, now.month, now.day),
@@ -112,13 +111,6 @@ void main() {
     tester,
   ) async {
     await seedTestSqlite({});
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
     final accounts = await configuredAccounts();
     final pending = Completer<IbkrPortfolioSnapshot>();
     var loads = 0;
@@ -149,13 +141,6 @@ void main() {
     'portfolio renders persistent cache without waiting for refresh',
     (tester) async {
       await seedTestSqlite({});
-      db = Database.connect(
-        DatabaseConnection(
-          NativeDatabase.memory(),
-          closeStreamsSynchronously: true,
-        ),
-      );
-      addTearDown(() => db.close());
       final accounts = await configuredAccounts();
       await accounts.cachePortfolio(
         'Default',
@@ -215,13 +200,6 @@ void main() {
       await seedTestSqlite({
         'ibkrHistorySeeded:https://default.example.test:Default:VOO': true,
       });
-      db = Database.connect(
-        DatabaseConnection(
-          NativeDatabase.memory(),
-          closeStreamsSynchronously: true,
-        ),
-      );
-      addTearDown(() => db.close());
       await seedCurrentCandle('VOO');
 
       final accounts = await configuredTwoAccounts();
@@ -253,13 +231,6 @@ void main() {
       await seedTestSqlite({
         'ibkrHistorySeeded:https://default.example.test:Default:VOO': true,
       });
-      db = Database.connect(
-        DatabaseConnection(
-          NativeDatabase.memory(),
-          closeStreamsSynchronously: true,
-        ),
-      );
-      addTearDown(() => db.close());
       await seedCurrentCandle('VOO');
 
       final accounts = await configuredTwoAccounts();
@@ -296,13 +267,6 @@ void main() {
     'portfolio shows a friendly IBKR error instead of exception text',
     (tester) async {
       await seedTestSqlite({});
-      db = Database.connect(
-        DatabaseConnection(
-          NativeDatabase.memory(),
-          closeStreamsSynchronously: true,
-        ),
-      );
-      addTearDown(() => db.close());
 
       final accounts = await configuredAccounts();
 
@@ -341,14 +305,6 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
     await seedTestSqlite({});
-
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
 
     final accounts = await configuredAccounts();
     await accounts.cachePortfolio(
@@ -409,14 +365,6 @@ void main() {
     });
     await seedTestSqlite({});
 
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
-
     final accounts = await configuredAccounts();
     await accounts.cachePortfolio(
       'Default',
@@ -457,14 +405,6 @@ void main() {
         tester.view.resetDevicePixelRatio();
       });
       await seedTestSqlite({});
-
-      db = Database.connect(
-        DatabaseConnection(
-          NativeDatabase.memory(),
-          closeStreamsSynchronously: true,
-        ),
-      );
-      addTearDown(() => db.close());
 
       final accounts = await configuredAccounts();
       await accounts.cachePortfolio(

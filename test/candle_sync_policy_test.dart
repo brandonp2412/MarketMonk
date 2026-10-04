@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:market_monk/unified_database.dart';
+import 'package:market_monk/database.dart';
 import 'package:market_monk/utils.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
 
@@ -30,8 +30,8 @@ DateTime _expectedMarketDay() {
   return day;
 }
 
-Future<List<UnifiedCandle>> _rows(UnifiedDatabase database) =>
-    (database.unifiedCandles.select()
+Future<List<StoredCandle>> _rows(Database database) =>
+    (database.candles.select()
           ..orderBy([
             (row) => OrderingTerm(
                   expression: row.date,
@@ -48,7 +48,7 @@ void main() {
 
   test('empty DB fetches only requested range and canonicalizes identity',
       () async {
-    final database = UnifiedDatabase.connect(NativeDatabase.memory());
+    final database = Database.connect(NativeDatabase.memory());
     addTearDown(database.close);
     final expected = _expectedMarketDay();
     final requiredFrom = _dayOffset(expected, -30);
@@ -90,7 +90,7 @@ void main() {
   });
 
   test('warm DB performs no market-data request or writes', () async {
-    final database = UnifiedDatabase.connect(NativeDatabase.memory());
+    final database = Database.connect(NativeDatabase.memory());
     addTearDown(database.close);
     final expected = _expectedMarketDay();
     final requiredFrom = _dayOffset(expected, -30);
@@ -123,7 +123,7 @@ void main() {
   });
 
   test('stale DB requests only the incremental overlap', () async {
-    final database = UnifiedDatabase.connect(NativeDatabase.memory());
+    final database = Database.connect(NativeDatabase.memory());
     addTearDown(database.close);
     final expected = _expectedMarketDay();
     final requiredFrom = _dayOffset(expected, -30);
@@ -164,7 +164,7 @@ void main() {
 
   test('manual refresh requests newest overlap without growing row count',
       () async {
-    final database = UnifiedDatabase.connect(NativeDatabase.memory());
+    final database = Database.connect(NativeDatabase.memory());
     addTearDown(database.close);
     final expected = _expectedMarketDay();
     final requiredFrom = _dayOffset(expected, -30);
@@ -201,7 +201,7 @@ void main() {
 
   test('concurrent normal and manual refresh share one market request',
       () async {
-    final database = UnifiedDatabase.connect(NativeDatabase.memory());
+    final database = Database.connect(NativeDatabase.memory());
     addTearDown(database.close);
     final expected = _expectedMarketDay();
     final requiredFrom = _dayOffset(expected, -30);
@@ -244,7 +244,7 @@ void main() {
 
   test('overlapping ranges serialize and only backfill missing coverage',
       () async {
-    final database = UnifiedDatabase.connect(NativeDatabase.memory());
+    final database = Database.connect(NativeDatabase.memory());
     addTearDown(database.close);
     final expected = _expectedMarketDay();
     final shortStart = _dayOffset(expected, -30);

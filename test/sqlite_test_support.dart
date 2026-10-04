@@ -3,28 +3,23 @@ import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:market_monk/app_state_database.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/legacy_preferences_migration.dart';
+import 'package:market_monk/legacy_profile_database.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/sqlite_settings.dart';
-import 'package:market_monk/unified_database.dart';
-import 'package:market_monk/unified_legacy_source.dart';
 
 export 'package:market_monk/sqlite_settings.dart';
 
 Directory? _profileDirectory;
-UnifiedDatabase? _profileDataTestDatabase;
+Database? _profileDataTestDatabase;
 
 /// Seeds isolated real SQLite stores from a legacy fixture.
 Future<void> seedTestSqlite(Map<String, Object?> values) async {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
-  final directory = Directory.systemTemp.createTempSync('monk-test-profiles-');
-  _profileDirectory = directory;
-  final database = AppStateDatabase.connect(NativeDatabase.memory());
-  final profileData = UnifiedDatabase.connect(
+  final profileData = Database.connect(
     DatabaseConnection(
       NativeDatabase.memory(),
       closeStreamsSynchronously: true,
@@ -33,33 +28,30 @@ Future<void> seedTestSqlite(Map<String, Object?> values) async {
   _profileDataTestDatabase = profileData;
   setProfileDataDatabaseForTesting(profileData);
   setMarketDataDatabaseForTesting(profileData);
+
+  await seedDatabaseFromLegacyValues(
+    values: values,
+    database: profileData,
+  );
+  await profileData.writeSetting(sqliteMigrationCompleteKey, true);
+  await profileData.writeSetting(legacyAppStateMigrationCompleteKey, true);
+  await profileData.writeSetting(Database.legacyMigrationCompleteKey, true);
+
+  await SqliteSettings.useInstance(SqliteSettings.load(profileData));
   addTearDown(() async {
     setProfileDataDatabaseForTesting(null);
     setMarketDataDatabaseForTesting(null);
     _profileDataTestDatabase = null;
     await profileData.close();
-    await database.close();
-    directory.deleteSync(recursive: true);
   });
-  final loaded = () async {
-    await seedSqliteFromLegacyValues(
-      values: values,
-      appState: database,
-      profileDatabaseFactory: (name) => Database.connect(
-        NativeDatabase(File('${directory.path}/$name.sqlite')),
-      ),
-    );
-    await database.writeSetting(sqliteMigrationCompleteKey, true);
-    final snapshot = await readLegacyUnifiedSnapshot(
-      appState: database,
-      openProfileDatabase: (name) async => Database.connect(
-        NativeDatabase(File('${directory.path}/$name.sqlite')),
-      ),
-    );
-    await profileData.migrateLegacySnapshot(snapshot, replaceExisting: true);
-    return SqliteSettings.load(database);
-  }();
-  await SqliteSettings.useInstance(loaded);
+}
+
+Database get testDatabase {
+  final database = _profileDataTestDatabase;
+  if (database == null) {
+    throw StateError('seedTestSqlite must be called first');
+  }
+  return database;
 }
 
 Future<void> ensureTestProfile(String name) async {
@@ -131,8 +123,8 @@ Future<void> seedTestTrade({
 
 /// Uses independent file connections so reopening exercises persistence.
 AccountManager testAccountManager() => AccountManager(
-      profileDatabaseFactory: (name) => Database.connect(
+      profileDatabaseFactory: (name) => LegacyProfileDatabase.connect(
         NativeDatabase(File('${_profileDirectory!.path}/$name.sqlite')),
       ),
-      unifiedDatabase: _profileDataTestDatabase!,
+      database: _profileDataTestDatabase!,
     );

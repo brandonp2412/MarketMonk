@@ -1,11 +1,11 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
-import 'package:market_monk/app_state_database.steps.dart';
+import 'package:market_monk/legacy_app_state_database.steps.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 
-part 'app_state_database.g.dart';
+part 'legacy_app_state_database.g.dart';
 
 class AppProfiles extends Table {
   TextColumn get name => text()();
@@ -25,7 +25,7 @@ class AppSettings extends Table {
 }
 
 @DriftDatabase(tables: [AppProfiles, AppSettings])
-class AppStateDatabase extends _$AppStateDatabase {
+class LegacyAppStateDatabase extends _$LegacyAppStateDatabase {
   static const activeProfileSettingKey = 'activeProfile';
 
   @override
@@ -36,9 +36,9 @@ class AppStateDatabase extends _$AppStateDatabase {
         onUpgrade: stepByStep(from1To2: (migrator, schema) async {}),
       );
 
-  AppStateDatabase() : super(_openConnection());
+  LegacyAppStateDatabase() : super(_openConnection());
 
-  AppStateDatabase.connect(super.executor);
+  LegacyAppStateDatabase.connect(super.executor);
 
   static QueryExecutor _openConnection() => driftDatabase(
         name: 'market-monk.settings',

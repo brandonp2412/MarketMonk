@@ -107,7 +107,7 @@ Future<File> buildMarketMonkBackupArchive({
       MarketMonkBackupStorageLayout.profileDatabases =>
         await _addProfileDatabases(encoder, logical, storage),
       MarketMonkBackupStorageLayout.unifiedDatabase =>
-        await _addUnifiedDatabase(encoder, storage),
+        await _addDatabase(encoder, storage),
     };
 
     final manifest = utf8.encode(
@@ -150,7 +150,7 @@ Future<Map<String, Object?>> _addProfileDatabases(
   };
 }
 
-Future<Map<String, Object?>> _addUnifiedDatabase(
+Future<Map<String, Object?>> _addDatabase(
   ZipFileEncoder encoder,
   MarketMonkBackupStorage storage,
 ) async {

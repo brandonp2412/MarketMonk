@@ -1,15 +1,13 @@
 import 'package:market_monk/database.dart';
-import 'package:market_monk/unified_database.dart';
 
-UnifiedDatabase? _profileDataDatabase;
+Database? _profileDataDatabase;
 
-UnifiedDatabase get profileDataDatabase =>
-    _profileDataDatabase ??= UnifiedDatabase();
+Database get profileDataDatabase => _profileDataDatabase ??= Database();
 
 ProfileDataRepository get profileDataRepository =>
     ProfileDataRepository(profileDataDatabase);
 
-void setProfileDataDatabaseForTesting(UnifiedDatabase? database) {
+void setProfileDataDatabaseForTesting(Database? database) {
   _profileDataDatabase = database;
 }
 
@@ -40,7 +38,7 @@ class ProfileTradeWrite {
 /// The UI keeps using the existing [Trade] value type while persistence is
 /// scoped by stable profile id. Market candles intentionally do not live here.
 class ProfileDataRepository {
-  final UnifiedDatabase database;
+  final Database database;
 
   const ProfileDataRepository(this.database);
 
@@ -128,7 +126,7 @@ class ProfileDataRepository {
       );
 }
 
-Trade _toTrade(UnifiedTrade row) => Trade(
+Trade _toTrade(StoredTrade row) => Trade(
       id: row.id,
       symbol: row.symbol,
       name: row.name,

@@ -4,7 +4,7 @@
 import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
 import 'package:drift_dev/api/migrations_native.dart';
-import 'package:market_monk/database.dart';
+import 'package:market_monk/legacy_profile_database.dart';
 import 'package:test/test.dart';
 
 import 'generated/schema.dart';
@@ -27,7 +27,7 @@ void main() {
     final schema = await verifier.schemaAt(10);
     addTearDown(schema.close);
 
-    final database = Database.connect(schema.newConnection());
+    final database = LegacyProfileDatabase.connect(schema.newConnection());
     await verifier.migrateAndValidate(database, 11);
 
     expect(await database.readIbkrProfileSettings(), isNull);
@@ -64,7 +64,7 @@ void main() {
       newVersion: 12,
       createOld: v11.DatabaseAtV11.new,
       createNew: v12.DatabaseAtV12.new,
-      openTestedDatabase: Database.connect,
+      openTestedDatabase: LegacyProfileDatabase.connect,
       createItems: (batch, oldDatabase) {
         batch.insertAll(oldDatabase.candles, [
           v11.CandlesData(

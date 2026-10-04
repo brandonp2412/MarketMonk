@@ -7,7 +7,7 @@ import 'package:market_monk/accounts_page.dart';
 import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/profile_data_repository.dart';
-import 'package:market_monk/unified_database.dart';
+import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/main.dart' as app;
@@ -156,16 +156,16 @@ void main() {
 
     final unified = profileDataDatabase;
     await unified.transaction(() async {
-      await unified.delete(unified.unifiedIbkrCacheEntries).go();
-      await unified.delete(unified.unifiedIbkrSettings).go();
-      await unified.delete(unified.unifiedTrades).go();
-      await unified.delete(unified.unifiedAppState).go();
-      await unified.delete(unified.unifiedProfiles).go();
-      await unified.delete(unified.unifiedAppSettings).go();
-      await unified.delete(unified.unifiedCandles).go();
-      await unified.delete(unified.unifiedSymbolMetadata).go();
+      await unified.delete(unified.ibkrCacheEntries).go();
+      await unified.delete(unified.ibkrSettings).go();
+      await unified.delete(unified.trades).go();
+      await unified.delete(unified.appState).go();
+      await unified.delete(unified.profiles).go();
+      await unified.delete(unified.appSettings).go();
+      await unified.delete(unified.candles).go();
+      await unified.delete(unified.symbolMetadata).go();
       await unified.writeSetting(
-        UnifiedDatabase.legacyMigrationCompleteKey,
+        Database.legacyMigrationCompleteKey,
         true,
       );
     });
@@ -428,7 +428,7 @@ void main() {
     await tester.tap(find.widgetWithText(TextButton, 'Delete'));
     await _waitForTradeCount(0);
     expect(
-      await marketDataDatabase.select(marketDataDatabase.unifiedCandles).get(),
+      await marketDataDatabase.select(marketDataDatabase.candles).get(),
       isEmpty,
     );
     await _pumpUntilGone(

@@ -1,30 +1,32 @@
 import 'dart:io';
 
 import 'package:drift/native.dart';
-import 'package:market_monk/app_state_database.dart';
-import 'package:market_monk/database.dart';
-import 'package:market_monk/unified_legacy_source.dart';
+import 'package:market_monk/legacy_app_state_database.dart';
+import 'package:market_monk/legacy_profile_database.dart';
+import 'package:market_monk/legacy_database_source.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-Future<LegacyUnifiedSnapshot?> loadLegacyUnifiedSnapshot() async {
+Future<LegacyDatabaseSnapshot?> loadLegacyDatabaseSnapshot() async {
   final directory = await getApplicationSupportDirectory();
   final settingsFile = File(
     p.join(directory.path, 'market-monk.settings.sqlite'),
   );
   if (!await settingsFile.exists()) return null;
 
-  final appState = AppStateDatabase.connect(NativeDatabase(settingsFile));
+  final appState = LegacyAppStateDatabase.connect(NativeDatabase(settingsFile));
   try {
-    return await readLegacyUnifiedSnapshot(
-      appState: appState,
+    return await readLegacyDatabaseSnapshot(
+      readSettings: appState.readSettings,
+      readProfileNames: appState.readProfiles,
+      readActiveProfile: appState.readActiveProfile,
       openProfileDatabase: (profileName) async {
         final fileName = profileName == 'Default'
             ? 'market-monk.sqlite'
             : 'market-monk-$profileName.sqlite';
         final file = File(p.join(directory.path, fileName));
         if (!await file.exists()) return null;
-        return Database.connect(NativeDatabase(file));
+        return LegacyProfileDatabase.connect(NativeDatabase(file));
       },
     );
   } finally {

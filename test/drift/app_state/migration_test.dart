@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:market_monk/app_state_database.dart';
+import 'package:market_monk/legacy_app_state_database.dart';
 import 'generated/schema.dart';
 import 'generated/schema_v1.dart' as v1;
 import 'generated/schema_v2.dart' as v2;
@@ -16,7 +16,7 @@ void main() {
       newVersion: 2,
       createOld: v1.DatabaseAtV1.new,
       createNew: v2.DatabaseAtV2.new,
-      openTestedDatabase: AppStateDatabase.connect,
+      openTestedDatabase: LegacyAppStateDatabase.connect,
       createItems: (batch, oldDb) {
         batch.insertAll(oldDb.appProfiles, [
           const v1.AppProfilesData(name: 'Default', sortOrder: 0),

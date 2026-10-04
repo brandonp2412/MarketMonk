@@ -1,12 +1,9 @@
 import 'dart:io';
 
-import 'package:drift/drift.dart' hide Column, Table;
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/crash_logger.dart';
-import 'package:market_monk/database.dart';
 import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/logging.dart';
@@ -35,13 +32,6 @@ void main() {
 
   Future<void> prepare(WidgetTester tester) async {
     await seedTestSqlite({});
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1400, 900);
     addTearDown(() {

@@ -11,7 +11,6 @@ import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/sqlite_settings.dart';
-import 'package:market_monk/unified_database.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
 
 var currency = NumberFormat.simpleCurrency();
@@ -399,7 +398,7 @@ List<Position> computePositions(
 /// one row per symbol instead of all historical candles.
 Future<Map<String, double>> fetchLatestPrices(
   List<String> symbols, {
-  UnifiedDatabase? database,
+  Database? database,
 }) async {
   if (symbols.isEmpty) return {};
   final targetDatabase = database ?? marketDataDatabase;
@@ -435,7 +434,7 @@ Future<Map<String, double>> fetchLatestPrices(
       variables: [
         for (final symbol in canonicalSymbols) Variable(symbol),
       ],
-      readsFrom: {targetDatabase.unifiedCandles},
+      readsFrom: {targetDatabase.candles},
     ).get();
 
     return {
@@ -451,7 +450,7 @@ Future<Map<String, double>> fetchLatestPrices(
     );
     final prices = <String, double>{};
     for (final symbol in canonicalSymbols) {
-      final candle = await (targetDatabase.unifiedCandles.select()
+      final candle = await (targetDatabase.candles.select()
             ..where((row) => row.symbol.equals(symbol))
             ..orderBy([
               (row) => OrderingTerm(
@@ -505,7 +504,7 @@ int _ibkrYearsForRange(DateTime from, DateTime through) {
 Future<int> insertCandles(
   List<YahooFinanceCandleData> dataList,
   String symbol, {
-  UnifiedDatabase? database,
+  Database? database,
 }) async {
   const batchSize = 1000;
   final targetDatabase = database ?? marketDataDatabase;
@@ -523,7 +522,7 @@ Future<int> insertCandles(
 
   for (var offset = 0; offset < normalized.length; offset += batchSize) {
     final candleBatch = normalized.skip(offset).take(batchSize).map((data) {
-      return UnifiedCandlesCompanion.insert(
+      return CandlesCompanion.insert(
         date: data.date,
         symbol: canonicalSymbol,
         open: Value(data.open),
@@ -537,7 +536,7 @@ Future<int> insertCandles(
 
     await targetDatabase.batch((batchBuilder) {
       batchBuilder.insertAll(
-        targetDatabase.unifiedCandles,
+        targetDatabase.candles,
         candleBatch,
         mode: InsertMode.insertOrReplace,
       );
@@ -557,14 +556,14 @@ Future<int> insertCandles(
 Future<int> insertIbkrCandles(
   List<IbkrHistoricalCandle> dataList,
   String symbol, {
-  UnifiedDatabase? database,
+  Database? database,
 }) async {
   const batchSize = 1000;
   final targetDatabase = database ?? marketDataDatabase;
   final canonicalSymbol = canonicalMarketSymbol(symbol);
   final byDay = <int, IbkrHistoricalCandle>{};
 
-  final existingRows = await (targetDatabase.unifiedCandles.select()
+  final existingRows = await (targetDatabase.candles.select()
         ..where((candle) => candle.symbol.equals(canonicalSymbol)))
       .get();
   for (final row in existingRows) {
@@ -572,7 +571,7 @@ Future<int> insertIbkrCandles(
         row.date.weekday != DateTime.sunday) {
       continue;
     }
-    await (targetDatabase.delete(targetDatabase.unifiedCandles)
+    await (targetDatabase.delete(targetDatabase.candles)
           ..where(
             (candle) =>
                 candle.symbol.equals(canonicalSymbol) &
@@ -602,7 +601,7 @@ Future<int> insertIbkrCandles(
 
   for (var offset = 0; offset < normalized.length; offset += batchSize) {
     final candleBatch = normalized.skip(offset).take(batchSize).map((data) {
-      return UnifiedCandlesCompanion.insert(
+      return CandlesCompanion.insert(
         date: data.date,
         symbol: canonicalSymbol,
         open: Value(data.open),
@@ -616,7 +615,7 @@ Future<int> insertIbkrCandles(
 
     await targetDatabase.batch((batchBuilder) {
       batchBuilder.insertAll(
-        targetDatabase.unifiedCandles,
+        targetDatabase.candles,
         candleBatch,
         mode: InsertMode.insertOrReplace,
       );
@@ -633,13 +632,13 @@ Future<int> insertIbkrCandles(
   return normalized.length;
 }
 
-Future<UnifiedCandle?> findClosestDate(DateTime date, String symbol) {
+Future<StoredCandle?> findClosestDate(DateTime date, String symbol) {
   final canonicalSymbol = canonicalMarketSymbol(symbol);
   final dateOnly = canonicalMarketDay(date);
   final timestamp = dateOnly.millisecondsSinceEpoch / 1000;
   final targetDatabase = marketDataDatabase;
 
-  return (targetDatabase.unifiedCandles.select()
+  return (targetDatabase.candles.select()
         ..where((candle) => candle.symbol.equals(canonicalSymbol))
         ..orderBy([
           (candle) =>
@@ -649,10 +648,10 @@ Future<UnifiedCandle?> findClosestDate(DateTime date, String symbol) {
       .getSingleOrNull();
 }
 
-Future<UnifiedCandle?> findClosestPrice(double price, String symbol) {
+Future<StoredCandle?> findClosestPrice(double price, String symbol) {
   final canonicalSymbol = canonicalMarketSymbol(symbol);
   final targetDatabase = marketDataDatabase;
-  return (targetDatabase.unifiedCandles.select()
+  return (targetDatabase.candles.select()
         ..where((candle) => candle.symbol.equals(canonicalSymbol))
         ..orderBy([
           (candle) => OrderingTerm.asc(CustomExpression('ABS(close - $price)')),
@@ -696,7 +695,7 @@ DateTime _latestExpectedMarketDay(DateTime today) {
 
 Future<bool> _syncIbkrCandlesIfAvailable(
   String symbol, {
-  required UnifiedDatabase targetDatabase,
+  required Database targetDatabase,
   required IbkrAccountConfig? ibkrConfig,
   required DateTime requestFrom,
   required DateTime expectedMarketDay,
@@ -763,7 +762,7 @@ Future<bool> _syncIbkrCandlesIfAvailable(
 
 Future<void> syncCandles(
   String symbol, {
-  UnifiedDatabase? database,
+  Database? database,
   IbkrAccountConfig? ibkrConfig,
   String syncNamespace = 'Default',
   DateTime? requiredFrom,
@@ -783,14 +782,14 @@ Future<void> syncCandles(
   );
 
   Future<({bool covered, DateTime? latestDay})> readCoverage() async {
-    final oldest = await (targetDatabase.unifiedCandles.select()
+    final oldest = await (targetDatabase.candles.select()
           ..where((row) => row.symbol.equals(canonicalSymbol))
           ..orderBy([
             (row) => OrderingTerm(expression: row.date, mode: OrderingMode.asc),
           ])
           ..limit(1))
         .getSingleOrNull();
-    final latest = await (targetDatabase.unifiedCandles.select()
+    final latest = await (targetDatabase.candles.select()
           ..where((row) => row.symbol.equals(canonicalSymbol))
           ..orderBy([
             (row) =>
@@ -816,7 +815,7 @@ Future<void> syncCandles(
         ? requiredStart
         : _offsetMarketDay(coverage.latestDay!, -1);
     if (!coverage.covered) {
-      final oldest = await (targetDatabase.unifiedCandles.select()
+      final oldest = await (targetDatabase.candles.select()
             ..where((row) => row.symbol.equals(canonicalSymbol))
             ..orderBy([
               (row) =>

@@ -1,7 +1,7 @@
 import 'package:drift/native.dart';
 import 'package:market_monk/csv_import.dart';
 import 'package:market_monk/profile_data_repository.dart';
-import 'package:market_monk/unified_database.dart';
+import 'package:market_monk/database.dart';
 import 'package:test/test.dart';
 
 // ---------------------------------------------------------------------------
@@ -335,11 +335,11 @@ void main() {
 
   // ─── importTrades — database round-trip ───────────────────────────────────
   group('importTrades — database round-trip', () {
-    late UnifiedDatabase testDb;
+    late Database testDb;
     late ProfileDataRepository repository;
 
     setUp(() async {
-      testDb = UnifiedDatabase.connect(NativeDatabase.memory());
+      testDb = Database.connect(NativeDatabase.memory());
       repository = ProfileDataRepository(testDb);
       await testDb.upsertProfile(
         id: 'profile-default',

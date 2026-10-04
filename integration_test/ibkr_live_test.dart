@@ -8,6 +8,8 @@ import 'package:integration_test/integration_test.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart' as app;
+import 'package:market_monk/profile_data_repository.dart';
+import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:provider/provider.dart';
 import 'package:market_monk/sqlite_settings.dart';
@@ -101,7 +103,22 @@ void main() {
     expect(liveHistory.candles.length, greaterThan(100));
     expect(liveHistory.candles.last.close, greaterThan(0));
 
-    app.db = Database.connect(NativeDatabase.memory());
+    final database = Database.connect(NativeDatabase.memory());
+    setProfileDataDatabaseForTesting(database);
+    setMarketDataDatabaseForTesting(database);
+    await database.upsertProfile(
+      id: 'profile-default',
+      name: 'Default',
+      sortOrder: 0,
+    );
+    await database.setActiveProfileId('profile-default');
+    await database.writeSetting(Database.legacyMigrationCompleteKey, true);
+    await SqliteSettings.useInstance(SqliteSettings.load(database));
+    addTearDown(() async {
+      setProfileDataDatabaseForTesting(null);
+      setMarketDataDatabaseForTesting(null);
+      await database.close();
+    });
     final settings = SettingsState();
     await settings.initialized;
     final accounts = app.AccountManager();
@@ -181,7 +198,7 @@ void main() {
       timeout: const Duration(seconds: 60),
     );
 
-    final storedCandles = await (app.db.candles.select()
+    final storedCandles = await (database.candles.select()
           ..where((candle) => candle.symbol.equals(largest.symbol)))
         .get();
     expect(storedCandles.length, greaterThan(100));

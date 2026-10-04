@@ -1,8 +1,5 @@
-import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:market_monk/database.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
@@ -33,12 +30,6 @@ void main() {
       // Pre-seed the currency cache so syncCandles doesn't fire a real
       // network request for it (there's no network in the test sandbox).
       cacheSymbolMeta('AAPL', 'USD');
-      db = Database.connect(
-        DatabaseConnection(
-          NativeDatabase.memory(),
-          closeStreamsSynchronously: true,
-        ),
-      );
       final accounts = testAccountManager();
 
       final today = DateTime.now();
@@ -77,8 +68,6 @@ void main() {
       // actually persisted, not just reflected in transient widget state.
       await _pumpApp(tester, testAccountManager());
       expect(find.text('AAPL'), findsNothing);
-
-      await db.close();
     },
   );
 
@@ -87,12 +76,6 @@ void main() {
     (WidgetTester tester) async {
       await seedTestSqlite({'favoriteStock': 'MSFT'});
       cacheSymbolMeta('MSFT', 'USD');
-      db = Database.connect(
-        DatabaseConnection(
-          NativeDatabase.memory(),
-          closeStreamsSynchronously: true,
-        ),
-      );
       final accounts = testAccountManager();
 
       await seedTestCandle('MSFT', DateTime.now(), 400);
@@ -111,8 +94,6 @@ void main() {
       final prefs = await SqliteSettings.getInstance();
       expect(prefs.getStringList('favoriteStocks'), ['MSFT']);
       expect(prefs.getString('favoriteStock'), null);
-
-      await db.close();
     },
   );
 }

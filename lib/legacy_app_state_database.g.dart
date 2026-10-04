@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'app_state_database.dart';
+part of 'legacy_app_state_database.dart';
 
 // ignore_for_file: type=lint
 class $AppProfilesTable extends AppProfiles
@@ -423,8 +423,8 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
   }
 }
 
-abstract class _$AppStateDatabase extends GeneratedDatabase {
-  _$AppStateDatabase(QueryExecutor e) : super(e);
+abstract class _$LegacyAppStateDatabase extends GeneratedDatabase {
+  _$LegacyAppStateDatabase(QueryExecutor e) : super(e);
   $AppStateDatabaseManager get managers => $AppStateDatabaseManager(this);
   late final $AppProfilesTable appProfiles = $AppProfilesTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
@@ -450,7 +450,7 @@ typedef $$AppProfilesTableUpdateCompanionBuilder = AppProfilesCompanion
 });
 
 class $$AppProfilesTableFilterComposer
-    extends Composer<_$AppStateDatabase, $AppProfilesTable> {
+    extends Composer<_$LegacyAppStateDatabase, $AppProfilesTable> {
   $$AppProfilesTableFilterComposer({
     required super.$db,
     required super.$table,
@@ -466,7 +466,7 @@ class $$AppProfilesTableFilterComposer
 }
 
 class $$AppProfilesTableOrderingComposer
-    extends Composer<_$AppStateDatabase, $AppProfilesTable> {
+    extends Composer<_$LegacyAppStateDatabase, $AppProfilesTable> {
   $$AppProfilesTableOrderingComposer({
     required super.$db,
     required super.$table,
@@ -482,7 +482,7 @@ class $$AppProfilesTableOrderingComposer
 }
 
 class $$AppProfilesTableAnnotationComposer
-    extends Composer<_$AppStateDatabase, $AppProfilesTable> {
+    extends Composer<_$LegacyAppStateDatabase, $AppProfilesTable> {
   $$AppProfilesTableAnnotationComposer({
     required super.$db,
     required super.$table,
@@ -498,7 +498,7 @@ class $$AppProfilesTableAnnotationComposer
 }
 
 class $$AppProfilesTableTableManager extends RootTableManager<
-    _$AppStateDatabase,
+    _$LegacyAppStateDatabase,
     $AppProfilesTable,
     AppProfile,
     $$AppProfilesTableFilterComposer,
@@ -508,11 +508,12 @@ class $$AppProfilesTableTableManager extends RootTableManager<
     $$AppProfilesTableUpdateCompanionBuilder,
     (
       AppProfile,
-      BaseReferences<_$AppStateDatabase, $AppProfilesTable, AppProfile>
+      BaseReferences<_$LegacyAppStateDatabase, $AppProfilesTable, AppProfile>
     ),
     AppProfile,
     PrefetchHooks Function()> {
-  $$AppProfilesTableTableManager(_$AppStateDatabase db, $AppProfilesTable table)
+  $$AppProfilesTableTableManager(
+      _$LegacyAppStateDatabase db, $AppProfilesTable table)
       : super(TableManagerState(
           db: db,
           table: table,
@@ -550,7 +551,7 @@ class $$AppProfilesTableTableManager extends RootTableManager<
 }
 
 typedef $$AppProfilesTableProcessedTableManager = ProcessedTableManager<
-    _$AppStateDatabase,
+    _$LegacyAppStateDatabase,
     $AppProfilesTable,
     AppProfile,
     $$AppProfilesTableFilterComposer,
@@ -560,7 +561,7 @@ typedef $$AppProfilesTableProcessedTableManager = ProcessedTableManager<
     $$AppProfilesTableUpdateCompanionBuilder,
     (
       AppProfile,
-      BaseReferences<_$AppStateDatabase, $AppProfilesTable, AppProfile>
+      BaseReferences<_$LegacyAppStateDatabase, $AppProfilesTable, AppProfile>
     ),
     AppProfile,
     PrefetchHooks Function()>;
@@ -580,7 +581,7 @@ typedef $$AppSettingsTableUpdateCompanionBuilder = AppSettingsCompanion
 });
 
 class $$AppSettingsTableFilterComposer
-    extends Composer<_$AppStateDatabase, $AppSettingsTable> {
+    extends Composer<_$LegacyAppStateDatabase, $AppSettingsTable> {
   $$AppSettingsTableFilterComposer({
     required super.$db,
     required super.$table,
@@ -599,7 +600,7 @@ class $$AppSettingsTableFilterComposer
 }
 
 class $$AppSettingsTableOrderingComposer
-    extends Composer<_$AppStateDatabase, $AppSettingsTable> {
+    extends Composer<_$LegacyAppStateDatabase, $AppSettingsTable> {
   $$AppSettingsTableOrderingComposer({
     required super.$db,
     required super.$table,
@@ -618,7 +619,7 @@ class $$AppSettingsTableOrderingComposer
 }
 
 class $$AppSettingsTableAnnotationComposer
-    extends Composer<_$AppStateDatabase, $AppSettingsTable> {
+    extends Composer<_$LegacyAppStateDatabase, $AppSettingsTable> {
   $$AppSettingsTableAnnotationComposer({
     required super.$db,
     required super.$table,
@@ -637,7 +638,7 @@ class $$AppSettingsTableAnnotationComposer
 }
 
 class $$AppSettingsTableTableManager extends RootTableManager<
-    _$AppStateDatabase,
+    _$LegacyAppStateDatabase,
     $AppSettingsTable,
     AppSetting,
     $$AppSettingsTableFilterComposer,
@@ -647,11 +648,12 @@ class $$AppSettingsTableTableManager extends RootTableManager<
     $$AppSettingsTableUpdateCompanionBuilder,
     (
       AppSetting,
-      BaseReferences<_$AppStateDatabase, $AppSettingsTable, AppSetting>
+      BaseReferences<_$LegacyAppStateDatabase, $AppSettingsTable, AppSetting>
     ),
     AppSetting,
     PrefetchHooks Function()> {
-  $$AppSettingsTableTableManager(_$AppStateDatabase db, $AppSettingsTable table)
+  $$AppSettingsTableTableManager(
+      _$LegacyAppStateDatabase db, $AppSettingsTable table)
       : super(TableManagerState(
           db: db,
           table: table,
@@ -693,7 +695,7 @@ class $$AppSettingsTableTableManager extends RootTableManager<
 }
 
 typedef $$AppSettingsTableProcessedTableManager = ProcessedTableManager<
-    _$AppStateDatabase,
+    _$LegacyAppStateDatabase,
     $AppSettingsTable,
     AppSetting,
     $$AppSettingsTableFilterComposer,
@@ -703,13 +705,13 @@ typedef $$AppSettingsTableProcessedTableManager = ProcessedTableManager<
     $$AppSettingsTableUpdateCompanionBuilder,
     (
       AppSetting,
-      BaseReferences<_$AppStateDatabase, $AppSettingsTable, AppSetting>
+      BaseReferences<_$LegacyAppStateDatabase, $AppSettingsTable, AppSetting>
     ),
     AppSetting,
     PrefetchHooks Function()>;
 
 class $AppStateDatabaseManager {
-  final _$AppStateDatabase _db;
+  final _$LegacyAppStateDatabase _db;
   $AppStateDatabaseManager(this._db);
   $$AppProfilesTableTableManager get appProfiles =>
       $$AppProfilesTableTableManager(_db, _db.appProfiles);

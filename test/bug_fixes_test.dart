@@ -7,7 +7,7 @@ import 'package:test/test.dart';
 /// Opens a fresh in-memory database at the current schema version.
 Database openDb() => Database.connect(NativeDatabase.memory());
 
-Future<Trade> _insertTrade(
+Future<StoredTrade> _insertTrade(
   Database db, {
   String symbol = 'AAPL',
   String name = 'Apple',
@@ -17,6 +17,7 @@ Future<Trade> _insertTrade(
 }) =>
     db.trades.insertReturning(
       TradesCompanion.insert(
+        profileId: 'profile-default',
         symbol: symbol,
         name: name,
         quantity: quantity,
@@ -34,8 +35,13 @@ void main() {
   group('Issue #16 — multiple trades for the same stock symbol', () {
     late Database db;
 
-    setUp(() {
+    setUp(() async {
       db = openDb();
+      await db.upsertProfile(
+        id: 'profile-default',
+        name: 'Default',
+        sortOrder: 0,
+      );
     });
 
     tearDown(() => db.close());

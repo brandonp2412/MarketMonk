@@ -25,7 +25,6 @@ import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 import 'package:market_monk/sqlite_settings.dart';
-import 'package:market_monk/unified_database.dart';
 
 enum _ChartMode { portfolio, searching, stock }
 
@@ -869,7 +868,7 @@ class ChartsPageState extends State<ChartsPage>
 
     for (final symbol in symbols) {
       final marketSymbol = canonicalMarketSymbol(symbol);
-      final rows = await (marketDataDatabase.unifiedCandles.select()
+      final rows = await (marketDataDatabase.candles.select()
             ..where(
               (candle) =>
                   candle.symbol.equals(marketSymbol) &
@@ -1181,39 +1180,36 @@ class ChartsPageState extends State<ChartsPage>
       "STRFTIME('%Y-%m-%W', DATE(\"date\", 'unixepoch', 'localtime'))",
     );
     Iterable<Expression<Object>> groupBy = [
-      marketDataDatabase.unifiedCandles.date,
+      marketDataDatabase.candles.date,
     ];
     if (years > 0 || months > 5) groupBy = [weekExpression];
 
     final capturedDays = days;
-    _stockStream =
-        (marketDataDatabase.selectOnly(marketDataDatabase.unifiedCandles)
-              ..addColumns([
-                marketDataDatabase.unifiedCandles.date,
-                marketDataDatabase.unifiedCandles.close,
-              ])
-              ..where(
-                marketDataDatabase.unifiedCandles.symbol.equals(marketSymbol) &
-                    marketDataDatabase.unifiedCandles.date
-                        .isBiggerThanValue(after),
-              )
-              ..orderBy([
-                OrderingTerm(
-                  expression: marketDataDatabase.unifiedCandles.date,
-                  mode: OrderingMode.asc,
-                ),
-              ])
-              ..groupBy(groupBy))
-            .watch()
-            .map((results) {
+    _stockStream = (marketDataDatabase.selectOnly(marketDataDatabase.candles)
+          ..addColumns([
+            marketDataDatabase.candles.date,
+            marketDataDatabase.candles.close,
+          ])
+          ..where(
+            marketDataDatabase.candles.symbol.equals(marketSymbol) &
+                marketDataDatabase.candles.date.isBiggerThanValue(after),
+          )
+          ..orderBy([
+            OrderingTerm(
+              expression: marketDataDatabase.candles.date,
+              mode: OrderingMode.asc,
+            ),
+          ])
+          ..groupBy(groupBy))
+        .watch()
+        .map((results) {
       var list = results
           .map(
             (result) => CandleTicker(
               candle: CandlesCompanion(
-                date:
-                    Value(result.read(marketDataDatabase.unifiedCandles.date)!),
+                date: Value(result.read(marketDataDatabase.candles.date)!),
                 close: Value(
-                  result.read(marketDataDatabase.unifiedCandles.close)!,
+                  result.read(marketDataDatabase.candles.close)!,
                 ),
               ),
             ),
@@ -2291,7 +2287,7 @@ class _FavoriteCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final stream = isActive
-        ? (marketDataDatabase.unifiedCandles.select()
+        ? (marketDataDatabase.candles.select()
               ..where((candle) => candle.symbol.equals(symbol))
               ..orderBy([
                 (candle) => OrderingTerm(
@@ -2301,7 +2297,7 @@ class _FavoriteCard extends StatelessWidget {
               ])
               ..limit(2))
             .watch()
-        : const Stream<List<UnifiedCandle>>.empty();
+        : const Stream<List<StoredCandle>>.empty();
 
     return Container(
       width: 92,
@@ -2330,7 +2326,7 @@ class _FavoriteCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                StreamBuilder<List<UnifiedCandle>>(
+                StreamBuilder<List<StoredCandle>>(
                   stream: stream,
                   builder: (context, snapshot) {
                     final candles = snapshot.data;

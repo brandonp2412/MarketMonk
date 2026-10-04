@@ -5,25 +5,16 @@ import 'package:flutter/services.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/database.dart';
+import 'package:market_monk/legacy_profile_database.dart' as legacy;
 import 'package:market_monk/main.dart';
-import 'package:market_monk/unified_database.dart';
 import 'sqlite_test_support.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() async {
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-  });
+  setUp(() async {});
 
-  tearDown(() async {
-    await db.close();
-  });
+  tearDown(() async {});
 
   test('repairs a persisted active account that no longer exists', () async {
     await seedTestSqlite({
@@ -56,7 +47,8 @@ void main() {
     expect(prefs.getString('activeAccount'), 'Default');
   });
 
-  test('rename and delete preserve stable profile identity without swapping db',
+  test(
+      'rename and delete preserve stable profile identity without swapping testDatabase',
       () async {
     await seedTestSqlite({
       'accounts': ['Default'],
@@ -64,7 +56,7 @@ void main() {
     });
     final manager = testAccountManager();
     await manager.init();
-    final runtimeDatabase = db;
+    final runtimeDatabase = testDatabase;
 
     await manager.addAccount('Brokerage');
     await manager.switchAccount('Brokerage');
@@ -73,12 +65,12 @@ void main() {
     await manager.renameAccount('Brokerage', 'Long Term');
     expect(manager.activeAccount, 'Long Term');
     expect(manager.activeProfileId, profileId);
-    expect(identical(db, runtimeDatabase), isTrue);
+    expect(identical(testDatabase, runtimeDatabase), isTrue);
 
     await manager.deleteAccount('Long Term');
     expect(manager.accounts, ['Default']);
     expect(manager.activeAccount, 'Default');
-    expect(identical(db, runtimeDatabase), isTrue);
+    expect(identical(testDatabase, runtimeDatabase), isTrue);
   });
 
   test('switchAccount publishes and persists without swapping runtime database',
@@ -103,14 +95,14 @@ void main() {
         'activeAccount': 'Default',
       });
 
-      final unifiedDatabase = UnifiedDatabase.connect(NativeDatabase.memory());
+      final unifiedDatabase = Database.connect(NativeDatabase.memory());
       addTearDown(unifiedDatabase.close);
-      final manager = AccountManager(unifiedDatabase: unifiedDatabase);
+      final manager = AccountManager(database: unifiedDatabase);
       await manager.init();
       var notifications = 0;
       manager.addListener(() => notifications++);
 
-      final runtimeDatabase = db;
+      final runtimeDatabase = testDatabase;
       final switchFuture = manager.switchAccount('Brokerage');
 
       expect(manager.activeAccount, 'Brokerage');
@@ -123,15 +115,8 @@ void main() {
         await unifiedDatabase.readActiveProfileId(),
         manager.activeProfileId,
       );
-      expect(identical(db, runtimeDatabase), isTrue);
+      expect(identical(testDatabase, runtimeDatabase), isTrue);
     } finally {
-      await db.close();
-      db = Database.connect(
-        DatabaseConnection(
-          NativeDatabase.memory(),
-          closeStreamsSynchronously: true,
-        ),
-      );
       messenger.setMockMethodCallHandler(pathProviderChannel, null);
       if (await tempDir.exists()) {
         await tempDir.delete(recursive: true);
@@ -139,7 +124,8 @@ void main() {
     }
   });
 
-  test('importDatabase refreshes active profile state without swapping db',
+  test(
+      'importDatabase refreshes active profile state without swapping testDatabase',
       () async {
     final tempDir =
         await Directory.systemTemp.createTemp('market-monk-import-');
@@ -167,14 +153,14 @@ void main() {
     });
 
     final sourceFile = File('${tempDir.path}/import.sqlite');
-    final sourceDb = Database.connect(
+    final sourceDb = legacy.LegacyProfileDatabase.connect(
       DatabaseConnection(
         NativeDatabase(sourceFile),
         closeStreamsSynchronously: true,
       ),
     );
     await sourceDb.trades.insertOne(
-      TradesCompanion.insert(
+      legacy.TradesCompanion.insert(
         symbol: 'VTI',
         name: 'Vanguard Total Stock Market ETF',
         quantity: 12,
@@ -185,16 +171,16 @@ void main() {
     );
     await sourceDb.close();
 
-    final unifiedDatabase = UnifiedDatabase.connect(NativeDatabase.memory());
+    final unifiedDatabase = Database.connect(NativeDatabase.memory());
     addTearDown(unifiedDatabase.close);
-    final manager = AccountManager(unifiedDatabase: unifiedDatabase);
+    final manager = AccountManager(database: unifiedDatabase);
     await manager.init();
     var notifications = 0;
     manager.addListener(() => notifications++);
 
     await manager.importDatabase(sourceFile);
 
-    final importedDb = Database.connect(
+    final importedDb = legacy.LegacyProfileDatabase.connect(
       DatabaseConnection(
         NativeDatabase(File('${tempDir.path}/market-monk.sqlite')),
         closeStreamsSynchronously: true,
@@ -239,14 +225,14 @@ void main() {
       String symbol,
       int quantity,
     ) async {
-      final profileDb = Database.connect(
+      final profileDb = legacy.LegacyProfileDatabase.connect(
         DatabaseConnection(
           NativeDatabase(File('${tempDir.path}/$fileName')),
           closeStreamsSynchronously: true,
         ),
       );
       await profileDb.trades.insertOne(
-        TradesCompanion.insert(
+        legacy.TradesCompanion.insert(
           symbol: symbol,
           name: symbol,
           quantity: quantity.toDouble(),
@@ -266,11 +252,14 @@ void main() {
       'displayCurrency': 'NZD',
     });
 
-    final unifiedDatabase = UnifiedDatabase.connect(NativeDatabase.memory());
+    final unifiedDatabase = Database.connect(NativeDatabase.memory());
     addTearDown(unifiedDatabase.close);
-    final manager = AccountManager(unifiedDatabase: unifiedDatabase);
+    final manager = AccountManager(database: unifiedDatabase);
     await manager.init();
-    for (final entry in const [('Default', 'VTI', 10.0), ('Brokerage', 'VXUS', 20.0)]) {
+    for (final entry in const [
+      ('Default', 'VTI', 10.0),
+      ('Brokerage', 'VXUS', 20.0),
+    ]) {
       final profile = await unifiedDatabase.readProfileByName(entry.$1);
       await unifiedDatabase.addTrade(
         profileId: profile!.id,
@@ -290,14 +279,14 @@ void main() {
 
     await manager.switchAccount('Default');
     await manager.deleteAccount('Brokerage');
-    final mutatedDefaultDb = Database.connect(
+    final mutatedDefaultDb = legacy.LegacyProfileDatabase.connect(
       DatabaseConnection(
         NativeDatabase(File('${tempDir.path}/market-monk.sqlite')),
         closeStreamsSynchronously: true,
       ),
     );
     await mutatedDefaultDb.trades.insertOne(
-      TradesCompanion.insert(
+      legacy.TradesCompanion.insert(
         symbol: 'BND',
         name: 'BND',
         quantity: 30,
@@ -316,7 +305,7 @@ void main() {
     expect(manager.activeAccount, 'Brokerage');
     expect(prefs.getString('displayCurrency'), 'NZD');
 
-    final brokerageDb = Database.connect(
+    final brokerageDb = legacy.LegacyProfileDatabase.connect(
       DatabaseConnection(
         NativeDatabase(File('${tempDir.path}/market-monk-Brokerage.sqlite')),
         closeStreamsSynchronously: true,
@@ -328,7 +317,7 @@ void main() {
     expect(brokerageTrades.single.quantity, 20);
     await brokerageDb.close();
 
-    final defaultDb = Database.connect(
+    final defaultDb = legacy.LegacyProfileDatabase.connect(
       DatabaseConnection(
         NativeDatabase(File('${tempDir.path}/market-monk.sqlite')),
         closeStreamsSynchronously: true,

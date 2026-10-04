@@ -1,17 +1,17 @@
-import 'package:market_monk/app_state_database.dart';
 import 'package:market_monk/legacy_app_state_reader_stub.dart'
     if (dart.library.io) 'package:market_monk/legacy_app_state_reader_io.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/legacy_preferences_migration.dart';
 import 'package:market_monk/legacy_preferences_reader.dart';
-import 'package:market_monk/unified_database.dart';
+import 'package:market_monk/database.dart';
+import 'package:market_monk/profile_data_repository.dart';
 
 /// Cached application settings whose only writable persistence is SQLite.
 class SqliteSettings {
   SqliteSettings._(this.database, this._values);
 
   /// SQLite store shared by application settings and the profile registry.
-  final AppStateDatabase database;
+  final Database database;
   final Map<String, Object?> _values;
   static Future<SqliteSettings>? _instance;
   static SqliteSettings? _loaded;
@@ -24,11 +24,10 @@ class SqliteSettings {
   }
 
   static Future<SqliteSettings> _open() async {
-    final database = AppStateDatabase();
+    final database = profileDataDatabase;
     try {
       return _loaded = await initialize(database);
     } catch (_) {
-      await database.close();
       _instance = null;
       rethrow;
     }
@@ -37,7 +36,7 @@ class SqliteSettings {
   /// Runs the upgrade once, marking completion only after every profile commits.
   /// A failed import can be retried without overwriting already copied rows.
   static Future<SqliteSettings> initialize(
-    AppStateDatabase database, {
+    Database database, {
     Future<Map<String, Object?>> Function()? readLegacyValues,
     Future<Map<String, Object?>?> Function()? readLegacyAppStateValues,
     Future<bool> Function(String profileName)? legacyProfileExists,
@@ -52,7 +51,7 @@ class SqliteSettings {
         var values =
             await (readLegacyAppStateValues ?? readLegacyAppStateFile)();
         if (values != null && sqliteAlreadyMigrated) {
-          final currentProfiles = await database.readProfiles();
+          final currentProfiles = await database.readProfileNames();
           if (currentProfiles.isNotEmpty) {
             final exists = legacyProfileExists ?? legacyProfileDatabaseExists;
             final legacyProfiles =
@@ -68,9 +67,9 @@ class SqliteSettings {
           }
         }
         if (values != null) {
-          await seedAppStateFromLegacyValues(
+          await seedDatabaseFromLegacyValues(
             values: values,
-            appState: database,
+            database: database,
           );
         }
         await database.writeSetting(legacyAppStateMigrationCompleteKey, true);
@@ -85,10 +84,9 @@ class SqliteSettings {
 
     if (!sqliteAlreadyMigrated) {
       final values = await (readLegacyValues ?? readLegacyPreferences)();
-      await seedSqliteFromLegacyValues(
+      await seedDatabaseFromLegacyValues(
         values: values,
-        appState: database,
-        profileDatabaseFactory: profileDatabaseFactory,
+        database: database,
       );
       await database.writeSetting(sqliteMigrationCompleteKey, true);
     }
@@ -97,7 +95,7 @@ class SqliteSettings {
   }
 
   /// Loads a supplied SQLite store, including its profile registry.
-  static Future<SqliteSettings> load(AppStateDatabase database) async {
+  static Future<SqliteSettings> load(Database database) async {
     final result = SqliteSettings._(database, {});
     await result.reload();
     return result;
@@ -111,21 +109,20 @@ class SqliteSettings {
 
   /// Removes the obsolete pre-cutover app-state file only after the unified
   /// migration marker exists and Drift validates the unified schema.
-  Future<void> cleanupLegacyAppStateAfterUnifiedMigration(
-    UnifiedDatabase unifiedDatabase, {
+  Future<void> cleanupLegacyAppStateAfterMigration({
     Future<void> Function()? cleanupLegacyAppState,
   }) async {
     await flush();
-    if (await database.readSetting(legacyAppStateMigrationCompleteKey) != true ||
+    if (await database.readSetting(legacyAppStateMigrationCompleteKey) !=
+            true ||
         await database.readSetting(sqliteMigrationCompleteKey) != true ||
         await database.readSetting(legacyAppStateCleanupCompleteKey) == true ||
-        await unifiedDatabase
-                .readSetting(UnifiedDatabase.legacyMigrationCompleteKey) !=
+        await database.readSetting(Database.legacyMigrationCompleteKey) !=
             true) {
       return;
     }
 
-    await unifiedDatabase.validateUnifiedSchema();
+    await database.validateSchema();
     try {
       await (cleanupLegacyAppState ?? deleteLegacyAppStateFile)();
       await database.writeSetting(legacyAppStateCleanupCompleteKey, true);
@@ -143,7 +140,7 @@ class SqliteSettings {
   /// Refreshes the in-memory view after a transactional restore.
   Future<void> reload() async {
     final values = await database.readSettings();
-    values['accounts'] = await database.readProfiles();
+    values['accounts'] = await database.readProfileNames();
     values['activeAccount'] = await database.readActiveProfile() ?? 'Default';
     _values
       ..clear()
@@ -155,7 +152,7 @@ class SqliteSettings {
         for (final entry in _values.entries)
           if (entry.key != 'accounts' &&
               entry.key != 'activeAccount' &&
-              entry.key != AppStateDatabase.activeProfileSettingKey &&
+              entry.key != 'activeProfile' &&
               entry.key != sqliteMigrationCompleteKey &&
               entry.key != legacyAppStateMigrationCompleteKey &&
               entry.key != legacyAppStateCleanupCompleteKey)
