@@ -1031,6 +1031,9 @@ class MyApp extends StatelessWidget {
               ? lightDynamic
               : ColorScheme.fromSeed(seedColor: settings.seedColor),
           useMaterial3: true,
+          popupMenuTheme: const PopupMenuThemeData(
+            menuPadding: EdgeInsets.zero,
+          ),
         ),
         darkTheme: ThemeData(
           colorScheme: (settings.systemColors
@@ -1045,6 +1048,9 @@ class MyApp extends StatelessWidget {
                     ))
               .copyWith(surface: settings.pureBlack ? Colors.black : null),
           useMaterial3: true,
+          popupMenuTheme: const PopupMenuThemeData(
+            menuPadding: EdgeInsets.zero,
+          ),
         ),
         themeMode: settings.theme,
         locale: settings.locale,

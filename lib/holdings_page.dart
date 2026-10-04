@@ -574,16 +574,15 @@ class HoldingsPageState extends State<HoldingsPage>
             const PopupMenuDivider(),
           ],
           PopupMenuItem<String>(
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsPage()),
+              );
+            },
             child: ListTile(
               leading: const Icon(Icons.settings),
               title: Text(context.l10n.text('Settings')),
-              onTap: () async {
-                Navigator.pop(context);
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingsPage()),
-                );
-              },
             ),
           ),
         ],
