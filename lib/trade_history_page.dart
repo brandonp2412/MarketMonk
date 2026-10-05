@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/empty_state.dart';
@@ -77,7 +78,8 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                   tooltip: context.l10n.text('Add trade'),
                   onPressed: () => Navigator.push(
                     context,
-                    MaterialPageRoute(
+                    adaptivePageRoute(
+                      context,
                       builder: (_) =>
                           EditTickerPage(symbol: widget.summary.symbol),
                     ),
@@ -201,7 +203,8 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                           ? null
                           : () => Navigator.push(
                                 context,
-                                MaterialPageRoute(
+                                adaptivePageRoute(
+                                  context,
                                   builder: (_) => EditTickerPage(
                                     symbol: widget.summary.symbol,
                                   ),

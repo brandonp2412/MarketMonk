@@ -1,12 +1,24 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 
 /// Minimum width at which Market Monk switches to its desktop navigation shell.
 const double desktopLayoutBreakpoint = 840;
 
-/// Desktop windows below this width use the compact icon rail.
-const double compactDesktopNavBreakpoint = 1200;
-
 /// Whether the current window should use the desktop layout.
 bool isDesktopLayout(BuildContext context) {
   return MediaQuery.sizeOf(context).width >= desktopLayoutBreakpoint;
+}
+
+/// Creates a material route that transitions instantly on desktop layouts.
+PageRoute<T> adaptivePageRoute<T>(
+  BuildContext context, {
+  required WidgetBuilder builder,
+}) {
+  if (!isDesktopLayout(context)) {
+    return MaterialPageRoute<T>(builder: builder);
+  }
+  return PageRouteBuilder<T>(
+    pageBuilder: (context, animation, secondaryAnimation) => builder(context),
+    transitionDuration: Duration.zero,
+    reverseTransitionDuration: Duration.zero,
+  );
 }

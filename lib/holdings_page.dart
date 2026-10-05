@@ -605,7 +605,10 @@ class HoldingsPageState extends State<HoldingsPage>
             onTap: () async {
               await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const SettingsPage()),
+                adaptivePageRoute(
+                  context,
+                  builder: (_) => const SettingsPage(),
+                ),
               );
             },
             child: ListTile(
@@ -709,7 +712,8 @@ class HoldingsPageState extends State<HoldingsPage>
                     FilledButton.icon(
                       onPressed: () => Navigator.push(
                         context,
-                        MaterialPageRoute(
+                        adaptivePageRoute(
+                          context,
                           builder: (_) => const EditTickerPage(),
                         ),
                       ),
@@ -822,7 +826,10 @@ class HoldingsPageState extends State<HoldingsPage>
                   child: FloatingActionButton.extended(
                     onPressed: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const EditTickerPage()),
+                      adaptivePageRoute(
+                        context,
+                        builder: (_) => const EditTickerPage(),
+                      ),
                     ),
                     label: Text(context.l10n.text('Add')),
                     icon: const Icon(Icons.add),
@@ -1414,7 +1421,8 @@ class HoldingsPageState extends State<HoldingsPage>
                   : Icons.add_rounded,
           onAction: () => Navigator.push(
             context,
-            MaterialPageRoute(
+            adaptivePageRoute(
+              context,
               builder: (_) => ibkrManaged || query.isEmpty
                   ? const SettingsPage()
                   : EditTickerPage(symbol: query.toUpperCase()),
@@ -1474,7 +1482,10 @@ class HoldingsPageState extends State<HoldingsPage>
     unawaited(
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => TradeHistoryPage(summary: s)),
+        adaptivePageRoute(
+          context,
+          builder: (_) => TradeHistoryPage(summary: s),
+        ),
       ),
     );
   }
