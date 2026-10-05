@@ -138,7 +138,7 @@ void main() {
     cacheSymbolMeta('AAPL', 'USD');
 
     final latest = _expectedMarketDay();
-    final requiredFrom = latest.subtract(const Duration(days: 14));
+    final requiredFrom = DateTime(latest.year, latest.month, latest.day - 14);
     await insertIbkrCandles(
       [
         IbkrHistoricalCandle(
@@ -177,6 +177,29 @@ void main() {
       },
     );
     expect(localRequests, 0);
+  });
+
+  test('empty Yahoo sync exits after one request when coverage cannot advance',
+      () async {
+    final target = Database.connect(NativeDatabase.memory());
+    addTearDown(target.close);
+    cacheSymbolMeta('AAPL', 'USD');
+
+    final latest = _expectedMarketDay();
+    final requiredFrom = DateTime(latest.year, latest.month, latest.day - 14);
+    var requests = 0;
+
+    await syncCandles(
+      'AAPL',
+      database: target,
+      requiredFrom: requiredFrom,
+      yahooFetcher: (symbol, startDate) async {
+        requests++;
+        return const [];
+      },
+    );
+
+    expect(requests, 1);
   });
 
   test('IBKR candle import removes closed-weekend rows', () async {

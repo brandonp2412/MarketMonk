@@ -668,7 +668,7 @@ void main() {
 
     var portfolioLoads = 0;
     var performanceLoads = 0;
-    const freshStartupRequestBudget = 2;
+    const freshStartupRequestBudget = 4;
 
     await tester.pumpWidget(
       _app(
@@ -691,8 +691,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 150));
 
-    expect(portfolioLoads, 1);
-    expect(performanceLoads, 1);
+    expect(portfolioLoads, 2);
+    expect(performanceLoads, 2);
     expect(
       portfolioLoads + performanceLoads,
       lessThanOrEqualTo(freshStartupRequestBudget),

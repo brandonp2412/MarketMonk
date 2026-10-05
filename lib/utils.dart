@@ -781,7 +781,8 @@ Future<void> syncCandles(
     expectedMarketDay,
   );
 
-  Future<({bool covered, DateTime? latestDay})> readCoverage() async {
+  Future<({bool covered, DateTime? oldestDay, DateTime? latestDay})>
+      readCoverage() async {
     final oldest = await (targetDatabase.candles.select()
           ..where((row) => row.symbol.equals(canonicalSymbol))
           ..orderBy([
@@ -804,29 +805,22 @@ Future<void> syncCandles(
         !oldestDay.isAfter(requiredStart) &&
         latestDay != null &&
         !expectedMarketDay.isAfter(latestDay);
-    return (covered: covered, latestDay: latestDay);
+    return (covered: covered, oldestDay: oldestDay, latestDay: latestDay);
   }
 
-  Future<bool> performSync() async {
+  Future<({bool requested, bool progressed})> performSync() async {
     final coverage = await readCoverage();
-    if (!forceRefresh && coverage.covered) return false;
+    if (!forceRefresh && coverage.covered) {
+      return (requested: false, progressed: false);
+    }
 
     var requestFrom = coverage.latestDay == null
         ? requiredStart
         : _offsetMarketDay(coverage.latestDay!, -1);
-    if (!coverage.covered) {
-      final oldest = await (targetDatabase.candles.select()
-            ..where((row) => row.symbol.equals(canonicalSymbol))
-            ..orderBy([
-              (row) =>
-                  OrderingTerm(expression: row.date, mode: OrderingMode.asc),
-            ])
-            ..limit(1))
-          .getSingleOrNull();
-      final oldestDay = oldest == null ? null : canonicalMarketDay(oldest.date);
-      if (oldestDay == null || oldestDay.isAfter(requiredStart)) {
-        requestFrom = requiredStart;
-      }
+    if (!coverage.covered &&
+        (coverage.oldestDay == null ||
+            coverage.oldestDay!.isAfter(requiredStart))) {
+      requestFrom = requiredStart;
     }
     if (requestFrom.isBefore(requiredStart)) {
       requestFrom = requiredStart;
@@ -840,7 +834,12 @@ Future<void> syncCandles(
       expectedMarketDay: expectedMarketDay,
       ibkrFetcher: ibkrFetcher,
     );
-    if (ibkrHandled) return true;
+    if (ibkrHandled) {
+      final after = await readCoverage();
+      final progressed = coverage.oldestDay != after.oldestDay ||
+          coverage.latestDay != after.latestDay;
+      return (requested: true, progressed: progressed);
+    }
 
     runDetachedTask(
       fetchSymbolCurrencyAndRate(canonicalSymbol),
@@ -869,24 +868,29 @@ Future<void> syncCandles(
       'Completed Yahoo candle sync for $canonicalSymbol: $stored rows '
       'from ${requestFrom.toIso8601String()}',
     );
-    return true;
+    final after = await readCoverage();
+    final progressed = coverage.oldestDay != after.oldestDay ||
+        coverage.latestDay != after.latestDay;
+    return (requested: true, progressed: progressed);
   }
 
   try {
     while (true) {
-      final networkRequested =
-          await backgroundNetworkCoordinator.coalesce<bool>(
+      final syncResult = await backgroundNetworkCoordinator
+          .coalesce<({bool requested, bool progressed})>(
         'market.candles',
         canonicalSymbol,
         performSync,
       );
 
       if (forceRefresh) {
-        if (networkRequested) return;
+        if (syncResult.requested) return;
         continue;
       }
 
       if ((await readCoverage()).covered) return;
+      if (!syncResult.requested) continue;
+      if (!syncResult.progressed) return;
     }
   } catch (error, stackTrace) {
     talker.handle(error, stackTrace, 'Candle sync failed');
