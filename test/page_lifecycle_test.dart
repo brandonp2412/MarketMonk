@@ -326,14 +326,6 @@ void main() {
     tester,
   ) async {
     await seedTestSqlite({});
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
-
     final accounts = await _configuredAccount();
     await tester.pumpWidget(
       _app(
@@ -382,14 +374,6 @@ void main() {
     'warm portfolio launch with fresh cache records no IBKR requests',
     (tester) async {
       await seedTestSqlite({});
-      db = Database.connect(
-        DatabaseConnection(
-          NativeDatabase.memory(),
-          closeStreamsSynchronously: true,
-        ),
-      );
-      addTearDown(() => db.close());
-
       final accounts = await _configuredAccount();
       await accounts.cachePortfolio(
         'Default',
@@ -437,14 +421,6 @@ void main() {
     tester,
   ) async {
     await seedTestSqlite({});
-    db = Database.connect(
-      DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
-    addTearDown(() => db.close());
-
     final accounts = await _configuredAccount();
     await accounts.cachePortfolio(
       'Default',
@@ -497,14 +473,6 @@ void main() {
     'account switch fetches only the newly active IBKR profile once',
     (tester) async {
       await seedTestSqlite({});
-      db = Database.connect(
-        DatabaseConnection(
-          NativeDatabase.memory(),
-          closeStreamsSynchronously: true,
-        ),
-      );
-      addTearDown(() => db.close());
-
       final accounts = await _configuredAccount();
       await accounts.addAccount('Bot');
       await accounts.setIbkrConfig(
