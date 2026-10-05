@@ -131,6 +131,10 @@ void main() {
         find.byType(RefreshIndicator).first,
       );
       expect(refreshIndicator.edgeOffset, greaterThanOrEqualTo(searchBottom));
+      expect(
+        refreshIndicator.edgeOffset + refreshIndicator.displacement,
+        greaterThan(searchBottom + 20),
+      );
       expect(find.text('Refresh'), findsNothing);
 
       await tester.drag(find.byType(ListView).first, const Offset(0, 240));
@@ -489,6 +493,28 @@ void main() {
     expect(find.text('History unavailable'), findsOneWidget);
     expect(find.textContaining('% holdings'), findsNothing);
 
+    final accountSelector = find.byKey(
+      const Key('chart-account-selector-Default'),
+    );
+    expect(accountSelector, findsOneWidget);
+    final accountTile = tester.widget<ListTile>(accountSelector);
+    expect(accountTile.onTap, isNotNull);
+    expect(accountTile.tileColor, isNotNull);
+    expect(accountTile.shape, isA<RoundedRectangleBorder>());
+
+    await tester.tap(accountSelector);
+    await tester.pumpAndSettle();
+    final hiddenOpacity = tester.widget<AnimatedOpacity>(
+      find.ancestor(
+        of: accountSelector,
+        matching: find.byType(AnimatedOpacity),
+      ),
+    );
+    expect(hiddenOpacity.opacity, 0.35);
+
+    await tester.tap(accountSelector);
+    await tester.pumpAndSettle();
+
     performanceAvailable = true;
     accounts.requestIbkrRefresh();
     await tester.pumpAndSettle();
@@ -735,6 +761,164 @@ void main() {
       findsNothing,
     );
     expect(tester.takeException(), null);
+  });
+
+  testWidgets('desktop chart search fills available width', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1400, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({});
+
+    final accounts = testAccountManager();
+    await accounts.init();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create: (_) => SettingsState(
+              localCurrencyDetector: () async => 'USD',
+            ),
+          ),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: const MyApp(),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    final searchRect =
+        tester.getRect(find.byKey(const Key('chart-search-bar')));
+    expect(searchRect.width, greaterThan(1000));
+    expect(searchRect.right, closeTo(1376, 1));
+    expect(
+      find.ancestor(
+        of: find.byKey(const Key('chart-period-5d')),
+        matching: find.byType(Wrap),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('chart-period-10y')), findsOneWidget);
+    expect(tester.takeException(), null);
+  });
+
+  testWidgets('manual refresh reloads every configured IBKR account',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1400, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({});
+
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.addAccount('IBKR Bot');
+    await accounts.setIbkrConfig(
+      'Default',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://default.example.test',
+        token: 'default-token',
+      ),
+    );
+    await accounts.setIbkrConfig(
+      'IBKR Bot',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://bot.example.test',
+        token: 'bot-token',
+      ),
+    );
+
+    final portfolioLoads = <String, int>{};
+    final performanceLoads = <String, int>{};
+
+    Future<IbkrPortfolioSnapshot> portfolioLoader(
+      IbkrAccountConfig config,
+    ) async {
+      portfolioLoads.update(
+        config.baseUrl,
+        (count) => count + 1,
+        ifAbsent: () => 1,
+      );
+      final value = config.baseUrl.contains('bot') ? 25000.0 : 350000.0;
+      return IbkrPortfolioSnapshot(
+        account: config.baseUrl,
+        positions: const [],
+        summary: {
+          'netliquidation': {'value': value, 'currency': 'USD'},
+          'netliquidationbycurrency:usd': {
+            'value': value,
+            'currency': 'USD',
+          },
+        },
+        ledger: const {},
+      );
+    }
+
+    Future<IbkrPerformanceSeries> performanceLoader(
+      IbkrAccountConfig config,
+      String period,
+    ) async {
+      performanceLoads.update(
+        config.baseUrl,
+        (count) => count + 1,
+        ifAbsent: () => 1,
+      );
+      final start = config.baseUrl.contains('bot') ? 24000.0 : 340000.0;
+      return IbkrPerformanceSeries(
+        period: period,
+        measure: 'TWR',
+        currency: 'USD',
+        startDate: DateTime(2026, 10, 1),
+        startNav: start,
+        dates: [DateTime(2026, 10, 2)],
+        nav: [start + 1000],
+        returnDates: [DateTime(2026, 10, 1), DateTime(2026, 10, 2)],
+        returns: const [0, 0.01],
+      );
+    }
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create: (_) => SettingsState(
+              localCurrencyDetector: () async => 'USD',
+            ),
+          ),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: ChartsPage(
+              ibkrLoader: portfolioLoader,
+              ibkrPerformanceLoader: performanceLoader,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(portfolioLoads['https://default.example.test'], 1);
+    expect(portfolioLoads['https://bot.example.test'], 1);
+    expect(performanceLoads['https://default.example.test'], 1);
+    expect(performanceLoads['https://bot.example.test'], 1);
+
+    await tester.tap(find.byTooltip('Refresh'));
+    await tester.pumpAndSettle();
+
+    expect(portfolioLoads['https://default.example.test'], 2);
+    expect(portfolioLoads['https://bot.example.test'], 2);
+    expect(performanceLoads['https://default.example.test'], 2);
+    expect(performanceLoads['https://bot.example.test'], 2);
   });
 
   testWidgets('IBKR chart keeps cached account when forced refresh fails',

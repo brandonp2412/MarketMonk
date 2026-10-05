@@ -118,7 +118,7 @@ void main() {
 
     expect(find.byType(DesktopNav), findsOneWidget);
     expect(find.byType(BottomNav), findsNothing);
-    expect(tester.widget<DesktopNav>(find.byType(DesktopNav)).compact, isTrue);
+    expect(tester.widget<DesktopNav>(find.byType(DesktopNav)).compact, isFalse);
 
     await tester.binding.setSurfaceSize(const Size(760, 900));
     await tester.pump(const Duration(milliseconds: 400));

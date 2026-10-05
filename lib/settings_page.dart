@@ -321,7 +321,7 @@ class _SettingsPageState extends State<SettingsPage> {
     );
     unawaited(
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const MyHomePage()),
+        adaptivePageRoute(context, builder: (_) => const MyHomePage()),
         (_) => false,
       ),
     );
@@ -681,7 +681,7 @@ class _SettingsPageState extends State<SettingsPage> {
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const AccountsPage()),
+            adaptivePageRoute(context, builder: (_) => const AccountsPage()),
           ),
         ),
         ListTile(
@@ -836,7 +836,7 @@ class _SettingsPageState extends State<SettingsPage> {
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const WhatsNew()),
+            adaptivePageRoute(context, builder: (_) => const WhatsNew()),
           ),
         ),
         ListTile(
@@ -1147,7 +1147,7 @@ class _SettingsPageState extends State<SettingsPage> {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const AccountsPage()),
+              adaptivePageRoute(context, builder: (_) => const AccountsPage()),
             ),
           ),
           ListTile(
@@ -1305,7 +1305,7 @@ class _SettingsPageState extends State<SettingsPage> {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const WhatsNew()),
+                adaptivePageRoute(context, builder: (_) => const WhatsNew()),
               ),
             ),
             ListTile(

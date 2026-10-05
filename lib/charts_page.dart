@@ -1387,49 +1387,51 @@ class ChartsPageState extends State<ChartsPage>
             child: Icon(Icons.search),
           );
 
-    return Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: desktop ? 760 : double.infinity),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            desktop ? 24 : 8,
-            8,
-            desktop ? 24 : 8,
-            4,
-          ),
-          child: SearchBar(
-            controller: _searchController,
-            focusNode: _searchFocus,
-            hintText: context.l10n.text('Search stocks...'),
-            leading: leading,
-            onChanged: _onSearchChanged,
-            onTap: () => _searchController.selection = TextSelection(
-              baseOffset: 0,
-              extentOffset: _searchController.text.length,
-            ),
-            onSubmitted: (text) {
-              if (text.isNotEmpty) _onSearchChanged(text);
-            },
-            trailing: [
-              if (desktop && _mode != _ChartMode.searching)
-                IconButton(
-                  onPressed: _networkLoading ? null : _refreshCurrentChart,
-                  tooltip: context.l10n.text('Refresh'),
-                  icon: const Icon(Icons.refresh_rounded),
-                ),
-              if (!desktop)
-                IconButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SettingsPage()),
-                  ),
-                  tooltip: context.l10n.text('Settings'),
-                  icon: const Icon(Icons.settings),
-                ),
-            ],
-          ),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        desktop ? 24 : 8,
+        8,
+        desktop ? 24 : 8,
+        4,
+      ),
+      child: SearchBar(
+        key: const Key('chart-search-bar'),
+        constraints: const BoxConstraints(
+          minHeight: 56,
+          maxWidth: double.infinity,
         ),
+        controller: _searchController,
+        focusNode: _searchFocus,
+        hintText: context.l10n.text('Search stocks...'),
+        leading: leading,
+        onChanged: _onSearchChanged,
+        onTap: () => _searchController.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: _searchController.text.length,
+        ),
+        onSubmitted: (text) {
+          if (text.isNotEmpty) _onSearchChanged(text);
+        },
+        trailing: [
+          if (desktop && _mode != _ChartMode.searching)
+            IconButton(
+              onPressed: _networkLoading ? null : _refreshCurrentChart,
+              tooltip: context.l10n.text('Refresh'),
+              icon: const Icon(Icons.refresh_rounded),
+            ),
+          if (!desktop)
+            IconButton(
+              onPressed: () => Navigator.push(
+                context,
+                adaptivePageRoute(
+                  context,
+                  builder: (_) => const SettingsPage(),
+                ),
+              ),
+              tooltip: context.l10n.text('Settings'),
+              icon: const Icon(Icons.settings),
+            ),
+        ],
       ),
     );
   }
@@ -1580,30 +1582,45 @@ class ChartsPageState extends State<ChartsPage>
       ('10y', 10, 0, 0),
     ];
 
-    return Center(
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Row(
-          children: [
-            for (final (label, optionYears, optionMonths, optionDays)
-                in options)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 3),
-                child: _PeriodChip(
-                  label: label,
-                  selected: optionYears == years &&
-                      optionMonths == months &&
-                      optionDays == days,
-                  onTap: () => _onPeriodSelected(
-                    selectedYears: optionYears,
-                    selectedMonths: optionMonths,
-                    selectedDays: optionDays,
-                  ),
-                ),
-              ),
-          ],
+    final chips = [
+      for (final (label, optionYears, optionMonths, optionDays) in options)
+        _PeriodChip(
+          key: Key('chart-period-$label'),
+          label: label,
+          selected: optionYears == years &&
+              optionMonths == months &&
+              optionDays == days,
+          onTap: () => _onPeriodSelected(
+            selectedYears: optionYears,
+            selectedMonths: optionMonths,
+            selectedDays: optionDays,
+          ),
         ),
+    ];
+
+    if (isDesktopLayout(context)) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 6,
+          runSpacing: 6,
+          children: chips,
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Row(
+        children: [
+          for (final chip in chips)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: chip,
+            ),
+        ],
       ),
     );
   }
@@ -1731,7 +1748,8 @@ class ChartsPageState extends State<ChartsPage>
                 label: context.l10n.text('Add trade'),
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(
+                  adaptivePageRoute(
+                    context,
                     builder: (_) => EditTickerPage(symbol: symbol),
                   ),
                 ),
@@ -2052,31 +2070,16 @@ class ChartsPageState extends State<ChartsPage>
         ? currentValueUsd
         : series.last.value;
     final theme = Theme.of(context);
-
-    Widget accountLabel() => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration:
-                  BoxDecoration(color: dotColor, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                accountName,
-                style: theme.textTheme.bodyMedium,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        );
+    final colors = theme.colorScheme;
 
     Widget returnLabel() => Text(
-          hasHistory
-              ? '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%'
-              : context.l10n.text('History unavailable'),
+          (hasHistory
+              ? <String>[
+                  if (pct >= 0) '+',
+                  pct.toStringAsFixed(2),
+                  '%',
+                ].join()
+              : context.l10n.text('History unavailable')),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: theme.textTheme.titleMedium!.copyWith(color: returnColor),
@@ -2091,87 +2094,84 @@ class ChartsPageState extends State<ChartsPage>
     );
     final changeText = Text(
       hasHistory
-          ? '${change >= 0 ? '+' : ''}${fmtCurrency(change)}'
+          ? (change >= 0 ? '+' : '') + fmtCurrency(change)
           : context.l10n.text('Historical prices unavailable'),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(color: returnColor, fontSize: 13),
     );
 
-    return GestureDetector(
-      onTap: () => setState(() {
-        if (isHidden) {
-          _hiddenAccounts.remove(accountName);
-        } else {
-          _hiddenAccounts.add(accountName);
-        }
-      }),
-      child: AnimatedOpacity(
-        opacity: isHidden ? 0.35 : 1.0,
-        duration: const Duration(milliseconds: 200),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 900;
-              if (compact) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Flexible(child: accountLabel()),
-                        const SizedBox(width: 12),
-                        Flexible(
-                          child: Align(
-                            alignment: Alignment.centerRight,
-                            child: valueText,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Flexible(child: returnLabel()),
-                        const SizedBox(width: 12),
-                        Flexible(
-                          child: Align(
-                            alignment: Alignment.centerRight,
-                            child: changeText,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                );
-              }
-
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+    return AnimatedOpacity(
+      opacity: isHidden ? 0.35 : 1.0,
+      duration: const Duration(milliseconds: 200),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: ListTile(
+          key: Key('chart-account-selector-$accountName'),
+          onTap: () => setState(() {
+            if (isHidden) {
+              _hiddenAccounts.remove(accountName);
+            } else {
+              _hiddenAccounts.add(accountName);
+            }
+          }),
+          tileColor: colors.surfaceContainerLow,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: colors.outlineVariant),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 4,
+          ),
+          leading: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: dotColor.withValues(alpha: 0.14),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: dotColor,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          title: Text(
+            accountName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          subtitle: returnLabel(),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: accountLabel(),
-                    ),
-                  ),
-                  Expanded(child: Center(child: returnLabel())),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        valueText,
-                        const SizedBox(height: 2),
-                        changeText,
-                      ],
-                    ),
-                  ),
+                  valueText,
+                  const SizedBox(height: 2),
+                  changeText,
                 ],
-              );
-            },
+              ),
+              const SizedBox(width: 12),
+              Icon(
+                isHidden
+                    ? Icons.visibility_off_rounded
+                    : Icons.visibility_rounded,
+                size: 20,
+                color: colors.onSurfaceVariant,
+              ),
+            ],
           ),
         ),
       ),
@@ -2197,6 +2197,7 @@ class _PeriodChip extends StatelessWidget {
   final VoidCallback onTap;
 
   const _PeriodChip({
+    super.key,
     required this.label,
     required this.selected,
     required this.onTap,

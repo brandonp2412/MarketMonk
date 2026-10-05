@@ -1155,12 +1155,15 @@ class _MyHomePageState extends State<MyHomePage> {
               children: [
                 DesktopNav(
                   tabs: _tabs,
-                  compact: constraints.maxWidth < compactDesktopNavBreakpoint,
+                  compact: false,
                   currentIndex: _currentIndex,
                   onTap: _selectDesktopPage,
                   onSettings: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const SettingsPage()),
+                    adaptivePageRoute(
+                      context,
+                      builder: (_) => const SettingsPage(),
+                    ),
                   ),
                 ),
                 const VerticalDivider(width: 1, thickness: 1),

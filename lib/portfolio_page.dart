@@ -548,7 +548,7 @@ class PortfolioPageState extends State<PortfolioPage>
     unawaited(
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const SettingsPage()),
+        adaptivePageRoute(context, builder: (_) => const SettingsPage()),
       ),
     );
   }
@@ -740,7 +740,7 @@ class PortfolioPageState extends State<PortfolioPage>
               ibkrEnabled ? Icons.settings_rounded : Icons.upload_file_rounded,
           onAction: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const SettingsPage()),
+            adaptivePageRoute(context, builder: (_) => const SettingsPage()),
           ),
         ),
       );
