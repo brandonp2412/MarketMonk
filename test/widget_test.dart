@@ -9,6 +9,11 @@ import 'package:market_monk/main.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:provider/provider.dart';
 
+Future<void> _disposeTestApp(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump(const Duration(milliseconds: 1));
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   testWidgets('App renders tab navigation', (WidgetTester tester) async {
@@ -179,5 +184,6 @@ void main() {
 
     expect(find.byType(TextField), findsOneWidget);
     expect(find.byType(FloatingActionButton), findsNothing);
+    await _disposeTestApp(tester);
   });
 }

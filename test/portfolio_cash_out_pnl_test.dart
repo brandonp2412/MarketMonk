@@ -7,6 +7,11 @@ import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 import 'sqlite_test_support.dart';
 
+Future<void> _disposeTestApp(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump(const Duration(milliseconds: 1));
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -77,7 +82,11 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider(
+            create: (_) => SettingsState(
+              localCurrencyDetector: () async => 'USD',
+            ),
+          ),
           ChangeNotifierProvider.value(value: accounts),
         ],
         child: const MaterialApp(home: PortfolioPage()),
@@ -88,5 +97,6 @@ void main() {
     expect(find.text('Unrealized P/L'), findsOneWidget);
     expect(find.text(r'+$939.36'), findsOneWidget);
     expect(tester.takeException(), null);
+    await _disposeTestApp(tester);
   });
 }
