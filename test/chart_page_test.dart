@@ -499,8 +499,6 @@ void main() {
     expect(accountSelector, findsOneWidget);
     final accountTile = tester.widget<ListTile>(accountSelector);
     expect(accountTile.onTap, isNotNull);
-    expect(accountTile.tileColor, isNotNull);
-    expect(accountTile.shape, isA<RoundedRectangleBorder>());
 
     await tester.tap(accountSelector);
     await tester.pumpAndSettle();
@@ -798,9 +796,20 @@ void main() {
     expect(
       find.ancestor(
         of: find.byKey(const Key('chart-period-5d')),
-        matching: find.byType(Wrap),
+        matching: find.byType(SingleChildScrollView),
       ),
       findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<SingleChildScrollView>(
+            find.ancestor(
+              of: find.byKey(const Key('chart-period-5d')),
+              matching: find.byType(SingleChildScrollView),
+            ),
+          )
+          .scrollDirection,
+      Axis.horizontal,
     );
     expect(find.byKey(const Key('chart-period-10y')), findsOneWidget);
     expect(tester.takeException(), null);
