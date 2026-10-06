@@ -2099,6 +2099,7 @@ class ChartsPageState extends State<ChartsPage>
       overflow: TextOverflow.ellipsis,
       style: TextStyle(color: returnColor, fontSize: 13),
     );
+    final colors = theme.colorScheme;
 
     return Column(
       children: [
@@ -2116,12 +2117,30 @@ class ChartsPageState extends State<ChartsPage>
                   _hiddenAccounts.add(accountName);
                 }
               }),
+              tileColor: colors.surfaceContainerLow,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: colors.outlineVariant),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 4,
+              ),
               leading: Container(
-                width: 12,
-                height: 12,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
-                  color: dotColor,
+                  color: dotColor.withValues(alpha: 0.14),
                   shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: dotColor,
+                    shape: BoxShape.circle,
+                  ),
                 ),
               ),
               title: Text(
