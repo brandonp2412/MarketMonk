@@ -7,17 +7,17 @@ import 'package:intl/intl.dart';
 import 'package:market_monk/accounts_page.dart';
 import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/backup_archive.dart';
-import 'package:market_monk/whats_new.dart';
 import 'package:market_monk/csv_import.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/main.dart';
-import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/market_data_store.dart';
+import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
+import 'package:market_monk/whats_new.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -478,9 +478,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 const SizedBox(width: 10),
                 Text(
                   title,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: theme.textTheme.titleLarge,
                 ),
               ],
             ),

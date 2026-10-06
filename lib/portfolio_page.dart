@@ -9,11 +9,11 @@ import 'package:market_monk/database.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/ibkr_cash_out_pnl.dart';
+import 'package:market_monk/l10n/app_localizations.dart';
+import 'package:market_monk/logging.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/market_donut_chart.dart';
 import 'package:market_monk/profile_data_repository.dart';
-import 'package:market_monk/l10n/app_localizations.dart';
-import 'package:market_monk/logging.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
@@ -879,7 +879,6 @@ class PortfolioPageState extends State<PortfolioPage>
                               sorted[selectedIndex].symbol,
                               textAlign: TextAlign.center,
                               style: const TextStyle(
-                                fontWeight: FontWeight.bold,
                                 fontSize: 13,
                               ),
                             ),
@@ -965,9 +964,7 @@ class PortfolioPageState extends State<PortfolioPage>
                       ? context.l10n.text('Holdings')
                       : sorted[selectedIndex].symbol,
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: theme.textTheme.titleMedium?.copyWith(),
                 ),
                 const SizedBox(height: 3),
                 Text(
@@ -1027,9 +1024,7 @@ class PortfolioPageState extends State<PortfolioPage>
                   children: [
                     Text(
                       context.l10n.text('Portfolio'),
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: theme.textTheme.headlineMedium,
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -1127,7 +1122,7 @@ class PortfolioPageState extends State<PortfolioPage>
             _buildRefreshWarning(context),
           ],
           const SizedBox(height: 20),
-          Row(
+          Wrap(
             children: [
               _DesktopPortfolioMetric(
                 label: context.l10n.text('Account value'),
@@ -1178,9 +1173,7 @@ class PortfolioPageState extends State<PortfolioPage>
                         children: [
                           Text(
                             context.l10n.text('Allocation'),
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                            style: theme.textTheme.titleLarge,
                           ),
                           const SizedBox(height: 3),
                           Text(
@@ -1296,9 +1289,7 @@ class PortfolioPageState extends State<PortfolioPage>
                         children: [
                           Text(
                             context.l10n.text('Return by holding'),
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                            style: theme.textTheme.titleLarge,
                           ),
                           const SizedBox(height: 3),
                           Text(
@@ -1369,71 +1360,68 @@ class _DesktopPortfolioMetric extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Expanded(
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 104),
-        padding: const EdgeInsets.all(17),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: theme.colorScheme.outlineVariant),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                size: 21,
-                color: theme.colorScheme.onPrimaryContainer,
-              ),
+    return Container(
+      constraints: const BoxConstraints(minHeight: 104),
+      padding: const EdgeInsets.all(17),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(12),
             ),
-            const SizedBox(width: 13),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+            child: Icon(
+              icon,
+              size: 21,
+              color: theme.colorScheme.onPrimaryContainer,
+            ),
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: valueColor,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+                if (detail != null) ...[
+                  const SizedBox(height: 2),
                   Text(
-                    label,
+                    detail!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: valueColor ?? theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    value,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: valueColor,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                  if (detail != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      detail!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: valueColor ?? theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
                 ],
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1490,17 +1478,6 @@ class _DesktopAllocationRow extends StatelessWidget {
                       children: [
                         Text(
                           symbol,
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
                         ),
                       ],
                     ),
@@ -1561,17 +1538,6 @@ class _DesktopReturnRow extends StatelessWidget {
               children: [
                 Text(
                   position.symbol,
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Text(
-                  position.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
                 ),
               ],
             ),
@@ -1591,7 +1557,6 @@ class _DesktopReturnRow extends StatelessWidget {
                 '${positive ? '+' : ''}${position.change.toStringAsFixed(2)}%',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: color,
-                  fontWeight: FontWeight.w600,
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),

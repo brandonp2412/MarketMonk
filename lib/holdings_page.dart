@@ -8,10 +8,10 @@ import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/ibkr_cash_out_pnl.dart';
-import 'package:market_monk/main.dart';
-import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
+import 'package:market_monk/main.dart';
+import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/trade_history_page.dart';
 import 'package:market_monk/utils.dart';
@@ -654,10 +654,7 @@ class HoldingsPageState extends State<HoldingsPage>
                       children: [
                         Text(
                           context.l10n.text('Holdings'),
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineMedium
-                              ?.copyWith(fontWeight: FontWeight.w700),
+                          style: Theme.of(context).textTheme.headlineMedium,
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -910,7 +907,6 @@ class HoldingsPageState extends State<HoldingsPage>
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
                 color: valueColor,
               ),
             ),
@@ -1013,7 +1009,6 @@ class HoldingsPageState extends State<HoldingsPage>
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: color,
-              fontWeight: fontWeight,
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
@@ -1107,7 +1102,6 @@ class HoldingsPageState extends State<HoldingsPage>
                             headingTextStyle:
                                 theme.textTheme.labelMedium?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w700,
                             ),
                             dataRowMinHeight: 62,
                             dataRowMaxHeight: 70,
@@ -1298,13 +1292,11 @@ class HoldingsPageState extends State<HoldingsPage>
                                                 position.currentValue,
                                               ),
                                         summary: summary,
-                                        fontWeight: FontWeight.w600,
                                       ),
                                       textCell(
                                         pnlText,
                                         summary: summary,
                                         color: pnlColor,
-                                        fontWeight: FontWeight.w600,
                                       ),
                                       textCell(
                                         position == null
@@ -1312,7 +1304,6 @@ class HoldingsPageState extends State<HoldingsPage>
                                             : '${returnPct >= 0 ? '+' : ''}${returnPct.toStringAsFixed(2)}%',
                                         summary: summary,
                                         color: changeColor,
-                                        fontWeight: FontWeight.w600,
                                       ),
                                     ],
                                   );

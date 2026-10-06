@@ -309,7 +309,7 @@ class _SummaryRow extends StatelessWidget {
           Text(label, style: Theme.of(context).textTheme.bodyMedium),
           Text(
             value,
-            style: TextStyle(fontWeight: FontWeight.w600, color: color),
+            style: TextStyle(color: color),
           ),
         ],
       ),
@@ -352,7 +352,6 @@ class _TradeTile extends StatelessWidget {
         title: Text(
           isBuy ? context.l10n.text('BUY') : context.l10n.text('SELL'),
           style: TextStyle(
-            fontWeight: FontWeight.bold,
             color: isBuy ? Colors.green : Colors.redAccent,
             fontSize: 13,
           ),

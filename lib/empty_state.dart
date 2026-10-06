@@ -32,9 +32,7 @@ class AppEmptyState extends StatelessWidget {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
+            style: theme.textTheme.titleLarge,
           ),
           if (message != null) ...[
             const SizedBox(height: 8),

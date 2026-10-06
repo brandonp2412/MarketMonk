@@ -216,10 +216,7 @@ class DesktopNav extends StatelessWidget {
                           'Market Monk',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w700),
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
                       ),
                     ],

@@ -1,30 +1,30 @@
 import 'dart:async';
 
-import 'package:drift/drift.dart' hide Column;
 import 'package:drafter/drafter.dart';
+import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:market_monk/candle_ticker.dart';
 import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/bottom_nav.dart';
+import 'package:market_monk/candle_ticker.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
-import 'package:market_monk/main.dart';
-import 'package:market_monk/market_line_chart.dart';
-import 'package:market_monk/profile_data_repository.dart';
-import 'package:market_monk/portfolio_chart_scale.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
+import 'package:market_monk/main.dart';
 import 'package:market_monk/market_data_store.dart';
+import 'package:market_monk/market_line_chart.dart';
+import 'package:market_monk/portfolio_chart_scale.dart';
+import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
+import 'package:market_monk/sqlite_settings.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
-import 'package:market_monk/sqlite_settings.dart';
 
 enum _ChartMode { portfolio, searching, stock }
 
@@ -2070,7 +2070,6 @@ class ChartsPageState extends State<ChartsPage>
         ? currentValueUsd
         : series.last.value;
     final theme = Theme.of(context);
-    final colors = theme.colorScheme;
 
     Widget returnLabel() => Text(
           (hasHistory
@@ -2101,59 +2100,37 @@ class ChartsPageState extends State<ChartsPage>
       style: TextStyle(color: returnColor, fontSize: 13),
     );
 
-    return AnimatedOpacity(
-      opacity: isHidden ? 0.35 : 1.0,
-      duration: const Duration(milliseconds: 200),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: ListTile(
-          key: Key('chart-account-selector-$accountName'),
-          onTap: () => setState(() {
-            if (isHidden) {
-              _hiddenAccounts.remove(accountName);
-            } else {
-              _hiddenAccounts.add(accountName);
-            }
-          }),
-          tileColor: colors.surfaceContainerLow,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: colors.outlineVariant),
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 4,
-          ),
-          leading: Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: dotColor.withValues(alpha: 0.14),
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                color: dotColor,
-                shape: BoxShape.circle,
+    return Column(
+      children: [
+        AnimatedOpacity(
+          opacity: isHidden ? 0.35 : 1.0,
+          duration: const Duration(milliseconds: 200),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: ListTile(
+              key: Key('chart-account-selector-$accountName'),
+              onTap: () => setState(() {
+                if (isHidden) {
+                  _hiddenAccounts.remove(accountName);
+                } else {
+                  _hiddenAccounts.add(accountName);
+                }
+              }),
+              leading: Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: dotColor,
+                  shape: BoxShape.circle,
+                ),
               ),
-            ),
-          ),
-          title: Text(
-            accountName,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          subtitle: returnLabel(),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Column(
+              title: Text(
+                accountName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: returnLabel(),
+              trailing: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -2163,18 +2140,11 @@ class ChartsPageState extends State<ChartsPage>
                   changeText,
                 ],
               ),
-              const SizedBox(width: 12),
-              Icon(
-                isHidden
-                    ? Icons.visibility_off_rounded
-                    : Icons.visibility_rounded,
-                size: 20,
-                color: colors.onSurfaceVariant,
-              ),
-            ],
+            ),
           ),
         ),
-      ),
+        if (idx != accounts.length - 1) Divider(),
+      ],
     );
   }
 
@@ -2232,7 +2202,6 @@ class _PeriodChip extends StatelessWidget {
                 style: TextStyle(
                   color: colorScheme.onSurface,
                   fontSize: 13,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                 ),
                 child: Text(label),
               ),
@@ -2285,7 +2254,6 @@ class _ActionChip extends StatelessWidget {
                   label,
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w500,
                     color: colorScheme.onSurface,
                   ),
                 ),
@@ -2350,7 +2318,6 @@ class _FavoriteCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 12,
                     height: 1,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 2),
