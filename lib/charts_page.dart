@@ -2130,7 +2130,7 @@ class ChartsPageState extends State<ChartsPage>
             ),
           ),
         ),
-        if (idx != accounts.length - 1) Divider(),
+        if (idx != accounts.length - 1) Divider(height: 4),
       ],
     );
   }
