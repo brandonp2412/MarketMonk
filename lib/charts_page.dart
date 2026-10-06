@@ -566,11 +566,18 @@ class ChartsPageState extends State<ChartsPage>
         clearAllSyncCache();
         await _refreshAllPortfolioCandles();
         await _loadAllPortfolios(
-          refreshIbkrPerformance: true,
-          forceIbkrPerformanceRefresh: true,
           refreshIbkrPortfolio: true,
           forceIbkrPortfolioRefresh: true,
         );
+        if (mounted && widget.isActive) {
+          runDetachedTask(
+            _loadAllPortfolios(
+              refreshIbkrPerformance: true,
+              forceIbkrPerformanceRefresh: true,
+            ),
+            'Failed to refresh IBKR performance history',
+          );
+        }
       }
     } catch (error, stackTrace) {
       talker.handle(error, stackTrace, 'Chart refresh failed');

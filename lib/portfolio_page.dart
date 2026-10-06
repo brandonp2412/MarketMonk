@@ -326,11 +326,6 @@ class PortfolioPageState extends State<PortfolioPage>
           accounts.activeAccount != accountName) {
         return;
       }
-      final performanceFuture = _loadIbkrCashOutPerformance(
-        accountName,
-        config,
-        forceRefresh: forceRefresh,
-      );
       final loaded = await _loadPortfolio(
         accountName,
         trades,
@@ -346,7 +341,6 @@ class PortfolioPageState extends State<PortfolioPage>
           netLiquidationUsd: loaded.netLiquidationUsd,
         );
       }
-      await performanceFuture;
       if (!mounted ||
           !widget.isActive ||
           accounts.activeAccount != accountName) {
@@ -358,6 +352,14 @@ class PortfolioPageState extends State<PortfolioPage>
         _hasCachedPortfolio = true;
         _loadError = null;
       });
+      runDetachedTask(
+        _loadIbkrCashOutPerformance(
+          accountName,
+          config,
+          forceRefresh: forceRefresh,
+        ),
+        'Failed to refresh IBKR performance history',
+      );
     } catch (error, stackTrace) {
       if (mounted && widget.isActive) {
         setState(() => _loadError = error);

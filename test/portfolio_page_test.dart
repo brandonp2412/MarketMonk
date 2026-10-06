@@ -199,6 +199,58 @@ void main() {
     },
   );
 
+  testWidgets(
+    'slow IBKR performance refresh does not keep portfolio loading',
+    (tester) async {
+      await seedTestSqlite({});
+      final accounts = await configuredAccounts();
+      await accounts.cachePortfolio(
+        'Default',
+        [cachedPosition()],
+        const IbkrAccountValue(value: 5500, currency: 'USD'),
+        netLiquidationUsd: 5500,
+      );
+      await accounts.cacheIbkrPerformance(
+        'Default',
+        await _performanceLoader(
+          const IbkrAccountConfig(),
+          '1Y',
+        ),
+      );
+
+      final pendingPerformance = Completer<IbkrPerformanceSeries>();
+      var performanceLoads = 0;
+
+      await tester.pumpWidget(
+        app(
+          accounts,
+          _portfolioPage(
+            ibkrLoader: (_) async => snapshotFor('*****6552', 'VOO'),
+            ibkrPerformanceLoader: (_, __) {
+              performanceLoads++;
+              return pendingPerformance.future;
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(performanceLoads, 0);
+
+      accounts.requestIbkrRefresh();
+      await tester.pump();
+      await tester.pump();
+
+      expect(performanceLoads, 1);
+      expect(find.bySemanticsLabel('Loading portfolio'), findsNothing);
+      expect(find.text('VOO'), findsWidgets);
+
+      pendingPerformance.complete(
+        await _performanceLoader(const IbkrAccountConfig(), '1Y'),
+      );
+      await tester.pumpAndSettle();
+    },
+  );
+
   test('portfolio cache survives AccountManager reinitialization', () async {
     await seedTestSqlite({});
     final accounts = testAccountManager();

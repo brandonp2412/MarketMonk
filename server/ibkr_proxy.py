@@ -16,7 +16,7 @@ import time
 from dataclasses import dataclass
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, urlencode, urlparse
@@ -1118,7 +1118,10 @@ def main() -> None:
     parser.parse_args()
     config = Config.from_env()
     client = make_client(config)
-    server = HTTPServer((config.bind, config.port), make_handler(client, config.token))
+    server = ThreadingHTTPServer(
+        (config.bind, config.port),
+        make_handler(client, config.token),
+    )
     print(
         f"MarketMonk IBKR proxy ({config.backend}) listening on "
         f"{config.bind}:{config.port}"

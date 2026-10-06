@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drafter/drafter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -929,6 +931,112 @@ void main() {
     expect(performanceLoads['https://default.example.test'], 2);
     expect(performanceLoads['https://bot.example.test'], 2);
   });
+
+  testWidgets(
+    'slow IBKR performance refresh does not keep chart refresh spinning',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1400, 900);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      await seedTestSqlite({});
+
+      final accounts = testAccountManager();
+      await accounts.init();
+      await accounts.setIbkrConfig(
+        'Default',
+        const IbkrAccountConfig(
+          enabled: true,
+          baseUrl: 'https://ibkr.example.test',
+          token: 'secret-token',
+        ),
+      );
+      await accounts.cachePortfolio(
+        'Default',
+        const [],
+        const IbkrAccountValue(value: 5500, currency: 'USD'),
+        netLiquidationUsd: 5500,
+      );
+      await accounts.cacheIbkrPerformance(
+        'Default',
+        IbkrPerformanceSeries(
+          period: '1Y',
+          measure: 'TWR',
+          currency: 'USD',
+          startDate: DateTime(2026, 10, 1),
+          startNav: 5000,
+          dates: [DateTime(2026, 10, 5)],
+          nav: const [5500],
+          returnDates: [DateTime(2026, 10, 1), DateTime(2026, 10, 5)],
+          returns: const [0, 0.1],
+        ),
+      );
+
+      final pendingPerformance = Completer<IbkrPerformanceSeries>();
+      var performanceLoads = 0;
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => SettingsState()),
+            ChangeNotifierProvider.value(value: accounts),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              body: ChartsPage(
+                ibkrLoader: (_) async => IbkrPortfolioSnapshot(
+                  account: '*****6552',
+                  positions: const [],
+                  summary: const {
+                    'netliquidation': {
+                      'value': 5500.0,
+                      'currency': 'USD',
+                    },
+                  },
+                  ledger: const {},
+                ),
+                ibkrPerformanceLoader: (_, __) {
+                  performanceLoads++;
+                  return pendingPerformance.future;
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(performanceLoads, 0);
+
+      final refresh = find.byTooltip('Refresh');
+      expect(refresh, findsOneWidget);
+      await tester.tap(refresh);
+      await tester.pump();
+      await tester.pump();
+
+      expect(performanceLoads, 1);
+      final refreshButton = tester.widget<IconButton>(
+        find.ancestor(of: refresh, matching: find.byType(IconButton)),
+      );
+      expect(refreshButton.onPressed, isNotNull);
+      expect(find.byType(MarketLineChart), findsOneWidget);
+
+      pendingPerformance.complete(
+        IbkrPerformanceSeries(
+          period: '1Y',
+          measure: 'TWR',
+          currency: 'USD',
+          startDate: DateTime(2026, 10, 1),
+          startNav: 5000,
+          dates: [DateTime(2026, 10, 6)],
+          nav: const [5550],
+          returnDates: [DateTime(2026, 10, 1), DateTime(2026, 10, 6)],
+          returns: const [0, 0.11],
+        ),
+      );
+      await tester.pumpAndSettle();
+    },
+  );
 
   testWidgets('IBKR chart keeps cached account when forced refresh fails',
       (tester) async {
