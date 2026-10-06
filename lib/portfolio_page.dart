@@ -1404,7 +1404,6 @@ class _DesktopPortfolioMetric extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
                       color: valueColor,
                       fontFeatures: const [FontFeature.tabularFigures()],
                     ),

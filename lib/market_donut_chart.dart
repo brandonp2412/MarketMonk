@@ -186,7 +186,6 @@ class _MarketDonutRenderer extends ChartRenderer {
           point,
           color: brightness == Brightness.dark ? Colors.white : Colors.black,
           fontSize: 12,
-          weight: FontWeight.w600,
           h: HAlign.center,
           v: VAlign.center,
         );

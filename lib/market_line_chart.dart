@@ -42,7 +42,6 @@ class _LineChartAxisLabel {
 
 const _lineChartEdgePaddingFraction = 0.02;
 const _axisLabelFontSize = 12.0;
-const _axisLabelFontWeight = FontWeight.w600;
 const _xAxisLabelMinGap = 12.0;
 const _chartTopInset = 24.0;
 const _chartBottomLabelInset = 38.0;
@@ -72,7 +71,6 @@ void _drawMarketTooltip(
       title,
       color: textColor,
       fontSize: _tooltipFontSize,
-      weight: FontWeight.w600,
     );
   }
   for (final row in rows) {
@@ -114,7 +112,6 @@ void _drawMarketTooltip(
       Offset(left + _tooltipPadding, rowTop + _tooltipRowHeight / 2),
       color: mutedTextColor,
       fontSize: _tooltipFontSize,
-      weight: FontWeight.w600,
       v: VAlign.center,
     );
     rowTop += _tooltipRowHeight;
@@ -696,7 +693,6 @@ class _MarketLineChartRenderer extends ChartRenderer
         Offset(bounds.left - 7, y),
         color: axisLabelColor,
         fontSize: _axisLabelFontSize,
-        weight: _axisLabelFontWeight,
         h: HAlign.end,
         v: VAlign.center,
       );
@@ -712,7 +708,6 @@ class _MarketLineChartRenderer extends ChartRenderer
         measureChartText(
           label.text,
           fontSize: _axisLabelFontSize,
-          weight: _axisLabelFontWeight,
           color: axisLabelColor,
         ),
       );
@@ -730,7 +725,6 @@ class _MarketLineChartRenderer extends ChartRenderer
         Offset(centers[i], bounds.bottom + 15),
         color: axisLabelColor,
         fontSize: _axisLabelFontSize,
-        weight: _axisLabelFontWeight,
         h: HAlign.center,
         v: VAlign.center,
       );

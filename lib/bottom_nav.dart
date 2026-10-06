@@ -326,8 +326,6 @@ class _DesktopNavItem extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.labelLarge?.copyWith(
                               color: foreground,
-                              fontWeight:
-                                  selected ? FontWeight.w700 : FontWeight.w500,
                             ),
                       ),
                     ),

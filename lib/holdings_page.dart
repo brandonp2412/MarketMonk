@@ -998,7 +998,6 @@ class HoldingsPageState extends State<HoldingsPage>
       required SymbolSummary summary,
       bool numeric = true,
       Color? color,
-      FontWeight? fontWeight,
     }) {
       return DataCell(
         Align(
@@ -1218,10 +1217,7 @@ class HoldingsPageState extends State<HoldingsPage>
                                                               .ellipsis,
                                                           style: theme.textTheme
                                                               .titleSmall
-                                                              ?.copyWith(
-                                                            fontWeight:
-                                                                FontWeight.w700,
-                                                          ),
+                                                              ?.copyWith(),
                                                         ),
                                                       ),
                                                       if (isClosed) ...[
