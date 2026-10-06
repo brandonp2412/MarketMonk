@@ -172,6 +172,13 @@ Future<void> appWrapper() async {
     'systemColors': false,
     'curveLines': true,
   });
+  for (final symbol in ['GME', 'AAPL', 'TSLA', 'MSFT', 'AMZN']) {
+    cacheSymbolMeta(symbol, 'USD');
+  }
+  allRatesFromUsd['USD'] = 1.0;
+  await testDatabase.candles.insertAll(mockCandles);
+  await testDatabase.trades.insertAll(mockTrades);
+
   final settings = SettingsState();
   final accounts = AccountManager();
   await accounts.init();
@@ -270,8 +277,6 @@ void main() {
       cacheSymbolMeta(symbol, 'USD');
     }
     allRatesFromUsd['USD'] = 1.0;
-    await testDatabase.candles.insertAll(mockCandles);
-    await testDatabase.trades.insertAll(mockTrades);
   });
 
   group("Generate default screenshots ", () {
