@@ -854,7 +854,11 @@ Future<void> syncCandles(
           );
           return response.candlesData;
         };
-    final response = await fetch(canonicalSymbol, requestFrom);
+    final response = await backgroundNetworkCoordinator
+        .observe<List<YahooFinanceCandleData>>(
+      RequestCategory.yahooCandles,
+      () => fetch(canonicalSymbol, requestFrom),
+    );
     final requestedCandles = response.where((candle) {
       final day = canonicalMarketDay(candle.date);
       return !day.isBefore(requestFrom) && !day.isAfter(expectedMarketDay);
@@ -863,6 +867,10 @@ Future<void> syncCandles(
       requestedCandles,
       canonicalSymbol,
       database: targetDatabase,
+    );
+    backgroundNetworkCoordinator.recordRows(
+      RequestCategory.yahooCandles,
+      stored,
     );
     talker.info(
       'Completed Yahoo candle sync for $canonicalSymbol: $stored rows '
@@ -878,7 +886,7 @@ Future<void> syncCandles(
     while (true) {
       final syncResult = await backgroundNetworkCoordinator
           .coalesce<({bool requested, bool progressed})>(
-        'market.candles',
+        RequestCategory.marketCandles,
         canonicalSymbol,
         performSync,
       );

@@ -5,5 +5,5 @@ targets:
         options:
           databases:
             database: lib/database.dart
-            app_state: lib/app_state_database.dart
-            unified_database: lib/unified_database.dart
+            legacy_app_state: lib/legacy_app_state_database.dart
+            legacy_profile: lib/legacy_profile_database.dart
