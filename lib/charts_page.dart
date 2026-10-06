@@ -2077,7 +2077,7 @@ class ChartsPageState extends State<ChartsPage>
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       textAlign: TextAlign.right,
-      style: theme.textTheme.titleMedium,
+      style: theme.textTheme.titleMedium!.copyWith(height: 1.1),
     );
     final changeText = Text(
       hasHistory
@@ -2085,7 +2085,7 @@ class ChartsPageState extends State<ChartsPage>
           : context.l10n.text('Historical prices unavailable'),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: TextStyle(color: returnColor, fontSize: 13),
+      style: TextStyle(color: returnColor, fontSize: 13, height: 1.1),
     );
     return Column(
       children: [
