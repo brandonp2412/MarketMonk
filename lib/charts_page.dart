@@ -2095,6 +2095,7 @@ class ChartsPageState extends State<ChartsPage>
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: ListTile(
+              dense: true,
               key: Key('chart-account-selector-$accountName'),
               onTap: () => setState(() {
                 if (isHidden) {
@@ -2130,7 +2131,6 @@ class ChartsPageState extends State<ChartsPage>
             ),
           ),
         ),
-        if (idx != accounts.length - 1) Divider(height: 4),
       ],
     );
   }
