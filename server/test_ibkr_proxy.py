@@ -1,9 +1,12 @@
 import json
+import sqlite3
+import tempfile
 import threading
 import unittest
 from datetime import date
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
+from pathlib import Path
 from types import SimpleNamespace
 
 from ibkr_proxy import (
@@ -33,6 +36,7 @@ def config(**overrides):
         "tws_client_id": 97,
         "performance_command": None,
         "transactions_command": None,
+        "performance_cache_database": None,
     }
     values.update(overrides)
     return Config(**values)
@@ -535,6 +539,53 @@ class ProxyTests(unittest.TestCase):
         self.assertEqual(calls[0][1]["timeout"], 90)
         client.performance("1Y")
         self.assertEqual(len(calls), 1)
+
+    def test_command_performance_client_reads_sqlalchemy_cache_without_helper(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "ibkr-state.sqlite3"
+            connection = sqlite3.connect(database)
+            connection.execute(
+                """
+                CREATE TABLE marketmonk_performance_cache (
+                    account_id TEXT NOT NULL,
+                    period TEXT NOT NULL,
+                    fetched_at DATETIME NOT NULL,
+                    payload JSON NOT NULL,
+                    PRIMARY KEY (account_id, period)
+                )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO marketmonk_performance_cache
+                    (account_id, period, fetched_at, payload)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    "U1234567",
+                    "1Y",
+                    "2026-10-07 00:00:00",
+                    json.dumps(raw_performance()),
+                ),
+            )
+            connection.commit()
+            connection.close()
+
+            def runner(*_args, **_kwargs):
+                self.fail("persistent cache hit must not launch helper")
+
+            client = CommandPerformanceClient(
+                config(
+                    performance_command=("helper",),
+                    performance_cache_database=str(database),
+                ),
+                runner=runner,
+            )
+
+            performance = client.performance("1Y")
+
+            self.assertEqual(performance["dates"][-1], "20260916")
+            self.assertEqual(performance["returns"][-1], 0.0549)
 
     def test_command_performance_client_rejects_wrong_account_output(self):
         client = CommandPerformanceClient(

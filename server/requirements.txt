@@ -1,1 +1,2 @@
 ib_async==2.1.0
+sqlalchemy>=2.1.3

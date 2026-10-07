@@ -15,12 +15,17 @@ import subprocess
 import time
 from dataclasses import dataclass
 from datetime import date, datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, urlencode, urlparse
 from urllib.request import HTTPSHandler, Request, build_opener
+
+from sqlalchemy import JSON, Column, DateTime, MetaData, String, Table, create_engine, select
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.engine import Engine
 
 
 @dataclass(frozen=True)
@@ -37,6 +42,7 @@ class Config:
     tws_client_id: int
     performance_command: tuple[str, ...] | None
     transactions_command: tuple[str, ...] | None
+    performance_cache_database: str | None = None
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -68,6 +74,15 @@ class Config:
         transactions_command = (
             tuple(shlex.split(transactions_command_raw))
             if transactions_command_raw
+            else None
+        )
+        performance_state_dir = os.getenv(
+            "MARKET_MONK_IBKR_STATE_DIR",
+            "",
+        ).strip()
+        performance_cache_database = (
+            str(Path(performance_state_dir) / "ibkr-state.sqlite3")
+            if performance_state_dir
             else None
         )
 
@@ -117,6 +132,7 @@ class Config:
             tws_client_id=tws_client_id,
             performance_command=performance_command,
             transactions_command=transactions_command,
+            performance_cache_database=performance_cache_database,
         )
 
 
@@ -354,6 +370,41 @@ class ClientPortalIbkrClient:
             raise IbkrError("IBKR Gateway returned invalid JSON") from error
 
 
+class SqlAlchemyPerformanceCache:
+    """Read the shared MarketMonk performance cache from the long-lived proxy."""
+
+    def __init__(self, database: str):
+        self._engine: Engine = create_engine(
+            f"sqlite+pysqlite:///{database}",
+            connect_args={"timeout": 30.0},
+        )
+        metadata = MetaData()
+        self._table = Table(
+            "marketmonk_performance_cache",
+            metadata,
+            Column("account_id", String, primary_key=True),
+            Column("period", String, primary_key=True),
+            Column("fetched_at", DateTime(timezone=True), nullable=False),
+            Column("payload", JSON, nullable=False),
+        )
+
+    def load(self, account_id: str, period: str) -> dict[str, Any] | None:
+        statement = select(self._table.c.payload).where(
+            self._table.c.account_id == account_id,
+            self._table.c.period == period,
+        )
+        try:
+            with self._engine.connect() as connection:
+                payload = connection.execute(statement).scalar_one_or_none()
+        except SQLAlchemyError:
+            return None
+        if payload is None:
+            return None
+        if not isinstance(payload, dict):
+            return None
+        return payload
+
+
 class CommandPerformanceClient:
     def __init__(
         self,
@@ -370,9 +421,29 @@ class CommandPerformanceClient:
             )
         self._config = config
         self._runner = runner
+        self._persistent_cache = (
+            SqlAlchemyPerformanceCache(config.performance_cache_database)
+            if config.performance_cache_database
+            else None
+        )
         self._performance_cache: dict[str, tuple[float, dict[str, Any]]] = {}
 
     def performance(self, period: str) -> dict[str, Any]:
+        if self._persistent_cache is not None:
+            raw_cached = self._persistent_cache.load(
+                self._config.account_id,
+                period,
+            )
+            if raw_cached is not None:
+                try:
+                    return _normalize_web_performance(
+                        raw_cached,
+                        period,
+                        self._config.account_id,
+                    )
+                except IbkrError:
+                    pass
+
         cached = self._performance_cache.get(period)
         now = time.monotonic()
         if (
