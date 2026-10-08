@@ -74,7 +74,7 @@ class PortfolioPageState extends State<PortfolioPage>
       _ibkrSnapshotLoads = {};
   final Map<(String, IbkrAccountConfig), Future<IbkrPerformanceSeries>>
       _ibkrPerformanceLoads = {};
-  final Map<bool, Future<void>> _preloadLoads = {};
+  final Map<(String, bool), Future<void>> _preloadLoads = {};
 
   @override
   void initState() {
@@ -285,16 +285,18 @@ class PortfolioPageState extends State<PortfolioPage>
   }
 
   Future<void> _preload({bool forceRefresh = false}) {
-    final existing = _preloadLoads[forceRefresh];
+    final accountName = context.read<AccountManager>().activeAccount;
+    final key = (accountName, forceRefresh);
+    final existing = _preloadLoads[key];
     if (existing != null) return existing;
 
     late final Future<void> future;
     future = _performPreload(forceRefresh: forceRefresh).whenComplete(() {
       _preloadLoads.removeWhere(
-        (key, value) => key == forceRefresh && identical(value, future),
+        (entryKey, value) => entryKey == key && identical(value, future),
       );
     });
-    _preloadLoads[forceRefresh] = future;
+    _preloadLoads[key] = future;
     return future;
   }
 
@@ -361,7 +363,7 @@ class PortfolioPageState extends State<PortfolioPage>
         'Failed to refresh IBKR performance history',
       );
     } catch (error, stackTrace) {
-      if (mounted && widget.isActive) {
+      if (mounted && widget.isActive && accounts.activeAccount == accountName) {
         setState(() => _loadError = error);
       }
       talker.handle(error, stackTrace, 'Failed to preload portfolio positions');

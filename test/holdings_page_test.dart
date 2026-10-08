@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/holdings_page.dart';
@@ -254,6 +256,200 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(accounts.activeAccount, 'Brokerage');
+  });
+
+  testWidgets('cached IBKR positions show before trade history completes',
+      (tester) async {
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.setIbkrConfig(
+      'Default',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'test-token',
+      ),
+    );
+    final position = Position(
+      symbol: 'VOO',
+      name: 'VANGUARD S&P 500 ETF',
+      nativeCurrency: 'USD',
+      netShares: 10,
+      avgCost: 500,
+      currentPrice: 550,
+      firstBuyDate: DateTime(2025),
+      lastBuyDate: DateTime(2026),
+    );
+    await accounts.cachePortfolio(
+      'Default',
+      [position],
+      const IbkrAccountValue(value: 5500, currency: 'USD'),
+    );
+
+    final pendingTrades = Completer<IbkrTradeHistory>();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: HoldingsPage(
+            ibkrTradeHistoryLoader: (_) => pendingTrades.future,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('VOO'), findsOneWidget);
+    expect(find.text('No IBKR stocks found'), findsNothing);
+
+    pendingTrades.complete(
+      const IbkrTradeHistory(available: false, trades: []),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('VOO'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField).first, 'other');
+    await tester.pump();
+    expect(find.text('No IBKR stocks found'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).first, 'VOO');
+    await tester.pump();
+    expect(find.text('VOO'), findsNWidgets(2));
+  });
+
+  testWidgets('IBKR portfolio loads without local trade records',
+      (tester) async {
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.setIbkrConfig(
+      'Default',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'test-token',
+      ),
+    );
+    final pendingPortfolio = Completer<IbkrPortfolioSnapshot>();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: HoldingsPage(
+            ibkrLoader: (_) => pendingPortfolio.future,
+            ibkrTradeHistoryLoader: (_) async =>
+                const IbkrTradeHistory(available: false, trades: []),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('No IBKR stocks found'), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    pendingPortfolio.complete(
+      const IbkrPortfolioSnapshot(
+        account: 'U1234',
+        positions: [
+          IbkrPosition(
+            symbol: 'NVDA',
+            securityType: 'STK',
+            currency: 'USD',
+            exchange: 'NASDAQ',
+            conid: 1234,
+            quantity: 5,
+            marketPrice: 100,
+            marketValue: 500,
+            averageCost: 90,
+            unrealizedPnl: 50,
+            realizedPnl: 0,
+          ),
+        ],
+        summary: {},
+        ledger: {},
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('NVDA'), findsOneWidget);
+    expect(find.text('No IBKR stocks found'), findsNothing);
+  });
+
+  testWidgets('switching IBKR accounts starts a separate holdings load',
+      (tester) async {
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.addAccount('IBKR Bot');
+    for (final account in ['Default', 'IBKR Bot']) {
+      await accounts.setIbkrConfig(
+        account,
+        IbkrAccountConfig(
+          enabled: true,
+          baseUrl: 'https://$account.example.test',
+          token: 'test-token',
+        ),
+      );
+      await accounts.cachePortfolio(
+        account,
+        [
+          Position(
+            symbol: account == 'Default' ? 'VOO' : 'NVDA',
+            name: account == 'Default' ? 'Vanguard' : 'Nvidia',
+            nativeCurrency: 'USD',
+            netShares: 1,
+            avgCost: 100,
+            currentPrice: 110,
+            firstBuyDate: DateTime(2025),
+            lastBuyDate: DateTime(2026),
+          ),
+        ],
+        const IbkrAccountValue(value: 110, currency: 'USD'),
+      );
+    }
+
+    final firstAccountTrades = Completer<IbkrTradeHistory>();
+    var secondAccountLoads = 0;
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: HoldingsPage(
+            ibkrTradeHistoryLoader: (config) {
+              if (config.baseUrl.contains('Default')) {
+                return firstAccountTrades.future;
+              }
+              secondAccountLoads++;
+              return Future.value(
+                const IbkrTradeHistory(available: true, trades: []),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('VOO'), findsOneWidget);
+
+    await accounts.switchAccount('IBKR Bot');
+    await tester.pumpAndSettle();
+    expect(secondAccountLoads, 1);
+    expect(find.text('NVDA'), findsOneWidget);
+    expect(find.text('VOO'), findsNothing);
+
+    firstAccountTrades.complete(
+      const IbkrTradeHistory(available: false, trades: []),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('NVDA'), findsOneWidget);
+    expect(find.text('VOO'), findsNothing);
   });
 
   testWidgets('IBKR holdings stay visible when a refresh fails',

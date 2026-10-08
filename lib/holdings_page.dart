@@ -92,14 +92,16 @@ class HoldingsPageState extends State<HoldingsPage>
   List<SymbolSummary> _summaries = [];
   List<Trade> _ibkrTrades = [];
   Future<List<Trade>>? _ibkrTradesLoad;
+  String? _ibkrTradesLoadingAccount;
   String? _ibkrTradesAccount;
   bool _ibkrTradeHistoryAvailable = true;
   late Stream<List<SymbolSummary>> _stream;
   String _lastAccount = '';
   int _lastIbkrRefreshVersion = -1;
   IbkrAccountConfig _lastIbkrConfig = const IbkrAccountConfig();
-  final Map<(bool, bool), Future<void>> _preloadLoads = {};
+  final Map<(String, bool, bool), Future<void>> _preloadLoads = {};
   Object? _preloadError;
+  bool _ibkrPreloadCompleted = false;
 
   bool _selecting = false;
   final Set<String> _selectedSymbols = {};
@@ -155,9 +157,13 @@ class HoldingsPageState extends State<HoldingsPage>
     _lastAccount = account;
     _lastIbkrConfig = ibkrConfig;
     _lastIbkrRefreshVersion = refreshVersion;
+    final cachedPositions = accounts.portfolioCacheFor(account)?.positions;
     setState(() {
       _stream = _buildStream(skipInitial: widget.isActive);
-      _summaries = [];
+      _summaries = ibkrConfig.enabled && cachedPositions != null
+          ? _summariesFromPositions(_ibkrTrades, cachedPositions)
+          : [];
+      _ibkrPreloadCompleted = cachedPositions != null;
       _preloadError = null;
     });
     if (widget.isActive) {
@@ -195,7 +201,11 @@ class HoldingsPageState extends State<HoldingsPage>
     }
 
     final existingLoad = _ibkrTradesLoad;
-    if (!forceRefresh && existingLoad != null) return existingLoad;
+    if (!forceRefresh &&
+        existingLoad != null &&
+        _ibkrTradesLoadingAccount == accountName) {
+      return existingLoad;
+    }
     if (!widget.isActive) return _ibkrTrades;
 
     final load = () async {
@@ -220,14 +230,20 @@ class HoldingsPageState extends State<HoldingsPage>
               commission: brokerTrades[index].commission,
             ),
         ];
-        _ibkrTrades = trades;
-        _ibkrTradesAccount = accountName;
-        _ibkrTradeHistoryAvailable = tradeHistory.available;
+        if (mounted &&
+            context.read<AccountManager>().activeAccount == accountName) {
+          _ibkrTrades = trades;
+          _ibkrTradesAccount = accountName;
+          _ibkrTradeHistoryAvailable = tradeHistory.available;
+        }
         return trades;
       } catch (error, stackTrace) {
-        _ibkrTrades = [];
-        _ibkrTradesAccount = accountName;
-        _ibkrTradeHistoryAvailable = false;
+        if (mounted &&
+            context.read<AccountManager>().activeAccount == accountName) {
+          _ibkrTrades = [];
+          _ibkrTradesAccount = accountName;
+          _ibkrTradeHistoryAvailable = false;
+        }
         talker.handle(
           error,
           stackTrace,
@@ -237,10 +253,14 @@ class HoldingsPageState extends State<HoldingsPage>
       }
     }();
     _ibkrTradesLoad = load;
+    _ibkrTradesLoadingAccount = accountName;
     try {
       return await load;
     } finally {
-      if (identical(_ibkrTradesLoad, load)) _ibkrTradesLoad = null;
+      if (identical(_ibkrTradesLoad, load)) {
+        _ibkrTradesLoad = null;
+        _ibkrTradesLoadingAccount = null;
+      }
     }
   }
 
@@ -248,7 +268,8 @@ class HoldingsPageState extends State<HoldingsPage>
     bool refreshPortfolio = false,
     bool refreshTrades = false,
   }) {
-    final key = (refreshPortfolio, refreshTrades);
+    final accountName = context.read<AccountManager>().activeAccount;
+    final key = (accountName, refreshPortfolio, refreshTrades);
     final existing = _preloadLoads[key];
     if (existing != null) return existing;
 
@@ -282,9 +303,17 @@ class HoldingsPageState extends State<HoldingsPage>
     bool refreshTrades = false,
   }) async {
     if (!mounted || !widget.isActive) return;
+    final accounts = context.read<AccountManager>();
+    final accountName = accounts.activeAccount;
     try {
-      final accounts = context.read<AccountManager>();
-      final accountName = accounts.activeAccount;
+      final cachedBefore = accounts.portfolioCacheFor(accountName);
+      if (cachedBefore != null) {
+        setState(() {
+          _summaries =
+              _summariesFromPositions(_ibkrTrades, cachedBefore.positions);
+          _ibkrPreloadCompleted = true;
+        });
+      }
       final trades = await _loadTradesForHoldings(forceRefresh: refreshTrades);
       if (!mounted ||
           !widget.isActive ||
@@ -306,6 +335,7 @@ class HoldingsPageState extends State<HoldingsPage>
         if (mounted) {
           setState(() {
             _summaries = result;
+            _ibkrPreloadCompleted = true;
             _preloadError = null;
           });
         }
@@ -315,12 +345,16 @@ class HoldingsPageState extends State<HoldingsPage>
       if (mounted && widget.isActive && accounts.activeAccount == accountName) {
         setState(() {
           _summaries = result;
+          _ibkrPreloadCompleted = true;
           _preloadError = null;
         });
       }
     } catch (error, stackTrace) {
-      if (mounted) {
-        setState(() => _preloadError = error);
+      if (mounted && widget.isActive && accounts.activeAccount == accountName) {
+        setState(() {
+          _ibkrPreloadCompleted = true;
+          _preloadError = error;
+        });
       }
       _reportError(error, stackTrace, 'preloading holdings');
     }
@@ -474,7 +508,11 @@ class HoldingsPageState extends State<HoldingsPage>
   Stream<List<SymbolSummary>> _buildStream({bool skipInitial = false}) {
     if (!widget.isActive) return Stream.value(_summaries);
 
-    final accountName = context.read<AccountManager>().activeAccount;
+    final accounts = context.read<AccountManager>();
+    if (accounts.ibkrConfigFor().enabled) {
+      return const Stream<List<SymbolSummary>>.empty();
+    }
+    final accountName = accounts.activeAccount;
     Stream<List<Trade>> trades =
         profileDataRepository.watchTradesForAccount(accountName);
     if (skipInitial) trades = trades.skip(1);
@@ -499,6 +537,20 @@ class HoldingsPageState extends State<HoldingsPage>
     final cachedPositions =
         accounts.portfolioCacheFor()?.positions ?? const <Position>[];
     return _summariesFromPositions(trades, cachedPositions);
+  }
+
+  void _onSearchChanged() {
+    final accounts = context.read<AccountManager>();
+    setState(() {
+      if (accounts.ibkrConfigFor().enabled) {
+        final positions = accounts.portfolioCacheFor()?.positions;
+        if (positions != null) {
+          _summaries = _summariesFromPositions(_ibkrTrades, positions);
+        }
+      } else {
+        _stream = _buildStream();
+      }
+    });
   }
 
   void _exitSelecting() {
@@ -649,10 +701,8 @@ class HoldingsPageState extends State<HoldingsPage>
           )
         : IconButton(
             onPressed: () {
-              setState(() {
-                _search.text = '';
-                _stream = _buildStream();
-              });
+              _search.clear();
+              _onSearchChanged();
             },
             icon: const Icon(Icons.arrow_back),
             padding: const EdgeInsets.only(left: 16, right: 8),
@@ -753,9 +803,7 @@ class HoldingsPageState extends State<HoldingsPage>
                   width: 460,
                   child: TextField(
                     controller: _search,
-                    onChanged: (_) => setState(() {
-                      _stream = _buildStream();
-                    }),
+                    onChanged: (_) => _onSearchChanged(),
                     decoration: InputDecoration(
                       hintText: context.l10n.text('Search...'),
                       prefixIcon: const Icon(Icons.search),
@@ -763,10 +811,8 @@ class HoldingsPageState extends State<HoldingsPage>
                           ? null
                           : IconButton(
                               onPressed: () {
-                                setState(() {
-                                  _search.clear();
-                                  _stream = _buildStream();
-                                });
+                                _search.clear();
+                                _onSearchChanged();
                               },
                               icon: const Icon(Icons.close),
                             ),
@@ -813,9 +859,7 @@ class HoldingsPageState extends State<HoldingsPage>
                   baseOffset: 0,
                   extentOffset: _search.text.length,
                 ),
-                onChanged: (_) => setState(() {
-                  _stream = _buildStream();
-                }),
+                onChanged: (_) => _onSearchChanged(),
                 trailing: [menuButton],
               ),
             ),
@@ -1378,15 +1422,16 @@ class HoldingsPageState extends State<HoldingsPage>
     }
 
     final ibkrManaged = context.watch<AccountManager>().ibkrConfigFor().enabled;
-    final summaries = snap.data ?? _summaries;
+    final summaries = ibkrManaged ? _summaries : snap.data ?? _summaries;
 
-    if (summaries.isEmpty && !snap.hasData) {
+    if (summaries.isEmpty &&
+        (ibkrManaged ? !_ibkrPreloadCompleted : !snap.hasData)) {
       return _refreshableState(
         const Center(child: CircularProgressIndicator()),
       );
     }
 
-    if (snap.hasData && snap.data != _summaries) {
+    if (!ibkrManaged && snap.hasData && snap.data != _summaries) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _summaries = snap.data!);
       });
