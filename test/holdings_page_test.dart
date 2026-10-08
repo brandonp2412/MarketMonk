@@ -258,6 +258,132 @@ void main() {
     expect(accounts.activeAccount, 'Brokerage');
   });
 
+  testWidgets('realized profits appear in holding details, not the mobile list',
+      (tester) async {
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.setIbkrConfig(
+      'Default',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'test-token',
+      ),
+    );
+    await accounts.cachePortfolio(
+      'Default',
+      [
+        Position(
+          symbol: 'VOO',
+          name: 'Vanguard S&P 500',
+          nativeCurrency: 'USD',
+          netShares: 10,
+          avgCost: 500,
+          currentPrice: 550,
+          firstBuyDate: DateTime(2025),
+          lastBuyDate: DateTime(2026),
+        ),
+      ],
+      const IbkrAccountValue(value: 5500, currency: 'USD'),
+    );
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: HoldingsPage(
+            ibkrTradeHistoryLoader: (_) async => IbkrTradeHistory(
+              available: true,
+              trades: [
+                IbkrTrade(
+                  symbol: 'VOO',
+                  name: 'Vanguard S&P 500',
+                  currency: 'USD',
+                  conid: 42,
+                  quantity: -1,
+                  price: 550,
+                  tradeType: 'SELL',
+                  tradeDate: DateTime.now(),
+                  realizedPnl: 42,
+                  commission: 0,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('VOO'), findsOneWidget);
+    expect(find.textContaining('Realized'), findsNothing);
+
+    await tester.tap(find.text('VOO'));
+    await tester.pumpAndSettle();
+    expect(find.text('Realized P/L today'), findsOneWidget);
+    expect(find.text('Imported realized P/L'), findsOneWidget);
+  });
+
+  testWidgets('desktop closed holdings do not show realized P/L in the table',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1400, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.setIbkrConfig(
+      'Default',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'test-token',
+      ),
+    );
+    await accounts.cachePortfolio('Default', [], null);
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: HoldingsPage(
+            ibkrTradeHistoryLoader: (_) async => IbkrTradeHistory(
+              available: true,
+              trades: [
+                IbkrTrade(
+                  symbol: 'VOO',
+                  name: 'Vanguard S&P 500',
+                  currency: 'USD',
+                  conid: 42,
+                  quantity: -1,
+                  price: 550,
+                  tradeType: 'SELL',
+                  tradeDate: DateTime.now(),
+                  realizedPnl: 123,
+                  commission: 0,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final table = tester.widget<DataTable>(find.byType(DataTable));
+    expect(table.rows, hasLength(1));
+    expect(find.text('VOO'), findsOneWidget);
+    final pnlCell = table.rows.single.cells[5].child as Align;
+    expect((pnlCell.child! as Text).data, '—');
+    expect(find.textContaining('Realized'), findsNothing);
+  });
+
   testWidgets('cached IBKR positions show before trade history completes',
       (tester) async {
     await seedTestSqlite({});

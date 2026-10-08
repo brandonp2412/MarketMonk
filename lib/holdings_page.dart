@@ -35,9 +35,6 @@ class SymbolSummary {
     this.brokerTradeHistoryAvailable = true,
   });
 
-  double get totalRealizedPL =>
-      trades.fold(0.0, (sum, t) => sum + t.realizedPL);
-
   /// Uses dated executions instead of the frequently zero broker position P/L.
   double? realizedTodayUsd({DateTime? tradingDate}) {
     final today = tradingDate ?? DateTime.now();
@@ -921,8 +918,8 @@ class HoldingsPageState extends State<HoldingsPage>
               );
         case _HoldingsSort.unrealized:
           return multiplier *
-              (a.position?.unrealizedPL ?? a.totalRealizedPL).compareTo(
-                b.position?.unrealizedPL ?? b.totalRealizedPL,
+              (a.position?.unrealizedPL ?? double.negativeInfinity).compareTo(
+                b.position?.unrealizedPL ?? double.negativeInfinity,
               );
       }
     }
@@ -1223,10 +1220,9 @@ class HoldingsPageState extends State<HoldingsPage>
                                   final position = summary.position;
                                   final isClosed = position == null;
                                   final returnPct = position?.change ?? 0;
-                                  final pnl = position?.unrealizedPL ??
-                                      summary.totalRealizedPL;
-                                  final pnlText = isClosed
-                                      ? '${pnl >= 0 ? '+' : ''}${fmtNativeCurrency(pnl, symbolCurrency(summary.symbol))}'
+                                  final pnl = position?.unrealizedPL;
+                                  final pnlText = pnl == null
+                                      ? '—'
                                       : '${pnl >= 0 ? '+' : ''}${fmtCurrency(pnl)}';
                                   final shares = position == null
                                       ? '—'
@@ -1242,9 +1238,11 @@ class HoldingsPageState extends State<HoldingsPage>
                                       : returnPct >= 0
                                           ? Colors.green
                                           : Colors.redAccent;
-                                  final pnlColor = pnl >= 0
-                                      ? Colors.green
-                                      : Colors.redAccent;
+                                  final pnlColor = pnl == null
+                                      ? null
+                                      : pnl >= 0
+                                          ? Colors.green
+                                          : Colors.redAccent;
 
                                   return DataRow(
                                     selected: _selectedSymbols.contains(
@@ -1593,10 +1591,6 @@ class _SymbolTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final position = summary.position;
     final changePct = position?.change ?? 0.0;
-    final hasRealizedPL = summary.trades.any((trade) => trade.realizedPL != 0);
-    final realizedPL = summary.totalRealizedPL;
-    final realizedToday = summary.realizedTodayUsd();
-
     Widget leadingWidget;
     if (selecting) {
       leadingWidget = Checkbox(
@@ -1624,35 +1618,12 @@ class _SymbolTile extends StatelessWidget {
       leading: leadingWidget,
       title: Text(summary.symbol),
       subtitle: position != null
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '${changePct >= 0 ? '+' : ''}${changePct.toStringAsFixed(2)}%',
-                  style: TextStyle(
-                    color: changePct >= 0 ? Colors.green : Colors.redAccent,
-                    fontSize: 13,
-                  ),
-                ),
-                if (realizedToday != null)
-                  Text(
-                    'Realized today: ${realizedToday >= 0 ? '+' : ''}${fmtCurrency(realizedToday)}',
-                    style: TextStyle(
-                      color:
-                          realizedToday >= 0 ? Colors.green : Colors.redAccent,
-                      fontSize: 12,
-                    ),
-                  )
-                else if (hasRealizedPL)
-                  Text(
-                    'Realized: ${realizedPL >= 0 ? '+' : ''}${fmtNativeCurrency(realizedPL, symbolCurrency(position.symbol))}',
-                    style: TextStyle(
-                      color: realizedPL >= 0 ? Colors.green : Colors.redAccent,
-                      fontSize: 12,
-                    ),
-                  ),
-              ],
+          ? Text(
+              '${changePct >= 0 ? '+' : ''}${changePct.toStringAsFixed(2)}%',
+              style: TextStyle(
+                color: changePct >= 0 ? Colors.green : Colors.redAccent,
+                fontSize: 13,
+              ),
             )
           : Text(
               '${summary.trades.length} trade(s) — closed position',
