@@ -807,6 +807,7 @@ class PortfolioPageState extends State<PortfolioPage>
         netLiquidation: netLiquidation,
         totalGain: totalGain,
         totalGainPct: totalGainPct,
+        isCashOut: cashOutSummary != null,
         hasRefreshWarning: hasLoadError,
       );
     }
@@ -998,6 +999,7 @@ class PortfolioPageState extends State<PortfolioPage>
     required IbkrAccountValue? netLiquidation,
     required double totalGain,
     required double totalGainPct,
+    required bool isCashOut,
     required bool hasRefreshWarning,
   }) {
     final theme = Theme.of(context);
@@ -1140,7 +1142,9 @@ class PortfolioPageState extends State<PortfolioPage>
               ),
               const SizedBox(width: 12),
               _DesktopPortfolioMetric(
-                label: context.l10n.text('Unrealized P/L'),
+                label: context.l10n.text(
+                  isCashOut ? 'Total P/L' : 'Unrealized P/L',
+                ),
                 value: '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}',
                 detail:
                     '${totalGainPct >= 0 ? '+' : ''}${totalGainPct.toStringAsFixed(2)}%',

@@ -61,7 +61,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
         final nativeRate = allRatesFromUsd[nativeCurr] ?? 1.0;
         final totalRealizedUsd = totalRealized / centDiv / nativeRate;
         final unrealizedPL = position?.unrealizedPL ?? 0.0;
-        final realizedToday = position?.realizedToday;
+        final realizedToday = widget.summary.realizedTodayUsd();
         final totalGain = totalRealizedUsd + unrealizedPL;
 
         return Scaffold(

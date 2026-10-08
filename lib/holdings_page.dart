@@ -37,6 +37,28 @@ class SymbolSummary {
 
   double get totalRealizedPL =>
       trades.fold(0.0, (sum, t) => sum + t.realizedPL);
+
+  /// Uses dated executions instead of the frequently zero broker position P/L.
+  double? realizedTodayUsd({DateTime? tradingDate}) {
+    final today = tradingDate ?? DateTime.now();
+    final realized = trades
+        .where(
+          (trade) =>
+              trade.tradeDate.year == today.year &&
+              trade.tradeDate.month == today.month &&
+              trade.tradeDate.day == today.day,
+        )
+        .fold(0.0, (sum, trade) => sum + trade.realizedPL);
+    if (realized != 0) {
+      final nativeCurrency = position?.nativeCurrency ?? symbolCurrency(symbol);
+      return realized /
+          symbolCentDivisor(symbol) /
+          requireUsdRate(nativeCurrency);
+    }
+    if (brokerTradeHistoryAvailable) return null;
+    final snapshot = position?.realizedToday;
+    return snapshot == 0 ? null : snapshot;
+  }
 }
 
 class HoldingsPage extends StatefulWidget {
@@ -1037,7 +1059,9 @@ class HoldingsPageState extends State<HoldingsPage>
               const SizedBox(width: 12),
               _desktopMetric(
                 context,
-                label: context.l10n.text('Unrealized P/L'),
+                label: context.l10n.text(
+                  cashOutSummary == null ? 'Unrealized P/L' : 'Total P/L',
+                ),
                 value:
                     '${totalUnrealized >= 0 ? '+' : ''}${fmtCurrency(totalUnrealized)}',
                 detail:
@@ -1526,7 +1550,7 @@ class _SymbolTile extends StatelessWidget {
     final changePct = position?.change ?? 0.0;
     final hasRealizedPL = summary.trades.any((trade) => trade.realizedPL != 0);
     final realizedPL = summary.totalRealizedPL;
-    final realizedToday = position?.realizedToday;
+    final realizedToday = summary.realizedTodayUsd();
 
     Widget leadingWidget;
     if (selecting) {

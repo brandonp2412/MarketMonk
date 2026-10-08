@@ -523,8 +523,8 @@ void main() {
     expect(ibkrLoads, 1);
     expect(find.textContaining('10,100'), findsWidgets);
     expect(allRatesFromUsd['NZD'], closeTo(10100 / 5800, 1e-9));
-    expect(find.text('+11.69%'), findsOneWidget);
-    expect(find.textContaining('TWR'), findsNothing);
+    expect(find.text('+11.69% · TWR'), findsOneWidget);
+    expect(find.textContaining('TWR'), findsOneWidget);
     expect(find.text('History unavailable'), findsNothing);
 
     final refreshedIbkrLoads = ibkrLoads;
@@ -640,8 +640,8 @@ void main() {
     expect(summaryInsets.left, 32);
     expect(summaryInsets.right, 32);
     expect(performanceLoads, greaterThan(0));
-    expect(find.text('+5.49%'), findsOneWidget);
-    expect(find.textContaining('TWR'), findsNothing);
+    expect(find.text('+5.49% · TWR'), findsOneWidget);
+    expect(find.textContaining('TWR'), findsOneWidget);
     expect(find.textContaining('return excl. transfers'), findsNothing);
     expect(find.textContaining('holdings change'), findsNothing);
     expect(find.byIcon(Icons.arrow_upward), findsNothing);

@@ -94,7 +94,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Unrealized P/L'), findsOneWidget);
+    expect(find.text('Total P/L'), findsOneWidget);
     expect(find.text(r'+$939.36'), findsOneWidget);
     expect(tester.takeException(), null);
     await _disposeTestApp(tester);

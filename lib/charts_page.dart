@@ -12,6 +12,7 @@ import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
+import 'package:market_monk/ibkr_cash_out_pnl.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/main.dart';
@@ -89,6 +90,7 @@ class ChartsPageState extends State<ChartsPage>
   Map<String, List<_DateValue>> _portfolioSeriesByAccount = {};
   Map<String, double> _portfolioReturnsByAccount = {};
   Map<String, double> _portfolioReturnAmountsByAccount = {};
+  Map<String, bool> _portfolioCashOutByAccount = {};
   String? _portfolioError;
   bool _portfolioLoading = true;
   bool _chartPeriodLoaded = false;
@@ -204,6 +206,7 @@ class ChartsPageState extends State<ChartsPage>
     final cachedSeries = <String, List<_DateValue>>{};
     final cachedReturns = <String, double>{};
     final cachedReturnAmounts = <String, double>{};
+    final cachedCashOuts = <String, bool>{};
 
     for (final accountName in accountManager.accounts) {
       final config = accountManager.ibkrConfigFor(accountName);
@@ -240,12 +243,14 @@ class ChartsPageState extends State<ChartsPage>
       cachedSeries[accountName] = brokerSeries.series;
       cachedReturns[accountName] = brokerSeries.twrPercent;
       cachedReturnAmounts[accountName] = brokerSeries.returnAmount;
+      cachedCashOuts[accountName] = brokerSeries.isCashOut;
     }
 
     if (cachedSeries.length != accountManager.accounts.length) return;
     _portfolioSeriesByAccount = cachedSeries;
     _portfolioReturnsByAccount = cachedReturns;
     _portfolioReturnAmountsByAccount = cachedReturnAmounts;
+    _portfolioCashOutByAccount = cachedCashOuts;
     _portfolioLoading = false;
   }
 
@@ -702,8 +707,13 @@ class ChartsPageState extends State<ChartsPage>
     }
   }
 
-  Future<({List<_DateValue> series, double twrPercent, double returnAmount})?>
-      _loadBrokerPerformanceSeries(
+  Future<
+      ({
+        List<_DateValue> series,
+        double twrPercent,
+        double returnAmount,
+        bool isCashOut
+      })?> _loadBrokerPerformanceSeries(
     String accountName,
     IbkrAccountConfig ibkrConfig,
     AccountManager accountManager,
@@ -780,6 +790,7 @@ class ChartsPageState extends State<ChartsPage>
     final newSeries = <String, List<_DateValue>>{};
     final newReturns = <String, double>{};
     final newReturnAmounts = <String, double>{};
+    final newCashOuts = <String, bool>{};
     String? firstError;
 
     for (final accountName in accounts) {
@@ -820,6 +831,7 @@ class ChartsPageState extends State<ChartsPage>
             newSeries[accountName] = brokerSeries.series;
             newReturns[accountName] = brokerSeries.twrPercent;
             newReturnAmounts[accountName] = brokerSeries.returnAmount;
+            newCashOuts[accountName] = brokerSeries.isCashOut;
             continue;
           }
         }
@@ -859,6 +871,7 @@ class ChartsPageState extends State<ChartsPage>
       _portfolioSeriesByAccount = newSeries;
       _portfolioReturnsByAccount = newReturns;
       _portfolioReturnAmountsByAccount = newReturnAmounts;
+      _portfolioCashOutByAccount = newCashOuts;
       _portfolioError = firstError;
       _portfolioLoading = false;
     });
@@ -1004,13 +1017,22 @@ class ChartsPageState extends State<ChartsPage>
     return (series: series, currentHoldingsReplay: currentHoldingsReplay);
   }
 
-  ({List<_DateValue> series, double twrPercent, double returnAmount})
-      _buildBrokerPerformanceSeries(
+  ({
+    List<_DateValue> series,
+    double twrPercent,
+    double returnAmount,
+    bool isCashOut
+  }) _buildBrokerPerformanceSeries(
     IbkrPerformanceSeries performance,
     _LoadedChartPortfolio loaded,
   ) {
     if (performance.nav.isEmpty || performance.dates.isEmpty) {
-      return (series: const [], twrPercent: 0, returnAmount: 0);
+      return (
+        series: const [],
+        twrPercent: 0,
+        returnAmount: 0,
+        isCashOut: false
+      );
     }
 
     var basePerUsd = allRatesFromUsd[performance.currency] ?? 1.0;
@@ -1052,7 +1074,12 @@ class ChartsPageState extends State<ChartsPage>
       (firstPoint, secondPoint) => firstPoint.date.compareTo(secondPoint.date),
     );
     if (points.isEmpty) {
-      return (series: const [], twrPercent: 0, returnAmount: 0);
+      return (
+        series: const [],
+        twrPercent: 0,
+        returnAmount: 0,
+        isCashOut: false
+      );
     }
 
     final anchor = points.last.date;
@@ -1085,7 +1112,7 @@ class ChartsPageState extends State<ChartsPage>
         externalFlowsUsd += cashFlows[index] / basePerUsd;
       }
     }
-    final returnAmount = historicalSeries.last.value -
+    var returnAmount = historicalSeries.last.value -
         historicalSeries.first.value -
         externalFlowsUsd;
 
@@ -1102,7 +1129,32 @@ class ChartsPageState extends State<ChartsPage>
     }
     final denominator = 1 + startReturn;
     final twr = denominator == 0 ? 0.0 : ((1 + endReturn) / denominator) - 1;
-    return (series: series, twrPercent: twr * 100, returnAmount: returnAmount);
+    // Inception-to-date cash-out P/L is the Portfolio headline metric, not
+    // time-weighted return. Use the same calculation when this chart covers
+    // the account's entire history, so the two screens agree.
+    if (baselineIndex == 0 && loaded.currentValue != null) {
+      try {
+        final cashOut = calculateIbkrCashOutPnl(
+          performance,
+          loaded.currentValue!,
+        );
+        returnAmount = cashOut.profitLoss / basePerUsd;
+        return (
+          series: series,
+          twrPercent: cashOut.percent ?? 0,
+          returnAmount: returnAmount,
+          isCashOut: true,
+        );
+      } on StateError {
+        // Partial broker history cannot produce an inception return.
+      }
+    }
+    return (
+      series: series,
+      twrPercent: twr * 100,
+      returnAmount: returnAmount,
+      isCashOut: false
+    );
   }
 
   static int _isoWeek(DateTime date) {
@@ -2035,6 +2087,7 @@ class ChartsPageState extends State<ChartsPage>
     final dotColor = accountColors[idx.clamp(0, accountColors.length - 1)];
     final brokerReturn = _portfolioReturnsByAccount[accountName];
     final brokerReturnAmount = _portfolioReturnAmountsByAccount[accountName];
+    final isCashOut = _portfolioCashOutByAccount[accountName] ?? false;
     final hasHistory = brokerReturn != null || series.length > 1;
     final pct = brokerReturn ??
         (hasHistory
@@ -2072,6 +2125,8 @@ class ChartsPageState extends State<ChartsPage>
                   if (pct >= 0) '+',
                   pct.toStringAsFixed(2),
                   '%',
+                  if (brokerReturn != null)
+                    isCashOut ? ' · Total P/L' : ' · TWR',
                 ].join()
               : context.l10n.text('History unavailable')),
           maxLines: 1,
