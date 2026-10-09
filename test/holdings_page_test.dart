@@ -5,12 +5,85 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/settings_state.dart';
+import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 import 'sqlite_test_support.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final width in [400.0, 1400.0]) {
+    testWidgets('holdings updates privacy after settings at width $width',
+        (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = Size(width, 900);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+        maskCurrencyAmounts = false;
+      });
+      await seedTestSqlite({});
+      allRatesFromUsd
+        ..clear()
+        ..['USD'] = 1;
+      final accounts = testAccountManager();
+      await accounts.init();
+      final settings = SettingsState();
+      addTearDown(settings.dispose);
+      await settings.initialized;
+      await settings.setHideDollarAmounts(true);
+      final position = Position(
+        symbol: 'VOO',
+        name: 'Vanguard S&P 500',
+        nativeCurrency: 'USD',
+        netShares: 10,
+        avgCost: 500,
+        currentPrice: 550,
+        firstBuyDate: DateTime(2025),
+        lastBuyDate: DateTime(2026),
+      );
+      var positionLoads = 0;
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: settings),
+            ChangeNotifierProvider.value(value: accounts),
+          ],
+          child: MaterialApp(
+            home: HoldingsPage(
+              positionsLoader: (_) async {
+                positionLoads++;
+                return [position];
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(r'$5,500.00'), findsNothing);
+      expect(find.text('••••'), findsWidgets);
+      final initialLoads = positionLoads;
+
+      for (final hidden in [false, true]) {
+        await tester.tap(find.byKey(const Key('holdings-menu-button')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Settings'));
+        await tester.pumpAndSettle();
+        final privacyTile =
+            find.widgetWithText(ListTile, 'Hide dollar amounts');
+        await tester.ensureVisible(privacyTile);
+        await tester.tap(privacyTile);
+        await tester.pumpAndSettle();
+        expect(settings.hideDollarAmounts, hidden);
+        Navigator.of(tester.element(find.byType(SettingsPage))).pop();
+        await tester.pumpAndSettle();
+        expect(find.text(r'$5,500.00'), hidden ? findsNothing : findsWidgets);
+        expect(find.text('••••'), hidden ? findsWidgets : findsNothing);
+        expect(positionLoads, initialLoads);
+      }
+    });
+  }
 
   testWidgets('desktop holdings renders sortable data table', (tester) async {
     tester.view.devicePixelRatio = 1;

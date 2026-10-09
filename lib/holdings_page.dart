@@ -13,6 +13,7 @@ import 'package:market_monk/logging.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/settings_page.dart';
+import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/trade_history_page.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
@@ -622,6 +623,8 @@ class HoldingsPageState extends State<HoldingsPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    context
+        .select<SettingsState, bool>((settings) => settings.hideDollarAmounts);
 
     final desktop = isDesktopLayout(context);
     final accounts = context.watch<AccountManager>();
