@@ -2397,6 +2397,7 @@ class _FavoriteCard extends StatelessWidget {
                           fmtNativeCurrency(price, symbolCurrency(symbol)),
                           style: const TextStyle(fontSize: 11, height: 1),
                         ),
+                        const SizedBox(height: 8),
                         if (pct != null)
                           Text(
                             '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%',
