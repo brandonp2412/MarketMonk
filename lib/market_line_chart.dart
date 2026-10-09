@@ -47,10 +47,13 @@ const _chartTopInset = 24.0;
 const _chartBottomLabelInset = 38.0;
 const _tooltipPadding = 8.0;
 const _tooltipRowHeight = 16.0;
-const _tooltipDotGap = 8.0;
+const _tooltipDotGap = 12.0;
 const _tooltipFontSize = 10.0;
 const _tooltipSwatchSize = 8.0;
 const _tooltipSwatchGap = 6.0;
+const _activeDotRadius = 3.5;
+const _activeDotRingRadius = 5.5;
+const _activeDotHaloRadius = 8.0;
 
 void _drawMarketTooltip(
   Canvas canvas, {
@@ -120,16 +123,9 @@ void _drawMarketTooltip(
     final rowCenter = rowTop + _tooltipRowHeight / 2;
     var textX = left + _tooltipPadding;
     if (row.swatch case final color?) {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(
-            textX,
-            rowCenter - _tooltipSwatchSize / 2,
-            _tooltipSwatchSize,
-            _tooltipSwatchSize,
-          ),
-          const Radius.circular(2),
-        ),
+      canvas.drawCircle(
+        Offset(textX + _tooltipSwatchSize / 2, rowCenter),
+        _tooltipSwatchSize / 2,
         Paint()..color = color,
       );
       textX += _tooltipSwatchSize + _tooltipSwatchGap;
@@ -449,9 +445,24 @@ class _MarketLineTooltipPainter extends CustomPainter {
       top: bounds.top,
       bottom: bounds.bottom,
       lineColor: theme.crosshair,
-      markers: [for (final mark in marks) mark.center],
-      markerColors: [for (final mark in marks) mark.color],
     );
+    for (final mark in marks) {
+      canvas.drawCircle(
+        mark.center,
+        _activeDotHaloRadius,
+        Paint()..color = mark.color.withValues(alpha: 0.16),
+      );
+      canvas.drawCircle(
+        mark.center,
+        _activeDotRingRadius,
+        Paint()..color = theme.surface,
+      );
+      canvas.drawCircle(
+        mark.center,
+        _activeDotRadius,
+        Paint()..color = mark.color,
+      );
+    }
     final title = marks.first.label.isEmpty ? null : marks.first.label;
     _drawMarketTooltip(
       canvas,
