@@ -2166,11 +2166,14 @@ class ChartsPageState extends State<ChartsPage>
                   _hiddenAccounts.add(accountName);
                 }
               }),
-              leading: Container(
+              leading: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
                 width: 12,
                 height: 12,
                 decoration: BoxDecoration(
-                  color: dotColor,
+                  color: isHidden
+                      ? theme.colorScheme.surfaceContainerHighest
+                      : dotColor,
                   shape: BoxShape.circle,
                 ),
               ),
