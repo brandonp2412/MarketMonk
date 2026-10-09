@@ -14,6 +14,7 @@ import 'package:market_monk/sqlite_settings.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
 
 var currency = NumberFormat.simpleCurrency();
+bool maskCurrencyAmounts = false;
 
 /// USD-based rates for every supported currency (key=ISO code, value=units per 1 USD).
 /// Populated by SettingsState on startup and currency change.
@@ -122,7 +123,8 @@ Future<void> fetchSymbolCurrencyAndRate(String symbol) async {
 }
 
 /// Formats [v] (assumed to be in USD) in the user's display currency.
-String fmtCurrency(double usdValue) => currency.format(usdValue * exchangeRate);
+String fmtCurrency(double usdValue) =>
+    maskCurrencyAmounts ? '••••' : currency.format(usdValue * exchangeRate);
 
 /// Formats [v] which is denominated in [nativeCurrency], converting it to the
 /// user's chosen display currency via the cached cross-rates.
@@ -135,8 +137,9 @@ String fmtNativeCurrency(double nativeValue, String nativeCurrency) {
 }
 
 /// Compact display-currency label for chart axes (e.g. $1.2K).
-String fmtCompactCurrency(double usdValue) =>
-    NumberFormat.compactCurrency(symbol: currency.currencySymbol)
+String fmtCompactCurrency(double usdValue) => maskCurrencyAmounts
+    ? '••••'
+    : NumberFormat.compactCurrency(symbol: currency.currencySymbol)
         .format(usdValue * exchangeRate);
 
 /// Compact axis label for [v] denominated in [nativeCurrency].

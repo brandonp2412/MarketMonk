@@ -53,6 +53,14 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Appearance'), findsOneWidget);
+    expect(find.text('Hide dollar amounts'), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: find.text('Language'),
+        matching: find.byType(ListTile),
+      ),
+      findsNothing,
+    );
     expect(find.text('Charts'), findsOneWidget);
     expect(find.text('Accounts'), findsOneWidget);
     expect(find.text('Data'), findsOneWidget);

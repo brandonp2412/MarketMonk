@@ -24,6 +24,7 @@ void main() {
       ..clear()
       ..['USD'] = 1.0;
     currency = NumberFormat.simpleCurrency(name: 'USD');
+    maskCurrencyAmounts = false;
   });
 
   test('locale currency detection respects the device region', () {
@@ -121,6 +122,26 @@ void main() {
     expect(settings.displayCurrency, 'USD');
     expect(currency.currencyName, 'USD');
     expect(exchangeRate, 1.0);
+  });
+
+  test('hide dollar amounts persists and masks shared currency formatters',
+      () async {
+    final settings = SettingsState();
+    await settings.initialized;
+
+    await settings.setHideDollarAmounts(true);
+
+    expect(settings.hideDollarAmounts, isTrue);
+    expect(maskCurrencyAmounts, isTrue);
+    expect(fmtCurrency(123.45), '••••');
+    expect(fmtCompactCurrency(12345), '••••');
+    expect(fmtNativeCurrency(123.45, 'USD'), '••••');
+    final prefs = await SqliteSettings.getInstance();
+    expect(prefs.getBool('hideDollarAmounts'), isTrue);
+
+    await settings.setHideDollarAmounts(false);
+    expect(maskCurrencyAmounts, isFalse);
+    expect(fmtCurrency(123.45), isNot('••••'));
   });
 
   test('stale exchange-rate responses cannot restore an old currency',

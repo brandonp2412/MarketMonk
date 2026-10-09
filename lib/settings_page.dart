@@ -457,6 +457,41 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       );
 
+  Widget _languageDropdown(
+    SettingsState settings, {
+    EdgeInsetsGeometry padding = const EdgeInsets.symmetric(horizontal: 16),
+  }) {
+    return Padding(
+      padding: padding,
+      child: DropdownButtonFormField<String>(
+        key: ValueKey(settings.languageCode ?? 'system'),
+        initialValue: settings.languageCode ?? 'system',
+        isExpanded: true,
+        decoration: InputDecoration(
+          labelText: context.l10n.text('Language'),
+          prefixIcon: const Icon(Icons.language),
+          border: const OutlineInputBorder(),
+          isDense: true,
+        ),
+        items: [
+          DropdownMenuItem(
+            value: 'system',
+            child: Text(context.l10n.text('System default')),
+          ),
+          ..._languageNames.entries.map(
+            (entry) => DropdownMenuItem(
+              value: entry.key,
+              child: Text(entry.value, overflow: TextOverflow.ellipsis),
+            ),
+          ),
+        ],
+        onChanged: (value) => settings.setLanguageCode(
+          value == 'system' ? null : value,
+        ),
+      ),
+    );
+  }
+
   Widget _desktopSettingsCard({
     required IconData icon,
     required String title,
@@ -528,29 +563,22 @@ class _SettingsPageState extends State<SettingsPage> {
           },
         ),
         const SizedBox(height: 8),
+        _languageDropdown(settings, padding: EdgeInsets.zero),
+        const SizedBox(height: 8),
         ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.language),
-          title: Text(context.l10n.text('Language')),
-          trailing: DropdownButton<String>(
-            value: settings.languageCode ?? 'system',
-            underline: const SizedBox.shrink(),
-            items: [
-              DropdownMenuItem(
-                value: 'system',
-                child: Text(context.l10n.text('System default')),
-              ),
-              ..._languageNames.entries.map(
-                (entry) => DropdownMenuItem(
-                  value: entry.key,
-                  child: Text(entry.value),
-                ),
-              ),
-            ],
-            onChanged: (value) => settings.setLanguageCode(
-              value == 'system' ? null : value,
-            ),
+          leading: Icon(
+            settings.hideDollarAmounts
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined,
           ),
+          title: Text(context.l10n.text('Hide dollar amounts')),
+          trailing: Switch(
+            value: settings.hideDollarAmounts,
+            onChanged: settings.setHideDollarAmounts,
+          ),
+          onTap: () =>
+              settings.setHideDollarAmounts(!settings.hideDollarAmounts),
         ),
         ListTile(
           contentPadding: EdgeInsets.zero,
@@ -982,28 +1010,21 @@ class _SettingsPageState extends State<SettingsPage> {
               },
             ),
           ),
+          _languageDropdown(settings),
+          const SizedBox(height: 8),
           ListTile(
-            leading: const Icon(Icons.language),
-            title: Text(context.l10n.text('Language')),
-            trailing: DropdownButton<String>(
-              value: settings.languageCode ?? 'system',
-              underline: const SizedBox.shrink(),
-              items: [
-                DropdownMenuItem(
-                  value: 'system',
-                  child: Text(context.l10n.text('System default')),
-                ),
-                ..._languageNames.entries.map(
-                  (entry) => DropdownMenuItem(
-                    value: entry.key,
-                    child: Text(entry.value),
-                  ),
-                ),
-              ],
-              onChanged: (value) => settings.setLanguageCode(
-                value == 'system' ? null : value,
-              ),
+            leading: Icon(
+              settings.hideDollarAmounts
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
             ),
+            title: Text(context.l10n.text('Hide dollar amounts')),
+            trailing: Switch(
+              value: settings.hideDollarAmounts,
+              onChanged: settings.setHideDollarAmounts,
+            ),
+            onTap: () =>
+                settings.setHideDollarAmounts(!settings.hideDollarAmounts),
           ),
           Tooltip(
             message: context.l10n.text(

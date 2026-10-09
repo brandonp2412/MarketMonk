@@ -73,6 +73,7 @@ class SettingsState extends ChangeNotifier {
   List<String> visibleCurrencies = ['USD'];
   bool showMarketClosed = false;
   bool pureBlack = false;
+  bool hideDollarAmounts = false;
 
   SettingsState({
     Future<http.Response> Function(Uri)? rateFetcher,
@@ -186,6 +187,8 @@ class SettingsState extends ChangeNotifier {
 
     showMarketClosed = prefs.getBool('showMarketClosed') ?? false;
     pureBlack = prefs.getBool('pureBlack') ?? false;
+    hideDollarAmounts = prefs.getBool('hideDollarAmounts') ?? false;
+    maskCurrencyAmounts = hideDollarAmounts;
 
     displayCurrency = prefs.getString('displayCurrency') ?? homeCurrency;
     if (!visibleCurrencies.contains(displayCurrency)) {
@@ -291,6 +294,15 @@ class SettingsState extends ChangeNotifier {
     notifyListeners();
     final prefs = await SqliteSettings.getInstance();
     await prefs.setBool('pureBlack', value);
+  }
+
+  /// Persists whether monetary values are masked throughout the interface.
+  Future<void> setHideDollarAmounts(bool value) async {
+    hideDollarAmounts = value;
+    maskCurrencyAmounts = value;
+    notifyListeners();
+    final prefs = await SqliteSettings.getInstance();
+    await prefs.setBool('hideDollarAmounts', value);
   }
 
   /// Persists whether closed-market indicators are shown.
