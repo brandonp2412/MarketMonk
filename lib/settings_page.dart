@@ -562,7 +562,7 @@ class _SettingsPageState extends State<SettingsPage> {
             await settings.setTheme(value);
           },
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
         _languageDropdown(settings, padding: EdgeInsets.zero),
         const SizedBox(height: 8),
         ListTile(
