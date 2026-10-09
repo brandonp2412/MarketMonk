@@ -51,9 +51,54 @@ const _tooltipDotGap = 12.0;
 const _tooltipFontSize = 10.0;
 const _tooltipSwatchSize = 8.0;
 const _tooltipSwatchGap = 6.0;
-const _activeDotRadius = 3.5;
-const _activeDotRingRadius = 5.5;
-const _activeDotHaloRadius = 8.0;
+const _activeDotRadius = 6.0;
+
+void _drawNeonDot(
+  Canvas canvas, {
+  required Offset center,
+  required Color color,
+  required Color surface,
+  required double radius,
+}) {
+  final dark = surface.computeLuminance() < 0.5;
+  final glowRadius = radius * 1.8;
+  final highlight = Color.lerp(color, Colors.white, dark ? 0.65 : 0.4)!;
+  canvas.drawCircle(
+    center,
+    glowRadius,
+    Paint()
+      ..shader = RadialGradient(
+        colors: [
+          color.withValues(alpha: dark ? 0.4 : 0.24),
+          color.withValues(alpha: 0.12),
+          color.withValues(alpha: 0),
+        ],
+        stops: const [0.0, 0.5, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: glowRadius)),
+  );
+  canvas.drawCircle(center, radius, Paint()..color = surface);
+  canvas.drawCircle(
+    center,
+    radius - 0.75,
+    Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [highlight, color],
+      ).createShader(Rect.fromCircle(center: center, radius: radius)),
+  );
+  canvas.drawCircle(
+    center,
+    radius * 0.48,
+    Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(-0.3, -0.3),
+        colors: [highlight, color],
+      ).createShader(Rect.fromCircle(center: center, radius: radius * 0.48)),
+  );
+}
 
 void _drawMarketTooltip(
   Canvas canvas, {
@@ -123,10 +168,12 @@ void _drawMarketTooltip(
     final rowCenter = rowTop + _tooltipRowHeight / 2;
     var textX = left + _tooltipPadding;
     if (row.swatch case final color?) {
-      canvas.drawCircle(
-        Offset(textX + _tooltipSwatchSize / 2, rowCenter),
-        _tooltipSwatchSize / 2,
-        Paint()..color = color,
+      _drawNeonDot(
+        canvas,
+        center: Offset(textX + _tooltipSwatchSize / 2, rowCenter),
+        color: color,
+        surface: background,
+        radius: _tooltipSwatchSize / 2,
       );
       textX += _tooltipSwatchSize + _tooltipSwatchGap;
     }
@@ -447,20 +494,12 @@ class _MarketLineTooltipPainter extends CustomPainter {
       lineColor: theme.crosshair,
     );
     for (final mark in marks) {
-      canvas.drawCircle(
-        mark.center,
-        _activeDotHaloRadius,
-        Paint()..color = mark.color.withValues(alpha: 0.16),
-      );
-      canvas.drawCircle(
-        mark.center,
-        _activeDotRingRadius,
-        Paint()..color = theme.surface,
-      );
-      canvas.drawCircle(
-        mark.center,
-        _activeDotRadius,
-        Paint()..color = mark.color,
+      _drawNeonDot(
+        canvas,
+        center: mark.center,
+        color: mark.color,
+        surface: theme.surface,
+        radius: _activeDotRadius,
       );
     }
     final title = marks.first.label.isEmpty ? null : marks.first.label;
