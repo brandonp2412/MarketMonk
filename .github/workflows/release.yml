@@ -71,6 +71,8 @@ jobs:
           echo "should_release=true" >> "$GITHUB_OUTPUT"
 
   quality-checks:
+    needs: release-gate
+    if: ${{ !cancelled() && (github.event_name != 'schedule' || needs.release-gate.outputs.should_release == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -103,6 +105,8 @@ jobs:
         run: flutter test
 
   screenshots:
+    needs: release-gate
+    if: ${{ !cancelled() && (github.event_name != 'schedule' || needs.release-gate.outputs.should_release == 'true') }}
     name: Screenshots (${{ matrix.device_type }})
     runs-on: ubuntu-latest
     strategy:
@@ -219,7 +223,7 @@ jobs:
 
   version-bump:
     needs: [release-gate, quality-checks, screenshots]
-    if: ${{ always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && needs.release-gate.outputs.should_release == 'true' && needs.quality-checks.result == 'success' }}
+    if: ${{ always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && needs.release-gate.outputs.should_release == 'true' && needs.quality-checks.result == 'success' && needs.screenshots.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
