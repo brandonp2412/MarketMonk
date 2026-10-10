@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/database.dart';
@@ -508,33 +509,44 @@ class PortfolioPageState extends State<PortfolioPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return Scaffold(
-      body: SafeArea(
-        child: StreamBuilder<_LoadedPortfolio>(
-          key: ValueKey(_lastAccount),
-          stream: _stream,
-          builder: (context, snapshot) {
-            final body = _buildBody(context, snapshot);
-            if (!_isLoadingPortfolio || !_hasCachedPortfolio) return body;
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                body,
-                Positioned(
-                  top: 16,
-                  right: 16,
-                  child: Semantics(
-                    label: context.l10n.text('Loading portfolio'),
-                    child: const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2.5),
+    return DesktopContextMenu(
+      actions: [
+        DesktopMenuAction(
+          context.l10n.text('Refresh'),
+          () => runDetachedTask(
+            _updateCandles(),
+            'Failed to refresh portfolio',
+          ),
+        ),
+      ],
+      child: Scaffold(
+        body: SafeArea(
+          child: StreamBuilder<_LoadedPortfolio>(
+            key: ValueKey(_lastAccount),
+            stream: _stream,
+            builder: (context, snapshot) {
+              final body = _buildBody(context, snapshot);
+              if (!_isLoadingPortfolio || !_hasCachedPortfolio) return body;
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  body,
+                  Positioned(
+                    top: 16,
+                    right: 16,
+                    child: Semantics(
+                      label: context.l10n.text('Loading portfolio'),
+                      child: const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -1459,60 +1471,66 @@ class _DesktopAllocationRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Material(
-      color: selected
-          ? theme.colorScheme.secondaryContainer.withValues(alpha: 0.45)
-          : Colors.transparent,
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        onTap: onTap,
+    return DesktopContextMenu(
+      actions: [DesktopMenuAction(context.l10n.text('Select'), onTap)],
+      copyText: '$symbol $name ${fmtCurrency(value)}',
+      child: Material(
+        color: selected
+            ? theme.colorScheme.secondaryContainer.withValues(alpha: 0.45)
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            symbol,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          symbol,
+                          fmtCurrency(value),
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontFeatures: const [
+                              FontFeature.tabularFigures(),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          '${allocationPct.toStringAsFixed(1)}%',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        fmtCurrency(value),
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                      Text(
-                        '${allocationPct.toStringAsFixed(1)}%',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1783,34 +1801,38 @@ class _LegendTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-      onTap: onTap,
-      selected: isHighlighted,
-      leading: Container(
-        width: 14,
-        height: 14,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      ),
-      title: Text(symbol),
-      subtitle: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            fmtCurrency(value),
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          Text(
-            '${allocationPct.toStringAsFixed(1)}%  '
-            '${changePct >= 0 ? '+' : ''}${changePct.toStringAsFixed(2)}%',
-            style: TextStyle(
-              fontSize: 13,
-              color: changePct >= 0 ? Colors.green : Colors.redAccent,
+    return DesktopContextMenu(
+      actions: [DesktopMenuAction(context.l10n.text('Select'), onTap)],
+      copyText: '$symbol $name ${fmtCurrency(value)}',
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+        onTap: onTap,
+        selected: isHighlighted,
+        leading: Container(
+          width: 14,
+          height: 14,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        title: Text(symbol),
+        subtitle: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              fmtCurrency(value),
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
-          ),
-        ],
+            Text(
+              '${allocationPct.toStringAsFixed(1)}%  '
+              '${changePct >= 0 ? '+' : ''}${changePct.toStringAsFixed(2)}%',
+              style: TextStyle(
+                fontSize: 13,
+                color: changePct >= 0 ? Colors.green : Colors.redAccent,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

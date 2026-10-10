@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
@@ -174,11 +175,33 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                   ),
                   const SizedBox(height: 8),
                   ...trades.map(
-                    (trade) => _TradeTile(
-                      trade: trade,
-                      centDiv: centDiv,
-                      onLongPress:
-                          ibkrManaged ? null : () => _showTradeActions(trade),
+                    (trade) => DesktopContextMenu(
+                      actions: [
+                        if (!ibkrManaged) ...[
+                          DesktopMenuAction(
+                            context.l10n.text('Edit trade'),
+                            () => runDetachedTask(
+                              _editTrade(trade),
+                              'Failed to edit trade',
+                            ),
+                          ),
+                          DesktopMenuAction(
+                            context.l10n.text('Delete trade'),
+                            () => runDetachedTask(
+                              _confirmDeleteTrade(trade),
+                              'Failed to delete trade',
+                            ),
+                          ),
+                        ],
+                      ],
+                      copyText:
+                          '${trade.symbol} ${trade.tradeType} ${trade.quantity} @ ${trade.price}',
+                      child: _TradeTile(
+                        trade: trade,
+                        centDiv: centDiv,
+                        onLongPress:
+                            ibkrManaged ? null : () => _showTradeActions(trade),
+                      ),
                     ),
                   ),
                 ] else

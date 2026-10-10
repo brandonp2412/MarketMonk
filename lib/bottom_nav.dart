@@ -1,3 +1,4 @@
+import 'package:market_monk/desktop_context_menu.dart';
 import 'package:flutter/material.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 
@@ -61,50 +62,61 @@ class BottomNav extends StatelessWidget {
                 button: true,
                 selected: isSelected,
                 excludeSemantics: true,
-                child: GestureDetector(
-                  key: Key(tab),
-                  onTap: () => onTap(index),
-                  onLongPress: onLongPress != null
-                      ? () => onLongPress!(context, tab)
-                      : null,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 350),
-                    curve: Curves.easeOutCubic,
-                    height: 48,
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isSelected ? 16 : 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSelected ? color.primary : Colors.transparent,
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _getIconForTab(tab),
-                          color: isSelected ? color.onPrimary : color.onSurface,
-                          size: 24,
-                          semanticLabel: label,
-                        ),
-                        AnimatedSize(
-                          duration: const Duration(milliseconds: 350),
-                          curve: Curves.easeOutCubic,
-                          child: isSelected
-                              ? Padding(
-                                  padding: const EdgeInsets.only(left: 8),
-                                  child: Text(
-                                    label,
-                                    maxLines: 1,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelLarge
-                                        ?.copyWith(color: color.onPrimary),
-                                  ),
-                                )
-                              : const SizedBox.shrink(),
-                        ),
-                      ],
+                child: DesktopContextMenu(
+                  actions: [
+                    DesktopMenuAction(label, () => onTap(index)),
+                    if (onLongPress != null)
+                      DesktopMenuAction(
+                        context.l10n.text('Hide'),
+                        () => onLongPress!(context, tab),
+                      ),
+                  ],
+                  child: GestureDetector(
+                    key: Key(tab),
+                    onTap: () => onTap(index),
+                    onLongPress: onLongPress != null
+                        ? () => onLongPress!(context, tab)
+                        : null,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 350),
+                      curve: Curves.easeOutCubic,
+                      height: 48,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isSelected ? 16 : 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected ? color.primary : Colors.transparent,
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _getIconForTab(tab),
+                            color:
+                                isSelected ? color.onPrimary : color.onSurface,
+                            size: 24,
+                            semanticLabel: label,
+                          ),
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 350),
+                            curve: Curves.easeOutCubic,
+                            child: isSelected
+                                ? Padding(
+                                    padding: const EdgeInsets.only(left: 8),
+                                    child: Text(
+                                      label,
+                                      maxLines: 1,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelLarge
+                                          ?.copyWith(color: color.onPrimary),
+                                    ),
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -301,37 +313,43 @@ class _DesktopNavItem extends StatelessWidget {
     final foreground =
         selected ? colors.onSecondaryContainer : colors.onSurfaceVariant;
 
-    final child = Material(
-      color: selected ? colors.secondaryContainer : Colors.transparent,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
+    final child = DesktopContextMenu(
+      actions: [DesktopMenuAction(label, onTap)],
+      child: Material(
+        color: selected ? colors.secondaryContainer : Colors.transparent,
         borderRadius: BorderRadius.circular(14),
-        child: compact
-            ? SizedBox(
-                height: 48,
-                child: Center(child: Icon(icon, size: 22, color: foreground)),
-              )
-            : Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                child: Row(
-                  children: [
-                    Icon(icon, size: 22, color: foreground),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                              color: foreground,
-                            ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: compact
+              ? SizedBox(
+                  height: 48,
+                  child: Center(child: Icon(icon, size: 22, color: foreground)),
+                )
+              : Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 13,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(icon, size: 22, color: foreground),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.labelLarge?.copyWith(
+                                    color: foreground,
+                                  ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
+        ),
       ),
     );
 

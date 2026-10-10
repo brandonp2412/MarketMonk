@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
+import 'package:market_monk/desktop_context_menu.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/ibkr_api.dart';
@@ -115,6 +117,7 @@ void main() {
           ChangeNotifierProvider.value(value: accounts),
         ],
         child: MaterialApp(
+          theme: ThemeData(platform: TargetPlatform.linux),
           home: HoldingsPage(
             positionsLoader: (_) async => [position],
           ),
@@ -126,6 +129,24 @@ void main() {
 
     expect(find.byType(DataTable), findsOneWidget);
     expect(find.text('VOO'), findsOneWidget);
+    final mouse = await tester.createGesture(
+      kind: PointerDeviceKind.mouse,
+      buttons: kSecondaryMouseButton,
+    );
+    await mouse.down(tester.getCenter(find.text('VOO')));
+    await mouse.up();
+    await tester.pumpAndSettle();
+    expect(find.text('Trade History'), findsOneWidget);
+    expect(find.text('Add trade'), findsWidgets);
+    expect(find.text('Delete'), findsOneWidget);
+    expect(find.text('Copy'), findsOneWidget);
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete 1 holding?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('VOO'), findsOneWidget);
+
     expect(find.text('VANGUARD S&P 500 ETF'), findsOneWidget);
     expect(find.text('Market value'), findsNWidgets(2));
     expect(find.text('Cost basis'), findsOneWidget);
@@ -140,9 +161,16 @@ void main() {
       find.byKey(const Key('desktop-holdings-content')),
     );
     expect(desktopPadding.padding, const EdgeInsets.fromLTRB(24, 16, 24, 24));
-    final scrollbar = tester.widget<Scrollbar>(find.byType(Scrollbar));
-    expect(scrollbar.controller == null, false);
-    expect(scrollbar.controller!.hasClients, true);
+    final scrollbars = tester.widgetList<Scrollbar>(
+      find.descendant(
+        of: find.byKey(const Key('desktop-holdings-content')),
+        matching: find.byType(Scrollbar),
+      ),
+    );
+    expect(
+      scrollbars.any((scrollbar) => scrollbar.controller?.hasClients ?? false),
+      true,
+    );
 
     await tester.tap(find.text('Return'));
     await tester.pump();
@@ -452,7 +480,8 @@ void main() {
     final table = tester.widget<DataTable>(find.byType(DataTable));
     expect(table.rows, hasLength(1));
     expect(find.text('VOO'), findsOneWidget);
-    final pnlCell = table.rows.single.cells[5].child as Align;
+    final menu = table.rows.single.cells[5].child as DesktopContextMenu;
+    final pnlCell = menu.child as Align;
     expect((pnlCell.child! as Text).data, '—');
     expect(find.textContaining('Realized'), findsNothing);
   });

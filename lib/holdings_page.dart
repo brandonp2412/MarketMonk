@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/database.dart';
@@ -570,10 +571,14 @@ class HoldingsPageState extends State<HoldingsPage>
     });
   }
 
-  Future<void> _deleteSelected(BuildContext context) async {
-    if (_selectedSymbols.isEmpty) return;
+  Future<void> _deleteSelected(
+    BuildContext context, {
+    Set<String>? symbols,
+  }) async {
+    final targets = symbols ?? _selectedSymbols;
+    if (targets.isEmpty) return;
 
-    final count = _selectedSymbols.length;
+    final count = targets.length;
     final ctx = context;
     final confirmed = await showDialog<bool>(
       context: ctx,
@@ -607,7 +612,7 @@ class HoldingsPageState extends State<HoldingsPage>
     final profileId = await profileDataRepository.profileIdForName(accountName);
     await profileDataRepository.deleteTradesForSymbols(
       profileId,
-      _selectedSymbols,
+      targets,
     );
     _exitSelecting();
     if (ctx.mounted)
@@ -711,120 +716,203 @@ class HoldingsPageState extends State<HoldingsPage>
     if (desktop) {
       final openCount =
           _summaries.where((summary) => summary.position != null).length;
-      return Scaffold(
-        body: Padding(
-          padding: const EdgeInsets.fromLTRB(32, 28, 32, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          context.l10n.text('Holdings'),
-                          style: Theme.of(context).textTheme.headlineMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '$openCount open · ${_summaries.length} total symbols',
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (_selecting) ...[
-                    TextButton.icon(
-                      onPressed: _toggleSelectAll,
-                      icon: Icon(
-                        allSelected ? Icons.deselect : Icons.select_all,
-                      ),
-                      label: Text(
-                        allSelected
-                            ? context.l10n.text('Deselect all')
-                            : context.l10n.text('Select all'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton.tonalIcon(
-                      onPressed: () => _deleteSelected(context),
-                      icon: const Icon(Icons.delete_outline),
-                      label: Text(
-                        context.l10n.text('Delete ({count})', {
-                          'count': _selectedSymbols.length,
-                        }),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      onPressed: _exitSelecting,
-                      tooltip: context.l10n.text('Cancel selection'),
-                      icon: const Icon(Icons.close),
-                    ),
-                  ] else if (!ibkrManaged) ...[
-                    OutlinedButton.icon(
-                      onPressed: _summaries.isEmpty
-                          ? null
-                          : () => setState(() => _selecting = true),
-                      icon: const Icon(Icons.checklist_rounded),
-                      label: Text(context.l10n.text('Select')),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton.icon(
-                      onPressed: () => Navigator.push(
-                        context,
-                        adaptivePageRoute(
-                          context,
-                          builder: (_) => const EditTickerPage(),
-                        ),
-                      ),
-                      icon: const Icon(Icons.add),
-                      label: Text(context.l10n.text('Add trade')),
-                    ),
-                  ],
-                  if (!_selecting) ...[
-                    const SizedBox(width: 8),
-                    menuButton,
-                  ],
-                ],
+      return DesktopContextMenu(
+        actions: [
+          DesktopMenuAction(
+            context.l10n.text('Refresh'),
+            () => runDetachedTask(
+              _refreshCandles(),
+              'Failed to refresh holdings',
+            ),
+          ),
+          if (!ibkrManaged)
+            DesktopMenuAction(
+              context.l10n.text('Add trade'),
+              () => Navigator.push(
+                context,
+                adaptivePageRoute(
+                  context,
+                  builder: (_) => const EditTickerPage(),
+                ),
               ),
-              const SizedBox(height: 20),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: 460,
-                  child: TextField(
-                    controller: _search,
-                    onChanged: (_) => _onSearchChanged(),
-                    decoration: InputDecoration(
-                      hintText: context.l10n.text('Search...'),
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _search.text.isEmpty
-                          ? null
-                          : IconButton(
-                              onPressed: () {
-                                _search.clear();
-                                _onSearchChanged();
-                              },
-                              icon: const Icon(Icons.close),
-                            ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+            ),
+        ],
+        child: Scaffold(
+          body: Padding(
+            padding: const EdgeInsets.fromLTRB(32, 28, 32, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            context.l10n.text('Holdings'),
+                            style: Theme.of(context).textTheme.headlineMedium,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '$openCount open · ${_summaries.length} total symbols',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
+                          ),
+                        ],
                       ),
-                      isDense: true,
+                    ),
+                    if (_selecting) ...[
+                      TextButton.icon(
+                        onPressed: _toggleSelectAll,
+                        icon: Icon(
+                          allSelected ? Icons.deselect : Icons.select_all,
+                        ),
+                        label: Text(
+                          allSelected
+                              ? context.l10n.text('Deselect all')
+                              : context.l10n.text('Select all'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton.tonalIcon(
+                        onPressed: () => _deleteSelected(context),
+                        icon: const Icon(Icons.delete_outline),
+                        label: Text(
+                          context.l10n.text('Delete ({count})', {
+                            'count': _selectedSymbols.length,
+                          }),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: _exitSelecting,
+                        tooltip: context.l10n.text('Cancel selection'),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ] else if (!ibkrManaged) ...[
+                      OutlinedButton.icon(
+                        onPressed: _summaries.isEmpty
+                            ? null
+                            : () => setState(() => _selecting = true),
+                        icon: const Icon(Icons.checklist_rounded),
+                        label: Text(context.l10n.text('Select')),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton.icon(
+                        onPressed: () => Navigator.push(
+                          context,
+                          adaptivePageRoute(
+                            context,
+                            builder: (_) => const EditTickerPage(),
+                          ),
+                        ),
+                        icon: const Icon(Icons.add),
+                        label: Text(context.l10n.text('Add trade')),
+                      ),
+                    ],
+                    if (!_selecting) ...[
+                      const SizedBox(width: 8),
+                      menuButton,
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: SizedBox(
+                    width: 460,
+                    child: TextField(
+                      controller: _search,
+                      onChanged: (_) => _onSearchChanged(),
+                      decoration: InputDecoration(
+                        hintText: context.l10n.text('Search...'),
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: _search.text.isEmpty
+                            ? null
+                            : IconButton(
+                                onPressed: () {
+                                  _search.clear();
+                                  _onSearchChanged();
+                                },
+                                icon: const Icon(Icons.close),
+                              ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        isDense: true,
+                      ),
                     ),
                   ),
                 ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: StreamBuilder<List<SymbolSummary>>(
+                    stream: _stream,
+                    builder: _buildList,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return DesktopContextMenu(
+      actions: [
+        DesktopMenuAction(
+          context.l10n.text('Refresh'),
+          () => runDetachedTask(
+            _refreshCandles(),
+            'Failed to refresh holdings',
+          ),
+        ),
+        if (!ibkrManaged)
+          DesktopMenuAction(
+            context.l10n.text('Add trade'),
+            () => Navigator.push(
+              context,
+              adaptivePageRoute(
+                context,
+                builder: (_) => const EditTickerPage(),
               ),
-              const SizedBox(height: 16),
+            ),
+          ),
+      ],
+      child: Scaffold(
+        body: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 16, right: 16, top: 16),
+                child: SearchBar(
+                  controller: _search,
+                  hintText: _selecting
+                      ? context.l10n.text('{count} selected', {
+                          'count': _selectedSymbols.length,
+                        })
+                      : context.l10n.text('Search...'),
+                  padding: WidgetStateProperty.all(
+                    const EdgeInsets.only(right: 8),
+                  ),
+                  leading: leading,
+                  onTap: () => _search.selection = TextSelection(
+                    baseOffset: 0,
+                    extentOffset: _search.text.length,
+                  ),
+                  onChanged: (_) => _onSearchChanged(),
+                  trailing: [menuButton],
+                ),
+              ),
               Expanded(
                 child: StreamBuilder<List<SymbolSummary>>(
                   stream: _stream,
@@ -834,71 +922,34 @@ class HoldingsPageState extends State<HoldingsPage>
             ],
           ),
         ),
-      );
-    }
-
-    return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(left: 16, right: 16, top: 16),
-              child: SearchBar(
-                controller: _search,
-                hintText: _selecting
-                    ? context.l10n.text('{count} selected', {
+        floatingActionButton: ibkrManaged
+            ? null
+            : _selecting
+                ? FloatingActionButton.extended(
+                    onPressed: () => _deleteSelected(context),
+                    label: Text(
+                      context.l10n.text('Delete ({count})', {
                         'count': _selectedSymbols.length,
-                      })
-                    : context.l10n.text('Search...'),
-                padding: WidgetStateProperty.all(
-                  const EdgeInsets.only(right: 8),
-                ),
-                leading: leading,
-                onTap: () => _search.selection = TextSelection(
-                  baseOffset: 0,
-                  extentOffset: _search.text.length,
-                ),
-                onChanged: (_) => _onSearchChanged(),
-                trailing: [menuButton],
-              ),
-            ),
-            Expanded(
-              child: StreamBuilder<List<SymbolSummary>>(
-                stream: _stream,
-                builder: _buildList,
-              ),
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: ibkrManaged
-          ? null
-          : _selecting
-              ? FloatingActionButton.extended(
-                  onPressed: () => _deleteSelected(context),
-                  label: Text(
-                    context.l10n.text('Delete ({count})', {
-                      'count': _selectedSymbols.length,
-                    }),
-                  ),
-                  icon: const Icon(Icons.delete),
-                )
-              : Padding(
-                  padding: const EdgeInsets.only(bottom: bottomNavHeight),
-                  child: FloatingActionButton.extended(
-                    onPressed: () => Navigator.push(
-                      context,
-                      adaptivePageRoute(
-                        context,
-                        builder: (_) => const EditTickerPage(),
-                      ),
+                      }),
                     ),
-                    label: Text(context.l10n.text('Add')),
-                    icon: const Icon(Icons.add),
-                    tooltip: context.l10n.text('Add trade'),
+                    icon: const Icon(Icons.delete),
+                  )
+                : Padding(
+                    padding: const EdgeInsets.only(bottom: bottomNavHeight),
+                    child: FloatingActionButton.extended(
+                      onPressed: () => Navigator.push(
+                        context,
+                        adaptivePageRoute(
+                          context,
+                          builder: (_) => const EditTickerPage(),
+                        ),
+                      ),
+                      label: Text(context.l10n.text('Add')),
+                      icon: const Icon(Icons.add),
+                      tooltip: context.l10n.text('Add trade'),
+                    ),
                   ),
-                ),
+      ),
     );
   }
 
@@ -1066,15 +1117,19 @@ class HoldingsPageState extends State<HoldingsPage>
       Color? color,
     }) {
       return DataCell(
-        Align(
-          alignment: numeric ? Alignment.centerRight : Alignment.centerLeft,
-          child: Text(
-            text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: color,
-              fontFeatures: const [FontFeature.tabularFigures()],
+        DesktopContextMenu(
+          actions: _holdingActions(summary, ibkrManaged),
+          copyText: '${summary.symbol}: $text',
+          child: Align(
+            alignment: numeric ? Alignment.centerRight : Alignment.centerLeft,
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: color,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
           ),
         ),
@@ -1256,74 +1311,84 @@ class HoldingsPageState extends State<HoldingsPage>
                                         : null,
                                     cells: [
                                       DataCell(
-                                        Row(
-                                          children: [
-                                            Icon(
-                                              isClosed
-                                                  ? Icons.history_rounded
-                                                  : returnPct >= 0
-                                                      ? Icons
-                                                          .trending_up_rounded
-                                                      : Icons
-                                                          .trending_down_rounded,
-                                              size: 20,
-                                              color: changeColor,
-                                            ),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: Column(
-                                                mainAxisAlignment:
-                                                    MainAxisAlignment.center,
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Row(
-                                                    children: [
-                                                      Flexible(
-                                                        child: Text(
-                                                          summary.symbol,
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
-                                                          style: theme.textTheme
-                                                              .titleSmall
-                                                              ?.copyWith(),
-                                                        ),
-                                                      ),
-                                                      if (isClosed) ...[
-                                                        const SizedBox(
-                                                          width: 8,
-                                                        ),
-                                                        Text(
-                                                          context.l10n.text(
-                                                            'Closed',
-                                                          ),
-                                                          style: theme.textTheme
-                                                              .labelSmall
-                                                              ?.copyWith(
-                                                            color: theme
-                                                                .colorScheme
-                                                                .onSurfaceVariant,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ],
-                                                  ),
-                                                  Text(
-                                                    summary.name,
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: theme
-                                                        .textTheme.bodySmall
-                                                        ?.copyWith(
-                                                      color: theme.colorScheme
-                                                          .onSurfaceVariant,
-                                                    ),
-                                                  ),
-                                                ],
+                                        DesktopContextMenu(
+                                          actions: _holdingActions(
+                                            summary,
+                                            ibkrManaged,
+                                          ),
+                                          copyText: summary.symbol,
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                isClosed
+                                                    ? Icons.history_rounded
+                                                    : returnPct >= 0
+                                                        ? Icons
+                                                            .trending_up_rounded
+                                                        : Icons
+                                                            .trending_down_rounded,
+                                                size: 20,
+                                                color: changeColor,
                                               ),
-                                            ),
-                                          ],
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: Column(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        Flexible(
+                                                          child: Text(
+                                                            summary.symbol,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                            style: theme
+                                                                .textTheme
+                                                                .titleSmall
+                                                                ?.copyWith(),
+                                                          ),
+                                                        ),
+                                                        if (isClosed) ...[
+                                                          const SizedBox(
+                                                            width: 8,
+                                                          ),
+                                                          Text(
+                                                            context.l10n.text(
+                                                              'Closed',
+                                                            ),
+                                                            style: theme
+                                                                .textTheme
+                                                                .labelSmall
+                                                                ?.copyWith(
+                                                              color: theme
+                                                                  .colorScheme
+                                                                  .onSurfaceVariant,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ],
+                                                    ),
+                                                    Text(
+                                                      summary.name,
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: theme
+                                                          .textTheme.bodySmall
+                                                          ?.copyWith(
+                                                        color: theme.colorScheme
+                                                            .onSurfaceVariant,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                         onTap: _selecting
                                             ? null
@@ -1503,37 +1568,78 @@ class HoldingsPageState extends State<HoldingsPage>
         itemBuilder: (context, index) {
           if (index == 0) return const SizedBox(height: 8);
           final summary = summaries[index - 1];
-          return _SymbolTile(
-            summary: summary,
-            selecting: _selecting,
-            isSelected: _selectedSymbols.contains(summary.symbol),
-            onTap: () {
-              if (_selecting) {
-                setState(() {
-                  if (_selectedSymbols.contains(summary.symbol)) {
-                    _selectedSymbols.remove(summary.symbol);
-                    if (_selectedSymbols.isEmpty) _selecting = false;
-                  } else {
-                    _selectedSymbols.add(summary.symbol);
-                  }
-                });
-              } else {
-                _openDetail(summary);
-              }
-            },
-            onLongPress: ibkrManaged
-                ? null
-                : () {
-                    setState(() {
-                      _selecting = true;
+          return DesktopContextMenu(
+            actions: _holdingActions(summary, ibkrManaged),
+            copyText: summary.symbol,
+            child: _SymbolTile(
+              summary: summary,
+              selecting: _selecting,
+              isSelected: _selectedSymbols.contains(summary.symbol),
+              onTap: () {
+                if (_selecting) {
+                  setState(() {
+                    if (_selectedSymbols.contains(summary.symbol)) {
+                      _selectedSymbols.remove(summary.symbol);
+                      if (_selectedSymbols.isEmpty) _selecting = false;
+                    } else {
                       _selectedSymbols.add(summary.symbol);
-                    });
-                  },
+                    }
+                  });
+                } else {
+                  _openDetail(summary);
+                }
+              },
+              onLongPress: ibkrManaged
+                  ? null
+                  : () {
+                      setState(() {
+                        _selecting = true;
+                        _selectedSymbols.add(summary.symbol);
+                      });
+                    },
+            ),
           );
         },
       ),
     );
   }
+
+  List<DesktopMenuAction> _holdingActions(
+    SymbolSummary summary,
+    bool ibkrManaged,
+  ) =>
+      [
+        DesktopMenuAction(
+          context.l10n.text('Trade History'),
+          () => _openDetail(summary),
+        ),
+        if (!ibkrManaged) ...[
+          DesktopMenuAction(
+            context.l10n.text('Delete'),
+            () => runDetachedTask(
+              _deleteSelected(context, symbols: {summary.symbol}),
+              'Failed to delete holding',
+            ),
+          ),
+          DesktopMenuAction(
+            context.l10n.text('Add trade'),
+            () => Navigator.push(
+              context,
+              adaptivePageRoute(
+                context,
+                builder: (_) => EditTickerPage(symbol: summary.symbol),
+              ),
+            ),
+          ),
+          DesktopMenuAction(
+            context.l10n.text('Select'),
+            () => setState(() {
+              _selecting = true;
+              _selectedSymbols.add(summary.symbol);
+            }),
+          ),
+        ],
+      ];
 
   void _openDetail(SymbolSummary s) {
     unawaited(

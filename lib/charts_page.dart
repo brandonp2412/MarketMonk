@@ -4,6 +4,7 @@ import 'package:drafter/drafter.dart';
 import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/bottom_nav.dart';
@@ -1408,53 +1409,65 @@ class ChartsPageState extends State<ChartsPage>
 
     // The chart fills the available height so the Drafter tooltip overlay can
     // render above its data points without being obscured by the search bar.
-    return PopScope<void>(
-      canPop: !hasText,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        if (hasText) _clearSearch();
-      },
-      child: Stack(
-        children: [
-          if (_mode == _ChartMode.searching)
-            Padding(
-              padding: EdgeInsets.only(top: _overlayHeight + 8),
-              child: _buildSearchResults(),
-            )
-          else
-            _buildChartContent(settings, accountColors),
-          Align(
-            alignment: Alignment.topCenter,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                // The page can briefly receive tiny constraints while a desktop
-                // window is being created or resized. SearchBar has a minimum
-                // interactive height, so laying it out in that space produces a
-                // RenderFlex overflow. It is safe to defer this visual overlay:
-                // the next real layout re-measures and displays it normally.
-                if (constraints.maxHeight < 72 || constraints.maxWidth < 120) {
-                  return const SizedBox.shrink();
-                }
-
-                return NotificationListener<SizeChangedLayoutNotification>(
-                  onNotification: (_) {
-                    WidgetsBinding.instance.addPostFrameCallback(
-                      (_) => _measureOverlay(),
-                    );
-                    return true;
-                  },
-                  child: SizeChangedLayoutNotifier(
-                    child: Column(
-                      key: _overlayKey,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [_buildSearchBar()],
-                    ),
-                  ),
-                );
-              },
-            ),
+    return DesktopContextMenu(
+      actions: [
+        DesktopMenuAction(
+          context.l10n.text('Refresh'),
+          () => runDetachedTask(
+            _refreshCurrentChart(),
+            'Failed to refresh chart',
           ),
-        ],
+        ),
+      ],
+      child: PopScope<void>(
+        canPop: !hasText,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          if (hasText) _clearSearch();
+        },
+        child: Stack(
+          children: [
+            if (_mode == _ChartMode.searching)
+              Padding(
+                padding: EdgeInsets.only(top: _overlayHeight + 8),
+                child: _buildSearchResults(),
+              )
+            else
+              _buildChartContent(settings, accountColors),
+            Align(
+              alignment: Alignment.topCenter,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // The page can briefly receive tiny constraints while a desktop
+                  // window is being created or resized. SearchBar has a minimum
+                  // interactive height, so laying it out in that space produces a
+                  // RenderFlex overflow. It is safe to defer this visual overlay:
+                  // the next real layout re-measures and displays it normally.
+                  if (constraints.maxHeight < 72 ||
+                      constraints.maxWidth < 120) {
+                    return const SizedBox.shrink();
+                  }
+
+                  return NotificationListener<SizeChangedLayoutNotification>(
+                    onNotification: (_) {
+                      WidgetsBinding.instance.addPostFrameCallback(
+                        (_) => _measureOverlay(),
+                      );
+                      return true;
+                    },
+                    child: SizeChangedLayoutNotifier(
+                      child: Column(
+                        key: _overlayKey,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [_buildSearchBar()],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1529,11 +1542,21 @@ class ChartsPageState extends State<ChartsPage>
 
     // "Use anyway" tile — always shown so a known symbol remains usable even
     // while Yahoo search is slow or unavailable (e.g. GLD).
-    final useAnywayTile = ListTile(
-      leading: const Icon(Icons.open_in_new),
-      title: Text(context.l10n.text('Use "{query}" anyway', {'query': query})),
-      subtitle: Text(context.l10n.text('Load chart for this exact ticker')),
-      onTap: () => _selectSymbol(query),
+    final useAnywayTile = DesktopContextMenu(
+      actions: [
+        DesktopMenuAction(
+          context.l10n.text('Open chart'),
+          () => _selectSymbol(query),
+        ),
+      ],
+      copyText: query,
+      child: ListTile(
+        leading: const Icon(Icons.open_in_new),
+        title:
+            Text(context.l10n.text('Use "{query}" anyway', {'query': query})),
+        subtitle: Text(context.l10n.text('Load chart for this exact ticker')),
+        onTap: () => _selectSymbol(query),
+      ),
     );
 
     return RefreshIndicator(
@@ -1554,14 +1577,31 @@ class ChartsPageState extends State<ChartsPage>
           final result = _searchResults[index];
           final name =
               result.longname.isNotEmpty ? result.longname : result.shortname;
-          return ListTile(
-            title: Text(result.symbol),
-            subtitle: Text(name),
-            trailing: Text(
-              result.exchange,
-              style: Theme.of(context).textTheme.bodySmall,
+          return DesktopContextMenu(
+            actions: [
+              DesktopMenuAction(
+                context.l10n.text('Open chart'),
+                () => _selectStock(result),
+              ),
+              DesktopMenuAction(
+                context.l10n.text(
+                  _favoriteStocks.contains(result.symbol)
+                      ? 'Remove favorite'
+                      : 'Add favorite',
+                ),
+                () => _toggleFavorite(result.symbol),
+              ),
+            ],
+            copyText: result.symbol,
+            child: ListTile(
+              title: Text(result.symbol),
+              subtitle: Text(name),
+              trailing: Text(
+                result.exchange,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              onTap: () => _selectStock(result),
             ),
-            onTap: () => _selectStock(result),
           );
         },
       ),
@@ -1574,50 +1614,71 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   Widget _buildMarketClosedBanner(SettingsState settings) {
-    return GestureDetector(
-      onLongPress: () {
-        runDetachedTask(
-          settings.setShowMarketClosed(false),
-          'Failed to hide market-closed indicator',
-        );
-        toast(
-          context,
-          'Market closed indicator hidden',
-          SnackBarAction(
-            label: context.l10n.text('Undo'),
-            onPressed: () => runDetachedTask(
-              settings.setShowMarketClosed(true),
-              'Failed to restore market-closed indicator',
+    return DesktopContextMenu(
+      actions: [
+        DesktopMenuAction(context.l10n.text('Hide'), () {
+          runDetachedTask(
+            settings.setShowMarketClosed(false),
+            'Failed to hide market-closed indicator',
+          );
+          toast(
+            context,
+            'Market closed indicator hidden',
+            SnackBarAction(
+              label: context.l10n.text('Undo'),
+              onPressed: () => runDetachedTask(
+                settings.setShowMarketClosed(true),
+                'Failed to restore market-closed indicator',
+              ),
             ),
-          ),
-        );
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        child: Center(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.secondaryContainer,
-              borderRadius: BorderRadius.circular(16),
+          );
+        }),
+      ],
+      child: GestureDetector(
+        onLongPress: () {
+          runDetachedTask(
+            settings.setShowMarketClosed(false),
+            'Failed to hide market-closed indicator',
+          );
+          toast(
+            context,
+            'Market closed indicator hidden',
+            SnackBarAction(
+              label: context.l10n.text('Undo'),
+              onPressed: () => runDetachedTask(
+                settings.setShowMarketClosed(true),
+                'Failed to restore market-closed indicator',
+              ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.schedule,
-                  size: 14,
-                  color: Theme.of(context).colorScheme.onSecondaryContainer,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'Market closed',
-                  style: TextStyle(
-                    fontSize: 12,
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.secondaryContainer,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.schedule,
+                    size: 14,
                     color: Theme.of(context).colorScheme.onSecondaryContainer,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 6),
+                  Text(
+                    'Market closed',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1743,12 +1804,42 @@ class ChartsPageState extends State<ChartsPage>
         ),
     ];
 
-    return SizedBox(
-      height: height,
-      child: TickerLine(
-        dates: candles.map((candle) => candle.date.value),
-        spots: spots,
-        nativeCurrency: _nativeCurrency,
+    return DesktopContextMenu(
+      actions: [
+        DesktopMenuAction(
+          context.l10n.text('Refresh'),
+          () => runDetachedTask(
+            _refreshCurrentChart(),
+            'Failed to refresh chart',
+          ),
+        ),
+        DesktopMenuAction(
+          context.l10n.text(
+            _favoriteStocks.contains(_selectedSymbol)
+                ? 'Remove favorite'
+                : 'Add favorite',
+          ),
+          () => _toggleFavorite(_selectedSymbol!),
+        ),
+        DesktopMenuAction(
+          context.l10n.text('Add trade'),
+          () => Navigator.push(
+            context,
+            adaptivePageRoute(
+              context,
+              builder: (_) => EditTickerPage(symbol: _selectedSymbol),
+            ),
+          ),
+        ),
+      ],
+      copyText: _selectedSymbol,
+      child: SizedBox(
+        height: height,
+        child: TickerLine(
+          dates: candles.map((candle) => candle.date.value),
+          spots: spots,
+          nativeCurrency: _nativeCurrency,
+        ),
       ),
     );
   }
@@ -1875,12 +1966,35 @@ class ChartsPageState extends State<ChartsPage>
             final symbol = _favoriteStocks[index];
             return Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: _FavoriteCard(
-                symbol: symbol,
-                isActive: widget.isActive,
-                selected: _selectedFavorites.contains(symbol),
-                selectionColor: _favoriteColor(symbol),
-                onTap: () => _selectFavorite(symbol),
+              child: DesktopContextMenu(
+                actions: [
+                  DesktopMenuAction(
+                    context.l10n.text('Open chart'),
+                    () => _selectSymbol(symbol),
+                  ),
+                  DesktopMenuAction(
+                    context.l10n.text('Remove favorite'),
+                    () => _toggleFavorite(symbol),
+                  ),
+                  DesktopMenuAction(
+                    context.l10n.text('Add trade'),
+                    () => Navigator.push(
+                      context,
+                      adaptivePageRoute(
+                        context,
+                        builder: (_) => EditTickerPage(symbol: symbol),
+                      ),
+                    ),
+                  ),
+                ],
+                copyText: symbol,
+                child: _FavoriteCard(
+                  symbol: symbol,
+                  isActive: widget.isActive,
+                  selected: _selectedFavorites.contains(symbol),
+                  selectionColor: _favoriteColor(symbol),
+                  onTap: () => _selectFavorite(symbol),
+                ),
               ),
             );
           },
@@ -2315,34 +2429,37 @@ class _PeriodChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeOutCubic,
-      height: 40,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: selected
-              ? colorScheme.primary.withValues(alpha: 0.7)
-              : colorScheme.outline.withValues(alpha: 0.3),
-          width: selected ? 2 : 1,
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+    return DesktopContextMenu(
+      actions: [DesktopMenuAction(label, onTap)],
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        height: 40,
+        decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Center(
-              child: AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 200),
-                style: TextStyle(
-                  color: colorScheme.onSurface,
-                  fontSize: 13,
+          border: Border.all(
+            color: selected
+                ? colorScheme.primary.withValues(alpha: 0.7)
+                : colorScheme.outline.withValues(alpha: 0.3),
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Center(
+                child: AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 200),
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
+                    fontSize: 13,
+                  ),
+                  child: Text(label),
                 ),
-                child: Text(label),
               ),
             ),
           ),
@@ -2377,26 +2494,29 @@ class _ActionChip extends StatelessWidget {
           width: 1,
         ),
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 16),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: colorScheme.onSurface,
+      child: DesktopContextMenu(
+        actions: [DesktopMenuAction(label, onTap)],
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 16),
+                  const SizedBox(width: 6),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: colorScheme.onSurface,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

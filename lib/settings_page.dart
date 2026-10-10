@@ -1,3 +1,4 @@
+import 'package:market_monk/desktop_context_menu.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -565,45 +566,51 @@ class _SettingsPageState extends State<SettingsPage> {
         const SizedBox(height: 16),
         _languageDropdown(settings, padding: EdgeInsets.zero),
         const SizedBox(height: 8),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(
-            settings.hideDollarAmounts
-                ? Icons.visibility_off_outlined
-                : Icons.visibility_outlined,
+        DesktopContextMenu.listTile(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(
+              settings.hideDollarAmounts
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+            ),
+            title: Text(context.l10n.text('Hide dollar amounts')),
+            trailing: Switch(
+              value: settings.hideDollarAmounts,
+              onChanged: settings.setHideDollarAmounts,
+            ),
+            onTap: () =>
+                settings.setHideDollarAmounts(!settings.hideDollarAmounts),
           ),
-          title: Text(context.l10n.text('Hide dollar amounts')),
-          trailing: Switch(
-            value: settings.hideDollarAmounts,
-            onChanged: settings.setHideDollarAmounts,
-          ),
-          onTap: () =>
-              settings.setHideDollarAmounts(!settings.hideDollarAmounts),
         ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: settings.systemColors
-              ? const Icon(Icons.color_lens)
-              : const Icon(Icons.color_lens_outlined),
-          title: Text(context.l10n.text('System color scheme')),
-          trailing: Switch(
-            value: settings.systemColors,
-            onChanged: settings.setSystemColors,
+        DesktopContextMenu.listTile(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: settings.systemColors
+                ? const Icon(Icons.color_lens)
+                : const Icon(Icons.color_lens_outlined),
+            title: Text(context.l10n.text('System color scheme')),
+            trailing: Switch(
+              value: settings.systemColors,
+              onChanged: settings.setSystemColors,
+            ),
+            onTap: () => settings.setSystemColors(!settings.systemColors),
           ),
-          onTap: () => settings.setSystemColors(!settings.systemColors),
         ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.contrast),
-          title: Text(context.l10n.text('Pure black (AMOLED)')),
-          subtitle: Text(
-            context.l10n.text('Use pure black for AMOLED displays'),
+        DesktopContextMenu.listTile(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.contrast),
+            title: Text(context.l10n.text('Pure black (AMOLED)')),
+            subtitle: Text(
+              context.l10n.text('Use pure black for AMOLED displays'),
+            ),
+            trailing: Switch(
+              value: settings.pureBlack,
+              onChanged: settings.setPureBlack,
+            ),
+            onTap: () => settings.setPureBlack(!settings.pureBlack),
           ),
-          trailing: Switch(
-            value: settings.pureBlack,
-            onChanged: settings.setPureBlack,
-          ),
-          onTap: () => settings.setPureBlack(!settings.pureBlack),
         ),
         if (!settings.systemColors) _ColorPicker(settings: settings),
         const SizedBox(height: 8),
@@ -636,27 +643,32 @@ class _SettingsPageState extends State<SettingsPage> {
       icon: Icons.insights_outlined,
       title: context.l10n.text('Charts'),
       children: [
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: settings.showMarketClosed
-              ? const Icon(Icons.schedule)
-              : const Icon(Icons.schedule_outlined),
-          title: Text(context.l10n.text('Market closed indicator')),
-          trailing: Switch(
-            value: settings.showMarketClosed,
-            onChanged: settings.setShowMarketClosed,
+        DesktopContextMenu.listTile(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: settings.showMarketClosed
+                ? const Icon(Icons.schedule)
+                : const Icon(Icons.schedule_outlined),
+            title: Text(context.l10n.text('Market closed indicator')),
+            trailing: Switch(
+              value: settings.showMarketClosed,
+              onChanged: settings.setShowMarketClosed,
+            ),
+            onTap: () =>
+                settings.setShowMarketClosed(!settings.showMarketClosed),
           ),
-          onTap: () => settings.setShowMarketClosed(!settings.showMarketClosed),
         ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.insights),
-          title: Text(context.l10n.text('Curve line graphs')),
-          trailing: Switch(
-            value: settings.curveLines,
-            onChanged: settings.setCurveLines,
+        DesktopContextMenu.listTile(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.insights),
+            title: Text(context.l10n.text('Curve line graphs')),
+            trailing: Switch(
+              value: settings.curveLines,
+              onChanged: settings.setCurveLines,
+            ),
+            onTap: () => settings.setCurveLines(!settings.curveLines),
           ),
-          onTap: () => settings.setCurveLines(!settings.curveLines),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
@@ -699,39 +711,45 @@ class _SettingsPageState extends State<SettingsPage> {
       icon: Icons.account_balance_wallet_outlined,
       title: context.l10n.text('Accounts'),
       children: [
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.manage_accounts),
-          title: Text(context.l10n.text('Manage accounts')),
-          subtitle: Text(accounts.activeAccount),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.push(
-            context,
-            adaptivePageRoute(context, builder: (_) => const AccountsPage()),
+        DesktopContextMenu.listTile(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.manage_accounts),
+            title: Text(context.l10n.text('Manage accounts')),
+            subtitle: Text(accounts.activeAccount),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              adaptivePageRoute(context, builder: (_) => const AccountsPage()),
+            ),
           ),
         ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.currency_exchange),
-          title: Text(context.l10n.text('Currencies')),
-          subtitle: Text(settings.visibleCurrencies.join(', ')),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => _showCurrencyPicker(context, settings),
-        ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.account_balance),
-          title: Text(context.l10n.text('Interactive Brokers')),
-          subtitle: Text(
-            ibkrConfig.enabled
-                ? context.l10n.text(
-                    'IBKR portfolio source • {url}',
-                    {'url': ibkrConfig.baseUrl},
-                  )
-                : context.l10n.text('Use a self-hosted IBKR portfolio API'),
+        DesktopContextMenu.listTile(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.currency_exchange),
+            title: Text(context.l10n.text('Currencies')),
+            subtitle: Text(settings.visibleCurrencies.join(', ')),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _showCurrencyPicker(context, settings),
           ),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => _showIbkrSettings(context),
+        ),
+        DesktopContextMenu.listTile(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.account_balance),
+            title: Text(context.l10n.text('Interactive Brokers')),
+            subtitle: Text(
+              ibkrConfig.enabled
+                  ? context.l10n.text(
+                      'IBKR portfolio source • {url}',
+                      {'url': ibkrConfig.baseUrl},
+                    )
+                  : context.l10n.text('Use a self-hosted IBKR portfolio API'),
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _showIbkrSettings(context),
+          ),
         ),
       ],
     );
@@ -763,90 +781,94 @@ class _SettingsPageState extends State<SettingsPage> {
           ],
         ),
         const SizedBox(height: 12),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          onTap:
-              settings.syncInProgress ? null : () => _syncAllTickers(context),
-          leading: settings.syncInProgress
-              ? const SizedBox.square(
-                  dimension: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Icon(
-                  settings.syncFailed > 0 ? Icons.sync_problem : Icons.sync,
-                ),
-          title: Text(context.l10n.text('Sync')),
-          subtitle: Text(
-            settings.syncInProgress
-                ? context.l10n.text(
-                    'Syncing {symbol} ({completed}/{total})',
-                    {
-                      'symbol': settings.syncingSymbol ?? '',
-                      'completed': settings.syncCompleted,
-                      'total': settings.syncTotal,
-                    },
+        DesktopContextMenu.listTile(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            onTap:
+                settings.syncInProgress ? null : () => _syncAllTickers(context),
+            leading: settings.syncInProgress
+                ? const SizedBox.square(
+                    dimension: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : settings.syncTotal == 0
-                    ? context.l10n.text('No sync running')
-                    : settings.syncFailed == 0
-                        ? context.l10n.text(
-                            'Last sync completed {completed}/{total}',
-                            {
-                              'completed': settings.syncCompleted,
-                              'total': settings.syncTotal,
-                            },
-                          )
-                        : context.l10n.text(
-                            'Last sync completed with {failed} failed',
-                            {'failed': settings.syncFailed},
-                          ),
+                : Icon(
+                    settings.syncFailed > 0 ? Icons.sync_problem : Icons.sync,
+                  ),
+            title: Text(context.l10n.text('Sync')),
+            subtitle: Text(
+              settings.syncInProgress
+                  ? context.l10n.text(
+                      'Syncing {symbol} ({completed}/{total})',
+                      {
+                        'symbol': settings.syncingSymbol ?? '',
+                        'completed': settings.syncCompleted,
+                        'total': settings.syncTotal,
+                      },
+                    )
+                  : settings.syncTotal == 0
+                      ? context.l10n.text('No sync running')
+                      : settings.syncFailed == 0
+                          ? context.l10n.text(
+                              'Last sync completed {completed}/{total}',
+                              {
+                                'completed': settings.syncCompleted,
+                                'total': settings.syncTotal,
+                              },
+                            )
+                          : context.l10n.text(
+                              'Last sync completed with {failed} failed',
+                              {'failed': settings.syncFailed},
+                            ),
+            ),
           ),
         ),
         Divider(color: Theme.of(context).colorScheme.outlineVariant),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(
-            Icons.delete_forever,
-            color: Theme.of(context).colorScheme.error,
-          ),
-          title: Text(context.l10n.text('Delete all data')),
-          subtitle: Text(
-            context.l10n.text(
-              'Permanently delete all holdings, trades, and candles',
+        DesktopContextMenu.listTile(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(
+              Icons.delete_forever,
+              color: Theme.of(context).colorScheme.error,
             ),
-          ),
-          onTap: () async {
-            final confirmed = await showDialog<bool>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: Text(context.l10n.text('Delete all data?')),
-                content: Text(
-                  context.l10n.text(
-                    'This will permanently delete all holdings, trades, and chart data. This cannot be undone.',
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: Text(context.l10n.text('Cancel')),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: Text(context.l10n.text('Delete')),
-                  ),
-                ],
+            title: Text(context.l10n.text('Delete all data')),
+            subtitle: Text(
+              context.l10n.text(
+                'Permanently delete all holdings, trades, and candles',
               ),
-            );
-            if (confirmed != true || !mounted) return;
-            final accounts = context.read<AccountManager>();
-            final profileId = await profileDataRepository
-                .profileIdForName(accounts.activeAccount);
-            await profileDataRepository.clearTrades(profileId);
-            await marketDataDatabase.delete(marketDataDatabase.candles).go();
-            clearAllSyncCache();
-            if (!mounted) return;
-            toast(context, context.l10n.text('All data deleted'));
-          },
+            ),
+            onTap: () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: Text(context.l10n.text('Delete all data?')),
+                  content: Text(
+                    context.l10n.text(
+                      'This will permanently delete all holdings, trades, and chart data. This cannot be undone.',
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: Text(context.l10n.text('Cancel')),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: Text(context.l10n.text('Delete')),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed != true || !mounted) return;
+              final accounts = context.read<AccountManager>();
+              final profileId = await profileDataRepository
+                  .profileIdForName(accounts.activeAccount);
+              await profileDataRepository.clearTrades(profileId);
+              await marketDataDatabase.delete(marketDataDatabase.candles).go();
+              clearAllSyncCache();
+              if (!mounted) return;
+              toast(context, context.l10n.text('All data deleted'));
+            },
+          ),
         ),
       ],
     );
@@ -855,49 +877,57 @@ class _SettingsPageState extends State<SettingsPage> {
       icon: Icons.info_outline,
       title: context.l10n.text('About'),
       children: [
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.new_releases_outlined),
-          title: Text(context.l10n.text("What's New")),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.push(
-            context,
-            adaptivePageRoute(context, builder: (_) => const WhatsNew()),
+        DesktopContextMenu.listTile(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.new_releases_outlined),
+            title: Text(context.l10n.text("What's New")),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              adaptivePageRoute(context, builder: (_) => const WhatsNew()),
+            ),
           ),
         ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.info_outline),
-          title: Text(context.l10n.text('Version')),
-          subtitle: FutureBuilder(
-            future: packageInfo,
-            builder: (context, snapshot) =>
-                Text(snapshot.data?.version ?? '1.0.0'),
+        DesktopContextMenu.listTile(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.info_outline),
+            title: Text(context.l10n.text('Version')),
+            subtitle: FutureBuilder(
+              future: packageInfo,
+              builder: (context, snapshot) =>
+                  Text(snapshot.data?.version ?? '1.0.0'),
+            ),
+            onTap: () async {
+              const url = 'https://github.com/brandonp2412/MarketMonk/releases';
+              if (await canLaunchUrlString(url)) await launchUrlString(url);
+            },
           ),
-          onTap: () async {
-            const url = 'https://github.com/brandonp2412/MarketMonk/releases';
-            if (await canLaunchUrlString(url)) await launchUrlString(url);
-          },
         ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.person),
-          title: Text(context.l10n.text('Author')),
-          subtitle: const Text('Brandon Dick'),
-          onTap: () async {
-            const url = 'https://github.com/brandonp2412';
-            if (await canLaunchUrlString(url)) await launchUrlString(url);
-          },
+        DesktopContextMenu.listTile(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.person),
+            title: Text(context.l10n.text('Author')),
+            subtitle: const Text('Brandon Dick'),
+            onTap: () async {
+              const url = 'https://github.com/brandonp2412';
+              if (await canLaunchUrlString(url)) await launchUrlString(url);
+            },
+          ),
         ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.code),
-          title: Text(context.l10n.text('Source code')),
-          subtitle: Text(context.l10n.text('Check it out on GitHub')),
-          onTap: () async {
-            const url = 'https://github.com/brandonp2412/MarketMonk';
-            if (await canLaunchUrlString(url)) await launchUrlString(url);
-          },
+        DesktopContextMenu.listTile(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.code),
+            title: Text(context.l10n.text('Source code')),
+            subtitle: Text(context.l10n.text('Check it out on GitHub')),
+            onTap: () async {
+              const url = 'https://github.com/brandonp2412/MarketMonk';
+              if (await canLaunchUrlString(url)) await launchUrlString(url);
+            },
+          ),
         ),
       ],
     );
@@ -1012,46 +1042,52 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           _languageDropdown(settings),
           const SizedBox(height: 8),
-          ListTile(
-            leading: Icon(
-              settings.hideDollarAmounts
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
+          DesktopContextMenu.listTile(
+            child: ListTile(
+              leading: Icon(
+                settings.hideDollarAmounts
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+              ),
+              title: Text(context.l10n.text('Hide dollar amounts')),
+              trailing: Switch(
+                value: settings.hideDollarAmounts,
+                onChanged: settings.setHideDollarAmounts,
+              ),
+              onTap: () =>
+                  settings.setHideDollarAmounts(!settings.hideDollarAmounts),
             ),
-            title: Text(context.l10n.text('Hide dollar amounts')),
-            trailing: Switch(
-              value: settings.hideDollarAmounts,
-              onChanged: settings.setHideDollarAmounts,
-            ),
-            onTap: () =>
-                settings.setHideDollarAmounts(!settings.hideDollarAmounts),
           ),
           Tooltip(
             message: context.l10n.text(
               'Use the primary color of your device for the app',
             ),
-            child: ListTile(
-              title: Text(context.l10n.text('System color scheme')),
-              leading: settings.systemColors
-                  ? const Icon(Icons.color_lens)
-                  : const Icon(Icons.color_lens_outlined),
-              onTap: () => settings.setSystemColors(!settings.systemColors),
-              trailing: Switch(
-                value: settings.systemColors,
-                onChanged: (value) => settings.setSystemColors(value),
+            child: DesktopContextMenu.listTile(
+              child: ListTile(
+                title: Text(context.l10n.text('System color scheme')),
+                leading: settings.systemColors
+                    ? const Icon(Icons.color_lens)
+                    : const Icon(Icons.color_lens_outlined),
+                onTap: () => settings.setSystemColors(!settings.systemColors),
+                trailing: Switch(
+                  value: settings.systemColors,
+                  onChanged: (value) => settings.setSystemColors(value),
+                ),
               ),
             ),
           ),
-          ListTile(
-            title: Text(context.l10n.text('Pure black (AMOLED)')),
-            leading: const Icon(Icons.contrast),
-            subtitle:
-                Text(context.l10n.text('Use pure black for AMOLED displays')),
-            trailing: Switch(
-              value: settings.pureBlack,
-              onChanged: (value) => settings.setPureBlack(value),
+          DesktopContextMenu.listTile(
+            child: ListTile(
+              title: Text(context.l10n.text('Pure black (AMOLED)')),
+              leading: const Icon(Icons.contrast),
+              subtitle:
+                  Text(context.l10n.text('Use pure black for AMOLED displays')),
+              trailing: Switch(
+                value: settings.pureBlack,
+                onChanged: (value) => settings.setPureBlack(value),
+              ),
+              onTap: () => settings.setPureBlack(!settings.pureBlack),
             ),
-            onTap: () => settings.setPureBlack(!settings.pureBlack),
           ),
           if (!settings.systemColors) _ColorPicker(settings: settings),
           Padding(
@@ -1091,28 +1127,32 @@ class _SettingsPageState extends State<SettingsPage> {
             message: context.l10n.text(
               'Show a badge on the chart when the market is closed (weekends)',
             ),
-            child: ListTile(
-              title: Text(context.l10n.text('Market closed indicator')),
-              leading: settings.showMarketClosed
-                  ? const Icon(Icons.schedule)
-                  : const Icon(Icons.schedule_outlined),
-              onTap: () =>
-                  settings.setShowMarketClosed(!settings.showMarketClosed),
-              trailing: Switch(
-                value: settings.showMarketClosed,
-                onChanged: (value) => settings.setShowMarketClosed(value),
+            child: DesktopContextMenu.listTile(
+              child: ListTile(
+                title: Text(context.l10n.text('Market closed indicator')),
+                leading: settings.showMarketClosed
+                    ? const Icon(Icons.schedule)
+                    : const Icon(Icons.schedule_outlined),
+                onTap: () =>
+                    settings.setShowMarketClosed(!settings.showMarketClosed),
+                trailing: Switch(
+                  value: settings.showMarketClosed,
+                  onChanged: (value) => settings.setShowMarketClosed(value),
+                ),
               ),
             ),
           ),
           Tooltip(
             message: context.l10n.text('Use wavy curves in the graphs page'),
-            child: ListTile(
-              title: Text(context.l10n.text('Curve line graphs')),
-              leading: const Icon(Icons.insights),
-              onTap: () => settings.setCurveLines(!settings.curveLines),
-              trailing: Switch(
-                value: settings.curveLines,
-                onChanged: (value) => settings.setCurveLines(value),
+            child: DesktopContextMenu.listTile(
+              child: ListTile(
+                title: Text(context.l10n.text('Curve line graphs')),
+                leading: const Icon(Icons.insights),
+                onTap: () => settings.setCurveLines(!settings.curveLines),
+                trailing: Switch(
+                  value: settings.curveLines,
+                  onChanged: (value) => settings.setCurveLines(value),
+                ),
               ),
             ),
           ),
@@ -1159,41 +1199,50 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           _sectionHeader(context.l10n.text('Accounts')),
-          ListTile(
-            leading: const Icon(Icons.manage_accounts),
-            title: Text(context.l10n.text('Manage accounts')),
-            subtitle: Text(context.watch<AccountManager>().activeAccount),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(
-              context,
-              adaptivePageRoute(context, builder: (_) => const AccountsPage()),
+          DesktopContextMenu.listTile(
+            child: ListTile(
+              leading: const Icon(Icons.manage_accounts),
+              title: Text(context.l10n.text('Manage accounts')),
+              subtitle: Text(context.watch<AccountManager>().activeAccount),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(
+                context,
+                adaptivePageRoute(
+                  context,
+                  builder: (_) => const AccountsPage(),
+                ),
+              ),
             ),
           ),
-          ListTile(
-            leading: const Icon(Icons.currency_exchange),
-            title: Text(context.l10n.text('Currencies')),
-            subtitle: Text(settings.visibleCurrencies.join(', ')),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showCurrencyPicker(context, settings),
+          DesktopContextMenu.listTile(
+            child: ListTile(
+              leading: const Icon(Icons.currency_exchange),
+              title: Text(context.l10n.text('Currencies')),
+              subtitle: Text(settings.visibleCurrencies.join(', ')),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _showCurrencyPicker(context, settings),
+            ),
           ),
           Builder(
             builder: (context) {
               final accounts = context.watch<AccountManager>();
               final config = accounts.ibkrConfigFor();
-              return ListTile(
-                leading: const Icon(Icons.account_balance),
-                title: Text(context.l10n.text('Interactive Brokers')),
-                subtitle: Text(
-                  config.enabled
-                      ? context.l10n.text(
-                          'IBKR portfolio source • {url}',
-                          {'url': config.baseUrl},
-                        )
-                      : context.l10n
-                          .text('Use a self-hosted IBKR portfolio API'),
+              return DesktopContextMenu.listTile(
+                child: ListTile(
+                  leading: const Icon(Icons.account_balance),
+                  title: Text(context.l10n.text('Interactive Brokers')),
+                  subtitle: Text(
+                    config.enabled
+                        ? context.l10n.text(
+                            'IBKR portfolio source • {url}',
+                            {'url': config.baseUrl},
+                          )
+                        : context.l10n
+                            .text('Use a self-hosted IBKR portfolio API'),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _showIbkrSettings(context),
                 ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => _showIbkrSettings(context),
               );
             },
           ),
@@ -1201,111 +1250,122 @@ class _SettingsPageState extends State<SettingsPage> {
           Tooltip(
             message:
                 context.l10n.text('Download a full backup of every profile'),
-            child: ListTile(
-              leading: const Icon(Icons.download),
-              title: Text(context.l10n.text('Export database')),
-              onTap: () => _exportBackup(context),
+            child: DesktopContextMenu.listTile(
+              child: ListTile(
+                leading: const Icon(Icons.download),
+                title: Text(context.l10n.text('Export database')),
+                onTap: () => _exportBackup(context),
+              ),
             ),
           ),
           Tooltip(
             message: context.l10n.text('Import a .sqlite database'),
-            child: ListTile(
-              leading: const Icon(Icons.upload),
-              title: Text(context.l10n.text('Import database')),
-              onTap: () => _importDatabase(context),
+            child: DesktopContextMenu.listTile(
+              child: ListTile(
+                leading: const Icon(Icons.upload),
+                title: Text(context.l10n.text('Import database')),
+                onTap: () => _importDatabase(context),
+              ),
             ),
           ),
           Tooltip(
             message:
                 context.l10n.text('Import holdings from a broker CSV export'),
-            child: ListTile(
-              leading: const Icon(Icons.table_chart),
-              title: Text(context.l10n.text('Import CSV')),
-              onTap: () => _importCsv(context),
+            child: DesktopContextMenu.listTile(
+              child: ListTile(
+                leading: const Icon(Icons.table_chart),
+                title: Text(context.l10n.text('Import CSV')),
+                onTap: () => _importCsv(context),
+              ),
             ),
           ),
-          ListTile(
-            onTap:
-                settings.syncInProgress ? null : () => _syncAllTickers(context),
-            leading: settings.syncInProgress
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Icon(
-                    settings.syncFailed > 0 ? Icons.sync_problem : Icons.sync,
-                  ),
-            title: Text(context.l10n.text('Sync')),
-            subtitle: settings.syncInProgress
-                ? Text(
-                    context.l10n.text(
-                      'Syncing {symbol} ({completed}/{total})',
-                      {
-                        'symbol': settings.syncingSymbol ?? '',
-                        'completed': settings.syncCompleted,
-                        'total': settings.syncTotal,
-                      },
+          DesktopContextMenu.listTile(
+            child: ListTile(
+              onTap: settings.syncInProgress
+                  ? null
+                  : () => _syncAllTickers(context),
+              leading: settings.syncInProgress
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      settings.syncFailed > 0 ? Icons.sync_problem : Icons.sync,
                     ),
-                  )
-                : Text(
-                    settings.syncTotal == 0
-                        ? context.l10n.text('No sync running')
-                        : settings.syncFailed == 0
-                            ? context.l10n.text(
-                                'Last sync completed {completed}/{total}',
-                                {
-                                  'completed': settings.syncCompleted,
-                                  'total': settings.syncTotal,
-                                },
-                              )
-                            : context.l10n.text(
-                                'Last sync completed with {failed} failed',
-                                {'failed': settings.syncFailed},
-                              ),
-                  ),
+              title: Text(context.l10n.text('Sync')),
+              subtitle: settings.syncInProgress
+                  ? Text(
+                      context.l10n.text(
+                        'Syncing {symbol} ({completed}/{total})',
+                        {
+                          'symbol': settings.syncingSymbol ?? '',
+                          'completed': settings.syncCompleted,
+                          'total': settings.syncTotal,
+                        },
+                      ),
+                    )
+                  : Text(
+                      settings.syncTotal == 0
+                          ? context.l10n.text('No sync running')
+                          : settings.syncFailed == 0
+                              ? context.l10n.text(
+                                  'Last sync completed {completed}/{total}',
+                                  {
+                                    'completed': settings.syncCompleted,
+                                    'total': settings.syncTotal,
+                                  },
+                                )
+                              : context.l10n.text(
+                                  'Last sync completed with {failed} failed',
+                                  {'failed': settings.syncFailed},
+                                ),
+                    ),
+            ),
           ),
           Tooltip(
             message: context.l10n.text(
               'Permanently delete all holdings, trades, and candles',
             ),
-            child: ListTile(
-              leading: const Icon(Icons.delete_forever),
-              title: Text(context.l10n.text('Delete all data')),
-              onTap: () async {
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: Text(context.l10n.text('Delete all data?')),
-                    content: Text(
-                      context.l10n.text(
-                        'This will permanently delete all holdings, trades, and chart data. This cannot be undone.',
+            child: DesktopContextMenu.listTile(
+              child: ListTile(
+                leading: const Icon(Icons.delete_forever),
+                title: Text(context.l10n.text('Delete all data')),
+                onTap: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: Text(context.l10n.text('Delete all data?')),
+                      content: Text(
+                        context.l10n.text(
+                          'This will permanently delete all holdings, trades, and chart data. This cannot be undone.',
+                        ),
                       ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: Text(context.l10n.text('Cancel')),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: Text(context.l10n.text('Delete')),
+                        ),
+                      ],
                     ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, false),
-                        child: Text(context.l10n.text('Cancel')),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, true),
-                        child: Text(context.l10n.text('Delete')),
-                      ),
-                    ],
-                  ),
-                );
-                if (confirmed != true || !context.mounted) return;
-                final accounts = context.read<AccountManager>();
-                final profileId = await profileDataRepository
-                    .profileIdForName(accounts.activeAccount);
-                await profileDataRepository.clearTrades(profileId);
-                await marketDataDatabase
-                    .delete(marketDataDatabase.candles)
-                    .go();
-                clearAllSyncCache();
-                if (!context.mounted) return;
-                toast(context, context.l10n.text('All data deleted'));
-              },
+                  );
+                  if (confirmed != true || !context.mounted) return;
+                  final accounts = context.read<AccountManager>();
+                  final profileId = await profileDataRepository
+                      .profileIdForName(accounts.activeAccount);
+                  await profileDataRepository.clearTrades(profileId);
+                  await marketDataDatabase
+                      .delete(marketDataDatabase.candles)
+                      .go();
+                  clearAllSyncCache();
+                  if (!context.mounted) return;
+                  toast(context, context.l10n.text('All data deleted'));
+                },
+              ),
             ),
           ),
           if (Platform.isAndroid || Platform.isWindows) ...[
@@ -1318,84 +1378,96 @@ class _SettingsPageState extends State<SettingsPage> {
                 style: Theme.of(context).textTheme.headlineLarge,
               ),
             ),
-            ListTile(
-              leading: const Icon(Icons.new_releases_outlined),
-              title: Text(context.l10n.text("What's New")),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
-                context,
-                adaptivePageRoute(context, builder: (_) => const WhatsNew()),
+            DesktopContextMenu.listTile(
+              child: ListTile(
+                leading: const Icon(Icons.new_releases_outlined),
+                title: Text(context.l10n.text("What's New")),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push(
+                  context,
+                  adaptivePageRoute(context, builder: (_) => const WhatsNew()),
+                ),
               ),
             ),
-            ListTile(
-              leading: const Icon(Icons.info_outline),
-              title: Text(context.l10n.text('Version')),
-              subtitle: FutureBuilder(
-                future: packageInfo,
-                builder: (context, snapshot) =>
-                    Text(snapshot.data?.version ?? "1.0.0"),
+            DesktopContextMenu.listTile(
+              child: ListTile(
+                leading: const Icon(Icons.info_outline),
+                title: Text(context.l10n.text('Version')),
+                subtitle: FutureBuilder(
+                  future: packageInfo,
+                  builder: (context, snapshot) =>
+                      Text(snapshot.data?.version ?? "1.0.0"),
+                ),
+                onTap: () async {
+                  if (Platform.isIOS || Platform.isMacOS) return;
+                  const url =
+                      'https://github.com/brandonp2412/MarketMonk/releases';
+                  if (await canLaunchUrlString(url)) await launchUrlString(url);
+                },
               ),
-              onTap: () async {
-                if (Platform.isIOS || Platform.isMacOS) return;
-                const url =
-                    'https://github.com/brandonp2412/MarketMonk/releases';
-                if (await canLaunchUrlString(url)) await launchUrlString(url);
-              },
             ),
-            ListTile(
-              title: Text(context.l10n.text('Author')),
-              leading: const Icon(Icons.person),
-              subtitle: FutureBuilder(
-                future: packageInfo,
-                builder: (context, snapshot) => const Text("Brandon Dick"),
+            DesktopContextMenu.listTile(
+              child: ListTile(
+                title: Text(context.l10n.text('Author')),
+                leading: const Icon(Icons.person),
+                subtitle: FutureBuilder(
+                  future: packageInfo,
+                  builder: (context, snapshot) => const Text("Brandon Dick"),
+                ),
+                onTap: () async {
+                  if (Platform.isIOS || Platform.isMacOS) return;
+                  const url = 'https://github.com/brandonp2412';
+                  if (await canLaunchUrlString(url)) await launchUrlString(url);
+                },
               ),
-              onTap: () async {
-                if (Platform.isIOS || Platform.isMacOS) return;
-                const url = 'https://github.com/brandonp2412';
-                if (await canLaunchUrlString(url)) await launchUrlString(url);
-              },
             ),
-            ListTile(
-              title: Text(context.l10n.text('License')),
-              leading: const Icon(Icons.balance),
-              subtitle: FutureBuilder(
-                future: packageInfo,
-                builder: (context, snapshot) => const Text("MIT"),
+            DesktopContextMenu.listTile(
+              child: ListTile(
+                title: Text(context.l10n.text('License')),
+                leading: const Icon(Icons.balance),
+                subtitle: FutureBuilder(
+                  future: packageInfo,
+                  builder: (context, snapshot) => const Text("MIT"),
+                ),
+                onTap: () async {
+                  if (Platform.isIOS || Platform.isMacOS) return;
+                  const url =
+                      'https://github.com/brandonp2412/MarketMonk?tab=MIT-1-ov-file#readme';
+                  if (await canLaunchUrlString(url)) await launchUrlString(url);
+                },
               ),
-              onTap: () async {
-                if (Platform.isIOS || Platform.isMacOS) return;
-                const url =
-                    'https://github.com/brandonp2412/MarketMonk?tab=MIT-1-ov-file#readme';
-                if (await canLaunchUrlString(url)) await launchUrlString(url);
-              },
             ),
-            ListTile(
-              title: Text(context.l10n.text('Source code')),
-              leading: const Icon(Icons.code),
-              subtitle: FutureBuilder(
-                future: packageInfo,
-                builder: (context, snapshot) =>
-                    Text(context.l10n.text('Check it out on GitHub')),
+            DesktopContextMenu.listTile(
+              child: ListTile(
+                title: Text(context.l10n.text('Source code')),
+                leading: const Icon(Icons.code),
+                subtitle: FutureBuilder(
+                  future: packageInfo,
+                  builder: (context, snapshot) =>
+                      Text(context.l10n.text('Check it out on GitHub')),
+                ),
+                onTap: () async {
+                  if (Platform.isIOS || Platform.isMacOS) return;
+                  const url = 'https://github.com/brandonp2412/MarketMonk';
+                  if (await canLaunchUrlString(url)) await launchUrlString(url);
+                },
               ),
-              onTap: () async {
-                if (Platform.isIOS || Platform.isMacOS) return;
-                const url = 'https://github.com/brandonp2412/MarketMonk';
-                if (await canLaunchUrlString(url)) await launchUrlString(url);
-              },
             ),
-            ListTile(
-              title: Text(context.l10n.text('Donate')),
-              leading: const Icon(Icons.favorite_outline),
-              subtitle: FutureBuilder(
-                future: packageInfo,
-                builder: (context, snapshot) =>
-                    Text(context.l10n.text('Help support this project')),
+            DesktopContextMenu.listTile(
+              child: ListTile(
+                title: Text(context.l10n.text('Donate')),
+                leading: const Icon(Icons.favorite_outline),
+                subtitle: FutureBuilder(
+                  future: packageInfo,
+                  builder: (context, snapshot) =>
+                      Text(context.l10n.text('Help support this project')),
+                ),
+                onTap: () async {
+                  if (Platform.isIOS || Platform.isMacOS) return;
+                  const url = 'https://github.com/sponsors/brandonp2412';
+                  if (await canLaunchUrlString(url)) await launchUrlString(url);
+                },
               ),
-              onTap: () async {
-                if (Platform.isIOS || Platform.isMacOS) return;
-                const url = 'https://github.com/sponsors/brandonp2412';
-                if (await canLaunchUrlString(url)) await launchUrlString(url);
-              },
             ),
           ],
         ],

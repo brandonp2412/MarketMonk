@@ -1,3 +1,4 @@
+import 'package:market_monk/desktop_context_menu.dart';
 import 'package:flutter/material.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/main.dart';
@@ -13,53 +14,86 @@ class AccountsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final accounts = context.watch<AccountManager>();
 
-    return Scaffold(
-      appBar: AppBar(title: Text(context.l10n.text('Accounts'))),
-      body: ListView.builder(
-        itemCount: accounts.accounts.length,
-        itemBuilder: (context, i) {
-          final name = accounts.accounts[i];
-          final isActive = name == accounts.activeAccount;
-          return ListTile(
-            leading: isActive
-                ? Icon(
-                    Icons.check_circle,
-                    color: Theme.of(context).colorScheme.primary,
-                  )
-                : const Icon(Icons.account_circle_outlined),
-            title: Text(name),
-            subtitle: isActive ? Text(context.l10n.text('Active')) : null,
-            onTap: isActive
-                ? null
-                : () async {
-                    await context.read<AccountManager>().switchAccount(name);
+    return DesktopContextMenu(
+      actions: [
+        DesktopMenuAction(
+          context.l10n.text('New account'),
+          () => _addAccount(context, accounts),
+        ),
+      ],
+      child: Scaffold(
+        appBar: AppBar(title: Text(context.l10n.text('Accounts'))),
+        body: ListView.builder(
+          itemCount: accounts.accounts.length,
+          itemBuilder: (context, i) {
+            final name = accounts.accounts[i];
+            final isActive = name == accounts.activeAccount;
+            return DesktopContextMenu(
+              actions: [
+                if (!isActive)
+                  DesktopMenuAction(context.l10n.text('Switch account'),
+                      () async {
+                    await accounts.switchAccount(name);
                     if (context.mounted) Navigator.pop(context);
-                  },
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+                  }),
                 if (name != 'Default') ...[
-                  IconButton(
-                    icon: const Icon(Icons.edit_outlined),
-                    tooltip: context.l10n.text('Rename account'),
-                    onPressed: () => _renameAccount(context, accounts, name),
+                  DesktopMenuAction(
+                    context.l10n.text('Rename account'),
+                    () => _renameAccount(context, accounts, name),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    tooltip: context.l10n.text('Delete account'),
-                    onPressed: () => _confirmDelete(context, accounts, name),
+                  DesktopMenuAction(
+                    context.l10n.text('Delete account'),
+                    () => _confirmDelete(context, accounts, name),
                   ),
                 ],
               ],
-            ),
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _addAccount(context, accounts),
-        label: Text(context.l10n.text('New account')),
-        icon: const Icon(Icons.add),
-        tooltip: context.l10n.text('Add account'),
+              copyText: name,
+              child: ListTile(
+                leading: isActive
+                    ? Icon(
+                        Icons.check_circle,
+                        color: Theme.of(context).colorScheme.primary,
+                      )
+                    : const Icon(Icons.account_circle_outlined),
+                title: Text(name),
+                subtitle: isActive ? Text(context.l10n.text('Active')) : null,
+                onTap: isActive
+                    ? null
+                    : () async {
+                        await context
+                            .read<AccountManager>()
+                            .switchAccount(name);
+                        if (context.mounted) Navigator.pop(context);
+                      },
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (name != 'Default') ...[
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined),
+                        tooltip: context.l10n.text('Rename account'),
+                        onPressed: () =>
+                            _renameAccount(context, accounts, name),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        tooltip: context.l10n.text('Delete account'),
+                        onPressed: () =>
+                            _confirmDelete(context, accounts, name),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () => _addAccount(context, accounts),
+          label: Text(context.l10n.text('New account')),
+          icon: const Icon(Icons.add),
+          tooltip: context.l10n.text('Add account'),
+        ),
       ),
     );
   }
