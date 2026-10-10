@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:drafter/drafter.dart';
 import 'package:drafter/painting.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 @immutable
@@ -366,6 +367,15 @@ class _MarketLineChartInteractionState
     extends State<_MarketLineChartInteraction> {
   final ValueNotifier<int?> _activeIndex = ValueNotifier(null);
 
+  (int, int)? _zoom;
+  Offset? _dragStart;
+  double? _dragX;
+  int? _dragPointer;
+
+  _MarketLineChartRenderer get _renderer => _zoom == null
+      ? widget.renderer
+      : widget.renderer.zoomTo(_zoom!.$1, _zoom!.$2);
+
   void _activate(Offset position, ChartScene scene) {
     _activeIndex.value = ChartHitTest.nearestIndexAtX(scene, position.dx);
   }
@@ -388,8 +398,18 @@ class _MarketLineChartInteractionState
   @override
   void didUpdateWidget(_MarketLineChartInteraction oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!listEquals(
+      oldWidget.renderer.dataSignature,
+      widget.renderer.dataSignature,
+    )) {
+      _zoom = null;
+      _dragStart = null;
+      _dragX = null;
+      _dragPointer = null;
+      _clear();
+    }
     final index = _activeIndex.value;
-    if (index != null && !widget.renderer.hasIndex(index)) _clear();
+    if (index != null && !_renderer.hasIndex(index)) _clear();
   }
 
   @override
@@ -406,7 +426,8 @@ class _MarketLineChartInteractionState
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = constraints.biggest;
-        final scene = widget.renderer.buildScene(size);
+        final renderer = _renderer;
+        final scene = renderer.buildScene(size);
 
         return MouseRegion(
           onHover: (event) => _activate(event.localPosition, scene),
@@ -415,12 +436,60 @@ class _MarketLineChartInteractionState
             behavior: HitTestBehavior.opaque,
             onPointerDown: (event) {
               _activate(event.localPosition, scene);
+              final bounds = scene.bounds;
+              if (event.kind == PointerDeviceKind.mouse &&
+                  event.buttons == kPrimaryMouseButton &&
+                  bounds != null &&
+                  Rect.fromLTRB(
+                    bounds.left,
+                    bounds.top,
+                    bounds.right,
+                    bounds.bottom,
+                  ).contains(event.localPosition)) {
+                _dragStart = event.localPosition;
+                _dragPointer = event.pointer;
+              }
+            },
+            onPointerMove: (event) {
+              if (event.pointer != _dragPointer || _dragStart == null) return;
+              setState(() {
+                _dragX = event.localPosition.dx;
+                _clear();
+              });
             },
             onPointerUp: (event) {
-              _activate(event.localPosition, scene);
+              if (event.pointer == _dragPointer) {
+                final start = _dragStart;
+                if (start != null &&
+                    (event.localPosition.dx - start.dx).abs() >= 8) {
+                  final first = ChartHitTest.nearestIndexAtX(scene, start.dx);
+                  final last = ChartHitTest.nearestIndexAtX(
+                    scene,
+                    event.localPosition.dx,
+                  );
+                  if (first != null && last != null && first != last) {
+                    setState(
+                      () => _zoom = (min(first, last), max(first, last)),
+                    );
+                  }
+                }
+                setState(() {
+                  _dragStart = null;
+                  _dragX = null;
+                  _dragPointer = null;
+                  _clear();
+                });
+              } else {
+                _activate(event.localPosition, scene);
+              }
               if (!_keepTooltipOnTapUp) _clear();
             },
-            onPointerCancel: (_) => _clear(),
+            onPointerCancel: (_) => setState(() {
+              _dragStart = null;
+              _dragX = null;
+              _dragPointer = null;
+              _clear();
+            }),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onLongPressStart: (details) =>
@@ -435,10 +504,44 @@ class _MarketLineChartInteractionState
                   DrafterTheme(
                     colors: theme,
                     child: ChartCanvas(
-                      renderer: widget.renderer,
+                      renderer: renderer,
                       animate: false,
                     ),
                   ),
+                  if (_dragStart != null &&
+                      _dragX != null &&
+                      scene.bounds != null)
+                    Positioned(
+                      left: min(_dragStart!.dx, _dragX!)
+                          .clamp(scene.bounds!.left, scene.bounds!.right),
+                      top: scene.bounds!.top,
+                      width: (max(_dragStart!.dx, _dragX!)
+                              .clamp(scene.bounds!.left, scene.bounds!.right) -
+                          min(_dragStart!.dx, _dragX!)
+                              .clamp(scene.bounds!.left, scene.bounds!.right)),
+                      height: scene.bounds!.height,
+                      child: IgnorePointer(
+                        child: ColoredBox(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withValues(alpha: 0.2),
+                        ),
+                      ),
+                    ),
+                  if (_zoom != null)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: IconButton(
+                        tooltip: 'Reset zoom',
+                        icon: const Icon(Icons.zoom_out),
+                        onPressed: () => setState(() {
+                          _zoom = null;
+                          _clear();
+                        }),
+                      ),
+                    ),
                   Positioned.fill(
                     child: IgnorePointer(
                       child: RepaintBoundary(
@@ -572,6 +675,7 @@ class _MarketLineChartRenderer extends ChartRenderer
   final double curveSmoothness;
   final List<_LineChartAxisLabel> xLabels;
   final int? uniformXCount;
+  final int firstColumn;
   final Color axisLabelColor;
   final String Function(double value) yLabelFormatter;
   final double leftInset;
@@ -586,6 +690,7 @@ class _MarketLineChartRenderer extends ChartRenderer
     required this.curveSmoothness,
     required this.xLabels,
     required this.uniformXCount,
+    this.firstColumn = 0,
     required this.axisLabelColor,
     required this.yLabelFormatter,
     required this.leftInset,
@@ -593,6 +698,60 @@ class _MarketLineChartRenderer extends ChartRenderer
     required String? accessibilityValue,
   })  : _accessibilityLabel = accessibilityLabel,
         _accessibilityValue = accessibilityValue;
+
+  List<Object> get dataSignature => [
+        uniformXCount ?? -1,
+        ...xLabels.map((label) => (label.x, label.column, label.text)),
+        for (final line in series) ...[
+          line.name,
+          for (final point in line.points) (point.x, point.y, point.column),
+        ],
+      ];
+
+  _MarketLineChartRenderer zoomTo(int start, int end) {
+    final visibleSeries = [
+      for (final line in series)
+        MarketLineChartSeries(
+          points: [
+            for (var i = 0; i < line.points.length; i++)
+              if ((line.points[i].column ?? i) >= start &&
+                  (line.points[i].column ?? i) <= end)
+                MarketLineChartPoint(
+                  line.points[i].x,
+                  line.points[i].y,
+                  column: line.points[i].column ?? i,
+                ),
+          ],
+          color: line.color,
+          name: line.name,
+          fill: line.fill,
+          strokeWidth: line.strokeWidth,
+        ),
+    ];
+    final bounds = _calculateYBounds([
+      for (final line in visibleSeries) ...line.points,
+    ]);
+    return _MarketLineChartRenderer(
+      series: visibleSeries,
+      minY: bounds.$1,
+      maxY: bounds.$2,
+      curveLines: curveLines,
+      curveSmoothness: curveSmoothness,
+      xLabels: [
+        for (final label in xLabels)
+          if ((label.column ?? label.x) >= start &&
+              (label.column ?? label.x) <= end)
+            label,
+      ],
+      uniformXCount: end - start + 1,
+      firstColumn: start,
+      axisLabelColor: axisLabelColor,
+      yLabelFormatter: yLabelFormatter,
+      leftInset: leftInset,
+      accessibilityLabel: _accessibilityLabel,
+      accessibilityValue: null,
+    );
+  }
 
   ChartBounds _bounds(Size size) => ChartBounds.insets(
         size,
@@ -633,7 +792,7 @@ class _MarketLineChartRenderer extends ChartRenderer
     if (count != null) {
       if (count <= 1) return bounds.left + bounds.width / 2;
       final column = point.column ?? pointIndex;
-      return bounds.left + bounds.width * column / (count - 1);
+      return bounds.left + bounds.width * (column - firstColumn) / (count - 1);
     }
 
     final xBounds = _xBounds;
