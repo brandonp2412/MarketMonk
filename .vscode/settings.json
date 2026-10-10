@@ -1,5 +1,6 @@
 {
   "git.ignoreSubmodules": true,
+  "dart.flutterSdkPath": "flutter",
   "git.detectSubmodules": false,
   "git.detectSubmodulesLimit": 0,
   "dart.analysisExcludedFolders": ["flutter"],

@@ -46,6 +46,26 @@ All issues and pull requests are welcome! Bugs will be fixed faster if you inclu
 
 Install [flutter](https://docs.flutter.dev/get-started/install) to run this app.
 
+Use the pinned SDK: `./flutter/bin/flutter run -d linux`, or
+`./scripts/run_linux.sh`. The VS Code workspace also selects `flutter/`.
+`scripts/watch.sh` watches Dart sources and requests reloads only for Flutter
+sessions running from this repository.
+
+For slow reloads, run `./scripts/run_linux.sh -v` and inspect the final
+`compile`, `reload`, and `reassemble` timings. Compilation and the reported
+synced size help distinguish broad source invalidation from expensive widget
+rebuilds. Hot reload preserves state and does not rerun startup migrations.
+
+In a Linux investigation, a reload detecting changes to three Flutter SDK
+libraries reloaded 607 libraries and synced 42.6 MB in 4,075 ms (compile:
+3,006 ms, reload: 751 ms, reassemble: 293 ms). The next reload took 383 ms;
+a small edit to `main.dart` took 426 ms. These samples identify broad SDK
+invalidation as a source of occasional delay, but do not establish a persistent
+app bottleneck or performance on other platforms. Avoid formatting the SDK
+during a development session: `./flutter/bin/dart format lib test tool
+integration_test` limits routine formatting to app sources. The required
+completion check `./flutter/bin/dart format .` also traverses the SDK.
+
 ## Command line
 
 Market Monk includes an installable `mm` terminal client for inspecting and editing portfolio data. See the [CLI guide](docs/cli.md) for installation, examples, safety notes, and screenshots.
@@ -70,4 +90,3 @@ from3To4: (Migrator m, Schema4 schema) async {
 ```
 
 4. Run `dart run build_runner build -d`
-
