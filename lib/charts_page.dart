@@ -1970,36 +1970,91 @@ class ChartsPageState extends State<ChartsPage>
   ) {
     return [
       _buildFavoritesRow(),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Wrap(
-          alignment: WrapAlignment.center,
-          children: [_buildRollingAverageChip()],
-        ),
-      ),
       _buildPortfolioChart(context, settings, accountColors),
       _buildPortfolioSummary(context, settings, accountColors),
     ];
   }
 
-  Widget _buildRollingAverageChip() {
+  Widget _buildRollingAverageChip({bool favoriteCard = false}) {
+    final colors = Theme.of(context).colorScheme;
+    final icon =
+        _showRollingAverage ? Icons.check_circle_outline : Icons.show_chart;
+    final label = context.l10n.text('Rolling average');
+    void toggle() => setState(
+          () => _showRollingAverage = !_showRollingAverage,
+        );
+
     return Semantics(
+      key: const Key('chart-rolling-average'),
       selected: _showRollingAverage,
       button: true,
-      child: _ActionChip(
-        key: const Key('chart-rolling-average'),
-        icon:
-            _showRollingAverage ? Icons.check_circle_outline : Icons.show_chart,
-        label: context.l10n.text('Rolling average'),
-        onTap: () => setState(
-          () => _showRollingAverage = !_showRollingAverage,
-        ),
-      ),
+      child: favoriteCard
+          ? AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              width: 108,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: _showRollingAverage
+                    ? colors.primary.withValues(alpha: 0.10)
+                    : null,
+                border: Border.all(
+                  color: _showRollingAverage
+                      ? colors.primary
+                      : colors.outline.withValues(alpha: 0.3),
+                  width: _showRollingAverage ? 2 : 1,
+                ),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: toggle,
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.show_chart,
+                              size: 16,
+                              color: colors.primary,
+                            ),
+                            const Spacer(),
+                            if (_showRollingAverage)
+                              Icon(
+                                Icons.check_circle_rounded,
+                                size: 14,
+                                color: colors.primary,
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1,
+                            fontWeight: _showRollingAverage
+                                ? FontWeight.w600
+                                : FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            )
+          : _ActionChip(icon: icon, label: label, onTap: toggle),
     );
   }
 
   Widget _buildFavoritesRow() {
-    if (_favoriteStocks.isEmpty) return const SizedBox.shrink();
     return Padding(
       // The period selector sits immediately above this row. Give the cards a
       // clear separation without making the landing page feel oversized.
@@ -2014,8 +2069,11 @@ class ChartsPageState extends State<ChartsPage>
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: _favoriteStocks.length,
+          itemCount: _favoriteStocks.length + 1,
           itemBuilder: (context, index) {
+            if (index == _favoriteStocks.length) {
+              return _buildRollingAverageChip(favoriteCard: true);
+            }
             final symbol = _favoriteStocks[index];
             return Padding(
               padding: const EdgeInsets.only(right: 8),
@@ -2556,7 +2614,6 @@ class _ActionChip extends StatelessWidget {
   final VoidCallback onTap;
 
   const _ActionChip({
-    super.key,
     required this.icon,
     required this.label,
     required this.onTap,
