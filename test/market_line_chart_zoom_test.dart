@@ -11,6 +11,8 @@ void main() {
   Widget chart({
     double valueOffset = 0,
     bool pageMenu = false,
+    bool showRollingAverage = false,
+    int pointCount = 10,
     List<MarketLineChartSeries>? series,
   }) =>
       MaterialApp(
@@ -29,7 +31,7 @@ void main() {
                       [
                         MarketLineChartSeries(
                           points: [
-                            for (var i = 0; i < 10; i++)
+                            for (var i = 0; i < pointCount; i++)
                               MarketLineChartPoint(
                                 i.toDouble(),
                                 i + valueOffset,
@@ -38,10 +40,11 @@ void main() {
                           color: Colors.blue,
                         ),
                       ],
-                  xLabels: List.generate(10, (i) => 'Day $i'),
-                  pointCount: 10,
+                  xLabels: List.generate(pointCount, (i) => 'Day $i'),
+                  pointCount: pointCount,
                   yLabelFormatter: (value) => value.toStringAsFixed(1),
                   tooltipRowLabel: (mark) => 'Column ${mark.index}',
+                  showRollingAverage: showRollingAverage,
                   curveLines: false,
                   curveSmoothness: 0,
                 ),
@@ -73,6 +76,35 @@ void main() {
     await gesture.up();
     await tester.pump();
   }
+
+  testWidgets('rolling average replaces plotted values and follows zoom',
+      (tester) async {
+    await tester.pumpWidget(chart(showRollingAverage: true));
+    expect(scene(tester).marks, hasLength(10));
+    expect(
+      scene(tester).marks.map((mark) => mark.value),
+      [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5],
+    );
+
+    await drag(tester, 2, 7);
+    expect(scene(tester).marks.map((mark) => mark.index), [2, 3, 4, 5, 6, 7]);
+    expect(
+      scene(tester).marks.map((mark) => mark.value),
+      [2, 2.5, 3, 3.5, 4, 4.5],
+    );
+
+    await tester.pumpWidget(chart());
+    expect(scene(tester).marks.map((mark) => mark.value), [2, 3, 4, 5, 6, 7]);
+  });
+
+  testWidgets('rolling average uses only the latest 20 observations',
+      (tester) async {
+    await tester.pumpWidget(chart(showRollingAverage: true, pointCount: 25));
+    expect(scene(tester).marks, hasLength(25));
+    expect(scene(tester).marks[19].value, 9.5);
+    expect(scene(tester).marks[20].value, 10.5);
+    expect(scene(tester).marks.last.value, 14.5);
+  });
 
   testWidgets('mouse drag zooms in either direction and preserves indices',
       (tester) async {

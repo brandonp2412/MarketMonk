@@ -224,7 +224,7 @@ class MarketLineChart extends StatelessWidget {
   final String Function(PlotMark mark) tooltipRowLabel;
   final bool curveLines;
 
-  /// Draws a dashed trailing average of up to 20 observations per series.
+  /// Replaces each series with its trailing average of up to 20 observations.
   final bool showRollingAverage;
   final double curveSmoothness;
   final double leftInset;
@@ -762,7 +762,7 @@ class _MarketLineChartRenderer extends ChartRenderer
   final double maxY;
   final bool curveLines;
 
-  /// Draws a dashed trailing average of up to 20 observations per series.
+  /// Replaces each series with its trailing average of up to 20 observations.
   final bool showRollingAverage;
   final double curveSmoothness;
   final List<_LineChartAxisLabel> xLabels;
@@ -1053,48 +1053,32 @@ class _MarketLineChartRenderer extends ChartRenderer
     }
   }
 
-  void _drawRollingAverage(
-    Canvas canvas,
-    ChartBounds bounds,
-    MarketLineChartSeries line,
-    double progress,
-  ) {
-    if (line.points.length < 2) return;
-    final averages = <Offset>[];
-    var total = 0.0;
-    for (var index = 0; index < line.points.length; index++) {
-      total += line.points[index].y;
-      if (index >= 20) total -= line.points[index - 20].y;
-      averages.add(
-        Offset(
-          _xForPoint(line.points[index], index, bounds),
-          _yForValue(total / min(index + 1, 20), bounds),
-        ),
-      );
-    }
-    final paint = Paint()
-      ..color = line.color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..isAntiAlias = true;
-    canvas.save();
-    canvas.clipRect(
-      Rect.fromLTRB(
-        bounds.left,
-        bounds.top,
-        bounds.left + bounds.width * progress,
-        bounds.bottom,
-      ),
-    );
-    for (final metric in polylinePath(averages).computeMetrics()) {
-      for (var distance = 0.0; distance < metric.length; distance += 10) {
-        canvas.drawPath(
-          metric.extractPath(distance, min(distance + 5, metric.length)),
-          paint,
+  List<MarketLineChartSeries> get _displaySeries {
+    if (!showRollingAverage) return series;
+    return series.map((line) {
+      var total = 0.0;
+      final points = <MarketLineChartPoint>[];
+      for (var index = 0; index < line.points.length; index++) {
+        final point = line.points[index];
+        total += point.y;
+        if (index >= 20) total -= line.points[index - 20].y;
+        points.add(
+          MarketLineChartPoint(
+            point.x,
+            total / min(index + 1, 20),
+            column: point.column,
+            comparisonValue: point.comparisonValue,
+          ),
         );
       }
-    }
-    canvas.restore();
+      return MarketLineChartSeries(
+        points: points,
+        color: line.color,
+        name: line.name,
+        fill: line.fill,
+        strokeWidth: line.strokeWidth,
+      );
+    }).toList();
   }
 
   @override
@@ -1108,28 +1092,25 @@ class _MarketLineChartRenderer extends ChartRenderer
     final bounds = _bounds(size);
     _drawAxes(canvas, bounds);
 
-    for (var i = 0; i < series.length; i++) {
+    final displayedSeries = _displaySeries;
+    for (var i = 0; i < displayedSeries.length; i++) {
       _drawSeries(
         canvas,
         bounds,
-        series[i],
-        fill: series[i].fill,
+        displayedSeries[i],
+        fill: displayedSeries[i].fill,
         progress: progress,
       );
-    }
-    if (showRollingAverage) {
-      for (final line in series) {
-        _drawRollingAverage(canvas, bounds, line, progress);
-      }
     }
   }
 
   @override
   ChartScene buildScene(Size size) {
     final bounds = _bounds(size);
+    final displayedSeries = _displaySeries;
     final xByIndex = <int, double>{};
 
-    for (final line in series) {
+    for (final line in displayedSeries) {
       for (var pointIndex = 0; pointIndex < line.points.length; pointIndex++) {
         final point = line.points[pointIndex];
         final index = point.column ?? pointIndex;
@@ -1160,8 +1141,10 @@ class _MarketLineChartRenderer extends ChartRenderer
     }
 
     final marks = <PlotMark>[];
-    for (var seriesIndex = 0; seriesIndex < series.length; seriesIndex++) {
-      final line = series[seriesIndex];
+    for (var seriesIndex = 0;
+        seriesIndex < displayedSeries.length;
+        seriesIndex++) {
+      final line = displayedSeries[seriesIndex];
       for (var pointIndex = 0; pointIndex < line.points.length; pointIndex++) {
         final point = line.points[pointIndex];
         final index = point.column ?? pointIndex;
