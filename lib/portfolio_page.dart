@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/desktop_context_menu.dart';
@@ -495,17 +498,30 @@ class PortfolioPageState extends State<PortfolioPage>
     }
 
     final safeName = accountName.replaceAll(RegExp(r'[^\w\-]'), '_');
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/positions_$safeName.csv');
-    await file.writeAsString(buf.toString());
+    final fileName = 'positions_$safeName.csv';
+    final csv = buf.toString();
+    if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
+      final path = await FilePicker.saveFile(
+        fileName: fileName,
+        bytes: Uint8List.fromList(utf8.encode(csv)),
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+      );
+      if (path == null) return;
+      await File(path).writeAsString(csv);
+    } else {
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/$fileName');
+      await file.writeAsString(csv);
+      if (!context.mounted) return;
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'text/csv')],
+          subject: 'Portfolio Positions',
+        ),
+      );
+    }
     talker.info('Exported portfolio CSV with ${positions.length} positions');
-    if (!context.mounted) return;
-    await SharePlus.instance.share(
-      ShareParams(
-        files: [XFile(file.path, mimeType: 'text/csv')],
-        subject: 'Portfolio Positions',
-      ),
-    );
   }
 
   @override
