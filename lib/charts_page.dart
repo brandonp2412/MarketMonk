@@ -1216,9 +1216,13 @@ class ChartsPageState extends State<ChartsPage>
     }
   }
 
-  Color _favoriteColor(String symbol) => Colors.primaries[
-      _favoriteStocks.indexOf(symbol).clamp(0, _favoriteStocks.length) %
-          Colors.primaries.length];
+  Color _favoriteColor(String symbol) {
+    final colors = Theme.of(context).colorScheme;
+    final palette = [colors.primary, colors.secondary, colors.tertiary];
+    return palette[
+        _favoriteStocks.indexOf(symbol).clamp(0, _favoriteStocks.length) %
+            palette.length];
+  }
 
   void _selectSymbol(String symbol) {
     _searchFocus.unfocus();
@@ -2440,12 +2444,12 @@ class _FavoriteCard extends StatelessWidget {
         width: 108,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          color: selected ? selectionColor.withValues(alpha: 0.04) : null,
+          color: selected ? selectionColor.withValues(alpha: 0.10) : null,
           border: Border.all(
             color: selected
-                ? selectionColor.withValues(alpha: 0.45)
+                ? selectionColor
                 : colorScheme.outline.withValues(alpha: 0.3),
-            width: selected ? 1.5 : 1,
+            width: selected ? 2 : 1,
           ),
         ),
         child: Material(
@@ -2477,7 +2481,7 @@ class _FavoriteCard extends StatelessWidget {
                         Icon(
                           Icons.check_circle_rounded,
                           size: 14,
-                          color: selectionColor.withValues(alpha: 0.7),
+                          color: selectionColor,
                         ),
                     ],
                   ),
