@@ -9,6 +9,7 @@ import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/candle_ticker.dart';
+import 'package:market_monk/chart_colors.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/empty_state.dart';
@@ -1230,14 +1231,12 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   Color _favoriteColor(String symbol) {
-    final primary = HSLColor.fromColor(Theme.of(context).colorScheme.primary);
-    const hueOffsets = [28.0, -28.0, 44.0, -44.0];
     final index =
         _favoriteStocks.indexOf(symbol).clamp(0, _favoriteStocks.length);
-    return primary
-        .withHue((primary.hue + hueOffsets[index % hueOffsets.length]) % 360)
-        .withSaturation(primary.saturation * 0.85)
-        .toColor();
+    return chartSeriesColor(
+      Theme.of(context).colorScheme,
+      context.read<AccountManager>().accounts.length + index,
+    );
   }
 
   void _selectSymbol(String symbol) {
@@ -1427,16 +1426,10 @@ class ChartsPageState extends State<ChartsPage>
     super.build(context);
     final settings = context.watch<SettingsState>();
 
-    final accountColors = [
-      Theme.of(context).colorScheme.primary,
-      Theme.of(context).colorScheme.secondary,
-      Theme.of(context).colorScheme.tertiary,
-      Theme.of(context).colorScheme.onSurface,
-      Color(0xFFE91E63),
-      Color(0xFF00BCD4),
-      Color(0xFFFF5722),
-      Color(0xFF607D8B),
-    ];
+    final accountColors = List.generate(
+      context.watch<AccountManager>().accounts.length + 1,
+      (index) => chartSeriesColor(Theme.of(context).colorScheme, index),
+    );
     final hasText = _searchController.text.isNotEmpty;
 
     // The chart fills the available height so the Drafter tooltip overlay can

@@ -7,6 +7,7 @@ import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/ticker_context_actions.dart';
 import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/bottom_nav.dart';
+import 'package:market_monk/chart_colors.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
@@ -1349,17 +1350,10 @@ class PortfolioPageState extends State<PortfolioPage>
   }
 
   List<Color> _buildColors(BuildContext context, int count) {
-    final base = Theme.of(context).colorScheme.primary;
-    final hsl = HSLColor.fromColor(base);
-    return List.generate(count, (index) {
-      final hue = (hsl.hue + index * (360 / count)) % 360;
-      return HSLColor.fromAHSL(
-        1.0,
-        hue,
-        hsl.saturation.clamp(0.4, 0.8),
-        hsl.lightness.clamp(0.35, 0.65),
-      ).toColor();
-    });
+    return List.generate(
+      count,
+      (index) => chartSeriesColor(Theme.of(context).colorScheme, index),
+    );
   }
 }
 
