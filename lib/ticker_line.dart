@@ -24,11 +24,15 @@ class TickerLine extends StatelessWidget {
   /// ISO 4217 currency the [spots] values are denominated in.
   final String nativeCurrency;
 
+  /// Includes local clock time in labels for timestamped intraday bars.
+  final bool intraday;
+
   const TickerLine({
     super.key,
     required this.spots,
     required this.dates,
     this.nativeCurrency = 'USD',
+    this.intraday = false,
     this.showRollingAverage = false,
     this.range,
     this.onRangeChanged,
@@ -45,7 +49,9 @@ class TickerLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsState>();
-    final formatter = DateFormat(settings.dateFormat);
+    final formatter = DateFormat(
+      intraday ? "${settings.dateFormat} HH:mm" : settings.dateFormat,
+    );
     final colorScheme = Theme.of(context).colorScheme;
     final labels = [for (final date in dates) formatter.format(date)];
 

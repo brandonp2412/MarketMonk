@@ -14,7 +14,7 @@ import ssl
 import subprocess
 import time
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -198,7 +198,14 @@ class ClientPortalIbkrClient:
             "positions": [_normalize_web_position(item) for item in positions],
         }
 
-    def historical(self, symbol: str, years: int) -> dict[str, Any]:
+    def intraday(self, symbol: str, days: int) -> dict[str, Any]:
+        if days not in (1, 5):
+            raise IbkrError("intraday days must be 1 or 5")
+        return self.historical(symbol, 1, intraday_days=days)
+
+    def historical(
+        self, symbol: str, years: int, *, intraday_days: int | None = None
+    ) -> dict[str, Any]:
         raw_account = self.ensure_account_visible()
         account = quote(raw_account, safe="")
         positions = self._get(f"portfolio2/{account}/positions")
@@ -221,11 +228,18 @@ class ClientPortalIbkrClient:
         if conid is None or conid <= 0:
             raise IbkrError(f"IBKR position {symbol} is missing its contract ID")
 
+        # One-week requests require bars of at least ten minutes.
+        # https://www.interactivebrokers.com/docs/web-api/v1/endpoints/market-data/historical-market-data
+        period = f"{years}y"
+        bar_size = "1d"
+        if intraday_days is not None:
+            period = "1d" if intraday_days == 1 else "1w"
+            bar_size = "1min" if intraday_days == 1 else "15min"
         query = urlencode(
             {
                 "conid": int(conid),
-                "period": f"{years}y",
-                "bar": "1d",
+                "period": period,
+                "bar": bar_size,
                 "outsideRth": "false",
             }
         )
@@ -234,7 +248,9 @@ class ClientPortalIbkrClient:
             raise IbkrError("IBKR returned invalid historical market data")
         volume_factor = _number(raw.get("volumeFactor")) or 1
         candles = [
-            _normalize_web_historical_bar(bar, volume_factor)
+            _normalize_web_historical_bar(
+                bar, volume_factor, intraday=intraday_days is not None
+            )
             for bar in raw["data"]
             if isinstance(bar, dict)
         ]
@@ -246,6 +262,10 @@ class ClientPortalIbkrClient:
             "symbol": symbol.upper(),
             "currency": str(position.get("currency") or "USD").strip(),
             "candles": candles,
+            **(
+                {"interval": "1m" if intraday_days == 1 else "15m"}
+                if intraday_days else {}
+            ),
         }
 
     def performance(self, period: str) -> dict[str, Any]:
@@ -605,7 +625,14 @@ class NativeIbkrClient:
         finally:
             ib.disconnect()
 
-    def historical(self, symbol: str, years: int) -> dict[str, Any]:
+    def intraday(self, symbol: str, days: int) -> dict[str, Any]:
+        if days not in (1, 5):
+            raise IbkrError("intraday days must be 1 or 5")
+        return self.historical(symbol, 1, intraday_days=days)
+
+    def historical(
+        self, symbol: str, years: int, *, intraday_days: int | None = None
+    ) -> dict[str, Any]:
         ib = self._connect()
         try:
             account = self._select_account(ib)
@@ -629,14 +656,19 @@ class NativeIbkrClient:
             if not str(getattr(contract, "exchange", "")).strip():
                 contract.exchange = "SMART"
 
+            duration = f"{years} Y"
+            bar_size = "1 day"
+            if intraday_days is not None:
+                duration = "1 D" if intraday_days == 1 else "1 W"
+                bar_size = "1 min" if intraday_days == 1 else "15 mins"
             bars = ib.reqHistoricalData(
                 contract,
                 endDateTime="",
-                durationStr=f"{years} Y",
-                barSizeSetting="1 day",
+                durationStr=duration,
+                barSizeSetting=bar_size,
                 whatToShow="TRADES",
                 useRTH=True,
-                formatDate=1,
+                formatDate=2 if intraday_days else 1,
                 timeout=30,
             )
             if not bars:
@@ -648,7 +680,14 @@ class NativeIbkrClient:
                 "source": "native",
                 "symbol": str(getattr(contract, "symbol", symbol)).strip(),
                 "currency": currency,
-                "candles": [_normalize_historical_bar(bar) for bar in bars],
+                "candles": [
+                    _normalize_historical_bar(bar, intraday=intraday_days is not None)
+                    for bar in bars
+                ],
+                **(
+                    {"interval": "1m" if intraday_days == 1 else "15m"}
+                    if intraday_days else {}
+                ),
             }
         except IbkrError:
             raise
@@ -725,6 +764,21 @@ def make_handler(client: Any, token: str) -> type[BaseHTTPRequestHandler]:
                     self._json(200, {"status": "ok", "source": "ibkr"})
                 elif parsed.path == "/v1/portfolio":
                     self._json(200, client.portfolio())
+                elif parsed.path == "/v1/intraday":
+                    query = parse_qs(parsed.query)
+                    symbol = (query.get("symbol") or [""])[0].strip()
+                    if not symbol or len(symbol) > 32:
+                        self._json(400, {"error": "invalid symbol"})
+                        return
+                    try:
+                        days = int((query.get("days") or ["1"])[0])
+                    except ValueError:
+                        self._json(400, {"error": "invalid days"})
+                        return
+                    if days not in (1, 5):
+                        self._json(400, {"error": "intraday days must be 1 or 5"})
+                        return
+                    self._json(200, client.intraday(symbol, days))
                 elif parsed.path == "/v1/historical":
                     query = parse_qs(parsed.query)
                     symbol = (query.get("symbol") or [""])[0].strip()
@@ -829,7 +883,7 @@ def _normalize_web_position(value: Any) -> dict[str, Any]:
 
 
 def _normalize_web_historical_bar(
-    bar: dict[str, Any], volume_factor: float
+    bar: dict[str, Any], volume_factor: float, *, intraday: bool = False
 ) -> dict[str, Any]:
     timestamp = _number(bar.get("t"))
     if timestamp is None or timestamp <= 0:
@@ -839,8 +893,12 @@ def _normalize_web_historical_bar(
         .date()
         .isoformat()
     )
+    candle_date = (
+        datetime.fromtimestamp(timestamp / 1000, tz=timezone.utc).isoformat()
+        if intraday else day
+    )
     return {
-        "date": day,
+        "date": candle_date,
         "open": _required_number(bar.get("o")),
         "high": _required_number(bar.get("h")),
         "low": _required_number(bar.get("l")),
@@ -1010,9 +1068,13 @@ def _normalize_web_performance(
     }
 
 
-def _normalize_historical_bar(bar: Any) -> dict[str, Any]:
+def _normalize_historical_bar(bar: Any, *, intraday: bool = False) -> dict[str, Any]:
     raw_date = getattr(bar, "date", None)
-    if isinstance(raw_date, datetime):
+    if intraday:
+        if not isinstance(raw_date, datetime) or raw_date.tzinfo is None:
+            raise IbkrError("IBKR returned an invalid intraday candle timestamp")
+        candle_date = raw_date.astimezone(timezone.utc).isoformat()
+    elif isinstance(raw_date, datetime):
         candle_date = raw_date.date().isoformat()
     elif isinstance(raw_date, date):
         candle_date = raw_date.isoformat()

@@ -159,7 +159,7 @@ class IbkrTradeHistory {
       );
 }
 
-/// One daily historical candle returned by the self-hosted IBKR service.
+/// One OHLCV bar returned by the self-hosted IBKR service.
 class IbkrHistoricalCandle {
   final DateTime date;
   final double open;
@@ -188,7 +188,7 @@ class IbkrHistoricalCandle {
       );
 }
 
-/// Historical daily bars and quote currency for one IBKR stock position.
+/// Historical OHLCV bars and quote currency for one IBKR stock position.
 class IbkrHistoricalSeries {
   final String symbol;
   final String currency;
@@ -486,6 +486,35 @@ class IbkrApiClient {
         return IbkrHistoricalSeries.fromJson(
           _decodeJsonObject(response, '/v1/historical'),
         );
+      },
+    );
+  }
+
+  /// Fetches timestamped bars for the latest session or five trading days.
+  Future<IbkrHistoricalSeries> fetchIntradayCandles(
+    String symbol, {
+    int days = 1,
+  }) {
+    if (days != 1 && days != 5) {
+      throw ArgumentError.value(days, 'days', 'Expected 1 or 5');
+    }
+    return backgroundNetworkCoordinator.coalesce<IbkrHistoricalSeries>(
+      'ibkr.intraday',
+      (config, symbol, days),
+      () async {
+        final response = await _request(
+          '/v1/intraday',
+          queryParameters: {'symbol': symbol, 'days': '$days'},
+        );
+        final body = _decodeJsonObject(response, '/v1/intraday');
+        if (body['interval'] != (days == 1 ? '1m' : '15m')) {
+          throw StateError('IBKR returned an unexpected intraday interval');
+        }
+        final series = IbkrHistoricalSeries.fromJson(body);
+        if (series.candles.any((bar) => !bar.date.isUtc)) {
+          throw StateError('IBKR intraday bars must include UTC timestamps');
+        }
+        return series;
       },
     );
   }

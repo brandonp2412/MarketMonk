@@ -97,11 +97,15 @@ String symbolPriceUnit(String symbol) {
 }
 
 /// Ensures the native currency and its exchange rate are cached for [symbol].
-/// Returns immediately if already cached. Remote metadata is best-effort so
-/// local portfolio and chart UI remain responsive when Yahoo is unavailable.
-Future<void> fetchSymbolCurrencyAndRate(String symbol) async {
+/// Uses [rawCurrency] when a price response already supplies the quote unit.
+/// Remote metadata is best-effort, and missing rates use the persisted cache.
+Future<void> fetchSymbolCurrencyAndRate(
+  String symbol, {
+  String? rawCurrency,
+}) async {
   final canonicalSymbol = canonicalMarketSymbol(symbol);
   if (canonicalSymbol.isEmpty) return;
+  if (rawCurrency != null) cacheSymbolMeta(canonicalSymbol, rawCurrency);
   try {
     await backgroundNetworkCoordinator.coalesce<void>(
       'yahoo.symbolMetadata',
@@ -917,7 +921,20 @@ Future<void> syncCandles(
 /// free and cent-quoted stocks (GBp/ZAc) keep the right scale offline.
 Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
   final canonicalSymbol = canonicalMarketSymbol(symbol);
-  if (_symbolCurrencies.containsKey(canonicalSymbol)) return;
+  final cachedCurrency = _symbolCurrencies[canonicalSymbol];
+  if (cachedCurrency != null) {
+    if (cachedCurrency != 'USD' &&
+        !allRatesFromUsd.containsKey(cachedCurrency)) {
+      final prefs = await SqliteSettings.getInstance();
+      final savedRate = prefs.getDouble('exchangeRate_$cachedCurrency');
+      if (savedRate != null && savedRate.isFinite && savedRate > 0) {
+        allRatesFromUsd[cachedCurrency] = savedRate;
+      } else {
+        await _fetchAndCacheRate(cachedCurrency);
+      }
+    }
+    return;
+  }
 
   final metadata = await marketDataDatabase.readSymbolMetadata(canonicalSymbol);
   final savedRaw = rawCurrencyFromMetadata(metadata);

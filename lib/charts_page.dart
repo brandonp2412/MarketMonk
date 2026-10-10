@@ -14,6 +14,7 @@ import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
+import 'package:market_monk/intraday_market_data.dart';
 import 'package:market_monk/ibkr_cash_out_pnl.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
@@ -48,6 +49,7 @@ class ChartsPage extends StatefulWidget {
 
   /// Ticker to display when opening a chart from another screen.
   final String? initialSymbol;
+  final IntradayMarketData? _intradayData;
   final Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? _ibkrLoader;
   final Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
       _ibkrPerformanceLoader;
@@ -56,10 +58,12 @@ class ChartsPage extends StatefulWidget {
     super.key,
     this.isActive = true,
     this.initialSymbol,
+    IntradayMarketData? intradayData,
     Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? ibkrLoader,
     Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
         ibkrPerformanceLoader,
-  })  : _ibkrLoader = ibkrLoader,
+  })  : _intradayData = intradayData,
+        _ibkrLoader = ibkrLoader,
         _ibkrPerformanceLoader = ibkrPerformanceLoader;
 
   @override
@@ -97,6 +101,12 @@ class ChartsPageState extends State<ChartsPage>
   (DateTime, DateTime)? _customChartRange;
 
   Stream<List<CandleTicker>>? _stockStream;
+  late final _intradayData = widget._intradayData ?? IntradayMarketData();
+  IntradaySeries? _intradaySeries;
+  int _stockLoadGeneration = 0;
+
+  bool get _usesIntraday =>
+      years == 0 && months == 0 && (days == 1 || days == 5);
 
   Map<String, List<_DateValue>> _portfolioSeriesByAccount = {};
   Map<String, double> _portfolioReturnsByAccount = {};
@@ -143,6 +153,8 @@ class ChartsPageState extends State<ChartsPage>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isActive && !widget.isActive) {
       _portfolioLoadGeneration++;
+      _stockLoadGeneration++;
+      _networkLoading = false;
       _stockStream = null;
       return;
     }
@@ -150,7 +162,9 @@ class ChartsPageState extends State<ChartsPage>
       runDetachedTask(_loadFavorites(), 'Failed to reload favorites');
       final accountManager = context.read<AccountManager>();
       _hydratePortfolioSeriesFromCache(accountManager);
-      if (_selectedSymbol != null) _setStockStream(_selectedSymbol!);
+      if (_selectedSymbol != null) {
+        runDetachedTask(_loadSelectedStock(), 'Failed to reload stock chart');
+      }
       runDetachedTask(
         _syncCandlesInBackground(refreshPerformance: true),
         'Failed to refresh chart data after activation',
@@ -183,13 +197,23 @@ class ChartsPageState extends State<ChartsPage>
     setState(() {
       years = periodYears;
       months = periodMonths;
-      days = periodDays;
+      days = periodDays == 1 &&
+              widget.initialSymbol == null &&
+              _selectedSymbol == null
+          ? 5
+          : periodDays;
       _chartPeriodLoaded = true;
     });
 
     final accountManager = context.read<AccountManager>();
     _hydratePortfolioSeriesFromCache(accountManager);
     if (widget.isActive) {
+      if (_selectedSymbol != null) {
+        runDetachedTask(
+          _loadSelectedStock(),
+          'Failed to initialize stock period',
+        );
+      }
       runDetachedTask(
         () async {
           await _syncCandlesInBackground(refreshPerformance: true);
@@ -481,7 +505,12 @@ class ChartsPageState extends State<ChartsPage>
         'Failed to refresh charts after account change',
       );
     }
-    if (_selectedSymbol != null) _setStockStream(_selectedSymbol!);
+    if (_selectedSymbol != null) {
+      runDetachedTask(
+        _loadSelectedStock(forceRefresh: ibkrChanged),
+        'Failed to reload stock after account change',
+      );
+    }
   }
 
   @override
@@ -522,6 +551,7 @@ class ChartsPageState extends State<ChartsPage>
     _searchController.dispose();
     _searchFocus.dispose();
     _yahooApi.dispose();
+    _stockLoadGeneration++;
     super.dispose();
   }
 
@@ -566,39 +596,30 @@ class ChartsPageState extends State<ChartsPage>
   Future<void> _refreshCurrentChart() async {
     if (!mounted || !widget.isActive || _networkLoading) return;
 
+    if (_mode == _ChartMode.stock && _selectedSymbol != null) {
+      await _loadSelectedStock(forceRefresh: true);
+      return;
+    }
     setState(() {
       _networkLoading = true;
       _stockError = null;
     });
 
     try {
-      if (_mode == _ChartMode.stock && _selectedSymbol != null) {
-        clearSyncCache(_selectedSymbol!);
-        final accountManager = context.read<AccountManager>();
-        await syncCandles(
-          _selectedSymbol!,
-          ibkrConfig: accountManager.ibkrConfigFor(),
-          syncNamespace: accountManager.activeAccount,
-          requiredFrom: _requiredCandleStart(),
-          forceRefresh: true,
+      clearAllSyncCache();
+      await _refreshAllPortfolioCandles();
+      await _loadAllPortfolios(
+        refreshIbkrPortfolio: true,
+        forceIbkrPortfolioRefresh: true,
+      );
+      if (mounted && widget.isActive) {
+        runDetachedTask(
+          _loadAllPortfolios(
+            refreshIbkrPerformance: true,
+            forceIbkrPerformanceRefresh: true,
+          ),
+          'Failed to refresh IBKR performance history',
         );
-        if (mounted) _setStockStream(_selectedSymbol!);
-      } else {
-        clearAllSyncCache();
-        await _refreshAllPortfolioCandles();
-        await _loadAllPortfolios(
-          refreshIbkrPortfolio: true,
-          forceIbkrPortfolioRefresh: true,
-        );
-        if (mounted && widget.isActive) {
-          runDetachedTask(
-            _loadAllPortfolios(
-              refreshIbkrPerformance: true,
-              forceIbkrPerformanceRefresh: true,
-            ),
-            'Failed to refresh IBKR performance history',
-          );
-        }
       }
     } catch (error, stackTrace) {
       talker.handle(error, stackTrace, 'Chart refresh failed');
@@ -1245,37 +1266,74 @@ class ChartsPageState extends State<ChartsPage>
       _customChartRange = null;
       _mode = _ChartMode.stock;
       _selectedSymbol = symbol;
-      _networkLoading = true;
+      _networkLoading = widget.isActive;
       _stockError = null;
     });
+    if (_chartPeriodLoaded) {
+      runDetachedTask(_loadSelectedStock(), 'Failed to load selected ticker');
+    }
+  }
+
+  Future<void> _loadSelectedStock({bool forceRefresh = false}) async {
+    if (!mounted || !widget.isActive || _selectedSymbol == null) return;
+    final generation = ++_stockLoadGeneration;
+    final symbol = _selectedSymbol!;
+    final accountManager = context.read<AccountManager>();
+    final config = accountManager.ibkrConfigFor();
+    final namespace = accountManager.activeAccount;
+    final intraday = _usesIntraday;
+    final selectedDays = days;
+    setState(() {
+      _networkLoading = true;
+      _stockError = null;
+      _intradaySeries = null;
+      _nativeCurrency = symbolCurrency(symbol);
+      _centDivisor = symbolCentDivisor(symbol);
+    });
     _setStockStream(symbol);
-    runDetachedTask(
-      () async {
-        String? err;
-        try {
-          final accountManager = context.read<AccountManager>();
-          await syncCandles(
-            symbol,
-            ibkrConfig: accountManager.ibkrConfigFor(),
-            syncNamespace: accountManager.activeAccount,
-            requiredFrom: _requiredCandleStart(),
-          );
-        } catch (error, stackTrace) {
-          talker.handle(error, stackTrace, 'Selected ticker sync failed');
-          err = error.toString();
-        }
+
+    bool isCurrent() =>
+        mounted &&
+        widget.isActive &&
+        _mode == _ChartMode.stock &&
+        _selectedSymbol == symbol &&
+        generation == _stockLoadGeneration;
+    try {
+      if (intraday) {
+        final series = await _intradayData.fetch(
+          symbol,
+          days: selectedDays,
+          config: config,
+          forceRefresh: forceRefresh,
+        );
+        if (!isCurrent()) return;
+        await fetchSymbolCurrencyAndRate(symbol, rawCurrency: series.currency);
+        if (!isCurrent()) return;
+        requireUsdRate(symbolCurrency(symbol));
+        setState(() => _intradaySeries = series);
+      } else {
+        await syncCandles(
+          symbol,
+          ibkrConfig: config,
+          syncNamespace: namespace,
+          requiredFrom: _requiredCandleStart(),
+          forceRefresh: forceRefresh,
+        );
+        if (!isCurrent()) return;
         await fetchSymbolCurrencyAndRate(symbol);
-        if (!mounted) return;
-        _setStockStream(symbol);
-        setState(() {
-          _networkLoading = false;
-          _stockError = err;
-          _nativeCurrency = symbolCurrency(symbol);
-          _centDivisor = symbolCentDivisor(symbol);
-        });
-      }(),
-      'Failed to load selected ticker',
-    );
+        if (!isCurrent()) return;
+      }
+      setState(() {
+        _nativeCurrency = symbolCurrency(symbol);
+        _centDivisor = symbolCentDivisor(symbol);
+      });
+      _setStockStream(symbol);
+    } catch (error, stackTrace) {
+      talker.handle(error, stackTrace, 'Selected ticker sync failed');
+      if (isCurrent()) setState(() => _stockError = error.toString());
+    } finally {
+      if (isCurrent()) setState(() => _networkLoading = false);
+    }
   }
 
   DateTime _requiredCandleStart() {
@@ -1288,6 +1346,11 @@ class ChartsPageState extends State<ChartsPage>
   void _setStockStream(String symbol) {
     if (!widget.isActive) {
       _stockStream = null;
+      return;
+    }
+    if (_usesIntraday) {
+      _stockStream = null;
+      setState(() {});
       return;
     }
     final after = _requiredCandleStart();
@@ -1376,25 +1439,9 @@ class ChartsPageState extends State<ChartsPage>
       );
     }
     if (_mode == _ChartMode.stock && _selectedSymbol != null) {
-      final symbol = _selectedSymbol!;
-      _setStockStream(symbol);
       runDetachedTask(
-        () async {
-          final accountManager = context.read<AccountManager>();
-          await syncCandles(
-            symbol,
-            ibkrConfig: accountManager.ibkrConfigFor(),
-            syncNamespace: accountManager.activeAccount,
-            requiredFrom: _requiredCandleStart(),
-          );
-          if (mounted &&
-              widget.isActive &&
-              _mode == _ChartMode.stock &&
-              _selectedSymbol == symbol) {
-            _setStockStream(symbol);
-          }
-        }(),
-        'Failed to backfill selected chart period',
+        _loadSelectedStock(),
+        'Failed to load selected chart period',
       );
     } else {
       runDetachedTask(
@@ -1408,6 +1455,7 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   void _clearSearch() {
+    final resetPeriod = years == 0 && months == 0 && days == 1;
     _searchController.clear();
     _searchFocus.unfocus();
     _yahooApi.cancelPendingSearch();
@@ -1416,9 +1464,12 @@ class ChartsPageState extends State<ChartsPage>
       _mode = _ChartMode.portfolio;
       _searchResults = [];
       _selectedSymbol = null;
+      _stockLoadGeneration++;
+      _networkLoading = false;
       _searchLoading = false;
       _stockError = null;
     });
+    if (resetPeriod) _onPeriodSelected(selectedDays: 5);
   }
 
   @override
@@ -1734,6 +1785,7 @@ class ChartsPageState extends State<ChartsPage>
 
   Widget _buildTimeChips() {
     final options = [
+      if (_mode == _ChartMode.stock) ('1d', 0, 0, 1),
       ('5d', 0, 0, 5),
       ('1m', 0, 1, 0),
       ('2m', 0, 2, 0),
@@ -1779,13 +1831,45 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   List<Widget> _buildStockContent(SettingsState settings) {
+    final intradaySnapshot = AsyncSnapshot.withData(
+      ConnectionState.done,
+      [
+        for (final bar in _intradaySeries?.candles ?? <IbkrHistoricalCandle>[])
+          CandleTicker(
+            candle: CandlesCompanion(
+              date: Value(bar.date.toLocal()),
+              close: Value(bar.close),
+            ),
+          ),
+      ],
+    );
     return [
-      StreamBuilder(
-        stream: _stockStream,
-        builder: (context, snapshot) =>
-            _buildStockChart(context, snapshot, settings),
-      ),
-      StreamBuilder(stream: _stockStream, builder: _buildStockSummary),
+      if (_usesIntraday)
+        _buildStockChart(context, intradaySnapshot, settings)
+      else
+        StreamBuilder(
+          key: ValueKey('stock-chart-$_stockLoadGeneration'),
+          stream: _stockStream,
+          builder: (context, snapshot) =>
+              _buildStockChart(context, snapshot, settings),
+        ),
+      if (_usesIntraday && _intradaySeries != null)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            '${_intradaySeries!.source} · ${days == 1 ? "1 min" : "15 min"} · ${context.l10n.text('Local time')}',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+      if (_usesIntraday)
+        _buildStockSummary(context, intradaySnapshot)
+      else
+        StreamBuilder(
+          key: ValueKey('stock-summary-$_stockLoadGeneration'),
+          stream: _stockStream,
+          builder: _buildStockSummary,
+        ),
     ];
   }
 
@@ -1808,7 +1892,12 @@ class ChartsPageState extends State<ChartsPage>
           child: Center(child: Text(_stockError!)),
         );
       }
-      return SizedBox(height: height, child: const Center());
+      return SizedBox(
+        height: height,
+        child: Center(
+          child: _networkLoading ? const CircularProgressIndicator() : null,
+        ),
+      );
     }
 
     final candles = snapshot.data!.map((tc) => tc.candle).toList();
@@ -1867,6 +1956,7 @@ class ChartsPageState extends State<ChartsPage>
           spots: spots,
           showRollingAverage: _showRollingAverage,
           nativeCurrency: _nativeCurrency,
+          intraday: _usesIntraday,
         ),
       ),
     );

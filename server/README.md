@@ -7,6 +7,7 @@ The HTTP interface consumed by MarketMonk is the same for both supported backend
 - `GET /v1/health`
 - `GET /v1/portfolio`
 - `GET /v1/historical?symbol=AAPL&years=10`
+- `GET /v1/intraday?symbol=AAPL&days=1`
 - `GET /v1/performance?period=1M`
 
 Every request requires `Authorization: Bearer <MARKET_MONK_IBKR_TOKEN>`. The bridge exposes no order endpoint and rejects POST requests.
@@ -93,6 +94,15 @@ The default listener is `127.0.0.1:8091`. Put HTTPS or a private VPN in front of
 `GET /v1/portfolio` returns a normalized read-only snapshot containing the masked account ID, summary values, ledger values, and current positions with quantity, average cost, current market price/value, daily realized P/L, daily unrealized P/L, currency, exchange, and contract ID when supplied by IBKR.
 
 `GET /v1/historical?symbol=AAPL&years=10` is available for a current stock position visible to the selected backend. `years` must be from 1 through 10. It returns daily OHLCV bars and the contract currency. The endpoint remains read-only and the service still exposes no order route.
+
+`GET /v1/intraday?symbol=AAPL&days=1` returns regular-hours OHLCV bars with UTC ISO 8601 timestamps, the contract currency, and `interval`. The only accepted `days` values are `1` (the default, one-minute bars) and `5` (15-minute bars over the last week). Both backends restrict this endpoint to current stock positions and use the username's market-data permissions. The native backend requests `formatDate=2` to preserve UTC bar timestamps. The Client Portal backend requests `period=1d&bar=1min` or `period=1w&bar=15min`.
+
+These requests return the currently available history rather than opening a streaming subscription. If the market is closed, the available bars may belong to the preceding trading session. Missing subscriptions or unavailable history produce an error; MarketMonk then tries Yahoo. Deploy the updated proxy to enable this endpoint on an existing installation.
+
+Intraday API references:
+
+- https://www.interactivebrokers.com/docs/tws-api/doc/market-data-historical/historical-bars/requesting-historical-bars
+- https://www.interactivebrokers.com/docs/web-api/v1/endpoints/market-data/historical-market-data
 
 `GET /v1/performance?period=1Y` returns PortfolioAnalyst NAV plus cumulative TWR data through the Client Portal Gateway, including when the main portfolio backend is native TWS. The proxy accepts `12M` as a compatibility alias for `1Y`.
 

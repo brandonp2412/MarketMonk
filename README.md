@@ -9,7 +9,7 @@ Track stocks on any platform 📈
 
 # Features
 
-- 💹 Line graph stocks (with Yahoo Finance Data)
+- 💹 Stock charts with daily and intraday Yahoo Finance data
 - 🥧 Build and monitor your portfolio
 - 🏦 Optional read-only Interactive Brokers live portfolio source
 - ⚙️ Customize to your hearts desires
@@ -72,7 +72,11 @@ Market Monk includes an installable `mm` terminal client for inspecting and edit
 
 ## Interactive Brokers
 
-MarketMonk can use the standalone read-only proxy in [`server/`](server/) as the current portfolio source. The recommended backend connects to the standard TWS / IB Gateway socket API; the Client Portal Web API remains available as an alternative. With the native backend, current IBKR stock positions also prefer IBKR daily historical bars for charts. Yahoo remains the fallback for unheld symbols or when IBKR historical data is unavailable. The proxy is independent of any personal trading bot or login automation.
+MarketMonk can use the standalone read-only proxy in [`server/`](server/) as the current portfolio source. The recommended backend connects to the standard TWS / IB Gateway socket API; the Client Portal Web API remains available as an alternative. Current IBKR stock positions also prefer IBKR historical bars for charts. Yahoo remains the fallback for unheld symbols or when IBKR historical data is unavailable. The proxy is independent of any personal trading bot or login automation.
+
+Stock charts offer `1d` with one-minute bars for the latest trading session and `5d` with 15-minute bars. Both IBKR backends support these ranges through `/v1/intraday`; update the self-hosted proxy to use IBKR intraday data. Older proxies automatically fall back to Yahoo. IBKR data requires the relevant market-data permissions.
+
+Intraday charts show the provider and local device time. Pull to refresh or use the desktop refresh button to update prices; these are fetched bars, not a streaming quote subscription. Intraday responses are cached in memory for one minute and kept separate from the daily database used by portfolio charts. Longer stock ranges continue to use daily history.
 
 ## Migrations
 

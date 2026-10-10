@@ -3,11 +3,12 @@ import sqlite3
 import tempfile
 import threading
 import unittest
-from datetime import date
+from datetime import date, datetime, timezone
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from types import SimpleNamespace
+from urllib.parse import parse_qs, urlparse
 
 from ibkr_proxy import (
     ClientPortalIbkrClient,
@@ -109,6 +110,12 @@ class FakeClient:
             "ledger": {"BASE": {"cashbalance": 100}},
             "positions": [],
         }
+
+    def intraday(self, symbol, days):
+        result = self.historical(symbol, 1)
+        result["interval"] = "1m" if days == 1 else "15m"
+        result["candles"][0]["date"] = "2026-08-28T14:30:00+00:00"
+        return result
 
     def historical(self, symbol, years):
         return {
@@ -326,6 +333,14 @@ class FakeNativeIb:
 
     def reqHistoricalData(self, contract, **kwargs):
         self.historical_request = (contract, kwargs)
+        if kwargs["barSizeSetting"] != "1 day":
+            return [
+                SimpleNamespace(
+                    date=datetime(2026, 8, 28, 14, minute, tzinfo=timezone.utc),
+                    open=198, high=202, low=197, close=200, volume=1234,
+                )
+                for minute in (30, 31)
+            ]
         return [
             SimpleNamespace(
                 date=date(2026, 8, 28),
@@ -406,6 +421,22 @@ class ProxyTests(unittest.TestCase):
         self.assertTrue(
             any(endpoint.startswith("iserver/marketdata/history?") for endpoint in client.endpoints)
         )
+
+    def test_client_portal_intraday_preserves_utc_time_and_bar_size(self):
+        for days, period, bar in [(1, "1d", "1min"), (5, "1w", "15min")]:
+            with self.subTest(days=days):
+                client = RecordingIbkrClient()
+                history = client.intraday("AAPL", days)
+                self.assertEqual(history["interval"], "1m" if days == 1 else "15m")
+                expected = datetime.fromtimestamp(1787961600, tz=timezone.utc).isoformat()
+                self.assertEqual(history["candles"][0]["date"], expected)
+                self.assertEqual(history["candles"][0]["volume"], 1234)
+                endpoint = next(value for value in client.endpoints
+                                if value.startswith("iserver/marketdata/history?"))
+                query = parse_qs(urlparse(endpoint).query)
+                self.assertEqual(query["period"], [period])
+                self.assertEqual(query["bar"], [bar])
+                self.assertEqual(query["outsideRth"], ["false"])
 
     def test_client_portal_returns_current_position_trade_history(self):
         client = RecordingIbkrClient()
@@ -754,6 +785,31 @@ class ProxyTests(unittest.TestCase):
         self.assertTrue(kwargs["useRTH"])
         self.assertTrue(fake.disconnected)
 
+    def test_native_intraday_preserves_multiple_bars_and_requests_utc(self):
+        for days, duration, bar in [(1, "1 D", "1 min"), (5, "1 W", "15 mins")]:
+            with self.subTest(days=days):
+                fake = FakeNativeIb()
+                client = NativeIbkrClient(config(backend="native"), ib_factory=lambda: fake)
+                history = client.intraday("AAPL", days)
+                self.assertEqual(len(history["candles"]), 2)
+                self.assertEqual(history["candles"][0]["date"], "2026-08-28T14:30:00+00:00")
+                self.assertEqual(history["candles"][1]["date"], "2026-08-28T14:31:00+00:00")
+                _, kwargs = fake.historical_request
+                self.assertEqual(kwargs["durationStr"], duration)
+                self.assertEqual(kwargs["barSizeSetting"], bar)
+                self.assertEqual(kwargs["formatDate"], 2)
+                self.assertTrue(kwargs["useRTH"])
+                self.assertTrue(fake.disconnected)
+
+    def test_intraday_rejects_non_held_stocks_and_unsupported_ranges(self):
+        for client in [RecordingIbkrClient(), NativeIbkrClient(
+            config(backend="native"), ib_factory=FakeNativeIb
+        )]:
+            with self.assertRaisesRegex(IbkrError, "current stock positions only"):
+                client.intraday("MSFT", 1)
+            with self.assertRaisesRegex(IbkrError, "days must be 1 or 5"):
+                client.intraday("AAPL", 30)
+
     def test_native_historical_rejects_non_held_symbol(self):
         fake = FakeNativeIb()
         client = NativeIbkrClient(
@@ -762,6 +818,32 @@ class ProxyTests(unittest.TestCase):
 
         with self.assertRaisesRegex(IbkrError, "current stock positions only"):
             client.historical("MSFT", 1)
+
+    def test_intraday_http_validates_parameters_and_requires_authentication(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(FakeClient(), "x" * 32))
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.shutdown)
+        self.addCleanup(server.server_close)
+        connection = HTTPConnection("127.0.0.1", server.server_port)
+        self.addCleanup(connection.close)
+        connection.request("GET", "/v1/intraday?symbol=AAPL")
+        response = connection.getresponse()
+        self.assertEqual(response.status, 401)
+        response.read()
+        for path in ["?symbol=AAPL&days=30", "?symbol=AAPL&days=bad", "?days=1"]:
+            connection.request("GET", "/v1/intraday" + path,
+                               headers={"Authorization": f"Bearer {'x' * 32}"})
+            response = connection.getresponse()
+            self.assertEqual(response.status, 400)
+            response.read()
+        for days in (1, 5):
+            connection.request("GET", f"/v1/intraday?symbol=AAPL&days={days}",
+                               headers={"Authorization": f"Bearer {'x' * 32}"})
+            response = connection.getresponse()
+            self.assertEqual(response.status, 200)
+            body = json.loads(response.read())
+            self.assertEqual(body["interval"], "1m" if days == 1 else "15m")
+            self.assertEqual(body["candles"][0]["date"], "2026-08-28T14:30:00+00:00")
 
     def test_http_api_requires_bearer_and_returns_portfolio(self):
         server = ThreadingHTTPServer(
