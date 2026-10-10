@@ -77,6 +77,7 @@ class ChartsPageState extends State<ChartsPage>
   Stream<List<StoredCandle>>? _favoriteChartStream;
   String _favoriteChartStreamKey = '';
   bool _networkLoading = false;
+  bool _showRollingAverage = false;
   String? _stockError;
   String _nativeCurrency = 'USD';
   double _centDivisor = 1.0;
@@ -1753,6 +1754,14 @@ class ChartsPageState extends State<ChartsPage>
     ];
 
     final chips = [
+      _PeriodChip(
+        key: const Key('chart-rolling-average'),
+        label: context.l10n.text('Rolling average'),
+        selected: _showRollingAverage,
+        onTap: () => setState(
+          () => _showRollingAverage = !_showRollingAverage,
+        ),
+      ),
       for (final (label, optionYears, optionMonths, optionDays) in options)
         _PeriodChip(
           key: Key('chart-period-$label'),
@@ -1871,6 +1880,7 @@ class ChartsPageState extends State<ChartsPage>
           ),
           dates: candles.map((candle) => candle.date.value),
           spots: spots,
+          showRollingAverage: _showRollingAverage,
           nativeCurrency: _nativeCurrency,
         ),
       ),
@@ -2216,6 +2226,7 @@ class ChartsPageState extends State<ChartsPage>
         range: _chartRangeFor(sortedDates),
         onRangeChanged: (range) => _setChartRange(sortedDates, range),
         series: chartSeries,
+        showRollingAverage: _showRollingAverage,
         xLabels: [for (final date in sortedDates) formatter.format(date)],
         pointCount: sortedDates.length,
         yLabelFormatter: (value) => scaleForComparison

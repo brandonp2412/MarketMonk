@@ -223,6 +223,9 @@ class MarketLineChart extends StatelessWidget {
   final String Function(double value) yLabelFormatter;
   final String Function(PlotMark mark) tooltipRowLabel;
   final bool curveLines;
+
+  /// Draws a dashed trailing average of up to 20 observations per series.
+  final bool showRollingAverage;
   final double curveSmoothness;
   final double leftInset;
   final String accessibilityLabel;
@@ -242,6 +245,7 @@ class MarketLineChart extends StatelessWidget {
     required this.yLabelFormatter,
     required this.tooltipRowLabel,
     required this.curveLines,
+    this.showRollingAverage = false,
     required this.curveSmoothness,
     this.leftInset = 64,
     this.accessibilityLabel = 'Price chart',
@@ -352,6 +356,7 @@ class MarketLineChart extends StatelessWidget {
         minY: yBounds.$1,
         maxY: yBounds.$2,
         curveLines: curveLines,
+        showRollingAverage: showRollingAverage,
         curveSmoothness: curveSmoothness,
         xLabels: [
           for (var i = 0; i < xLabels.length; i++)
@@ -756,6 +761,9 @@ class _MarketLineChartRenderer extends ChartRenderer
   final double minY;
   final double maxY;
   final bool curveLines;
+
+  /// Draws a dashed trailing average of up to 20 observations per series.
+  final bool showRollingAverage;
   final double curveSmoothness;
   final List<_LineChartAxisLabel> xLabels;
   final int? uniformXCount;
@@ -771,6 +779,7 @@ class _MarketLineChartRenderer extends ChartRenderer
     required this.minY,
     required this.maxY,
     required this.curveLines,
+    this.showRollingAverage = false,
     required this.curveSmoothness,
     required this.xLabels,
     required this.uniformXCount,
@@ -839,6 +848,7 @@ class _MarketLineChartRenderer extends ChartRenderer
       minY: bounds.$1,
       maxY: bounds.$2,
       curveLines: curveLines,
+      showRollingAverage: showRollingAverage,
       curveSmoothness: curveSmoothness,
       xLabels: [
         for (final label in xLabels)
@@ -1043,6 +1053,50 @@ class _MarketLineChartRenderer extends ChartRenderer
     }
   }
 
+  void _drawRollingAverage(
+    Canvas canvas,
+    ChartBounds bounds,
+    MarketLineChartSeries line,
+    double progress,
+  ) {
+    if (line.points.length < 2) return;
+    final averages = <Offset>[];
+    var total = 0.0;
+    for (var index = 0; index < line.points.length; index++) {
+      total += line.points[index].y;
+      if (index >= 20) total -= line.points[index - 20].y;
+      averages.add(
+        Offset(
+          _xForPoint(line.points[index], index, bounds),
+          _yForValue(total / min(index + 1, 20), bounds),
+        ),
+      );
+    }
+    final paint = Paint()
+      ..color = line.color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..isAntiAlias = true;
+    canvas.save();
+    canvas.clipRect(
+      Rect.fromLTRB(
+        bounds.left,
+        bounds.top,
+        bounds.left + bounds.width * progress,
+        bounds.bottom,
+      ),
+    );
+    for (final metric in polylinePath(averages).computeMetrics()) {
+      for (var distance = 0.0; distance < metric.length; distance += 10) {
+        canvas.drawPath(
+          metric.extractPath(distance, min(distance + 5, metric.length)),
+          paint,
+        );
+      }
+    }
+    canvas.restore();
+  }
+
   @override
   void draw(
     Canvas canvas,
@@ -1062,6 +1116,11 @@ class _MarketLineChartRenderer extends ChartRenderer
         fill: series[i].fill,
         progress: progress,
       );
+    }
+    if (showRollingAverage) {
+      for (final line in series) {
+        _drawRollingAverage(canvas, bounds, line, progress);
+      }
     }
   }
 

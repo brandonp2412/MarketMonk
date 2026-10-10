@@ -12,6 +12,9 @@ class TickerLine extends StatelessWidget {
   final List<MarketLineChartPoint> spots;
   final Iterable<DateTime> dates;
 
+  /// Overlays a trailing average of up to 20 price observations.
+  final bool showRollingAverage;
+
   /// Inclusive columns selected by the chart's parent.
   final (int, int)? range;
 
@@ -26,6 +29,7 @@ class TickerLine extends StatelessWidget {
     required this.spots,
     required this.dates,
     this.nativeCurrency = 'USD',
+    this.showRollingAverage = false,
     this.range,
     this.onRangeChanged,
   });
@@ -47,6 +51,7 @@ class TickerLine extends StatelessWidget {
 
     return MarketLineChart(
       range: range,
+      showRollingAverage: showRollingAverage,
       onRangeChanged: onRangeChanged,
       series: [
         MarketLineChartSeries(
