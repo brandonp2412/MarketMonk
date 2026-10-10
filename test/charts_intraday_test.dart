@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:market_monk/charts_page.dart';
+import 'package:market_monk/ibkr_api.dart';
+import 'package:market_monk/main.dart';
 import 'package:market_monk/intraday_market_data.dart';
 import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/settings_state.dart';
@@ -59,6 +61,7 @@ void main() {
     String? initialSymbol = 'VOD.L',
     List<String> favorites = const [],
     int days = 1,
+    Future<void> Function(AccountManager)? configureAccounts,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1000, 900);
@@ -76,6 +79,7 @@ void main() {
     allRatesFromUsd.remove('GBP');
     final accounts = testAccountManager();
     await accounts.init();
+    await configureAccounts?.call(accounts);
     await tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -196,10 +200,66 @@ void main() {
     expect(chart.xLabels.first, contains(RegExp(r'\d{2}:\d{2}')));
     expect(
       find.text(
-        'Account values are daily; stock prices are intraday in local time.',
+        'Estimated intraday portfolio and stock prices · Local time',
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets('portfolio 5d weights every holding and offers intraday 1d',
+      (tester) async {
+    final loader = IntradayMarketData(
+      yahooGet: (uri) async => _prices(
+        uri.path.endsWith('AAPL') ? 100 : 50,
+        currency: 'USD',
+        count: uri.queryParameters['range'] == '5d' ? 12 : 3,
+        intervalSeconds: uri.queryParameters['range'] == '5d' ? 900 : 60,
+      ),
+    );
+    await mountChart(
+      tester,
+      loader,
+      initialSymbol: null,
+      days: 5,
+      configureAccounts: (accounts) async {
+        await accounts.setIbkrConfig(
+          'Default',
+          const IbkrAccountConfig(enabled: true),
+        );
+        await accounts.cachePortfolio(
+          'Default',
+          [
+            for (final entry in {'AAPL': 2.0, 'MSFT': 3.0}.entries)
+              Position(
+                symbol: entry.key,
+                name: entry.key,
+                nativeCurrency: 'USD',
+                netShares: entry.value,
+                avgCost: 50,
+                currentPrice: 100,
+                firstBuyDate: DateTime(2026),
+                lastBuyDate: DateTime(2026),
+              ),
+          ],
+          const IbkrAccountValue(value: 1000, currency: 'USD'),
+        );
+      },
+    );
+    await tester.pumpAndSettle();
+    var chart = tester.widget<MarketLineChart>(find.byType(MarketLineChart));
+    expect(chart.series.single.name, 'Default');
+    expect(chart.series.single.points, hasLength(12));
+    expect(chart.series.single.points.first.y, 945);
+    expect(chart.series.single.points.last.y, 1000);
+    expect(chart.xLabels.first, contains(RegExp(r'\d{2}:\d{2}')));
+    expect(find.textContaining('Estimated intraday portfolio'), findsOneWidget);
+    expect(find.textContaining('TWR'), findsNothing);
+    await tester.tap(find.byKey(const Key('chart-period-1d')));
+    await tester.pumpAndSettle();
+    chart = tester.widget<MarketLineChart>(find.byType(MarketLineChart));
+    expect(chart.series.single.points, hasLength(3));
+    expect(chart.series.single.points.first.y, 990);
+    expect(chart.series.single.points.last.y, 1000);
   });
 
   testWidgets('inactive charts do not request intraday bars', (tester) async {

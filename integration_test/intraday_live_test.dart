@@ -91,92 +91,146 @@ void main() {
           .writeAsBytes(bytes!.buffer.asUint8List());
     }
 
-    await mount();
-    await _waitFor(tester, () => find.text('SPY').evaluate().isNotEmpty);
-    await tester.tap(find.text('SPY'));
-    await _waitFor(
-      tester,
-      () =>
-          chart()?.series.any(
-                (series) => series.name == 'SPY' && series.points.length > 20,
-              ) ??
-          false,
-    );
-    final favorite = chart()!.series.single;
-    expect(favorite.points.length, greaterThan(20));
-    expect(chart()!.xLabels.any((label) => label.contains(':')), isTrue);
-    debugPrint(
-      'LIVE Yahoo favorite 5d rendered ${favorite.points.length} points',
-    );
-    await capture('yahoo-favorite-5d');
-
-    await tester.tap(find.text('SPY'), buttons: kSecondaryMouseButton);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Open chart'));
-    await _waitFor(
-      tester,
-      () => find.text('Yahoo · 15 min · Local time').evaluate().isNotEmpty,
-    );
-    expect(chart()!.series.single.points.length, greaterThan(20));
-    debugPrint(
-      'LIVE Yahoo stock 5d rendered ${chart()!.series.single.points.length} points',
-    );
-    await capture('yahoo-stock-5d');
-    await tester.tap(find.byKey(const Key('chart-period-1d')));
-    await _waitFor(
-      tester,
-      () => find.text('Yahoo · 1 min · Local time').evaluate().isNotEmpty,
-    );
-    expect(chart()!.series.single.points.length, greaterThan(20));
-    debugPrint(
-      'LIVE Yahoo stock 1d rendered ${chart()!.series.single.points.length} points',
-    );
-    await capture('yahoo-stock-1d');
-
-    const rawConfigs = String.fromEnvironment('MARKET_MONK_LIVE_CONFIGS');
-    final configs = rawConfigs.isEmpty ? [] : jsonDecode(rawConfigs) as List;
-    for (var index = 0; index < configs.length; index++) {
-      final raw = configs[index] as Map<String, dynamic>;
-      final config = IbkrAccountConfig(
-        enabled: true,
-        baseUrl: raw['base_url'] as String,
-        token: raw['token'] as String,
-      );
-      final snapshot = await IbkrApiClient(config).fetchPortfolio();
-      final symbol = snapshot.positions
-          .firstWhere(
-            (position) =>
-                position.securityType == 'STK' && position.quantity > 0,
-          )
-          .symbol;
-      await tester.pumpWidget(const SizedBox());
-      await tester.pump();
-      await accounts.setIbkrConfig(accounts.activeAccount, config);
-      await mount(symbol: symbol);
+    if (!const bool.fromEnvironment('MARKET_MONK_PORTFOLIO_ONLY')) {
+      await mount();
+      await _waitFor(tester, () => find.text('SPY').evaluate().isNotEmpty);
+      await tester.tap(find.text('SPY'));
       await _waitFor(
         tester,
-        () => find.text('IBKR · 1 min · Local time').evaluate().isNotEmpty,
+        () =>
+            chart()?.series.any(
+                  (series) => series.name == 'SPY' && series.points.length > 20,
+                ) ??
+            false,
+      );
+      final favorite = chart()!.series.single;
+      expect(favorite.points.length, greaterThan(20));
+      expect(chart()!.xLabels.any((label) => label.contains(':')), isTrue);
+      debugPrint(
+        'LIVE Yahoo favorite 5d rendered ${favorite.points.length} points',
+      );
+      await capture('yahoo-favorite-5d');
+
+      await tester.tap(find.text('SPY'), buttons: kSecondaryMouseButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open chart'));
+      await _waitFor(
+        tester,
+        () => find.text('Yahoo · 15 min · Local time').evaluate().isNotEmpty,
       );
       expect(chart()!.series.single.points.length, greaterThan(20));
       debugPrint(
-        'LIVE IBKR account ${index + 1} stock 1d rendered ${chart()!.series.single.points.length} points',
+        'LIVE Yahoo stock 5d rendered ${chart()!.series.single.points.length} points',
       );
-      await capture('ibkr-${index + 1}-stock-1d');
-      await tester.tap(find.byKey(const Key('chart-period-5d')));
-      await _waitFor(
-        tester,
-        () => find.text('IBKR · 15 min · Local time').evaluate().isNotEmpty,
-      );
-      expect(chart()!.series.single.points.length, greaterThan(20));
-      debugPrint(
-        'LIVE IBKR account ${index + 1} stock 5d rendered ${chart()!.series.single.points.length} points',
-      );
-      await capture('ibkr-${index + 1}-stock-5d');
+      await capture('yahoo-stock-5d');
       await tester.tap(find.byKey(const Key('chart-period-1d')));
       await _waitFor(
         tester,
-        () => find.text('IBKR · 1 min · Local time').evaluate().isNotEmpty,
+        () => find.text('Yahoo · 1 min · Local time').evaluate().isNotEmpty,
       );
+      expect(chart()!.series.single.points.length, greaterThan(20));
+      debugPrint(
+        'LIVE Yahoo stock 1d rendered ${chart()!.series.single.points.length} points',
+      );
+      await capture('yahoo-stock-1d');
+    }
+    const rawConfigs = String.fromEnvironment('MARKET_MONK_LIVE_CONFIGS');
+    final configs = rawConfigs.isEmpty ? [] : jsonDecode(rawConfigs) as List;
+    if (!const bool.fromEnvironment('MARKET_MONK_PORTFOLIO_ONLY')) {
+      for (var index = 0; index < configs.length; index++) {
+        final raw = configs[index] as Map<String, dynamic>;
+        final config = IbkrAccountConfig(
+          enabled: true,
+          baseUrl: raw['base_url'] as String,
+          token: raw['token'] as String,
+        );
+        final snapshot = await IbkrApiClient(config).fetchPortfolio();
+        final symbol = snapshot.positions
+            .firstWhere(
+              (position) =>
+                  position.securityType == 'STK' && position.quantity > 0,
+            )
+            .symbol;
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump();
+        await accounts.setIbkrConfig(accounts.activeAccount, config);
+        await mount(symbol: symbol);
+        await _waitFor(
+          tester,
+          () => find.text('IBKR · 1 min · Local time').evaluate().isNotEmpty,
+        );
+        expect(chart()!.series.single.points.length, greaterThan(20));
+        debugPrint(
+          'LIVE IBKR account ${index + 1} stock 1d rendered ${chart()!.series.single.points.length} points',
+        );
+        await capture('ibkr-${index + 1}-stock-1d');
+        await tester.tap(find.byKey(const Key('chart-period-5d')));
+        await _waitFor(
+          tester,
+          () => find.text('IBKR · 15 min · Local time').evaluate().isNotEmpty,
+        );
+        expect(chart()!.series.single.points.length, greaterThan(20));
+        debugPrint(
+          'LIVE IBKR account ${index + 1} stock 5d rendered ${chart()!.series.single.points.length} points',
+        );
+        await capture('ibkr-${index + 1}-stock-5d');
+        await tester.tap(find.byKey(const Key('chart-period-1d')));
+        await _waitFor(
+          tester,
+          () => find.text('IBKR · 1 min · Local time').evaluate().isNotEmpty,
+        );
+      }
+    }
+    if (configs.isNotEmpty) {
+      await tester.pumpWidget(const SizedBox());
+      for (var index = 0; index < configs.length; index++) {
+        final raw = configs[index] as Map<String, dynamic>;
+        final name = index == 0 ? 'Default' : 'IBKR account ${index + 1}';
+        if (index > 0) await accounts.addAccount(name);
+        await accounts.setIbkrConfig(
+          name,
+          IbkrAccountConfig(
+            enabled: true,
+            baseUrl: raw['base_url'] as String,
+            token: raw['token'] as String,
+          ),
+        );
+      }
+      final prefs = await SqliteSettings.getInstance();
+      await prefs.setInt('chartPeriodDays', 5);
+      await mount();
+      await _waitFor(
+        tester,
+        () =>
+            chart()?.series.length == configs.length &&
+            chart()!.series.every((series) => series.points.length > 20),
+      );
+      for (final series in chart()!.series) {
+        debugPrint(
+          'LIVE portfolio 5d ${series.name} rendered ${series.points.length} points',
+        );
+      }
+      expect(chart()!.xLabels.first, contains(RegExp(r'\d{2}:\d{2}')));
+      expect(
+        find.text(
+          'Estimated intraday portfolio · Current holdings and exchange rates; cash held constant.',
+        ),
+        findsOneWidget,
+      );
+      await capture('ibkr-portfolio-5d');
+      await tester.tap(find.byKey(const Key('chart-period-1d')));
+      await _waitFor(
+        tester,
+        () =>
+            chart()?.series.length == configs.length &&
+            chart()!.series.every((series) => series.points.length > 100),
+      );
+      for (final series in chart()!.series) {
+        debugPrint(
+          'LIVE portfolio 1d ${series.name} rendered ${series.points.length} points',
+        );
+      }
+      await capture('ibkr-portfolio-1d');
     }
     await tester.pumpWidget(const SizedBox());
     settings.dispose();

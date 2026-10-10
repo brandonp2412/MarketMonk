@@ -15,6 +15,7 @@ import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/intraday_market_data.dart';
+import 'package:market_monk/intraday_portfolio.dart';
 import 'package:market_monk/ibkr_cash_out_pnl.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
@@ -115,6 +116,7 @@ class ChartsPageState extends State<ChartsPage>
   Map<String, double> _portfolioReturnsByAccount = {};
   Map<String, double> _portfolioReturnAmountsByAccount = {};
   Map<String, bool> _portfolioCashOutByAccount = {};
+  final _portfolioIntradayWarnings = <String, String>{};
   String? _portfolioError;
   bool _portfolioLoading = true;
   bool _chartPeriodLoaded = false;
@@ -201,11 +203,7 @@ class ChartsPageState extends State<ChartsPage>
     setState(() {
       years = periodYears;
       months = periodMonths;
-      days = periodDays == 1 &&
-              widget.initialSymbol == null &&
-              _selectedSymbol == null
-          ? 5
-          : periodDays;
+      days = periodDays;
       _chartPeriodLoaded = true;
     });
 
@@ -217,6 +215,7 @@ class ChartsPageState extends State<ChartsPage>
           _loadSelectedStock(),
           'Failed to initialize stock period',
         );
+        return;
       }
       runDetachedTask(
         () async {
@@ -240,7 +239,9 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   void _hydratePortfolioSeriesFromCache(AccountManager accountManager) {
-    if (!_chartPeriodLoaded || _portfolioSeriesByAccount.isNotEmpty) return;
+    if (!_chartPeriodLoaded ||
+        _usesIntraday ||
+        _portfolioSeriesByAccount.isNotEmpty) return;
 
     // The persisted IBKR performance cache is one year of history. It can
     // faithfully satisfy any selected period up to one year, but must never be
@@ -867,6 +868,7 @@ class ChartsPageState extends State<ChartsPage>
 
     setState(() {
       _portfolioError = null;
+      _portfolioIntradayWarnings.clear();
       _portfolioLoading = _portfolioSeriesByAccount.isEmpty;
     });
 
@@ -895,6 +897,20 @@ class ChartsPageState extends State<ChartsPage>
             !widget.isActive ||
             generation != _portfolioLoadGeneration) {
           return;
+        }
+        if (_usesIntraday) {
+          final series = await _buildIntradayPortfolioSeries(
+            accountName,
+            loaded,
+            ibkrConfig,
+            generation: generation,
+            forceRefresh: forceIbkrPortfolioRefresh,
+          );
+          if (!mounted ||
+              !widget.isActive ||
+              generation != _portfolioLoadGeneration) return;
+          newSeries[accountName] = series;
+          continue;
         }
         if (ibkrConfig.isConfigured && years <= 1) {
           final brokerSeries = await _loadBrokerPerformanceSeries(
@@ -958,6 +974,77 @@ class ChartsPageState extends State<ChartsPage>
       _portfolioError = firstError;
       _portfolioLoading = false;
     });
+  }
+
+  Future<List<_DateValue>> _buildIntradayPortfolioSeries(
+    String accountName,
+    _LoadedChartPortfolio loaded,
+    IbkrAccountConfig config, {
+    required int generation,
+    required bool forceRefresh,
+  }) async {
+    final selectedDays = days;
+    final holdings = <IntradayPortfolioHolding>[];
+    final unavailable = <String>[];
+    for (final position in loaded.positions) {
+      if (!mounted ||
+          !widget.isActive ||
+          generation != _portfolioLoadGeneration) return [];
+      if (position.netShares == 0) continue;
+      try {
+        final series = await _intradayData.fetch(
+          position.symbol,
+          days: selectedDays,
+          config: config,
+          forceRefresh: forceRefresh,
+        );
+        await fetchSymbolCurrencyAndRate(
+          position.symbol,
+          rawCurrency: series.currency,
+        );
+        holdings.add(
+          IntradayPortfolioHolding.fromSeries(
+            series,
+            quantity: position.netShares,
+            currencyPerUsd: requireUsdRate(symbolCurrency(position.symbol)),
+            centDivisor: symbolCentDivisor(position.symbol),
+          ),
+        );
+      } catch (error, stackTrace) {
+        unavailable.add(position.symbol);
+        talker.handle(
+          error,
+          stackTrace,
+          'Portfolio intraday prices unavailable',
+        );
+      }
+    }
+    if (!mounted || !widget.isActive || generation != _portfolioLoadGeneration)
+      return [];
+    if (unavailable.isNotEmpty) {
+      _portfolioIntradayWarnings[accountName] =
+          '$accountName: prices unavailable for ${unavailable.join(', ')}; these holdings stay constant.';
+    }
+    if (holdings.isEmpty && loaded.positions.isNotEmpty) {
+      throw StateError(
+        'No intraday portfolio prices available for $accountName',
+      );
+    }
+    final nav = loaded.currentValue;
+    final currentValueUsd = loaded.currentValueUsd ??
+        (nav != null
+            ? nav.value / requireUsdRate(nav.currency)
+            : loaded.positions.fold<double>(
+                0,
+                (sum, position) => sum + position.currentValue,
+              ));
+    return [
+      for (final point in buildIntradayPortfolio(
+        holdings: holdings,
+        currentValueUsd: currentValueUsd,
+      ))
+        _DateValue(point.date.toLocal(), point.valueUsd),
+    ];
   }
 
   Future<({List<_DateValue> series, bool currentHoldingsReplay})>
@@ -1471,6 +1558,14 @@ class ChartsPageState extends State<ChartsPage>
   }) {
     setState(() {
       _customChartRange = null;
+      _portfolioLoadGeneration++;
+      _portfolioLoads.clear();
+      _backgroundSyncs.clear();
+      _portfolioSeriesByAccount.clear();
+      _portfolioReturnsByAccount.clear();
+      _portfolioReturnAmountsByAccount.clear();
+      _portfolioCashOutByAccount.clear();
+      _portfolioLoading = true;
       years = selectedYears;
       months = selectedMonths;
       days = selectedDays;
@@ -1494,7 +1589,6 @@ class ChartsPageState extends State<ChartsPage>
       runDetachedTask(
         () async {
           await _syncCandlesInBackground();
-          await _loadAllPortfolios();
         }(),
         'Failed to reload portfolios for chart period',
       );
@@ -1502,7 +1596,6 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   void _clearSearch() {
-    final resetPeriod = years == 0 && months == 0 && days == 1;
     _searchController.clear();
     _searchFocus.unfocus();
     _yahooApi.cancelPendingSearch();
@@ -1516,7 +1609,7 @@ class ChartsPageState extends State<ChartsPage>
       _searchLoading = false;
       _stockError = null;
     });
-    if (resetPeriod) _onPeriodSelected(selectedDays: 5);
+    runDetachedTask(_loadAllPortfolios(), 'Failed to reload portfolio chart');
   }
 
   @override
@@ -1832,7 +1925,7 @@ class ChartsPageState extends State<ChartsPage>
 
   Widget _buildTimeChips() {
     final options = [
-      if (_mode == _ChartMode.stock) ('1d', 0, 0, 1),
+      ('1d', 0, 0, 1),
       ('5d', 0, 0, 5),
       ('1m', 0, 1, 0),
       ('2m', 0, 2, 0),
@@ -2113,15 +2206,21 @@ class ChartsPageState extends State<ChartsPage>
           child: Text(
             _selectedFavorites.isEmpty
                 ? context.l10n.text(
-                    'Account performance uses daily broker values. Open a stock chart for intraday prices.',
+                    'Estimated intraday portfolio · Current holdings and exchange rates; cash held constant.',
                   )
                 : context.l10n.text(
-                    'Account values are daily; stock prices are intraday in local time.',
+                    'Estimated intraday portfolio and stock prices · Local time',
                   ),
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ),
+      if (_usesIntraday)
+        for (final warning in _portfolioIntradayWarnings.values)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(warning),
+          ),
       for (final symbol in _selectedFavorites)
         if (_usesIntraday && _favoriteIntradayErrors.containsKey(symbol))
           Padding(
@@ -2338,7 +2437,7 @@ class ChartsPageState extends State<ChartsPage>
       );
     }
     if (_portfolioError != null &&
-        _portfolioSeriesByAccount.isEmpty &&
+        _portfolioSeriesByAccount.values.every((series) => series.isEmpty) &&
         _selectedFavorites.isEmpty) {
       return SizedBox(
         height: height,
@@ -2465,9 +2564,7 @@ class ChartsPageState extends State<ChartsPage>
     }
 
     final formatter = DateFormat(
-      _usesIntraday && _selectedFavorites.isNotEmpty
-          ? '${settings.dateFormat} HH:mm'
-          : settings.dateFormat,
+      _usesIntraday ? '${settings.dateFormat} HH:mm' : settings.dateFormat,
     );
     final visibleKeys = visibleSeries.keys.toList();
 

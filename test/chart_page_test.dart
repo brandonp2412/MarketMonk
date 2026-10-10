@@ -154,8 +154,8 @@ void main() {
             '{"Default":{"enabled":true,"baseUrl":"https://ibkr.example.test","token":"secret-token"}}',
         'ibkrHistorySeeded:https://ibkr.example.test:Default:VOO': true,
         'chartPeriodYears': 0,
-        'chartPeriodMonths': 0,
-        'chartPeriodDays': 5,
+        'chartPeriodMonths': 1,
+        'chartPeriodDays': 0,
       });
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(1200, 1000);
@@ -257,8 +257,8 @@ void main() {
         find.byType(MarketLineChart),
       );
       final cachedSpots = chart.series.single.points;
-      expect(cachedSpots, hasLength(5));
-      expect(cachedSpots.first.y, closeTo(9400 / (10000 / 5750), 1e-6));
+      expect(cachedSpots, hasLength(9));
+      expect(cachedSpots.first.y, closeTo(9000 / (10000 / 5750), 1e-6));
       expect(find.bySemanticsLabel('Loading portfolio'), findsNothing);
 
       final lastSpot = cachedSpots.last;
@@ -291,8 +291,8 @@ void main() {
         'ibkrAccountConfigs':
             '{"Default":{"enabled":true,"baseUrl":"https://ibkr.example.test","token":"secret-token"}}',
         'chartPeriodYears': 0,
-        'chartPeriodMonths': 0,
-        'chartPeriodDays': 5,
+        'chartPeriodMonths': 1,
+        'chartPeriodDays': 0,
       });
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(1200, 1000);
