@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
@@ -21,8 +22,7 @@ Future<void> _pumpApp(WidgetTester tester, AccountManager accounts) async {
 
 void main() {
   testWidgets(
-    'favorites row renders a seeded favorite, navigates to its chart, '
-    'and persists un-favoriting',
+    'favorites toggle graph lines and selection without opening search',
     (WidgetTester tester) async {
       await seedTestSqlite({
         'favoriteStocks': ['AAPL'],
@@ -58,21 +58,23 @@ void main() {
       await tester.tap(find.text('AAPL'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Favorite'), findsOneWidget);
-
-      await tester.tap(find.text('Favorite'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Removed as favorite'), findsOneWidget);
-
-      await tester.tap(find.byTooltip('Back'));
-      await tester.pumpAndSettle();
       expect(find.text('Favorite'), findsNothing);
+      expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
+      final chart =
+          tester.widget<MarketLineChart>(find.byType(MarketLineChart));
+      expect(chart.series.single.name, 'AAPL');
+      expect(chart.series.single.points.first.y, 0);
+      expect(chart.series.single.points.last.y, greaterThan(0));
+      final search = tester.widget<SearchBar>(find.byType(SearchBar));
+      expect(search.controller!.text, isEmpty);
 
-      // Re-mount the app (simulating a restart) to confirm the removal was
-      // actually persisted, not just reflected in transient widget state.
-      await _pumpApp(tester, testAccountManager());
-      expect(find.text('AAPL'), findsNothing);
+      await tester.tap(find.text('AAPL'));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.check_circle_rounded), findsNothing);
+      expect(find.byType(MarketLineChart), findsNothing);
+      expect(find.text('AAPL'), findsOneWidget);
+      final prefs = await SqliteSettings.getInstance();
+      expect(prefs.getStringList('favoriteStocks'), ['AAPL']);
     },
   );
 

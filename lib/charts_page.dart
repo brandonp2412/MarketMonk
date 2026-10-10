@@ -68,6 +68,9 @@ class ChartsPageState extends State<ChartsPage>
   _ChartMode _mode = _ChartMode.portfolio;
   String? _selectedSymbol;
   List<String> _favoriteStocks = [];
+  final Set<String> _selectedFavorites = {};
+  Stream<List<StoredCandle>>? _favoriteChartStream;
+  String _favoriteChartStreamKey = '';
   bool _networkLoading = false;
   String? _stockError;
   String _nativeCurrency = 'USD';
@@ -627,6 +630,7 @@ class ChartsPageState extends State<ChartsPage>
         symbol,
         ibkrConfig: accountManager.ibkrConfigFor(),
         syncNamespace: accountManager.activeAccount,
+        requiredFrom: _requiredCandleStart(),
       );
     } catch (error, stackTrace) {
       talker.handle(error, stackTrace, 'Favorite ticker candle sync failed');
@@ -641,6 +645,7 @@ class ChartsPageState extends State<ChartsPage>
     setState(() {
       if (isFavorite) {
         _favoriteStocks.remove(symbol);
+        _selectedFavorites.remove(symbol);
       } else {
         _favoriteStocks.add(symbol);
       }
@@ -1198,12 +1203,22 @@ class ChartsPageState extends State<ChartsPage>
   void _selectStock(StockResult result) => _selectSymbol(result.symbol);
 
   void _selectFavorite(String symbol) {
-    _searchController.value = TextEditingValue(
-      text: symbol,
-      selection: TextSelection.collapsed(offset: symbol.length),
-    );
-    _selectSymbol(symbol);
+    setState(() {
+      if (!_selectedFavorites.add(symbol)) {
+        _selectedFavorites.remove(symbol);
+      }
+    });
+    if (_selectedFavorites.contains(symbol)) {
+      runDetachedTask(
+        _syncFavoriteCandle(symbol),
+        'Failed to sync selected favorite',
+      );
+    }
   }
+
+  Color _favoriteColor(String symbol) => Colors.primaries[
+      _favoriteStocks.indexOf(symbol).clamp(0, _favoriteStocks.length) %
+          Colors.primaries.length];
 
   void _selectSymbol(String symbol) {
     _searchFocus.unfocus();
@@ -1316,6 +1331,12 @@ class ChartsPageState extends State<ChartsPage>
       days = selectedDays;
     });
     runDetachedTask(_savePeriod(), 'Failed to save chart period');
+    if (_selectedFavorites.isNotEmpty) {
+      runDetachedTask(
+        _syncFavoriteCandles(),
+        'Failed to backfill favorite period',
+      );
+    }
     if (_mode == _ChartMode.stock && _selectedSymbol != null) {
       final symbol = _selectedSymbol!;
       _setStockStream(symbol);
@@ -1850,6 +1871,8 @@ class ChartsPageState extends State<ChartsPage>
               child: _FavoriteCard(
                 symbol: symbol,
                 isActive: widget.isActive,
+                selected: _selectedFavorites.contains(symbol),
+                selectionColor: _favoriteColor(symbol),
                 onTap: () => _selectFavorite(symbol),
               ),
             );
@@ -1864,9 +1887,43 @@ class ChartsPageState extends State<ChartsPage>
     SettingsState settings,
     List<Color> accountColors,
   ) {
+    final streamKey =
+        '${widget.isActive}|$_selectedFavorites|$years|$months|$days';
+    if (_favoriteChartStreamKey != streamKey) {
+      _favoriteChartStreamKey = streamKey;
+      _favoriteChartStream = widget.isActive && _selectedFavorites.isNotEmpty
+          ? (marketDataDatabase.candles.select()
+                ..where(
+                  (candle) =>
+                      candle.symbol
+                          .isIn(_selectedFavorites.map(canonicalMarketSymbol)) &
+                      candle.date.isBiggerThanValue(_requiredCandleStart()),
+                )
+                ..orderBy([(candle) => OrderingTerm.asc(candle.date)]))
+              .watch()
+          : null;
+    }
+    return StreamBuilder<List<StoredCandle>>(
+      key: ValueKey(streamKey),
+      stream: _favoriteChartStream,
+      builder: (context, snapshot) => _buildCombinedPortfolioChart(
+        context,
+        settings,
+        accountColors,
+        snapshot.data ?? const [],
+      ),
+    );
+  }
+
+  Widget _buildCombinedPortfolioChart(
+    BuildContext context,
+    SettingsState settings,
+    List<Color> accountColors,
+    List<StoredCandle> favoriteCandles,
+  ) {
     final height = MediaQuery.of(context).size.height * 0.30;
 
-    if (_portfolioLoading) {
+    if (_portfolioLoading && _selectedFavorites.isEmpty) {
       return SizedBox(
         height: height,
         child: Center(
@@ -1877,7 +1934,9 @@ class ChartsPageState extends State<ChartsPage>
         ),
       );
     }
-    if (_portfolioError != null && _portfolioSeriesByAccount.isEmpty) {
+    if (_portfolioError != null &&
+        _portfolioSeriesByAccount.isEmpty &&
+        _selectedFavorites.isEmpty) {
       return SizedBox(
         height: height,
         child: Center(child: Text(_portfolioError!)),
@@ -1891,6 +1950,21 @@ class ChartsPageState extends State<ChartsPage>
         if (!_hiddenAccounts.contains(entry.key) && entry.value.isNotEmpty)
           entry.key: entry.value,
     };
+
+    for (final symbol in _selectedFavorites) {
+      var candles = favoriteCandles
+          .where((candle) => candle.symbol == canonicalMarketSymbol(symbol))
+          .toList();
+      if (days > 0 && candles.length > days) {
+        candles = candles.sublist(candles.length - days);
+      }
+      if (candles.isNotEmpty) {
+        visibleSeries[symbol] = [
+          for (final candle in candles)
+            _DateValue(candle.date, candle.close / symbolCentDivisor(symbol)),
+        ];
+      }
+    }
 
     if (visibleSeries.isEmpty) {
       final allEmpty = _portfolioSeriesByAccount.values.every(
@@ -1942,12 +2016,13 @@ class ChartsPageState extends State<ChartsPage>
     };
 
     final singleLine = visibleSeries.length == 1;
-    final scaleForComparison = !singleLine;
+    final scaleForComparison = !singleLine || _selectedFavorites.isNotEmpty;
     final chartSeries = <MarketLineChartSeries>[];
     for (final entry in visibleSeries.entries) {
       final accountIndex = accounts.indexOf(entry.key);
-      final color =
-          accountColors[accountIndex.clamp(0, accountColors.length - 1)];
+      final color = _selectedFavorites.contains(entry.key)
+          ? _favoriteColor(entry.key)
+          : accountColors[accountIndex.clamp(0, accountColors.length - 1)];
       final displayValues = scaleForComparison
           ? scalePortfolioSeriesForComparison(
               entry.value.map((point) => point.value),
@@ -2000,7 +2075,12 @@ class ChartsPageState extends State<ChartsPage>
               }
             }
           }
-          final valueLabel = fmtCurrency(actualValue ?? mark.value);
+          final valueLabel = _selectedFavorites.contains(accountName)
+              ? fmtNativeCurrency(
+                  actualValue ?? mark.value,
+                  symbolCurrency(accountName),
+                )
+              : fmtCurrency(actualValue ?? mark.value);
           final dateLabel = date == null ? '' : formatter.format(date);
           return dateLabel.isEmpty ? valueLabel : '$valueLabel · $dateLabel';
         },
@@ -2323,11 +2403,15 @@ class _ActionChip extends StatelessWidget {
 class _FavoriteCard extends StatelessWidget {
   final String symbol;
   final bool isActive;
+  final bool selected;
+  final Color selectionColor;
   final VoidCallback onTap;
 
   const _FavoriteCard({
     required this.symbol,
     required this.isActive,
+    required this.selected,
+    required this.selectionColor,
     required this.onTap,
   });
 
@@ -2347,71 +2431,97 @@ class _FavoriteCard extends StatelessWidget {
             .watch()
         : const Stream<List<StoredCandle>>.empty();
 
-    return Container(
-      width: 92,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.3)),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        width: 108,
+        decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  symbol,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    height: 1,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                StreamBuilder<List<StoredCandle>>(
-                  stream: stream,
-                  builder: (context, snapshot) {
-                    final candles = snapshot.data;
-                    if (candles == null || candles.isEmpty) {
-                      return const SizedBox(height: 14, width: 14);
-                    }
-                    final centDivisor = symbolCentDivisor(symbol);
-                    final price = candles.first.close / centDivisor;
-                    final pct = candles.length > 1
-                        ? safePercentChange(
-                            candles[1].close,
-                            candles.first.close,
-                          )
-                        : null;
-                    final changeColor =
-                        (pct ?? 0) >= 0 ? Colors.green : Colors.redAccent;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          fmtNativeCurrency(price, symbolCurrency(symbol)),
-                          style: const TextStyle(fontSize: 11, height: 1),
-                        ),
-                        const SizedBox(height: 8),
-                        if (pct != null)
-                          Text(
-                            '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%',
-                            style: TextStyle(
-                              fontSize: 10,
-                              height: 1,
-                              color: changeColor,
-                            ),
+          color: selected ? selectionColor.withValues(alpha: 0.10) : null,
+          border: Border.all(
+            color: selected
+                ? selectionColor
+                : colorScheme.outline.withValues(alpha: 0.3),
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          symbol,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1,
+                            fontWeight:
+                                selected ? FontWeight.w600 : FontWeight.w400,
                           ),
-                      ],
-                    );
-                  },
-                ),
-              ],
+                        ),
+                      ),
+                      if (selected)
+                        Icon(
+                          Icons.check_circle_rounded,
+                          size: 14,
+                          color: selectionColor,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  StreamBuilder<List<StoredCandle>>(
+                    stream: stream,
+                    builder: (context, snapshot) {
+                      final candles = snapshot.data;
+                      if (candles == null || candles.isEmpty) {
+                        return const SizedBox(height: 14, width: 14);
+                      }
+                      final centDivisor = symbolCentDivisor(symbol);
+                      final price = candles.first.close / centDivisor;
+                      final pct = candles.length > 1
+                          ? safePercentChange(
+                              candles[1].close,
+                              candles.first.close,
+                            )
+                          : null;
+                      final changeColor =
+                          (pct ?? 0) >= 0 ? Colors.green : Colors.redAccent;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            fmtNativeCurrency(price, symbolCurrency(symbol)),
+                            style: const TextStyle(fontSize: 11, height: 1),
+                          ),
+                          const SizedBox(height: 8),
+                          if (pct != null)
+                            Text(
+                              '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%',
+                              style: TextStyle(
+                                fontSize: 10,
+                                height: 1,
+                                color: changeColor,
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ),
