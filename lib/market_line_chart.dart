@@ -598,7 +598,7 @@ class _MarketLineChartRenderer extends ChartRenderer
         size,
         left: leftInset,
         top: _chartTopInset,
-        right: 8,
+        right: 32,
         bottom: _chartBottomLabelInset,
       );
 
