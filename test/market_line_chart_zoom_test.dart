@@ -4,29 +4,38 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/market_line_chart.dart';
+import 'package:market_monk/desktop_context_menu.dart';
 
 void main() {
-  Widget chart({double valueOffset = 0}) => MaterialApp(
+  Widget chart({double valueOffset = 0, bool pageMenu = false}) => MaterialApp(
+        theme: ThemeData(platform: TargetPlatform.linux),
         home: Scaffold(
-          body: SizedBox(
-            width: 800,
-            height: 300,
-            child: MarketLineChart(
-              series: [
-                MarketLineChartSeries(
-                  points: [
-                    for (var i = 0; i < 10; i++)
-                      MarketLineChartPoint(i.toDouble(), i + valueOffset),
+          body: DesktopContextMenu(
+            actions:
+                pageMenu ? [DesktopMenuAction('Refresh', () {})] : const [],
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: 800,
+                height: 300,
+                child: MarketLineChart(
+                  series: [
+                    MarketLineChartSeries(
+                      points: [
+                        for (var i = 0; i < 10; i++)
+                          MarketLineChartPoint(i.toDouble(), i + valueOffset),
+                      ],
+                      color: Colors.blue,
+                    ),
                   ],
-                  color: Colors.blue,
+                  xLabels: List.generate(10, (i) => 'Day $i'),
+                  pointCount: 10,
+                  yLabelFormatter: (value) => value.toStringAsFixed(1),
+                  tooltipRowLabel: (mark) => 'Column ${mark.index}',
+                  curveLines: false,
+                  curveSmoothness: 0,
                 ),
-              ],
-              xLabels: List.generate(10, (i) => 'Day $i'),
-              pointCount: 10,
-              yLabelFormatter: (value) => value.toStringAsFixed(1),
-              tooltipRowLabel: (mark) => 'Column ${mark.index}',
-              curveLines: false,
-              curveSmoothness: 0,
+              ),
             ),
           ),
         ),
@@ -124,6 +133,30 @@ void main() {
     expect(find.text('Start from this date'), findsNothing);
     expect(scene(tester).marks, hasLength(10));
     expect(find.byTooltip('Reset zoom'), findsNothing);
+  });
+
+  testWidgets(
+      'chart menu wins over refresh menu even after holding right click',
+      (tester) async {
+    await tester.pumpWidget(chart(pageMenu: true));
+    final gesture = await tester.startGesture(
+      scene(tester).marks[3].center,
+      kind: PointerDeviceKind.mouse,
+      buttons: kSecondaryMouseButton,
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Refresh'), findsNothing);
+    expect(find.text('Start from this date'), findsNothing);
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.text('Start from this date'), findsOneWidget);
+    expect(find.text('Refresh'), findsNothing);
+    await tester.tap(find.text('Start from this date'));
+    await tester.pumpAndSettle();
+    expect(scene(tester).marks, hasLength(7));
+    expect(find.text('Refresh'), findsNothing);
+    await rightClick(tester, const Offset(400, 400));
+    expect(find.text('Refresh'), findsOneWidget);
   });
 
   testWidgets('clicks and touch drags keep the full range', (tester) async {

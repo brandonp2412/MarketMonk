@@ -474,24 +474,6 @@ class _MarketLineChartInteractionState
               _activate(event.localPosition, scene);
               final bounds = scene.bounds;
               if (event.kind == PointerDeviceKind.mouse &&
-                  event.buttons == kSecondaryMouseButton &&
-                  bounds != null &&
-                  Rect.fromLTRB(
-                    bounds.left,
-                    bounds.top,
-                    bounds.right,
-                    bounds.bottom,
-                  ).contains(event.localPosition)) {
-                final start = ChartHitTest.nearestIndexAtX(
-                  scene,
-                  event.localPosition.dx,
-                );
-                if (start != null && scene.marks.isNotEmpty) {
-                  final end = scene.marks.map((mark) => mark.index).reduce(max);
-                  unawaited(_showStartDateMenu(event.position, start, end));
-                }
-              }
-              if (event.kind == PointerDeviceKind.mouse &&
                   event.buttons == kPrimaryMouseButton &&
                   bounds != null &&
                   Rect.fromLTRB(
@@ -546,6 +528,25 @@ class _MarketLineChartInteractionState
             }),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
+              onSecondaryTapUp: (details) {
+                final bounds = scene.bounds;
+                if (bounds == null ||
+                    !Rect.fromLTRB(
+                      bounds.left,
+                      bounds.top,
+                      bounds.right,
+                      bounds.bottom,
+                    ).contains(details.localPosition)) return;
+                final start = ChartHitTest.nearestIndexAtX(
+                  scene,
+                  details.localPosition.dx,
+                );
+                if (start == null || scene.marks.isEmpty) return;
+                final end = scene.marks.map((mark) => mark.index).reduce(max);
+                unawaited(
+                  _showStartDateMenu(details.globalPosition, start, end),
+                );
+              },
               onLongPressStart: (details) =>
                   _activate(details.localPosition, scene),
               onLongPressMoveUpdate: (details) =>

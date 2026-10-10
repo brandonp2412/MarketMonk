@@ -53,7 +53,7 @@ class DesktopContextMenu extends StatelessWidget {
     }
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onSecondaryTapDown: (details) async {
+      onSecondaryTapUp: (details) async {
         final overlay =
             Overlay.of(context).context.findRenderObject()! as RenderBox;
         final resolved = await actionsBuilder?.call() ?? actions;
