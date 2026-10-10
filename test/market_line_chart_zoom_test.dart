@@ -5,9 +5,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/desktop_context_menu.dart';
+import 'package:market_monk/portfolio_chart_scale.dart';
 
 void main() {
-  Widget chart({double valueOffset = 0, bool pageMenu = false}) => MaterialApp(
+  Widget chart({
+    double valueOffset = 0,
+    bool pageMenu = false,
+    List<MarketLineChartSeries>? series,
+  }) =>
+      MaterialApp(
         theme: ThemeData(platform: TargetPlatform.linux),
         home: Scaffold(
           body: DesktopContextMenu(
@@ -19,15 +25,19 @@ void main() {
                 width: 800,
                 height: 300,
                 child: MarketLineChart(
-                  series: [
-                    MarketLineChartSeries(
-                      points: [
-                        for (var i = 0; i < 10; i++)
-                          MarketLineChartPoint(i.toDouble(), i + valueOffset),
+                  series: series ??
+                      [
+                        MarketLineChartSeries(
+                          points: [
+                            for (var i = 0; i < 10; i++)
+                              MarketLineChartPoint(
+                                i.toDouble(),
+                                i + valueOffset,
+                              ),
+                          ],
+                          color: Colors.blue,
+                        ),
                       ],
-                      color: Colors.blue,
-                    ),
-                  ],
                   xLabels: List.generate(10, (i) => 'Day $i'),
                   pointCount: 10,
                   yLabelFormatter: (value) => value.toStringAsFixed(1),
@@ -157,6 +167,63 @@ void main() {
     expect(find.text('Refresh'), findsNothing);
     await rightClick(tester, const Offset(400, 400));
     expect(find.text('Refresh'), findsOneWidget);
+  });
+
+  testWidgets('start date rebases comparison lines like a shorter period',
+      (tester) async {
+    final rawValues = <List<double>>[
+      [100.0, 200, 746.5, 754, 761.5, 769, 776.5, 784, 791.5, 799],
+      [10000.0, 10050, 10100, 10201, 10302, 10403, 10504, 10605, 10706, 10807],
+    ];
+    final lines = [
+      for (var line = 0; line < rawValues.length; line++)
+        MarketLineChartSeries(
+          color: line == 0 ? Colors.blue : Colors.red,
+          points: [
+            for (var i = 0; i < 10; i++)
+              MarketLineChartPoint(
+                i.toDouble(),
+                scalePortfolioSeriesForComparison(rawValues[line])[i],
+                comparisonValue: rawValues[line][i],
+              ),
+          ],
+        ),
+    ];
+    await tester.pumpWidget(chart(series: lines));
+    expect(scene(tester).scale!.maxValue, greaterThan(646.5));
+    await rightClick(tester, scene(tester).marks[2].center);
+    await tester.tap(find.text('Start from this date'));
+    await tester.pumpAndSettle();
+    for (var line = 0; line < rawValues.length; line++) {
+      final expected =
+          scalePortfolioSeriesForComparison(rawValues[line].skip(2));
+      final marks = scene(tester)
+          .marks
+          .where((mark) => mark.seriesIndex == line)
+          .toList();
+      expect(marks.first.value, 0);
+      for (var i = 0; i < marks.length; i++) {
+        expect(marks[i].value, closeTo(expected[i], 1e-9));
+        expect(marks[i].index, i + 2);
+      }
+    }
+    expect(scene(tester).scale!.maxValue, lessThan(10));
+    await drag(tester, 4, 7);
+    for (var line = 0; line < rawValues.length; line++) {
+      final expected = scalePortfolioSeriesForComparison(
+        rawValues[line].sublist(4, 8),
+      );
+      final marks = scene(tester)
+          .marks
+          .where((mark) => mark.seriesIndex == line)
+          .toList();
+      for (var i = 0; i < marks.length; i++) {
+        expect(marks[i].value, closeTo(expected[i], 1e-9));
+      }
+    }
+    await tester.tap(find.byTooltip('Reset zoom'));
+    await tester.pump();
+    expect(scene(tester).scale!.maxValue, greaterThan(646.5));
   });
 
   testWidgets('clicks and touch drags keep the full range', (tester) async {

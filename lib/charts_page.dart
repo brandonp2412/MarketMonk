@@ -92,6 +92,7 @@ class ChartsPageState extends State<ChartsPage>
   int years = 1;
   int months = 0;
   int days = 0;
+  (DateTime, DateTime)? _customChartRange;
 
   Stream<List<CandleTicker>>? _stockStream;
 
@@ -1181,6 +1182,7 @@ class ChartsPageState extends State<ChartsPage>
     if (text.trim().isEmpty) {
       _yahooApi.cancelPendingSearch();
       setState(() {
+        _customChartRange = null;
         _mode = _ChartMode.portfolio;
         _searchResults = [];
         _searchLoading = false;
@@ -1240,6 +1242,7 @@ class ChartsPageState extends State<ChartsPage>
   void _selectSymbol(String symbol) {
     _searchFocus.unfocus();
     setState(() {
+      _customChartRange = null;
       _mode = _ChartMode.stock;
       _selectedSymbol = symbol;
       _networkLoading = true;
@@ -1337,12 +1340,30 @@ class ChartsPageState extends State<ChartsPage>
     setState(() {});
   }
 
+  (int, int)? _chartRangeFor(List<DateTime> dates) {
+    final range = _customChartRange;
+    if (range == null || dates.isEmpty) return null;
+    final first = dates.indexWhere((date) => !date.isBefore(range.$1));
+    final last = dates.lastIndexWhere((date) => !date.isAfter(range.$2));
+    final start = first < 0 ? dates.length - 1 : first;
+    final end = last < start ? start : last;
+    return (start, end);
+  }
+
+  void _setChartRange(List<DateTime> dates, (int, int)? range) {
+    setState(() {
+      _customChartRange =
+          range == null ? null : (dates[range.$1], dates[range.$2]);
+    });
+  }
+
   void _onPeriodSelected({
     int selectedYears = 0,
     int selectedMonths = 0,
     int selectedDays = 0,
   }) {
     setState(() {
+      _customChartRange = null;
       years = selectedYears;
       months = selectedMonths;
       days = selectedDays;
@@ -1391,6 +1412,7 @@ class ChartsPageState extends State<ChartsPage>
     _searchFocus.unfocus();
     _yahooApi.cancelPendingSearch();
     setState(() {
+      _customChartRange = null;
       _mode = _ChartMode.portfolio;
       _searchResults = [];
       _selectedSymbol = null;
@@ -1735,7 +1757,8 @@ class ChartsPageState extends State<ChartsPage>
         _PeriodChip(
           key: Key('chart-period-$label'),
           label: label,
-          selected: optionYears == years &&
+          selected: _customChartRange == null &&
+              optionYears == years &&
               optionMonths == months &&
               optionDays == days,
           onTap: () => _onPeriodSelected(
@@ -1838,6 +1861,14 @@ class ChartsPageState extends State<ChartsPage>
       child: SizedBox(
         height: height,
         child: TickerLine(
+          key: ValueKey('$_selectedSymbol|$years|$months|$days'),
+          range: _chartRangeFor([
+            for (final candle in candles) candle.date.value,
+          ]),
+          onRangeChanged: (range) => _setChartRange(
+            [for (final candle in candles) candle.date.value],
+            range,
+          ),
           dates: candles.map((candle) => candle.date.value),
           spots: spots,
           nativeCurrency: _nativeCurrency,
@@ -2164,6 +2195,8 @@ class ChartsPageState extends State<ChartsPage>
               MarketLineChartPoint(
                 dateIndex[entry.value[index].date]!.toDouble(),
                 displayValues[index],
+                comparisonValue:
+                    scaleForComparison ? entry.value[index].value : null,
                 column: dateIndex[entry.value[index].date]!,
               ),
           ],
@@ -2177,6 +2210,9 @@ class ChartsPageState extends State<ChartsPage>
     return SizedBox(
       height: height,
       child: MarketLineChart(
+        key: ValueKey('portfolio|$years|$months|$days'),
+        range: _chartRangeFor(sortedDates),
+        onRangeChanged: (range) => _setChartRange(sortedDates, range),
         series: chartSeries,
         xLabels: [for (final date in sortedDates) formatter.format(date)],
         pointCount: sortedDates.length,

@@ -12,6 +12,12 @@ class TickerLine extends StatelessWidget {
   final List<MarketLineChartPoint> spots;
   final Iterable<DateTime> dates;
 
+  /// Inclusive columns selected by the chart's parent.
+  final (int, int)? range;
+
+  /// Notifies the parent when the visible period changes or is reset.
+  final ValueChanged<(int, int)?>? onRangeChanged;
+
   /// ISO 4217 currency the [spots] values are denominated in.
   final String nativeCurrency;
 
@@ -20,6 +26,8 @@ class TickerLine extends StatelessWidget {
     required this.spots,
     required this.dates,
     this.nativeCurrency = 'USD',
+    this.range,
+    this.onRangeChanged,
   });
 
   String tooltipTextAt(int index, DateFormat formatter) {
@@ -38,6 +46,8 @@ class TickerLine extends StatelessWidget {
     final labels = [for (final date in dates) formatter.format(date)];
 
     return MarketLineChart(
+      range: range,
+      onRangeChanged: onRangeChanged,
       series: [
         MarketLineChartSeries(
           points: spots,

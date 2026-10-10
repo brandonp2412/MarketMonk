@@ -6,14 +6,24 @@ import 'package:drafter/painting.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:market_monk/portfolio_chart_scale.dart';
 
+/// A chart value that can retain its absolute value for range comparisons.
 @immutable
 class MarketLineChartPoint {
   final double x;
   final double y;
   final int? column;
 
-  const MarketLineChartPoint(this.x, this.y, {this.column});
+  /// Absolute value used to rebase percentage comparisons when the range changes.
+  final double? comparisonValue;
+
+  const MarketLineChartPoint(
+    this.x,
+    this.y, {
+    this.column,
+    this.comparisonValue,
+  });
 }
 
 @immutable
@@ -218,6 +228,12 @@ class MarketLineChart extends StatelessWidget {
   final String accessibilityLabel;
   final String? accessibilityValue;
 
+  /// Selected inclusive columns, retained by the caller across data changes.
+  final (int, int)? range;
+
+  /// Updates the caller-owned [range]; null restores the full period.
+  final ValueChanged<(int, int)?>? onRangeChanged;
+
   const MarketLineChart({
     super.key,
     required this.series,
@@ -230,6 +246,8 @@ class MarketLineChart extends StatelessWidget {
     this.leftInset = 64,
     this.accessibilityLabel = 'Price chart',
     this.accessibilityValue,
+    this.range,
+    this.onRangeChanged,
   });
 
   @visibleForTesting
@@ -347,6 +365,8 @@ class MarketLineChart extends StatelessWidget {
         accessibilityValue: accessibilityValue,
       ),
       rowLabel: tooltipRowLabel,
+      range: range,
+      onRangeChanged: onRangeChanged,
     );
   }
 }
@@ -354,9 +374,13 @@ class MarketLineChart extends StatelessWidget {
 class _MarketLineChartInteraction extends StatefulWidget {
   final _MarketLineChartRenderer renderer;
   final String Function(PlotMark mark) rowLabel;
+  final (int, int)? range;
+  final ValueChanged<(int, int)?>? onRangeChanged;
   const _MarketLineChartInteraction({
     required this.renderer,
     required this.rowLabel,
+    this.range,
+    this.onRangeChanged,
   });
 
   @override
@@ -373,9 +397,19 @@ class _MarketLineChartInteractionState
   double? _dragX;
   int? _dragPointer;
 
-  _MarketLineChartRenderer get _renderer => _zoom == null
+  (int, int)? get _range => widget.range ?? _zoom;
+
+  _MarketLineChartRenderer get _renderer => _range == null
       ? widget.renderer
-      : widget.renderer.zoomTo(_zoom!.$1, _zoom!.$2);
+      : widget.renderer.zoomTo(_range!.$1, _range!.$2);
+
+  void _setRange((int, int)? range) {
+    setState(() {
+      _zoom = widget.onRangeChanged == null ? range : null;
+      _clear();
+    });
+    widget.onRangeChanged?.call(range);
+  }
 
   Future<void> _showStartDateMenu(
     Offset globalPosition,
@@ -403,8 +437,8 @@ class _MarketLineChartInteractionState
     if (!mounted ||
         selected != true ||
         !listEquals(dataSignature, widget.renderer.dataSignature)) return;
+    _setRange((start, end));
     setState(() {
-      _zoom = (start, end);
       _dragStart = null;
       _dragX = null;
       _dragPointer = null;
@@ -504,9 +538,7 @@ class _MarketLineChartInteractionState
                     event.localPosition.dx,
                   );
                   if (first != null && last != null && first != last) {
-                    setState(
-                      () => _zoom = (min(first, last), max(first, last)),
-                    );
+                    _setRange((min(first, last), max(first, last)));
                   }
                 }
                 setState(() {
@@ -584,17 +616,14 @@ class _MarketLineChartInteractionState
                         ),
                       ),
                     ),
-                  if (_zoom != null)
+                  if (_range != null)
                     Positioned(
                       top: 0,
                       right: 0,
                       child: IconButton(
                         tooltip: 'Reset zoom',
                         icon: const Icon(Icons.zoom_out),
-                        onPressed: () => setState(() {
-                          _zoom = null;
-                          _clear();
-                        }),
+                        onPressed: () => _setRange(null),
                       ),
                     ),
                   Positioned.fill(
@@ -759,30 +788,49 @@ class _MarketLineChartRenderer extends ChartRenderer
         ...xLabels.map((label) => (label.x, label.column, label.text)),
         for (final line in series) ...[
           line.name,
-          for (final point in line.points) (point.x, point.y, point.column),
+          for (final point in line.points)
+            (point.x, point.y, point.column, point.comparisonValue),
         ],
       ];
 
   _MarketLineChartRenderer zoomTo(int start, int end) {
-    final visibleSeries = [
-      for (final line in series)
+    final visibleSeries = <MarketLineChartSeries>[];
+    for (final line in series) {
+      final points = [
+        for (var i = 0; i < line.points.length; i++)
+          if ((line.points[i].column ?? i) >= start &&
+              (line.points[i].column ?? i) <= end)
+            MarketLineChartPoint(
+              line.points[i].x,
+              line.points[i].y,
+              column: line.points[i].column ?? i,
+              comparisonValue: line.points[i].comparisonValue,
+            ),
+      ];
+      final compare = points.any((point) => point.comparisonValue != null);
+      final values = compare
+          ? scalePortfolioSeriesForComparison(
+              points.map((point) => point.comparisonValue ?? point.y),
+            )
+          : points.map((point) => point.y).toList();
+      visibleSeries.add(
         MarketLineChartSeries(
           points: [
-            for (var i = 0; i < line.points.length; i++)
-              if ((line.points[i].column ?? i) >= start &&
-                  (line.points[i].column ?? i) <= end)
-                MarketLineChartPoint(
-                  line.points[i].x,
-                  line.points[i].y,
-                  column: line.points[i].column ?? i,
-                ),
+            for (var i = 0; i < points.length; i++)
+              MarketLineChartPoint(
+                points[i].x,
+                values[i],
+                column: points[i].column,
+                comparisonValue: points[i].comparisonValue,
+              ),
           ],
           color: line.color,
           name: line.name,
           fill: line.fill,
           strokeWidth: line.strokeWidth,
         ),
-    ];
+      );
+    }
     final bounds = _calculateYBounds([
       for (final line in visibleSeries) ...line.points,
     ]);
