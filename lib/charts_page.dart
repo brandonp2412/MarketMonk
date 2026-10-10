@@ -1747,14 +1747,6 @@ class ChartsPageState extends State<ChartsPage>
     ];
 
     final chips = [
-      _PeriodChip(
-        key: const Key('chart-rolling-average'),
-        label: context.l10n.text('Rolling average'),
-        selected: _showRollingAverage,
-        onTap: () => setState(
-          () => _showRollingAverage = !_showRollingAverage,
-        ),
-      ),
       for (final (label, optionYears, optionMonths, optionDays) in options)
         _PeriodChip(
           key: Key('chart-period-$label'),
@@ -1944,6 +1936,7 @@ class ChartsPageState extends State<ChartsPage>
           Wrap(
             alignment: WrapAlignment.center,
             spacing: 8,
+            runSpacing: 8,
             children: [
               _ActionChip(
                 icon: Icons.add,
@@ -1963,6 +1956,7 @@ class ChartsPageState extends State<ChartsPage>
                 label: context.l10n.text('Favorite'),
                 onTap: () => _toggleFavorite(symbol),
               ),
+              _buildRollingAverageChip(),
             ],
           ),
         ],
@@ -1976,9 +1970,32 @@ class ChartsPageState extends State<ChartsPage>
   ) {
     return [
       _buildFavoritesRow(),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Wrap(
+          alignment: WrapAlignment.center,
+          children: [_buildRollingAverageChip()],
+        ),
+      ),
       _buildPortfolioChart(context, settings, accountColors),
       _buildPortfolioSummary(context, settings, accountColors),
     ];
+  }
+
+  Widget _buildRollingAverageChip() {
+    return Semantics(
+      selected: _showRollingAverage,
+      button: true,
+      child: _ActionChip(
+        key: const Key('chart-rolling-average'),
+        icon:
+            _showRollingAverage ? Icons.check_circle_outline : Icons.show_chart,
+        label: context.l10n.text('Rolling average'),
+        onTap: () => setState(
+          () => _showRollingAverage = !_showRollingAverage,
+        ),
+      ),
+    );
   }
 
   Widget _buildFavoritesRow() {
@@ -2539,6 +2556,7 @@ class _ActionChip extends StatelessWidget {
   final VoidCallback onTap;
 
   const _ActionChip({
+    super.key,
     required this.icon,
     required this.label,
     required this.onTap,
