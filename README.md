@@ -94,3 +94,7 @@ from3To4: (Migrator m, Schema4 schema) async {
 ```
 
 4. Run `dart run build_runner build -d`
+
+Selected favorites also use intraday prices for `5d`. Account-performance lines use daily broker NAV values; they do not interpolate intraday account balances.
+
+Run the live Linux chart test with `flutter/bin/flutter test integration_test/intraday_live_test.dart -d linux`. It fetches real Yahoo bars, checks rendered point counts, and saves screenshots in `/tmp/market-monk-intraday-e2e`, using an isolated test database. To exercise deployed IBKR accounts too, pass a private `--dart-define-from-file` JSON file whose `MARKET_MONK_LIVE_CONFIGS` value is a JSON-encoded list of objects with `base_url` and `token` fields. Keep that file and the resulting test build private because they contain credentials.

@@ -13,6 +13,8 @@ import shlex
 import ssl
 import subprocess
 import time
+import threading
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -596,34 +598,30 @@ class NativeIbkrClient:
         else:
             self._startup_fetch = 9
         self._ib_factory = ib_factory
+        self._connection_lock = threading.Lock()
 
     def ensure_account_visible(self) -> str:
-        ib = self._connect()
-        try:
+        with self._session() as ib:
             return self._select_account(ib)
-        finally:
-            ib.disconnect()
 
     def portfolio(self) -> dict[str, Any]:
-        ib = self._connect()
-        try:
-            account = self._select_account(ib)
-            items = list(ib.portfolio(account))
-            values = list(ib.accountValues(account))
-            return {
-                "account": _mask_account(account),
-                "read_only": True,
-                "source": "native",
-                "summary": _native_summary(values),
-                "ledger": _native_ledger(values),
-                "positions": [_normalize_native_position(item) for item in items],
-            }
-        except IbkrError:
-            raise
-        except Exception as error:
-            raise IbkrError(f"IBKR TWS API portfolio read failed: {error}") from error
-        finally:
-            ib.disconnect()
+        with self._session() as ib:
+            try:
+                account = self._select_account(ib)
+                items = list(ib.portfolio(account))
+                values = list(ib.accountValues(account))
+                return {
+                    "account": _mask_account(account),
+                    "read_only": True,
+                    "source": "native",
+                    "summary": _native_summary(values),
+                    "ledger": _native_ledger(values),
+                    "positions": [_normalize_native_position(item) for item in items],
+                }
+            except IbkrError:
+                raise
+            except Exception as error:
+                raise IbkrError(f"IBKR TWS API portfolio read failed: {error}") from error
 
     def intraday(self, symbol: str, days: int) -> dict[str, Any]:
         if days not in (1, 5):
@@ -633,68 +631,66 @@ class NativeIbkrClient:
     def historical(
         self, symbol: str, years: int, *, intraday_days: int | None = None
     ) -> dict[str, Any]:
-        ib = self._connect()
-        try:
-            account = self._select_account(ib)
-            item = next(
-                (
-                    position
-                    for position in ib.portfolio(account)
-                    if str(getattr(position.contract, "symbol", "")).upper()
-                    == symbol.upper()
-                    and str(getattr(position.contract, "secType", "")).upper()
-                    == "STK"
-                ),
-                None,
-            )
-            if item is None:
-                raise IbkrError(
-                    "IBKR historical candles are available for current stock positions only"
+        with self._session() as ib:
+            try:
+                account = self._select_account(ib)
+                item = next(
+                    (
+                        position
+                        for position in ib.portfolio(account)
+                        if str(getattr(position.contract, "symbol", "")).upper()
+                        == symbol.upper()
+                        and str(getattr(position.contract, "secType", "")).upper()
+                        == "STK"
+                    ),
+                    None,
                 )
+                if item is None:
+                    raise IbkrError(
+                        "IBKR historical candles are available for current stock positions only"
+                    )
 
-            contract = item.contract
-            if not str(getattr(contract, "exchange", "")).strip():
-                contract.exchange = "SMART"
+                contract = item.contract
+                if not str(getattr(contract, "exchange", "")).strip():
+                    contract.exchange = "SMART"
 
-            duration = f"{years} Y"
-            bar_size = "1 day"
-            if intraday_days is not None:
-                duration = "1 D" if intraday_days == 1 else "1 W"
-                bar_size = "1 min" if intraday_days == 1 else "15 mins"
-            bars = ib.reqHistoricalData(
-                contract,
-                endDateTime="",
-                durationStr=duration,
-                barSizeSetting=bar_size,
-                whatToShow="TRADES",
-                useRTH=True,
-                formatDate=2 if intraday_days else 1,
-                timeout=30,
-            )
-            if not bars:
-                raise IbkrError(f"IBKR returned no historical candles for {symbol}")
+                duration = f"{years} Y"
+                bar_size = "1 day"
+                if intraday_days is not None:
+                    duration = "1 D" if intraday_days == 1 else "1 W"
+                    bar_size = "1 min" if intraday_days == 1 else "15 mins"
+                bars = ib.reqHistoricalData(
+                    contract,
+                    endDateTime="",
+                    durationStr=duration,
+                    barSizeSetting=bar_size,
+                    whatToShow="TRADES",
+                    useRTH=True,
+                    formatDate=2 if intraday_days else 1,
+                    timeout=30,
+                )
+                if not bars:
+                    raise IbkrError(f"IBKR returned no historical candles for {symbol}")
 
-            currency = str(getattr(contract, "currency", "") or "USD").strip()
-            return {
-                "read_only": True,
-                "source": "native",
-                "symbol": str(getattr(contract, "symbol", symbol)).strip(),
-                "currency": currency,
-                "candles": [
-                    _normalize_historical_bar(bar, intraday=intraday_days is not None)
-                    for bar in bars
-                ],
-                **(
-                    {"interval": "1m" if intraday_days == 1 else "15m"}
-                    if intraday_days else {}
-                ),
-            }
-        except IbkrError:
-            raise
-        except Exception as error:
-            raise IbkrError(f"IBKR TWS API historical read failed: {error}") from error
-        finally:
-            ib.disconnect()
+                currency = str(getattr(contract, "currency", "") or "USD").strip()
+                return {
+                    "read_only": True,
+                    "source": "native",
+                    "symbol": str(getattr(contract, "symbol", symbol)).strip(),
+                    "currency": currency,
+                    "candles": [
+                        _normalize_historical_bar(bar, intraday=intraday_days is not None)
+                        for bar in bars
+                    ],
+                    **(
+                        {"interval": "1m" if intraday_days == 1 else "15m"}
+                        if intraday_days else {}
+                    ),
+                }
+            except IbkrError:
+                raise
+            except Exception as error:
+                raise IbkrError(f"IBKR TWS API historical read failed: {error}") from error
 
     def performance(self, period: str) -> dict[str, Any]:
         return self._performance_client.performance(period)
@@ -711,6 +707,17 @@ class NativeIbkrClient:
             "includes_real_time": False,
             "trades": [],
         }
+
+    @contextmanager
+    def _session(self):
+        # TWS rejects concurrent connections using the same client ID (error 326).
+        # https://www.interactivebrokers.com/docs/tws-api/doc/error-handling/error-codes
+        with self._connection_lock:
+            ib = self._connect()
+            try:
+                yield ib
+            finally:
+                ib.disconnect()
 
     def _connect(self) -> Any:
         ib = self._ib_factory()

@@ -15,20 +15,29 @@ import 'package:provider/provider.dart';
 import 'sqlite_test_support.dart';
 import 'test_log_support.dart';
 
-http.Response _prices(double first, {String currency = 'GBp'}) => http.Response(
+http.Response _prices(
+  double first, {
+  String currency = 'GBp',
+  int count = 3,
+  int intervalSeconds = 60,
+}) =>
+    http.Response(
       jsonEncode({
         'chart': {
           'result': [
             {
               'meta': {'currency': currency},
-              'timestamp': [1791552600, 1791552660, 1791552720],
+              'timestamp': [
+                for (var i = 0; i < count; i++)
+                  1791552600 + i * intervalSeconds,
+              ],
               'indicators': {
                 'quote': [
                   {
-                    'open': [first, first + 1, first + 2],
-                    'high': [first, first + 1, first + 2],
-                    'low': [first, first + 1, first + 2],
-                    'close': [first, first + 1, first + 2],
+                    'open': [for (var i = 0; i < count; i++) first + i],
+                    'high': [for (var i = 0; i < count; i++) first + i],
+                    'low': [for (var i = 0; i < count; i++) first + i],
+                    'close': [for (var i = 0; i < count; i++) first + i],
                   }
                 ],
               },
@@ -47,6 +56,9 @@ void main() {
     WidgetTester tester,
     IntradayMarketData loader, {
     bool active = true,
+    String? initialSymbol = 'VOD.L',
+    List<String> favorites = const [],
+    int days = 1,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1000, 900);
@@ -57,7 +69,8 @@ void main() {
     await seedTestSqlite({
       'chartPeriodYears': 0,
       'chartPeriodMonths': 0,
-      'chartPeriodDays': 1,
+      'chartPeriodDays': days,
+      'favoriteStocks': favorites,
       'exchangeRate_GBP': 0.75,
     });
     allRatesFromUsd.remove('GBP');
@@ -76,7 +89,7 @@ void main() {
           theme: ThemeData(platform: TargetPlatform.linux),
           home: Scaffold(
             body: ChartsPage(
-              initialSymbol: 'VOD.L',
+              initialSymbol: initialSymbol,
               intradayData: loader,
               isActive: active,
             ),
@@ -153,6 +166,40 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(TickerLine), findsOneWidget);
     expect(calls, 2);
+  });
+
+  testWidgets('favorite 5d chart preserves all intraday observations',
+      (tester) async {
+    final loader = IntradayMarketData(
+      yahooGet: (_) async => _prices(
+        100,
+        currency: 'USD',
+        count: 12,
+        intervalSeconds: 900,
+      ),
+    );
+    await mountChart(
+      tester,
+      loader,
+      initialSymbol: null,
+      favorites: ['AAPL'],
+      days: 5,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('AAPL'));
+    await tester.pumpAndSettle();
+    final chart = tester.widget<MarketLineChart>(find.byType(MarketLineChart));
+    expect(chart.series.single.name, 'AAPL');
+    expect(chart.series.single.points, hasLength(12));
+    expect(chart.series.single.points.first.y, 0);
+    expect(chart.series.single.points.last.y, closeTo(11, 1e-8));
+    expect(chart.xLabels.first, contains(RegExp(r'\d{2}:\d{2}')));
+    expect(
+      find.text(
+        'Account values are daily; stock prices are intraday in local time.',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('inactive charts do not request intraday bars', (tester) async {

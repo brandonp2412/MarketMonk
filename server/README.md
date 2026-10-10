@@ -121,3 +121,5 @@ Intraday API references:
 cd server
 python3 -m unittest -v test_ibkr_proxy.py
 ```
+
+Native TWS requests share a connection lock for the full connect/read/disconnect cycle. This prevents overlapping portfolio and historical requests from opening simultaneous connections with the configured client ID, which TWS rejects with error 326.

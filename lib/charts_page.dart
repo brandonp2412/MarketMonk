@@ -81,6 +81,9 @@ class ChartsPageState extends State<ChartsPage>
   final Set<String> _selectedFavorites = {};
   Stream<List<StoredCandle>>? _favoriteChartStream;
   String _favoriteChartStreamKey = '';
+  final _favoriteIntraday = <String, IntradaySeries>{};
+  final _favoriteIntradayErrors = <String, String>{};
+  int _favoriteLoadGeneration = 0;
   bool _networkLoading = false;
   bool _showRollingAverage = false;
   String? _stockError;
@@ -154,6 +157,7 @@ class ChartsPageState extends State<ChartsPage>
     if (oldWidget.isActive && !widget.isActive) {
       _portfolioLoadGeneration++;
       _stockLoadGeneration++;
+      _favoriteLoadGeneration++;
       _networkLoading = false;
       _stockStream = null;
       return;
@@ -505,6 +509,10 @@ class ChartsPageState extends State<ChartsPage>
         'Failed to refresh charts after account change',
       );
     }
+    _favoriteLoadGeneration++;
+    _favoriteIntraday.clear();
+    _favoriteIntradayErrors.clear();
+    runDetachedTask(_syncFavoriteCandles(), 'Failed to reload favorite charts');
     if (_selectedSymbol != null) {
       runDetachedTask(
         _loadSelectedStock(forceRefresh: ibkrChanged),
@@ -552,6 +560,7 @@ class ChartsPageState extends State<ChartsPage>
     _searchFocus.dispose();
     _yahooApi.dispose();
     _stockLoadGeneration++;
+    _favoriteLoadGeneration++;
     super.dispose();
   }
 
@@ -608,6 +617,7 @@ class ChartsPageState extends State<ChartsPage>
     try {
       clearAllSyncCache();
       await _refreshAllPortfolioCandles();
+      await _syncFavoriteCandles(forceRefresh: true);
       await _loadAllPortfolios(
         refreshIbkrPortfolio: true,
         forceIbkrPortfolioRefresh: true,
@@ -649,25 +659,59 @@ class ChartsPageState extends State<ChartsPage>
     }
   }
 
-  Future<void> _syncFavoriteCandles() async {
+  Future<void> _syncFavoriteCandles({bool forceRefresh = false}) async {
     for (final symbol in _favoriteStocks) {
       if (!mounted || !widget.isActive) return;
-      await _syncFavoriteCandle(symbol);
+      await _syncFavoriteCandle(symbol, forceRefresh: forceRefresh);
     }
   }
 
-  Future<void> _syncFavoriteCandle(String symbol) async {
+  Future<void> _syncFavoriteCandle(
+    String symbol, {
+    bool forceRefresh = false,
+  }) async {
     if (!mounted || !widget.isActive) return;
+    final generation = _favoriteLoadGeneration;
+    final selectedDays = days;
+    final intraday = _usesIntraday && _selectedFavorites.contains(symbol);
     try {
       final accountManager = context.read<AccountManager>();
+      if (intraday) {
+        final series = await _intradayData.fetch(
+          symbol,
+          days: selectedDays,
+          config: accountManager.ibkrConfigFor(),
+          forceRefresh: forceRefresh,
+        );
+        if (!mounted ||
+            !widget.isActive ||
+            generation != _favoriteLoadGeneration) return;
+        await fetchSymbolCurrencyAndRate(symbol, rawCurrency: series.currency);
+        if (!mounted ||
+            !widget.isActive ||
+            generation != _favoriteLoadGeneration) return;
+        requireUsdRate(symbolCurrency(symbol));
+        setState(() {
+          _favoriteIntraday[symbol] = series;
+          _favoriteIntradayErrors.remove(symbol);
+        });
+        return;
+      }
       await syncCandles(
         symbol,
         ibkrConfig: accountManager.ibkrConfigFor(),
         syncNamespace: accountManager.activeAccount,
         requiredFrom: _requiredCandleStart(),
+        forceRefresh: forceRefresh,
       );
     } catch (error, stackTrace) {
       talker.handle(error, stackTrace, 'Favorite ticker candle sync failed');
+      if (intraday &&
+          mounted &&
+          widget.isActive &&
+          generation == _favoriteLoadGeneration) {
+        setState(() => _favoriteIntradayErrors[symbol] = error.toString());
+      }
     }
   }
 
@@ -1430,6 +1474,9 @@ class ChartsPageState extends State<ChartsPage>
       years = selectedYears;
       months = selectedMonths;
       days = selectedDays;
+      _favoriteLoadGeneration++;
+      _favoriteIntraday.clear();
+      _favoriteIntradayErrors.clear();
     });
     runDetachedTask(_savePeriod(), 'Failed to save chart period');
     if (_favoriteStocks.isNotEmpty) {
@@ -2060,6 +2107,27 @@ class ChartsPageState extends State<ChartsPage>
   ) {
     return [
       _buildFavoritesRow(),
+      if (_usesIntraday)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Text(
+            _selectedFavorites.isEmpty
+                ? context.l10n.text(
+                    'Account performance uses daily broker values. Open a stock chart for intraday prices.',
+                  )
+                : context.l10n.text(
+                    'Account values are daily; stock prices are intraday in local time.',
+                  ),
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+      for (final symbol in _selectedFavorites)
+        if (_usesIntraday && _favoriteIntradayErrors.containsKey(symbol))
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text('$symbol: ${_favoriteIntradayErrors[symbol]}'),
+          ),
       _buildPortfolioChart(context, settings, accountColors),
       _buildPortfolioSummary(context, settings, accountColors),
     ];
@@ -2199,6 +2267,9 @@ class ChartsPageState extends State<ChartsPage>
                   symbol: symbol,
                   periodStart: _requiredCandleStart(),
                   periodDays: days,
+                  intraday:
+                      _usesIntraday && _selectedFavorites.contains(symbol),
+                  intradaySeries: _favoriteIntraday[symbol],
                   isActive: widget.isActive,
                   selected: _selectedFavorites.contains(symbol),
                   selectionColor: _favoriteColor(symbol),
@@ -2221,7 +2292,9 @@ class ChartsPageState extends State<ChartsPage>
         '${widget.isActive}|$_selectedFavorites|$years|$months|$days';
     if (_favoriteChartStreamKey != streamKey) {
       _favoriteChartStreamKey = streamKey;
-      _favoriteChartStream = widget.isActive && _selectedFavorites.isNotEmpty
+      _favoriteChartStream = widget.isActive &&
+              !_usesIntraday &&
+              _selectedFavorites.isNotEmpty
           ? (marketDataDatabase.candles.select()
                 ..where(
                   (candle) =>
@@ -2282,6 +2355,19 @@ class ChartsPageState extends State<ChartsPage>
     };
 
     for (final symbol in _selectedFavorites) {
+      if (_usesIntraday) {
+        final series = _favoriteIntraday[symbol];
+        if (series != null) {
+          visibleSeries[symbol] = [
+            for (final bar in series.candles)
+              _DateValue(
+                bar.date.toLocal(),
+                bar.close / symbolCentDivisor(symbol),
+              ),
+          ];
+        }
+        continue;
+      }
       var candles = favoriteCandles
           .where((candle) => candle.symbol == canonicalMarketSymbol(symbol))
           .toList();
@@ -2378,7 +2464,11 @@ class ChartsPageState extends State<ChartsPage>
       );
     }
 
-    final formatter = DateFormat(settings.dateFormat);
+    final formatter = DateFormat(
+      _usesIntraday && _selectedFavorites.isNotEmpty
+          ? '${settings.dateFormat} HH:mm'
+          : settings.dateFormat,
+    );
     final visibleKeys = visibleSeries.keys.toList();
 
     return SizedBox(
@@ -2760,6 +2850,8 @@ class _FavoriteCard extends StatelessWidget {
   final String symbol;
   final DateTime periodStart;
   final int periodDays;
+  final bool intraday;
+  final IntradaySeries? intradaySeries;
   final bool isActive;
   final bool selected;
   final Color selectionColor;
@@ -2769,6 +2861,8 @@ class _FavoriteCard extends StatelessWidget {
     required this.symbol,
     required this.periodStart,
     required this.periodDays,
+    required this.intraday,
+    this.intradaySeries,
     required this.isActive,
     required this.selected,
     required this.selectionColor,
@@ -2778,7 +2872,7 @@ class _FavoriteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final stream = isActive
+    final stream = isActive && !intraday
         ? (marketDataDatabase.candles.select()
               ..where(
                 (candle) =>
@@ -2847,7 +2941,23 @@ class _FavoriteCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   StreamBuilder<List<StoredCandle>>(
-                    stream: stream,
+                    stream: intraday
+                        ? Stream.value([
+                            for (final bar
+                                in intradaySeries?.candles.reversed ??
+                                    <IbkrHistoricalCandle>[])
+                              StoredCandle(
+                                symbol: canonicalMarketSymbol(symbol),
+                                date: bar.date.toLocal(),
+                                open: bar.open,
+                                high: bar.high,
+                                low: bar.low,
+                                close: bar.close,
+                                adjClose: bar.close,
+                                volume: bar.volume,
+                              ),
+                          ])
+                        : stream,
                     builder: (context, snapshot) {
                       final candles = snapshot.data;
                       if (candles == null || candles.isEmpty) {

@@ -354,6 +354,54 @@ class FakeNativeIb:
 
 
 class ProxyTests(unittest.TestCase):
+    def test_native_requests_share_one_connection_at_a_time(self):
+        from concurrent.futures import ThreadPoolExecutor
+
+        entered = threading.Event()
+        release = threading.Event()
+        second_entered = threading.Event()
+        state_lock = threading.Lock()
+        active = 0
+        maximum = 0
+        connections = 0
+
+        class BlockingIb(FakeNativeIb):
+            def connect(self, host, port, **kwargs):
+                nonlocal active, maximum, connections
+                with state_lock:
+                    active += 1
+                    maximum = max(maximum, active)
+                    connections += 1
+                    first = connections == 1
+                if first:
+                    entered.set()
+                    if not release.wait(5):
+                        raise RuntimeError("test connection was not released")
+                else:
+                    second_entered.set()
+                super().connect(host, port, **kwargs)
+
+            def disconnect(self):
+                nonlocal active
+                with state_lock:
+                    active -= 1
+                super().disconnect()
+
+        client = NativeIbkrClient(config(backend="native"), ib_factory=BlockingIb)
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            first = executor.submit(client.portfolio)
+            try:
+                self.assertTrue(entered.wait(5))
+                second = executor.submit(client.intraday, "AAPL", 5)
+                self.assertFalse(second_entered.wait(0.1))
+            finally:
+                release.set()
+            self.assertTrue(first.result(timeout=5)["positions"])
+            self.assertTrue(second.result(timeout=5)["candles"])
+        self.assertEqual(maximum, 1)
+        self.assertEqual(active, 0)
+
+
     def test_normalizes_official_portfolio2_shape(self):
         position = _normalize_web_position(
             {
