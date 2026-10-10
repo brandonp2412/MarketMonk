@@ -1369,7 +1369,7 @@ class ChartsPageState extends State<ChartsPage>
       days = selectedDays;
     });
     runDetachedTask(_savePeriod(), 'Failed to save chart period');
-    if (_selectedFavorites.isNotEmpty) {
+    if (_favoriteStocks.isNotEmpty) {
       runDetachedTask(
         _syncFavoriteCandles(),
         'Failed to backfill favorite period',
@@ -2025,6 +2025,8 @@ class ChartsPageState extends State<ChartsPage>
                 copyLabel: context.l10n.text('Copy symbol'),
                 child: _FavoriteCard(
                   symbol: symbol,
+                  periodStart: _requiredCandleStart(),
+                  periodDays: days,
                   isActive: widget.isActive,
                   selected: _selectedFavorites.contains(symbol),
                   selectionColor: _favoriteColor(symbol),
@@ -2579,10 +2581,12 @@ class _ActionChip extends StatelessWidget {
   }
 }
 
-/// A small card showing a favorited symbol's latest price and day change,
+/// A small card showing a favorited symbol's latest price and selected period change,
 /// used in the favorites row on the portfolio landing view.
 class _FavoriteCard extends StatelessWidget {
   final String symbol;
+  final DateTime periodStart;
+  final int periodDays;
   final bool isActive;
   final bool selected;
   final Color selectionColor;
@@ -2590,6 +2594,8 @@ class _FavoriteCard extends StatelessWidget {
 
   const _FavoriteCard({
     required this.symbol,
+    required this.periodStart,
+    required this.periodDays,
     required this.isActive,
     required this.selected,
     required this.selectionColor,
@@ -2601,14 +2607,18 @@ class _FavoriteCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final stream = isActive
         ? (marketDataDatabase.candles.select()
-              ..where((candle) => candle.symbol.equals(symbol))
+              ..where(
+                (candle) =>
+                    candle.symbol.equals(canonicalMarketSymbol(symbol)) &
+                    candle.date.isBiggerThanValue(periodStart),
+              )
               ..orderBy([
                 (candle) => OrderingTerm(
                       expression: candle.date,
                       mode: OrderingMode.desc,
                     ),
               ])
-              ..limit(2))
+              ..limit(periodDays > 0 ? periodDays : -1))
             .watch()
         : const Stream<List<StoredCandle>>.empty();
 
@@ -2674,7 +2684,7 @@ class _FavoriteCard extends StatelessWidget {
                       final price = candles.first.close / centDivisor;
                       final pct = candles.length > 1
                           ? safePercentChange(
-                              candles[1].close,
+                              candles.last.close,
                               candles.first.close,
                             )
                           : null;

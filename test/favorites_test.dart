@@ -39,6 +39,11 @@ void main() {
         DateTime(today.year - 1, today.month, today.day - 1),
         170,
       );
+      await seedTestCandle(
+        'AAPL',
+        DateTime(today.year, today.month - 1, today.day),
+        170,
+      );
       await seedTestCandle('AAPL', yesterday, 180);
       await seedTestCandle('AAPL', today, 190);
 
@@ -53,7 +58,16 @@ void main() {
 
       expect(find.text('AAPL'), findsOneWidget);
       expect(find.textContaining('190'), findsWidgets);
-      expect(find.textContaining('5.56%'), findsOneWidget);
+      expect(find.text('+11.76%'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('chart-period-5d')));
+      await tester.pumpAndSettle();
+      expect(find.text('+5.56%'), findsOneWidget);
+      expect(find.text('+11.76%'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('chart-period-1y')));
+      await tester.pumpAndSettle();
+      expect(find.text('+11.76%'), findsOneWidget);
 
       await tester.tap(find.text('AAPL'));
       await tester.pumpAndSettle();
