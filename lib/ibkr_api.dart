@@ -512,8 +512,13 @@ class IbkrApiClient {
       throw StateError('IBKR API is not fully configured');
     }
     final base = Uri.parse(config.baseUrl.trim());
-    if (!base.hasScheme || base.host.isEmpty) {
-      throw FormatException('IBKR API URL must include http:// or https://');
+    if (base.host.isEmpty ||
+        (base.scheme != 'https' && base.scheme != 'http')) {
+      throw FormatException('IBKR API URL must include https://');
+    }
+    const localHosts = {'localhost', '127.0.0.1', '::1'};
+    if (base.scheme == 'http' && !localHosts.contains(base.host)) {
+      throw FormatException('IBKR API requires HTTPS outside localhost');
     }
     final uri = base.replace(
       path: '${base.path.replaceFirst(RegExp(r'/$'), '')}$path',

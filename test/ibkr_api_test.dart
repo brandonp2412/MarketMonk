@@ -15,6 +15,50 @@ void main() {
       ..['USD'] = 1.0;
   });
 
+  test('IBKR refuses insecure remote HTTP before sending credentials',
+      () async {
+    var contactedNetwork = false;
+    for (final insecureUrl in [
+      'http://192.168.1.243:8091',
+      'http://pi.presley.nz:8091',
+      'http://example.com',
+    ]) {
+      final client = IbkrApiClient(
+        IbkrAccountConfig(
+          enabled: true,
+          baseUrl: insecureUrl,
+          token: 'secret-token',
+        ),
+        get: (uri, {headers}) async {
+          contactedNetwork = true;
+          return http.Response('{}', 200);
+        },
+      );
+      await expectLater(
+        client.testConnection(),
+        throwsA(isA<FormatException>()),
+      );
+    }
+    expect(contactedNetwork, isFalse);
+  });
+
+  test('IBKR still permits loopback HTTP for local development', () async {
+    Uri? requestedUri;
+    final client = IbkrApiClient(
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'http://127.0.0.1:8091',
+        token: 'development-token',
+      ),
+      get: (uri, {headers}) async {
+        requestedUri = uri;
+        return http.Response('{"status":"ok"}', 200);
+      },
+    );
+    await client.testConnection();
+    expect(requestedUri.toString(), 'http://127.0.0.1:8091/v1/health');
+  });
+
   test('IBKR client authenticates and parses portfolio snapshots', () async {
     Uri? requestedUri;
     Map<String, String>? requestedHeaders;
