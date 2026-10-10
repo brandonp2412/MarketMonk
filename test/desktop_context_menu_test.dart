@@ -6,6 +6,44 @@ import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/bottom_nav.dart';
 
 void main() {
+  testWidgets('desktop menus appear fully open and animate dismissal',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(platform: TargetPlatform.linux),
+        home: Scaffold(
+          body: DesktopContextMenu(
+            actions: [DesktopMenuAction('Edit trade', () {})],
+            child: const Text('Trade'),
+          ),
+        ),
+      ),
+    );
+    final mouse = await tester.createGesture(
+      kind: PointerDeviceKind.mouse,
+      buttons: kSecondaryMouseButton,
+    );
+    await mouse.down(tester.getCenter(find.text('Trade')));
+    await mouse.up();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1));
+
+    final menuContext = tester.element(find.text('Edit trade'));
+    final route = ModalRoute.of(menuContext)!;
+    expect(route.animation!.value, 1);
+    final initialSize = tester.getSize(find.byType(PopupMenuItem<int>));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(find.byType(PopupMenuItem<int>)), initialSize);
+
+    await tester.tapAt(const Offset(700, 500));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(route.animation!.value, greaterThan(0));
+    expect(route.animation!.value, lessThan(1));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit trade'), findsNothing);
+  });
+
   Future<void> rightClick(WidgetTester tester, Finder target) async {
     final mouse = await tester.createGesture(
       kind: PointerDeviceKind.mouse,

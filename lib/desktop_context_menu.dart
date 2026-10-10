@@ -69,6 +69,7 @@ class DesktopContextMenu extends StatelessWidget {
         final position = overlay.globalToLocal(details.globalPosition);
         final selected = await showMenu<int>(
           context: context,
+          popUpAnimationStyle: const AnimationStyle(curve: Threshold(0)),
           position: RelativeRect.fromRect(
             position & const Size(1, 1),
             Offset.zero & overlay.size,
