@@ -1977,8 +1977,9 @@ class ChartsPageState extends State<ChartsPage>
 
   Widget _buildRollingAverageChip({bool favoriteCard = false}) {
     final colors = Theme.of(context).colorScheme;
-    final icon =
-        _showRollingAverage ? Icons.check_circle_outline : Icons.show_chart;
+    final icon = _showRollingAverage
+        ? Icons.radio_button_checked
+        : Icons.radio_button_unchecked;
     final label = context.l10n.text('Rolling average');
     void toggle() => setState(
           () => _showRollingAverage = !_showRollingAverage,
@@ -2022,6 +2023,8 @@ class ChartsPageState extends State<ChartsPage>
                             Expanded(
                               child: Text(
                                 label,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: 12,
                                   height: 1,
@@ -2031,19 +2034,19 @@ class ChartsPageState extends State<ChartsPage>
                                 ),
                               ),
                             ),
-                            if (_showRollingAverage)
-                              Icon(
-                                Icons.check_circle_rounded,
-                                size: 14,
-                                color: colors.primary,
-                              ),
+                            Icon(
+                              icon,
+                              size: 14,
+                              color: colors.primary,
+                            ),
                           ],
                         ),
-                        const SizedBox(height: 2),
-                        Icon(
-                          Icons.show_chart,
-                          size: 16,
-                          color: colors.primary,
+                        const SizedBox(height: 8),
+                        CustomPaint(
+                          size: const Size(32, 14),
+                          painter: _RollingAverageIndicatorPainter(
+                            color: colors.primary,
+                          ),
                         ),
                       ],
                     ),
@@ -2799,4 +2802,37 @@ class _FavoriteCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Draws a smooth trend curve for the rolling average control.
+class _RollingAverageIndicatorPainter extends CustomPainter {
+  final Color color;
+
+  const _RollingAverageIndicatorPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(1, size.height - 2)
+      ..cubicTo(
+        size.width * 0.35,
+        size.height - 2,
+        size.width * 0.65,
+        2,
+        size.width - 1,
+        2,
+      );
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_RollingAverageIndicatorPainter oldDelegate) =>
+      color != oldDelegate.color;
 }
