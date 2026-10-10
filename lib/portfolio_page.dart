@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/desktop_context_menu.dart';
+import 'package:market_monk/ticker_context_actions.dart';
 import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/database.dart';
@@ -1472,8 +1473,10 @@ class _DesktopAllocationRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return DesktopContextMenu(
-      actions: [DesktopMenuAction(context.l10n.text('Select'), onTap)],
-      copyText: '$symbol $name ${fmtCurrency(value)}',
+      actionsBuilder: () => tickerContextActions(context, symbol),
+      copyText:
+          '$symbol $name ${fmtCurrency(value)} (${allocationPct.toStringAsFixed(2)}%)',
+      copyLabel: context.l10n.text('Copy allocation'),
       child: Material(
         color: selected
             ? theme.colorScheme.secondaryContainer.withValues(alpha: 0.45)
@@ -1802,8 +1805,10 @@ class _LegendTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DesktopContextMenu(
-      actions: [DesktopMenuAction(context.l10n.text('Select'), onTap)],
-      copyText: '$symbol $name ${fmtCurrency(value)}',
+      actionsBuilder: () => tickerContextActions(context, symbol),
+      copyText:
+          '$symbol $name ${fmtCurrency(value)} (${allocationPct.toStringAsFixed(2)}%)',
+      copyLabel: context.l10n.text('Copy allocation'),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 0),
         onTap: onTap,

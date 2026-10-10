@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:market_monk/desktop_context_menu.dart';
+import 'package:market_monk/ticker_context_actions.dart';
 import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/database.dart';
@@ -1118,8 +1119,9 @@ class HoldingsPageState extends State<HoldingsPage>
     }) {
       return DataCell(
         DesktopContextMenu(
-          actions: _holdingActions(summary, ibkrManaged),
-          copyText: '${summary.symbol}: $text',
+          actionsBuilder: () => _holdingActions(summary, ibkrManaged),
+          copyText: text,
+          copyLabel: context.l10n.text('Copy value'),
           child: Align(
             alignment: numeric ? Alignment.centerRight : Alignment.centerLeft,
             child: Text(
@@ -1312,11 +1314,10 @@ class HoldingsPageState extends State<HoldingsPage>
                                     cells: [
                                       DataCell(
                                         DesktopContextMenu(
-                                          actions: _holdingActions(
+                                          actionsBuilder: () => _holdingActions(
                                             summary,
                                             ibkrManaged,
                                           ),
-                                          copyText: summary.symbol,
                                           child: Row(
                                             children: [
                                               Icon(
@@ -1569,8 +1570,7 @@ class HoldingsPageState extends State<HoldingsPage>
           if (index == 0) return const SizedBox(height: 8);
           final summary = summaries[index - 1];
           return DesktopContextMenu(
-            actions: _holdingActions(summary, ibkrManaged),
-            copyText: summary.symbol,
+            actionsBuilder: () => _holdingActions(summary, ibkrManaged),
             child: _SymbolTile(
               summary: summary,
               selecting: _selecting,
@@ -1604,42 +1604,42 @@ class HoldingsPageState extends State<HoldingsPage>
     );
   }
 
-  List<DesktopMenuAction> _holdingActions(
+  Future<List<DesktopMenuAction>> _holdingActions(
     SymbolSummary summary,
     bool ibkrManaged,
   ) =>
-      [
-        DesktopMenuAction(
-          context.l10n.text('Trade History'),
-          () => _openDetail(summary),
-        ),
-        if (!ibkrManaged) ...[
+      tickerContextActions(
+        context,
+        summary.symbol,
+        extraActions: [
           DesktopMenuAction(
-            context.l10n.text('Delete'),
-            () => runDetachedTask(
-              _deleteSelected(context, symbols: {summary.symbol}),
-              'Failed to delete holding',
-            ),
+            context.l10n.text('Trade History'),
+            () => _openDetail(summary),
           ),
-          DesktopMenuAction(
-            context.l10n.text('Add trade'),
-            () => Navigator.push(
-              context,
-              adaptivePageRoute(
-                context,
-                builder: (_) => EditTickerPage(symbol: summary.symbol),
+          if (!ibkrManaged) ...[
+            DesktopMenuAction(
+              context.l10n.text('Delete'),
+              () => runDetachedTask(
+                _deleteSelected(context, symbols: {summary.symbol}),
+                'Failed to delete holding',
               ),
             ),
-          ),
-          DesktopMenuAction(
-            context.l10n.text('Select'),
-            () => setState(() {
-              _selecting = true;
-              _selectedSymbols.add(summary.symbol);
-            }),
-          ),
+            DesktopMenuAction(
+              context.l10n.text(
+                _selectedSymbols.contains(summary.symbol)
+                    ? 'Deselect holding'
+                    : 'Select holding',
+              ),
+              () => setState(() {
+                if (!_selectedSymbols.remove(summary.symbol)) {
+                  _selectedSymbols.add(summary.symbol);
+                }
+                _selecting = _selectedSymbols.isNotEmpty;
+              }),
+            ),
+          ],
         ],
-      ];
+      );
 
   void _openDetail(SymbolSummary s) {
     unawaited(

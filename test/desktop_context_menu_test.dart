@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/desktop_context_menu.dart';
+import 'package:market_monk/bottom_nav.dart';
 
 void main() {
   Future<void> rightClick(WidgetTester tester, Finder target) async {
@@ -94,5 +95,27 @@ void main() {
     );
     await rightClick(tester, find.text('Trade'));
     expect(find.text('Edit trade'), findsNothing);
+  });
+  testWidgets('navigation does not offer a duplicate Open menu',
+      (tester) async {
+    var selected = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(platform: TargetPlatform.linux),
+        home: Scaffold(
+          body: DesktopNav(
+            tabs: const ['ChartPage', 'PortfolioPage', 'HoldingsPage'],
+            currentIndex: 0,
+            onTap: (_) => selected++,
+            onSettings: () {},
+          ),
+        ),
+      ),
+    );
+    await rightClick(tester, find.text('Holdings'));
+    expect(find.byType(PopupMenuItem<int>), findsNothing);
+    expect(selected, 0);
+    await tester.tap(find.text('Holdings'));
+    expect(selected, 1);
   });
 }

@@ -137,9 +137,11 @@ void main() {
     await mouse.up();
     await tester.pumpAndSettle();
     expect(find.text('Trade History'), findsOneWidget);
+    expect(find.text('Open chart'), findsOneWidget);
+    expect(find.text('Add favorite'), findsOneWidget);
     expect(find.text('Add trade'), findsWidgets);
     expect(find.text('Delete'), findsOneWidget);
-    expect(find.text('Copy'), findsOneWidget);
+    expect(find.text('Copy symbol'), findsOneWidget);
     await tester.tap(find.text('Delete'));
     await tester.pumpAndSettle();
     expect(find.text('Delete 1 holding?'), findsOneWidget);

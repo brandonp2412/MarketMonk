@@ -21,25 +21,21 @@ class DesktopContextMenu extends StatelessWidget {
   /// Wraps an item or page with its available desktop actions.
   const DesktopContextMenu({
     super.key,
-    required this.actions,
+    this.actions = const [],
+    this.actionsBuilder,
     required this.child,
     this.copyText,
+    this.copyLabel,
   });
-
-  /// Offers the tile's existing action using its displayed text as the label.
-  factory DesktopContextMenu.listTile({required ListTile child}) {
-    final title = child.title;
-    return DesktopContextMenu(
-      actions: [
-        if (title is Text && title.data != null)
-          DesktopMenuAction(title.data!, child.onTap),
-      ],
-      child: child,
-    );
-  }
 
   /// Actions for the wrapped item, in display order.
   final List<DesktopMenuAction> actions;
+
+  /// Resolves current actions when the menu opens, including persisted state.
+  final Future<List<DesktopMenuAction>> Function()? actionsBuilder;
+
+  /// Label identifying which value the copy action copies.
+  final String? copyLabel;
 
   /// Content retaining its original touch and primary-click behavior.
   final Widget child;
@@ -58,16 +54,18 @@ class DesktopContextMenu extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onSecondaryTapDown: (details) async {
+        final overlay =
+            Overlay.of(context).context.findRenderObject()! as RenderBox;
+        final resolved = await actionsBuilder?.call() ?? actions;
+        if (!context.mounted) return;
         final entries = [
-          ...actions,
+          ...resolved,
           if (copyText != null)
-            DesktopMenuAction(context.l10n.text('Copy'), () {
+            DesktopMenuAction(copyLabel ?? context.l10n.text('Copy'), () {
               unawaited(Clipboard.setData(ClipboardData(text: copyText!)));
             }),
         ];
         if (entries.isEmpty) return;
-        final overlay =
-            Overlay.of(context).context.findRenderObject()! as RenderBox;
         final position = overlay.globalToLocal(details.globalPosition);
         final selected = await showMenu<int>(
           context: context,

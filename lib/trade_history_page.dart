@@ -195,7 +195,8 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                         ],
                       ],
                       copyText:
-                          '${trade.symbol} ${trade.tradeType} ${trade.quantity} @ ${trade.price}',
+                          '${trade.symbol} ${trade.tradeType == 'open' ? 'BUY' : 'SELL'} ${trade.quantity.abs()} @ ${fmtNativeCurrency(trade.price / centDiv, nativeCurr)} · ${DateFormat('yyyy-MM-dd').format(trade.tradeDate)}',
+                      copyLabel: context.l10n.text('Copy trade'),
                       child: _TradeTile(
                         trade: trade,
                         centDiv: centDiv,

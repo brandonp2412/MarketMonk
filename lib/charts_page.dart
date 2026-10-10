@@ -44,6 +44,9 @@ class _LoadedChartPortfolio {
 
 class ChartsPage extends StatefulWidget {
   final bool isActive;
+
+  /// Ticker to display when opening a chart from another screen.
+  final String? initialSymbol;
   final Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? _ibkrLoader;
   final Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
       _ibkrPerformanceLoader;
@@ -51,6 +54,7 @@ class ChartsPage extends StatefulWidget {
   const ChartsPage({
     super.key,
     this.isActive = true,
+    this.initialSymbol,
     Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? ibkrLoader,
     Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
         ibkrPerformanceLoader,
@@ -124,7 +128,11 @@ class ChartsPageState extends State<ChartsPage>
       'Failed to initialize chart period and portfolios',
     );
     _setColors();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _measureOverlay());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _measureOverlay();
+      if (widget.initialSymbol != null) _selectSymbol(widget.initialSymbol!);
+    });
   }
 
   @override
@@ -136,6 +144,7 @@ class ChartsPageState extends State<ChartsPage>
       return;
     }
     if (!oldWidget.isActive && widget.isActive && _chartPeriodLoaded) {
+      runDetachedTask(_loadFavorites(), 'Failed to reload favorites');
       final accountManager = context.read<AccountManager>();
       _hydratePortfolioSeriesFromCache(accountManager);
       if (_selectedSymbol != null) _setStockStream(_selectedSymbol!);
@@ -1542,21 +1551,11 @@ class ChartsPageState extends State<ChartsPage>
 
     // "Use anyway" tile — always shown so a known symbol remains usable even
     // while Yahoo search is slow or unavailable (e.g. GLD).
-    final useAnywayTile = DesktopContextMenu(
-      actions: [
-        DesktopMenuAction(
-          context.l10n.text('Open chart'),
-          () => _selectSymbol(query),
-        ),
-      ],
-      copyText: query,
-      child: ListTile(
-        leading: const Icon(Icons.open_in_new),
-        title:
-            Text(context.l10n.text('Use "{query}" anyway', {'query': query})),
-        subtitle: Text(context.l10n.text('Load chart for this exact ticker')),
-        onTap: () => _selectSymbol(query),
-      ),
+    final useAnywayTile = ListTile(
+      leading: const Icon(Icons.open_in_new),
+      title: Text(context.l10n.text('Use "{query}" anyway', {'query': query})),
+      subtitle: Text(context.l10n.text('Load chart for this exact ticker')),
+      onTap: () => _selectSymbol(query),
     );
 
     return RefreshIndicator(
@@ -1593,6 +1592,7 @@ class ChartsPageState extends State<ChartsPage>
               ),
             ],
             copyText: result.symbol,
+            copyLabel: context.l10n.text('Copy symbol'),
             child: ListTile(
               title: Text(result.symbol),
               subtitle: Text(name),
@@ -1821,18 +1821,20 @@ class ChartsPageState extends State<ChartsPage>
           ),
           () => _toggleFavorite(_selectedSymbol!),
         ),
-        DesktopMenuAction(
-          context.l10n.text('Add trade'),
-          () => Navigator.push(
-            context,
-            adaptivePageRoute(
+        if (!context.read<AccountManager>().ibkrConfigFor().enabled)
+          DesktopMenuAction(
+            context.l10n.text('Add trade'),
+            () => Navigator.push(
               context,
-              builder: (_) => EditTickerPage(symbol: _selectedSymbol),
+              adaptivePageRoute(
+                context,
+                builder: (_) => EditTickerPage(symbol: _selectedSymbol),
+              ),
             ),
           ),
-        ),
       ],
       copyText: _selectedSymbol,
+      copyLabel: context.l10n.text('Copy symbol'),
       child: SizedBox(
         height: height,
         child: TickerLine(
@@ -1976,18 +1978,20 @@ class ChartsPageState extends State<ChartsPage>
                     context.l10n.text('Remove favorite'),
                     () => _toggleFavorite(symbol),
                   ),
-                  DesktopMenuAction(
-                    context.l10n.text('Add trade'),
-                    () => Navigator.push(
-                      context,
-                      adaptivePageRoute(
+                  if (!context.read<AccountManager>().ibkrConfigFor().enabled)
+                    DesktopMenuAction(
+                      context.l10n.text('Add trade'),
+                      () => Navigator.push(
                         context,
-                        builder: (_) => EditTickerPage(symbol: symbol),
+                        adaptivePageRoute(
+                          context,
+                          builder: (_) => EditTickerPage(symbol: symbol),
+                        ),
                       ),
                     ),
-                  ),
                 ],
                 copyText: symbol,
+                copyLabel: context.l10n.text('Copy symbol'),
                 child: _FavoriteCard(
                   symbol: symbol,
                   isActive: widget.isActive,
@@ -2357,42 +2361,62 @@ class ChartsPageState extends State<ChartsPage>
           duration: const Duration(milliseconds: 200),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
-            child: ListTile(
-              dense: true,
-              key: Key('chart-account-selector-$accountName'),
-              onTap: () => setState(() {
-                if (isHidden) {
-                  _hiddenAccounts.remove(accountName);
-                } else {
-                  _hiddenAccounts.add(accountName);
-                }
-              }),
-              leading: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: 12,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: isHidden
-                      ? theme.colorScheme.surfaceContainerHighest
-                      : dotColor,
-                  shape: BoxShape.circle,
+            child: DesktopContextMenu(
+              actions: [
+                DesktopMenuAction(
+                  context.l10n.text('Show only this account'),
+                  () => setState(() {
+                    _hiddenAccounts.clear();
+                    _hiddenAccounts.addAll(
+                      accounts.where((name) => name != accountName),
+                    );
+                  }),
                 ),
-              ),
-              title: Text(
-                accountName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              subtitle: returnLabel(),
-              trailing: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  valueText,
-                  const SizedBox(height: 2),
-                  changeText,
-                ],
+                if (_hiddenAccounts.isNotEmpty)
+                  DesktopMenuAction(
+                    context.l10n.text('Show all accounts'),
+                    () => setState(_hiddenAccounts.clear),
+                  ),
+              ],
+              copyText: '$accountName: ${valueText.data} · ${changeText.data}',
+              copyLabel: context.l10n.text('Copy account summary'),
+              child: ListTile(
+                dense: true,
+                key: Key('chart-account-selector-$accountName'),
+                onTap: () => setState(() {
+                  if (isHidden) {
+                    _hiddenAccounts.remove(accountName);
+                  } else {
+                    _hiddenAccounts.add(accountName);
+                  }
+                }),
+                leading: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: isHidden
+                        ? theme.colorScheme.surfaceContainerHighest
+                        : dotColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                title: Text(
+                  accountName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: returnLabel(),
+                trailing: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    valueText,
+                    const SizedBox(height: 2),
+                    changeText,
+                  ],
+                ),
               ),
             ),
           ),
@@ -2429,37 +2453,34 @@ class _PeriodChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return DesktopContextMenu(
-      actions: [DesktopMenuAction(label, onTap)],
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutCubic,
-        height: 40,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected
-                ? colorScheme.primary.withValues(alpha: 0.7)
-                : colorScheme.outline.withValues(alpha: 0.3),
-            width: selected ? 2 : 1,
-          ),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOutCubic,
+      height: 40,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: selected
+              ? colorScheme.primary.withValues(alpha: 0.7)
+              : colorScheme.outline.withValues(alpha: 0.3),
+          width: selected ? 2 : 1,
         ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: Center(
-                child: AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 200),
-                  style: TextStyle(
-                    color: colorScheme.onSurface,
-                    fontSize: 13,
-                  ),
-                  child: Text(label),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Center(
+              child: AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
+                style: TextStyle(
+                  color: colorScheme.onSurface,
+                  fontSize: 13,
                 ),
+                child: Text(label),
               ),
             ),
           ),
@@ -2494,29 +2515,26 @@ class _ActionChip extends StatelessWidget {
           width: 1,
         ),
       ),
-      child: DesktopContextMenu(
-        actions: [DesktopMenuAction(label, onTap)],
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(icon, size: 16),
-                  const SizedBox(width: 6),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: colorScheme.onSurface,
-                    ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: colorScheme.onSurface,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
