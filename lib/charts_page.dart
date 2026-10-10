@@ -2019,12 +2019,18 @@ class ChartsPageState extends State<ChartsPage>
                       children: [
                         Row(
                           children: [
-                            Icon(
-                              Icons.show_chart,
-                              size: 16,
-                              color: colors.primary,
+                            Expanded(
+                              child: Text(
+                                label,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  height: 1,
+                                  fontWeight: _showRollingAverage
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                ),
+                              ),
                             ),
-                            const Spacer(),
                             if (_showRollingAverage)
                               Icon(
                                 Icons.check_circle_rounded,
@@ -2033,16 +2039,11 @@ class ChartsPageState extends State<ChartsPage>
                               ),
                           ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          label,
-                          style: TextStyle(
-                            fontSize: 12,
-                            height: 1,
-                            fontWeight: _showRollingAverage
-                                ? FontWeight.w600
-                                : FontWeight.w400,
-                          ),
+                        const SizedBox(height: 2),
+                        Icon(
+                          Icons.show_chart,
+                          size: 16,
+                          color: colors.primary,
                         ),
                       ],
                     ),
