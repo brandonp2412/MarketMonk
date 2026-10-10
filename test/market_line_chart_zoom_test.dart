@@ -78,15 +78,21 @@ void main() {
       buttons: kSecondaryMouseButton,
     );
     await gesture.up();
-    await tester.pump();
+    await tester.pumpAndSettle();
   }
 
   testWidgets('right click sets the start date and reset restores all points',
       (tester) async {
     await tester.pumpWidget(chart());
     await rightClick(tester, scene(tester).marks[3].center);
+    expect(scene(tester).marks, hasLength(10));
+    expect(find.text('Start from this date'), findsOneWidget);
+    await tester.tap(find.text('Start from this date'));
+    await tester.pumpAndSettle();
     expect(
-        scene(tester).marks.map((mark) => mark.index), [3, 4, 5, 6, 7, 8, 9]);
+      scene(tester).marks.map((mark) => mark.index),
+      [3, 4, 5, 6, 7, 8, 9],
+    );
     expect(scene(tester).marks.first.center.dx, 64);
     await tester.tap(find.byTooltip('Reset zoom'));
     await tester.pump();
@@ -98,11 +104,26 @@ void main() {
     await tester.pumpWidget(chart());
     await drag(tester, 2, 7);
     await rightClick(tester, scene(tester).marks[2].center);
+    expect(scene(tester).marks.map((mark) => mark.index), [2, 3, 4, 5, 6, 7]);
+    await tester.tap(find.text('Start from this date'));
+    await tester.pumpAndSettle();
     expect(scene(tester).marks.map((mark) => mark.index), [4, 5, 6, 7]);
     await rightClick(tester, const Offset(20, 100));
+    expect(find.text('Start from this date'), findsNothing);
     expect(scene(tester).marks.map((mark) => mark.index), [4, 5, 6, 7]);
     await rightClick(tester, scene(tester).marks.last.center);
     expect(scene(tester).marks.map((mark) => mark.index), [4, 5, 6, 7]);
+  });
+
+  testWidgets('dismissing the start date menu leaves the range unchanged',
+      (tester) async {
+    await tester.pumpWidget(chart());
+    await rightClick(tester, scene(tester).marks[3].center);
+    await tester.tapAt(const Offset(20, 280));
+    await tester.pumpAndSettle();
+    expect(find.text('Start from this date'), findsNothing);
+    expect(scene(tester).marks, hasLength(10));
+    expect(find.byTooltip('Reset zoom'), findsNothing);
   });
 
   testWidgets('clicks and touch drags keep the full range', (tester) async {

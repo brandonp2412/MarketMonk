@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:drafter/drafter.dart';
@@ -376,6 +377,41 @@ class _MarketLineChartInteractionState
       ? widget.renderer
       : widget.renderer.zoomTo(_zoom!.$1, _zoom!.$2);
 
+  Future<void> _showStartDateMenu(
+    Offset globalPosition,
+    int start,
+    int end,
+  ) async {
+    final dataSignature = widget.renderer.dataSignature;
+    final overlay =
+        Overlay.of(context).context.findRenderObject()! as RenderBox;
+    final position = overlay.globalToLocal(globalPosition);
+    final selected = await showMenu<bool>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromLTWH(position.dx, position.dy, 0, 0),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        PopupMenuItem(
+          value: true,
+          enabled: start < end,
+          child: const Text('Start from this date'),
+        ),
+      ],
+    );
+    if (!mounted ||
+        selected != true ||
+        !listEquals(dataSignature, widget.renderer.dataSignature)) return;
+    setState(() {
+      _zoom = (start, end);
+      _dragStart = null;
+      _dragX = null;
+      _dragPointer = null;
+      _clear();
+    });
+  }
+
   void _activate(Offset position, ChartScene scene) {
     _activeIndex.value = ChartHitTest.nearestIndexAtX(scene, position.dx);
   }
@@ -452,15 +488,7 @@ class _MarketLineChartInteractionState
                 );
                 if (start != null && scene.marks.isNotEmpty) {
                   final end = scene.marks.map((mark) => mark.index).reduce(max);
-                  if (start < end) {
-                    setState(() {
-                      _zoom = (start, end);
-                      _dragStart = null;
-                      _dragX = null;
-                      _dragPointer = null;
-                      _clear();
-                    });
-                  }
+                  unawaited(_showStartDateMenu(event.position, start, end));
                 }
               }
               if (event.kind == PointerDeviceKind.mouse &&
