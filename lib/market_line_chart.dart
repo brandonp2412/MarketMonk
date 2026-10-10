@@ -438,6 +438,32 @@ class _MarketLineChartInteractionState
               _activate(event.localPosition, scene);
               final bounds = scene.bounds;
               if (event.kind == PointerDeviceKind.mouse &&
+                  event.buttons == kSecondaryMouseButton &&
+                  bounds != null &&
+                  Rect.fromLTRB(
+                    bounds.left,
+                    bounds.top,
+                    bounds.right,
+                    bounds.bottom,
+                  ).contains(event.localPosition)) {
+                final start = ChartHitTest.nearestIndexAtX(
+                  scene,
+                  event.localPosition.dx,
+                );
+                if (start != null && scene.marks.isNotEmpty) {
+                  final end = scene.marks.map((mark) => mark.index).reduce(max);
+                  if (start < end) {
+                    setState(() {
+                      _zoom = (start, end);
+                      _dragStart = null;
+                      _dragX = null;
+                      _dragPointer = null;
+                      _clear();
+                    });
+                  }
+                }
+              }
+              if (event.kind == PointerDeviceKind.mouse &&
                   event.buttons == kPrimaryMouseButton &&
                   bounds != null &&
                   Rect.fromLTRB(
