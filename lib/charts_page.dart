@@ -1217,11 +1217,14 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   Color _favoriteColor(String symbol) {
-    final colors = Theme.of(context).colorScheme;
-    final palette = [colors.primary, colors.secondary, colors.tertiary];
-    return palette[
-        _favoriteStocks.indexOf(symbol).clamp(0, _favoriteStocks.length) %
-            palette.length];
+    final primary = HSLColor.fromColor(Theme.of(context).colorScheme.primary);
+    const hueOffsets = [28.0, -28.0, 44.0, -44.0];
+    final index =
+        _favoriteStocks.indexOf(symbol).clamp(0, _favoriteStocks.length);
+    return primary
+        .withHue((primary.hue + hueOffsets[index % hueOffsets.length]) % 360)
+        .withSaturation(primary.saturation * 0.85)
+        .toColor();
   }
 
   void _selectSymbol(String symbol) {
