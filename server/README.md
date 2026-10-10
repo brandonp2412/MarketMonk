@@ -1,6 +1,6 @@
 # MarketMonk IBKR proxy
 
-This directory contains a standalone, read-only bridge between MarketMonk and Interactive Brokers. It is intentionally independent of any personal IBKR bot, login automation, or trading project.
+This directory contains a standalone, read-only bridge between MarketMonk and Interactive Brokers.
 
 The HTTP interface consumed by MarketMonk is the same for both supported backends:
 
