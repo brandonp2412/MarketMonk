@@ -10,9 +10,76 @@
 struct _MyApplication {
   GtkApplication parent_instance;
   char** dart_entrypoint_arguments;
+  GtkSettings* gtk_settings;
+  GDBusProxy* appearance_portal;
+  gboolean default_prefer_dark;
 };
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
+
+// https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.Settings.html
+static void apply_color_scheme(MyApplication* self, GVariant* value) {
+  if (g_variant_is_of_type(value, G_VARIANT_TYPE_VARIANT)) {
+    g_autoptr(GVariant) unboxed = g_variant_get_variant(value);
+    apply_color_scheme(self, unboxed);
+    return;
+  }
+  if (!g_variant_is_of_type(value, G_VARIANT_TYPE_UINT32)) {
+    return;
+  }
+  const guint32 scheme = g_variant_get_uint32(value);
+  if (scheme <= 2) {
+    g_object_set(self->gtk_settings, "gtk-application-prefer-dark-theme",
+                 scheme == 0 ? self->default_prefer_dark : scheme == 1,
+                 nullptr);
+  }
+}
+
+static void portal_setting_changed(GDBusProxy* proxy, const gchar* sender,
+                                   const gchar* signal, GVariant* parameters,
+                                   gpointer user_data) {
+  if (g_strcmp0(signal, "SettingChanged") != 0) {
+    return;
+  }
+  const gchar* namespace_name;
+  const gchar* key;
+  g_autoptr(GVariant) value = nullptr;
+  g_variant_get(parameters, "(&s&s@v)", &namespace_name, &key, &value);
+  if (g_strcmp0(namespace_name, "org.freedesktop.appearance") == 0 &&
+      g_strcmp0(key, "color-scheme") == 0) {
+    apply_color_scheme(MY_APPLICATION(user_data), value);
+  }
+}
+
+static void portal_read_finished(GObject* source, GAsyncResult* result,
+                                 gpointer user_data) {
+  MyApplication* self = MY_APPLICATION(user_data);
+  g_autoptr(GError) error = nullptr;
+  g_autoptr(GVariant) reply =
+      g_dbus_proxy_call_finish(G_DBUS_PROXY(source), result, &error);
+  if (reply != nullptr) {
+    g_autoptr(GVariant) value = g_variant_get_child_value(reply, 0);
+    apply_color_scheme(self, value);
+  }
+  g_object_unref(self);
+}
+
+static void portal_connected(GObject* source, GAsyncResult* result,
+                             gpointer user_data) {
+  MyApplication* self = MY_APPLICATION(user_data);
+  g_autoptr(GError) error = nullptr;
+  self->appearance_portal = g_dbus_proxy_new_for_bus_finish(result, &error);
+  if (self->appearance_portal != nullptr) {
+    g_signal_connect(self->appearance_portal, "g-signal",
+                     G_CALLBACK(portal_setting_changed), self);
+    g_dbus_proxy_call(self->appearance_portal, "Read",
+                      g_variant_new("(ss)", "org.freedesktop.appearance",
+                                    "color-scheme"),
+                      G_DBUS_CALL_FLAGS_NONE, -1, nullptr,
+                      portal_read_finished, g_object_ref(self));
+  }
+  g_object_unref(self);
+}
 
 // Implements GApplication::activate.
 static void my_application_activate(GApplication* application) {
@@ -38,6 +105,15 @@ static void my_application_activate(GApplication* application) {
   }
 #endif
   if (use_header_bar) {
+    self->gtk_settings = gtk_settings_get_for_screen(gtk_window_get_screen(window));
+    g_object_get(self->gtk_settings, "gtk-application-prefer-dark-theme",
+                 &self->default_prefer_dark, nullptr);
+    g_dbus_proxy_new_for_bus(
+        G_BUS_TYPE_SESSION, G_DBUS_PROXY_FLAGS_NONE, nullptr,
+        "org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop",
+        "org.freedesktop.portal.Settings", nullptr, portal_connected,
+        g_object_ref(self));
+
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));
     gtk_header_bar_set_title(header_bar, "Market Monk");
@@ -104,6 +180,7 @@ static void my_application_shutdown(GApplication* application) {
 static void my_application_dispose(GObject* object) {
   MyApplication* self = MY_APPLICATION(object);
   g_clear_pointer(&self->dart_entrypoint_arguments, g_strfreev);
+  g_clear_object(&self->appearance_portal);
   G_OBJECT_CLASS(my_application_parent_class)->dispose(object);
 }
 
