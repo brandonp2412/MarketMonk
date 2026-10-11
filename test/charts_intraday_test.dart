@@ -276,6 +276,58 @@ void main() {
     expect(requests, 6);
   });
 
+  testWidgets('portfolio starts independent holding requests concurrently', (
+    tester,
+  ) async {
+    final requests = <String>[];
+    final pending = {
+      'AAPL': Completer<http.Response>(),
+      'MSFT': Completer<http.Response>(),
+    };
+    final loader = IntradayMarketData(
+      yahooGet: (uri) {
+        final symbol = uri.pathSegments.last;
+        requests.add(symbol);
+        return pending[symbol]!.future;
+      },
+    );
+    await mountChart(
+      tester,
+      loader,
+      initialSymbol: null,
+      configureAccounts: (accounts) async {
+        await accounts.setIbkrConfig(
+          'Default',
+          const IbkrAccountConfig(enabled: true),
+        );
+        await accounts.cachePortfolio(
+          'Default',
+          [
+            for (final symbol in ['AAPL', 'MSFT'])
+              Position(
+                symbol: symbol,
+                name: symbol,
+                nativeCurrency: 'USD',
+                netShares: 2,
+                avgCost: 50,
+                currentPrice: 100,
+                firstBuyDate: DateTime(2026),
+                lastBuyDate: DateTime(2026),
+              ),
+          ],
+          const IbkrAccountValue(value: 1000, currency: 'USD'),
+        );
+      },
+    );
+    await tester.pump();
+    expect(requests, containsAll(['AAPL', 'MSFT']));
+    for (final request in pending.values) {
+      request.complete(_prices(100, currency: 'USD'));
+    }
+    await tester.pumpAndSettle();
+    expect(find.byType(MarketLineChart), findsOneWidget);
+  });
+
   testWidgets('inactive charts do not request intraday bars', (tester) async {
     var calls = 0;
     final loader = IntradayMarketData(

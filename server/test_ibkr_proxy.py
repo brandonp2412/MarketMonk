@@ -1,4 +1,6 @@
+import asyncio
 import json
+import time
 import sqlite3
 import tempfile
 import threading
@@ -335,6 +337,12 @@ class FakeNativeIb:
             SimpleNamespace(tag="CashBalance", value="100", currency="USD"),
         ]
 
+    def run(self, awaitable):
+        return asyncio.run(awaitable)
+
+    async def reqHistoricalDataAsync(self, contract, **kwargs):
+        return self.reqHistoricalData(contract, **kwargs)
+
     def reqHistoricalData(self, contract, **kwargs):
         self.historical_request = (contract, kwargs)
         if kwargs["barSizeSetting"] != "1 day":
@@ -382,6 +390,81 @@ class ProxyTests(unittest.TestCase):
         self.assertEqual(fake.connects, 1)
         self.assertEqual(fake.histories, 2)
         self.assertTrue(fake.disconnected)
+
+    def test_native_intraday_retrieval_overlaps_independent_stocks(self):
+        class ConcurrentIb(FakeNativeIb):
+            def __init__(self):
+                super().__init__()
+                self.active = 0
+                self.peak = 0
+
+            def portfolio(self, account):
+                first = super().portfolio(account)[0]
+                result = []
+                for symbol in ("AAPL", "MSFT", "NVDA", "AMZN"):
+                    item = SimpleNamespace(**vars(first))
+                    item.contract = SimpleNamespace(**vars(first.contract))
+                    item.contract.symbol = symbol
+                    result.append(item)
+                return result
+
+            async def reqHistoricalDataAsync(self, contract, **kwargs):
+                self.active += 1
+                self.peak = max(self.peak, self.active)
+                try:
+                    await asyncio.sleep(0.02)
+                    return self.reqHistoricalData(contract, **kwargs)
+                finally:
+                    self.active -= 1
+
+        fake = ConcurrentIb()
+        client = NativeIbkrClient(config(backend="native"), ib_factory=lambda: fake)
+        result = client.intraday_portfolio(1)
+        self.assertEqual(fake.peak, 3)
+        self.assertEqual(
+            [item["symbol"] for item in result["series"]],
+            ["AAPL", "MSFT", "NVDA", "AMZN"],
+        )
+        self.assertEqual(result["errors"], {})
+        self.assertTrue(fake.disconnected)
+
+    def test_web_intraday_retrieval_overlaps_independent_stocks(self):
+        class ConcurrentWeb(RecordingIbkrClient):
+            def __init__(self):
+                super().__init__()
+                self.active = 0
+                self.peak = 0
+                self.lock = threading.Lock()
+
+            def _get(self, endpoint):
+                result = super()._get(endpoint)
+                if endpoint.endswith("/positions"):
+                    return [
+                        dict(result[0], description=symbol, conid=i)
+                        for i, symbol in enumerate(("AAPL", "MSFT", "NVDA", "AMZN"), 1)
+                    ]
+                return result
+
+            def historical(self, symbol, years, *, intraday_days=None, _positions=None):
+                with self.lock:
+                    self.active += 1
+                    self.peak = max(self.peak, self.active)
+                try:
+                    time.sleep(0.02)
+                    if symbol == "NVDA":
+                        raise IbkrError("missing market data")
+                    return {"symbol": symbol, "candles": []}
+                finally:
+                    with self.lock:
+                        self.active -= 1
+
+        client = ConcurrentWeb()
+        result = client.intraday_portfolio(5)
+        self.assertEqual(client.peak, 3)
+        self.assertEqual([item["symbol"] for item in result["series"]], ["AAPL", "MSFT", "AMZN"])
+        self.assertEqual(result["errors"], {"NVDA": "missing market data"})
+        self.assertEqual(client.endpoints.count("portfolio/accounts"), 1)
+        self.assertEqual(client.endpoints.count("portfolio2/U1234567/positions"), 1)
 
     def test_web_portfolio_intraday_reads_accounts_and_positions_once(self):
         class MultipleStocks(RecordingIbkrClient):

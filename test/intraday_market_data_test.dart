@@ -189,6 +189,36 @@ void main() {
     expect(batches, 3);
   });
 
+  test('slow broker portfolio does not delay each Yahoo fallback', () async {
+    var now = DateTime.utc(2026, 10, 11);
+    var individualCalls = 0;
+    var batches = 0;
+    final neverCompletes = Completer<List<IbkrHistoricalSeries>>();
+    final loader = IntradayMarketData(
+      now: () => now,
+      brokerTimeout: const Duration(milliseconds: 5),
+      ibkrPortfolioFetch: (_, __) {
+        batches++;
+        return neverCompletes.future;
+      },
+      ibkrFetch: (_, __, ___) async {
+        individualCalls++;
+        return _ibkrSeries();
+      },
+      yahooGet: (_) async => _yahooResponse(),
+    );
+
+    expect(await loader.prefetchPortfolio(_config, days: 1), isFalse);
+    expect((await loader.fetch('AAPL', config: _config)).source, 'Yahoo');
+    expect((await loader.fetch('MSFT', config: _config)).source, 'Yahoo');
+    expect(individualCalls, 0);
+    expect(batches, 1);
+
+    now = now.add(const Duration(minutes: 5));
+    expect((await loader.fetch('GOOG', config: _config)).source, 'IBKR');
+    expect(individualCalls, 1);
+  });
+
   test('account config changes do not reuse another account cache', () async {
     var calls = 0;
     final loader = IntradayMarketData(

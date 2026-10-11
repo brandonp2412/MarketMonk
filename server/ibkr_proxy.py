@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import hmac
 import ipaddress
 import json
@@ -14,6 +15,7 @@ import ssl
 import subprocess
 import time
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
@@ -281,19 +283,28 @@ class ClientPortalIbkrClient:
         positions = self._get(f"portfolio2/{account}/positions")
         if not isinstance(positions, list):
             raise IbkrError("IBKR returned an invalid position list")
-        series = []
-        errors = {}
-        for item in positions:
-            if str(item.get("secType", "")).upper() != "STK":
-                continue
-            symbol = str(item.get("description", "")).strip().upper()
+        stocks = [
+            str(item.get("description", "")).strip().upper()
+            for item in positions
+            if str(item.get("secType", "")).upper() == "STK"
+        ]
+
+        def load(symbol):
             try:
-                series.append(self.historical(symbol, 1, intraday_days=days,
-                                              _positions=positions))
+                return symbol, self.historical(
+                    symbol, 1, intraday_days=days, _positions=positions
+                ), None
             except Exception as error:
-                errors[symbol] = str(error)
-        return {"read_only": True, "series": series, "errors": errors,
-                "interval": "1m" if days == 1 else "15m"}
+                return symbol, None, str(error)
+
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            results = list(pool.map(load, stocks))
+        return {
+            "read_only": True,
+            "series": [series for _, series, _ in results if series is not None],
+            "errors": {symbol: error for symbol, _, error in results if error is not None},
+            "interval": "1m" if days == 1 else "15m",
+        }
 
     def performance(self, period: str) -> dict[str, Any]:
         performance_client = getattr(self, "_performance_client", None)
@@ -687,11 +698,7 @@ class NativeIbkrClient:
 
     def _read_historical(self, ib, item, symbol, years, intraday_days):
         contract = item.contract
-        duration = f"{years} Y"
-        bar_size = "1 day"
-        if intraday_days is not None:
-            duration = "1 D" if intraday_days == 1 else "1 W"
-            bar_size = "1 min" if intraday_days == 1 else "15 mins"
+        duration, bar_size = self._historical_parameters(years, intraday_days)
         bars = ib.reqHistoricalData(
             contract,
             endDateTime="",
@@ -702,9 +709,20 @@ class NativeIbkrClient:
             formatDate=2 if intraday_days else 1,
             timeout=30,
         )
+        return self._historical_result(contract, symbol, intraday_days, bars)
+
+    @staticmethod
+    def _historical_parameters(years, intraday_days):
+        if intraday_days is None:
+            return f"{years} Y", "1 day"
+        return ("1 D" if intraday_days == 1 else "1 W"), (
+            "1 min" if intraday_days == 1 else "15 mins"
+        )
+
+    @staticmethod
+    def _historical_result(contract, symbol, intraday_days, bars):
         if not bars:
             raise IbkrError(f"IBKR returned no historical candles for {symbol}")
-
         currency = str(getattr(contract, "currency", "") or "USD").strip()
         return {
             "read_only": True,
@@ -724,22 +742,51 @@ class NativeIbkrClient:
     def intraday_portfolio(self, days):
         if days not in (1, 5):
             raise IbkrError("intraday days must be 1 or 5")
-        series = []
-        errors = {}
         with self._session() as ib:
             account = self._select_account(ib)
+            stocks = []
             for item in ib.portfolio(account):
                 if str(getattr(item.contract, "secType", "")).upper() != "STK":
                     continue
                 symbol = str(item.contract.symbol).strip().upper()
                 if not str(getattr(item.contract, "exchange", "")).strip():
                     item.contract.exchange = "SMART"
-                try:
-                    series.append(self._read_historical(ib, item, symbol, 1, days))
-                except Exception as error:
-                    errors[symbol] = str(error)
-        return {"read_only": True, "series": series, "errors": errors,
-                "interval": "1m" if days == 1 else "15m"}
+                stocks.append((symbol, item))
+
+            async def load_all():
+                semaphore = asyncio.Semaphore(3)
+
+                async def load(symbol, item):
+                    async with semaphore:
+                        try:
+                            duration, bar_size = self._historical_parameters(1, days)
+                            bars = await ib.reqHistoricalDataAsync(
+                                item.contract,
+                                endDateTime="",
+                                durationStr=duration,
+                                barSizeSetting=bar_size,
+                                whatToShow="TRADES",
+                                useRTH=True,
+                                formatDate=2,
+                                timeout=12,
+                            )
+                            return symbol, self._historical_result(
+                                item.contract, symbol, days, bars
+                            ), None
+                        except Exception as error:
+                            return symbol, None, str(error)
+
+                return await asyncio.gather(
+                    *(load(symbol, item) for symbol, item in stocks)
+                )
+
+            results = ib.run(load_all()) if stocks else []
+        return {
+            "read_only": True,
+            "series": [series for _, series, _ in results if series is not None],
+            "errors": {symbol: error for symbol, _, error in results if error is not None},
+            "interval": "1m" if days == 1 else "15m",
+        }
 
     def performance(self, period: str) -> dict[str, Any]:
         return self._performance_client.performance(period)

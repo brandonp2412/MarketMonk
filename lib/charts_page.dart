@@ -1049,11 +1049,7 @@ class ChartsPageState extends State<ChartsPage>
           days: selectedDays,
           forceRefresh: forceRefresh,
         );
-    for (final position in loaded.positions) {
-      if (!mounted ||
-          !widget.isActive ||
-          generation != _portfolioLoadGeneration) return [];
-      if (position.netShares == 0) continue;
+    Future<IntradayPortfolioHolding?> loadHolding(Position position) async {
       try {
         final series = await _intradayData.fetch(
           position.symbol,
@@ -1065,13 +1061,11 @@ class ChartsPageState extends State<ChartsPage>
           position.symbol,
           rawCurrency: series.currency,
         );
-        holdings.add(
-          IntradayPortfolioHolding.fromSeries(
-            series,
-            quantity: position.netShares,
-            currencyPerUsd: requireUsdRate(symbolCurrency(position.symbol)),
-            centDivisor: symbolCentDivisor(position.symbol),
-          ),
+        return IntradayPortfolioHolding.fromSeries(
+          series,
+          quantity: position.netShares,
+          currencyPerUsd: requireUsdRate(symbolCurrency(position.symbol)),
+          centDivisor: symbolCentDivisor(position.symbol),
         );
       } catch (error, stackTrace) {
         unavailable.add(position.symbol);
@@ -1080,7 +1074,20 @@ class ChartsPageState extends State<ChartsPage>
           stackTrace,
           'Portfolio intraday prices unavailable',
         );
+        return null;
       }
+    }
+
+    final positions =
+        loaded.positions.where((position) => position.netShares != 0).toList();
+    for (var start = 0; start < positions.length; start += 4) {
+      if (!mounted ||
+          !widget.isActive ||
+          generation != _portfolioLoadGeneration) return [];
+      final batch = await Future.wait(
+        positions.skip(start).take(4).map(loadHolding),
+      );
+      holdings.addAll(batch.whereType<IntradayPortfolioHolding>());
     }
     if (!mounted || !widget.isActive || generation != _portfolioLoadGeneration)
       return [];

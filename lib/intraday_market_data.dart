@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -53,7 +54,9 @@ class IntradayMarketData {
   final Future<List<IbkrHistoricalSeries>> Function(IbkrAccountConfig, int)?
       _ibkrPortfolioFetch;
   final _portfolioBatchAt = <(IbkrAccountConfig, int), DateTime>{};
+  final _slowPortfolioBatchAt = <(IbkrAccountConfig, int), DateTime>{};
   final DateTime Function() _now;
+  final Duration _brokerTimeout;
   final _cache = <(String, int, IbkrAccountConfig),
       ({DateTime fetchedAt, IntradaySeries series})>{};
 
@@ -65,6 +68,7 @@ class IntradayMarketData {
     Future<List<IbkrHistoricalSeries>> Function(IbkrAccountConfig, int)?
         ibkrPortfolioFetch,
     DateTime Function()? now,
+    Duration brokerTimeout = const Duration(seconds: 12),
   })  : _yahooGet = yahooGet ?? _getYahoo,
         _ibkrFetch = ibkrFetch ??
             ((config, symbol, days) =>
@@ -74,7 +78,8 @@ class IntradayMarketData {
                 ? ((config, days) =>
                     IbkrApiClient(config).fetchIntradayPortfolio(days: days))
                 : null),
-        _now = now ?? DateTime.now;
+        _now = now ?? DateTime.now,
+        _brokerTimeout = brokerTimeout;
 
   static Future<http.Response> _getYahoo(Uri uri) =>
       http.get(uri, headers: {'User-Agent': 'Mozilla/5.0'});
@@ -105,10 +110,13 @@ class IntradayMarketData {
         final batchAt = _portfolioBatchAt[(config, days)];
         final batchFresh = batchAt != null &&
             _now().difference(batchAt) < const Duration(minutes: 5);
-        if (config.isConfigured && (!batchFresh || forceRefresh)) {
+        final slowAt = _slowPortfolioBatchAt[(config, days)];
+        final batchSlow = slowAt != null &&
+            _now().difference(slowAt) < const Duration(minutes: 5);
+        if (config.isConfigured && !batchSlow && (!batchFresh || forceRefresh)) {
           try {
             final result = await _ibkrFetch(config, canonicalSymbol, days)
-                .timeout(const Duration(seconds: 45));
+                .timeout(_brokerTimeout);
             series = IntradaySeries(
               currency: result.currency,
               source: 'IBKR',
@@ -146,8 +154,9 @@ class IntradayMarketData {
       return await backgroundNetworkCoordinator
           .coalesce('market.intradayPortfolio', (this, config, days), () async {
         final series =
-            await fetch(config, days).timeout(const Duration(seconds: 90));
+            await fetch(config, days).timeout(_brokerTimeout);
         final fetchedAt = _now();
+        _slowPortfolioBatchAt.remove((config, days));
         for (final item in series) {
           final normalized = IntradaySeries(
             currency: item.currency,
@@ -162,10 +171,13 @@ class IntradayMarketData {
         return true;
       });
     } catch (error, stackTrace) {
+      if (error is TimeoutException) {
+        _slowPortfolioBatchAt[(config, days)] = _now();
+      }
       talker.handle(
         error,
         stackTrace,
-        'IBKR batch intraday unavailable; using individual requests',
+        'IBKR batch intraday unavailable; using fallback prices',
       );
       return false;
     }
