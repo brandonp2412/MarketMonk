@@ -180,72 +180,107 @@ void main() {
     expect(tester.takeException(), null);
   });
 
-  testWidgets('compact desktop holdings fits half-width content',
-      (tester) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(879, 900);
-    addTearDown(() {
-      tester.view.resetPhysicalSize();
-      tester.view.resetDevicePixelRatio();
-    });
+  for (final width in [879.0, 960.0]) {
+    testWidgets('desktop holdings at ${width}px shows all scrollable columns',
+        (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = Size(width, 900);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
 
-    await seedTestSqlite({});
+      await seedTestSqlite({});
 
-    final accounts = testAccountManager();
-    await accounts.init();
-    final position = Position(
-      symbol: 'VOO',
-      name: 'VANGUARD S&P 500 ETF',
-      nativeCurrency: 'USD',
-      netShares: 10,
-      avgCost: 500,
-      currentPrice: 550,
-      firstBuyDate: DateTime(2025),
-      lastBuyDate: DateTime(2026),
-    );
+      final accounts = testAccountManager();
+      await accounts.init();
+      final position = Position(
+        symbol: 'VOO',
+        name: 'VANGUARD S&P 500 ETF',
+        nativeCurrency: 'USD',
+        netShares: 10,
+        avgCost: 500,
+        currentPrice: 550,
+        firstBuyDate: DateTime(2025),
+        lastBuyDate: DateTime(2026),
+      );
 
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider(create: (_) => SettingsState()),
-          ChangeNotifierProvider.value(value: accounts),
-        ],
-        child: MaterialApp(
-          home: HoldingsPage(
-            positionsLoader: (_) async => [position],
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => SettingsState()),
+            ChangeNotifierProvider.value(value: accounts),
+          ],
+          child: MaterialApp(
+            home: HoldingsPage(
+              positionsLoader: (_) async => [position],
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.byType(DataTable), findsOneWidget);
-    expect(find.text('Value'), findsOneWidget);
-    expect(find.text('Shares'), findsNothing);
-    expect(find.text('Avg cost'), findsNothing);
-    expect(find.text('Price'), findsNothing);
-    expect(find.text('P/L'), findsOneWidget);
-    expect(find.text('Return'), findsOneWidget);
-    expect(find.byKey(const Key('desktop-holdings-metrics')), findsOneWidget);
-    expect(
-      tester.getTopLeft(find.text('Market value')).dy,
-      tester.getTopLeft(find.text('Cost basis')).dy,
-    );
-    expect(
-      tester.getTopLeft(find.text('Open positions')).dy,
-      greaterThan(tester.getTopLeft(find.text('Market value')).dy),
-    );
-    expect(
-      tester.getSize(find.byType(DataTable)).width,
-      greaterThanOrEqualTo(900),
-    );
-    expect(tester.takeException(), null);
+      expect(find.byType(DataTable), findsOneWidget);
+      for (final header in [
+        'Holding',
+        'Shares',
+        'Avg cost',
+        'Price',
+        'Market value',
+        'P/L',
+        'Return',
+      ]) {
+        expect(find.text(header), findsWidgets);
+      }
+      expect(find.byKey(const Key('desktop-holdings-metrics')), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('Shares')).dx -
+            tester.getTopLeft(find.text('Holding')).dx,
+        lessThan(350),
+      );
+      final marketValueMetric = find.descendant(
+        of: find.byKey(const Key('desktop-holdings-metrics')),
+        matching: find.text('Market value'),
+      );
+      expect(
+        tester.getTopLeft(marketValueMetric).dy,
+        tester.getTopLeft(find.text('Cost basis')).dy,
+      );
+      expect(
+        tester.getTopLeft(find.text('Open positions')).dy,
+        greaterThan(tester.getTopLeft(marketValueMetric).dy),
+      );
 
-    await tester.tap(find.text('Return'));
-    await tester.pump();
-    expect(tester.takeException(), null);
-  });
+      final horizontalScrollbar = tester.widget<Scrollbar>(
+        find.byKey(const Key('desktop-holdings-horizontal-scrollbar')),
+      );
+      expect(horizontalScrollbar.thumbVisibility, true);
+      final horizontalScroll = tester.widget<SingleChildScrollView>(
+        find.byKey(const Key('desktop-holdings-horizontal-scroll')),
+      );
+      expect(horizontalScroll.scrollDirection, Axis.horizontal);
+      expect(horizontalScroll.controller?.hasClients, true);
+      final controller = horizontalScroll.controller!;
+      expect(controller.position.maxScrollExtent, greaterThan(0));
+      expect(tester.getSize(find.byType(DataTable)).width, greaterThan(1200));
+      final initialOffset = controller.offset;
+      await tester.drag(
+        find.byKey(const Key('desktop-holdings-horizontal-scroll')),
+        const Offset(-360, 0),
+      );
+      await tester.pumpAndSettle();
+      expect(controller.offset, greaterThan(initialOffset));
+      expect(tester.takeException(), null);
+
+      controller.jumpTo(controller.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(tester.getCenter(find.text('Return')).dx, lessThan(width));
+      await tester.tap(find.text('Return'));
+      await tester.pump();
+      expect(tester.takeException(), null);
+    });
+  }
 
   testWidgets('desktop holdings matches portfolio cash-out P/L',
       (tester) async {

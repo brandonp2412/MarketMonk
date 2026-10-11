@@ -89,6 +89,7 @@ class HoldingsPageState extends State<HoldingsPage>
 
   final _search = TextEditingController();
   final _desktopTableScrollController = ScrollController();
+  final _desktopTableHorizontalScrollController = ScrollController();
   List<SymbolSummary> _summaries = [];
   List<Trade> _ibkrTrades = [];
   Future<List<Trade>>? _ibkrTradesLoad;
@@ -129,6 +130,7 @@ class HoldingsPageState extends State<HoldingsPage>
   void dispose() {
     _search.dispose();
     _desktopTableScrollController.dispose();
+    _desktopTableHorizontalScrollController.dispose();
     super.dispose();
   }
 
@@ -1093,13 +1095,6 @@ class HoldingsPageState extends State<HoldingsPage>
     final winners = open.where((position) => position.change >= 0).length;
     final sorted = _sortDesktopSummaries(summaries);
 
-    final sortColumnIndex = switch (_desktopSort) {
-      _HoldingsSort.symbol => 0,
-      _HoldingsSort.value => 4,
-      _HoldingsSort.unrealized => 5,
-      _HoldingsSort.returnPct => 6,
-    };
-
     void toggleSelection(SymbolSummary summary) {
       setState(() {
         if (_selectedSymbols.contains(summary.symbol)) {
@@ -1202,52 +1197,52 @@ class HoldingsPageState extends State<HoldingsPage>
               clipBehavior: Clip.antiAlias,
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final compactTable = constraints.maxWidth < 1000;
-                  final effectiveSortColumnIndex = compactTable
-                      ? switch (_desktopSort) {
-                          _HoldingsSort.symbol => 0,
-                          _HoldingsSort.value => 1,
-                          _HoldingsSort.unrealized => 2,
-                          _HoldingsSort.returnPct => 3,
-                        }
-                      : sortColumnIndex;
-                  final tableWidth = compactTable
-                      ? constraints.maxWidth < 900
-                          ? 900.0
-                          : constraints.maxWidth
-                      : constraints.maxWidth < 1240
-                          ? 1240.0
-                          : constraints.maxWidth;
+                  final tableWidth = constraints.maxWidth < 1240
+                      ? 1240.0
+                      : constraints.maxWidth;
                   return Scrollbar(
-                    controller: _desktopTableScrollController,
+                    key: const Key('desktop-holdings-horizontal-scrollbar'),
+                    controller: _desktopTableHorizontalScrollController,
+                    thumbVisibility: true,
+                    notificationPredicate: (notification) =>
+                        notification.depth == 0,
                     child: SingleChildScrollView(
-                      controller: _desktopTableScrollController,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: SizedBox(
-                          width: tableWidth,
-                          child: DataTable(
-                            showCheckboxColumn: _selecting && !ibkrManaged,
-                            sortColumnIndex: effectiveSortColumnIndex,
-                            sortAscending: _desktopSortAscending,
-                            headingRowColor: WidgetStatePropertyAll(
-                              theme.colorScheme.surfaceContainerLow,
-                            ),
-                            headingTextStyle:
-                                theme.textTheme.labelMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                            dataRowMinHeight: 62,
-                            dataRowMaxHeight: 70,
-                            horizontalMargin: 18,
-                            columnSpacing: 24,
-                            columns: [
-                              DataColumn(
-                                label: Text(context.l10n.text('Holding')),
-                                onSort: (_, __) =>
-                                    _setDesktopSort(_HoldingsSort.symbol),
+                      key: const Key('desktop-holdings-horizontal-scroll'),
+                      controller: _desktopTableHorizontalScrollController,
+                      scrollDirection: Axis.horizontal,
+                      child: SizedBox(
+                        width: tableWidth,
+                        child: Scrollbar(
+                          controller: _desktopTableScrollController,
+                          child: SingleChildScrollView(
+                            controller: _desktopTableScrollController,
+                            child: DataTable(
+                              showCheckboxColumn: _selecting && !ibkrManaged,
+                              sortColumnIndex: switch (_desktopSort) {
+                                _HoldingsSort.symbol => 0,
+                                _HoldingsSort.value => 4,
+                                _HoldingsSort.unrealized => 5,
+                                _HoldingsSort.returnPct => 6,
+                              },
+                              sortAscending: _desktopSortAscending,
+                              headingRowColor: WidgetStatePropertyAll(
+                                theme.colorScheme.surfaceContainerLow,
                               ),
-                              if (!compactTable) ...[
+                              headingTextStyle:
+                                  theme.textTheme.labelMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                              dataRowMinHeight: 62,
+                              dataRowMaxHeight: 70,
+                              horizontalMargin: 18,
+                              columnSpacing: 24,
+                              columns: [
+                                DataColumn(
+                                  columnWidth: const FixedColumnWidth(280),
+                                  label: Text(context.l10n.text('Holding')),
+                                  onSort: (_, __) =>
+                                      _setDesktopSort(_HoldingsSort.symbol),
+                                ),
                                 DataColumn(
                                   numeric: true,
                                   label: Text(context.l10n.text('Shares')),
@@ -1260,152 +1255,155 @@ class HoldingsPageState extends State<HoldingsPage>
                                   numeric: true,
                                   label: Text(context.l10n.text('Price')),
                                 ),
-                              ],
-                              DataColumn(
-                                numeric: true,
-                                label: Text(
-                                  context.l10n.text(
-                                    compactTable ? 'Value' : 'Market value',
-                                  ),
-                                ),
-                                onSort: (_, __) =>
-                                    _setDesktopSort(_HoldingsSort.value),
-                              ),
-                              DataColumn(
-                                numeric: true,
-                                label: Text(context.l10n.text('P/L')),
-                                onSort: (_, __) =>
-                                    _setDesktopSort(_HoldingsSort.unrealized),
-                              ),
-                              DataColumn(
-                                numeric: true,
-                                label: Text(context.l10n.text('Return')),
-                                onSort: (_, __) =>
-                                    _setDesktopSort(_HoldingsSort.returnPct),
-                              ),
-                            ],
-                            rows: [
-                              for (final summary in sorted)
-                                (() {
-                                  final position = summary.position;
-                                  final isClosed = position == null;
-                                  final returnPct = position?.change ?? 0;
-                                  final pnl = position?.unrealizedPL;
-                                  final pnlText = pnl == null
-                                      ? '—'
-                                      : '${pnl >= 0 ? '+' : ''}${fmtCurrency(pnl)}';
-                                  final shares = position == null
-                                      ? '—'
-                                      : position.netShares.toStringAsFixed(
-                                          position.netShares ==
-                                                  position.netShares
-                                                      .roundToDouble()
-                                              ? 0
-                                              : 3,
-                                        );
-                                  final changeColor = isClosed
-                                      ? theme.colorScheme.onSurfaceVariant
-                                      : returnPct >= 0
-                                          ? Colors.green
-                                          : Colors.redAccent;
-                                  final pnlColor = pnl == null
-                                      ? null
-                                      : pnl >= 0
-                                          ? Colors.green
-                                          : Colors.redAccent;
-
-                                  return DataRow(
-                                    selected: _selectedSymbols.contains(
-                                      summary.symbol,
+                                DataColumn(
+                                  numeric: true,
+                                  label: Text(
+                                    context.l10n.text(
+                                      'Market value',
                                     ),
-                                    onSelectChanged: _selecting && !ibkrManaged
-                                        ? (_) => toggleSelection(summary)
-                                        : null,
-                                    cells: [
-                                      DataCell(
-                                        DesktopContextMenu(
-                                          actionsBuilder: () => _holdingActions(
-                                            summary,
-                                            ibkrManaged,
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                isClosed
-                                                    ? Icons.history_rounded
-                                                    : returnPct >= 0
-                                                        ? Icons
-                                                            .trending_up_rounded
-                                                        : Icons
-                                                            .trending_down_rounded,
-                                                size: 20,
-                                                color: changeColor,
-                                              ),
-                                              const SizedBox(width: 10),
-                                              Expanded(
-                                                child: Column(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment.center,
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Row(
-                                                      children: [
-                                                        Flexible(
-                                                          child: Text(
-                                                            summary.symbol,
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
-                                                            style: theme
-                                                                .textTheme
-                                                                .titleSmall
-                                                                ?.copyWith(),
-                                                          ),
-                                                        ),
-                                                        if (isClosed) ...[
-                                                          const SizedBox(
-                                                            width: 8,
-                                                          ),
-                                                          Text(
-                                                            context.l10n.text(
-                                                              'Closed',
-                                                            ),
-                                                            style: theme
-                                                                .textTheme
-                                                                .labelSmall
-                                                                ?.copyWith(
-                                                              color: theme
-                                                                  .colorScheme
-                                                                  .onSurfaceVariant,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ],
-                                                    ),
-                                                    Text(
-                                                      summary.name,
-                                                      maxLines: 1,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                      style: theme
-                                                          .textTheme.bodySmall
-                                                          ?.copyWith(
-                                                        color: theme.colorScheme
-                                                            .onSurfaceVariant,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        onTap: _selecting
-                                            ? null
-                                            : () => _openDetail(summary),
+                                  ),
+                                  onSort: (_, __) =>
+                                      _setDesktopSort(_HoldingsSort.value),
+                                ),
+                                DataColumn(
+                                  numeric: true,
+                                  label: Text(context.l10n.text('P/L')),
+                                  onSort: (_, __) =>
+                                      _setDesktopSort(_HoldingsSort.unrealized),
+                                ),
+                                DataColumn(
+                                  numeric: true,
+                                  label: Text(context.l10n.text('Return')),
+                                  onSort: (_, __) =>
+                                      _setDesktopSort(_HoldingsSort.returnPct),
+                                ),
+                              ],
+                              rows: [
+                                for (final summary in sorted)
+                                  (() {
+                                    final position = summary.position;
+                                    final isClosed = position == null;
+                                    final returnPct = position?.change ?? 0;
+                                    final pnl = position?.unrealizedPL;
+                                    final pnlText = pnl == null
+                                        ? '—'
+                                        : '${pnl >= 0 ? '+' : ''}${fmtCurrency(pnl)}';
+                                    final shares = position == null
+                                        ? '—'
+                                        : position.netShares.toStringAsFixed(
+                                            position.netShares ==
+                                                    position.netShares
+                                                        .roundToDouble()
+                                                ? 0
+                                                : 3,
+                                          );
+                                    final changeColor = isClosed
+                                        ? theme.colorScheme.onSurfaceVariant
+                                        : returnPct >= 0
+                                            ? Colors.green
+                                            : Colors.redAccent;
+                                    final pnlColor = pnl == null
+                                        ? null
+                                        : pnl >= 0
+                                            ? Colors.green
+                                            : Colors.redAccent;
+
+                                    return DataRow(
+                                      selected: _selectedSymbols.contains(
+                                        summary.symbol,
                                       ),
-                                      if (!compactTable) ...[
+                                      onSelectChanged:
+                                          _selecting && !ibkrManaged
+                                              ? (_) => toggleSelection(summary)
+                                              : null,
+                                      cells: [
+                                        DataCell(
+                                          DesktopContextMenu(
+                                            actionsBuilder: () =>
+                                                _holdingActions(
+                                              summary,
+                                              ibkrManaged,
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  isClosed
+                                                      ? Icons.history_rounded
+                                                      : returnPct >= 0
+                                                          ? Icons
+                                                              .trending_up_rounded
+                                                          : Icons
+                                                              .trending_down_rounded,
+                                                  size: 20,
+                                                  color: changeColor,
+                                                ),
+                                                const SizedBox(width: 10),
+                                                Expanded(
+                                                  child: Column(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Row(
+                                                        children: [
+                                                          Flexible(
+                                                            child: Text(
+                                                              summary.symbol,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
+                                                              style: theme
+                                                                  .textTheme
+                                                                  .titleSmall
+                                                                  ?.copyWith(),
+                                                            ),
+                                                          ),
+                                                          if (isClosed) ...[
+                                                            const SizedBox(
+                                                              width: 8,
+                                                            ),
+                                                            Text(
+                                                              context.l10n.text(
+                                                                'Closed',
+                                                              ),
+                                                              style: theme
+                                                                  .textTheme
+                                                                  .labelSmall
+                                                                  ?.copyWith(
+                                                                color: theme
+                                                                    .colorScheme
+                                                                    .onSurfaceVariant,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ],
+                                                      ),
+                                                      Text(
+                                                        summary.name,
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: theme
+                                                            .textTheme.bodySmall
+                                                            ?.copyWith(
+                                                          color: theme
+                                                              .colorScheme
+                                                              .onSurfaceVariant,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          onTap: _selecting
+                                              ? null
+                                              : () => _openDetail(summary),
+                                        ),
                                         textCell(shares, summary: summary),
                                         textCell(
                                           position == null
@@ -1425,31 +1423,31 @@ class HoldingsPageState extends State<HoldingsPage>
                                                 ),
                                           summary: summary,
                                         ),
+                                        textCell(
+                                          position == null
+                                              ? '—'
+                                              : fmtCurrency(
+                                                  position.currentValue,
+                                                ),
+                                          summary: summary,
+                                        ),
+                                        textCell(
+                                          pnlText,
+                                          summary: summary,
+                                          color: pnlColor,
+                                        ),
+                                        textCell(
+                                          position == null
+                                              ? '—'
+                                              : '${returnPct >= 0 ? '+' : ''}${returnPct.toStringAsFixed(2)}%',
+                                          summary: summary,
+                                          color: changeColor,
+                                        ),
                                       ],
-                                      textCell(
-                                        position == null
-                                            ? '—'
-                                            : fmtCurrency(
-                                                position.currentValue,
-                                              ),
-                                        summary: summary,
-                                      ),
-                                      textCell(
-                                        pnlText,
-                                        summary: summary,
-                                        color: pnlColor,
-                                      ),
-                                      textCell(
-                                        position == null
-                                            ? '—'
-                                            : '${returnPct >= 0 ? '+' : ''}${returnPct.toStringAsFixed(2)}%',
-                                        summary: summary,
-                                        color: changeColor,
-                                      ),
-                                    ],
-                                  );
-                                })(),
-                            ],
+                                    );
+                                  })(),
+                              ],
+                            ),
                           ),
                         ),
                       ),
