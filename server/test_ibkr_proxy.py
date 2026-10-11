@@ -14,6 +14,7 @@ from urllib.parse import parse_qs, urlparse
 
 from ibkr_proxy import (
     ClientPortalIbkrClient,
+    CommandMarketDataClient,
     CommandPerformanceClient,
     CommandTransactionsClient,
     Config,
@@ -37,6 +38,7 @@ def config(**overrides):
         "tws_host": "127.0.0.1",
         "tws_port": 4001,
         "tws_client_id": 97,
+        "data_command": None,
         "performance_command": None,
         "transactions_command": None,
         "performance_cache_database": None,
@@ -95,6 +97,55 @@ def raw_trades(account_id="U1234567"):
                 "trade_date": "2026-09-30",
                 "realized_pnl": 123.45,
                 "commission": 1.25,
+            }
+        ],
+    }
+
+
+def raw_portfolio(account_id="U1234567"):
+    return {
+        "account_id": account_id,
+        "account": "****4567",
+        "read_only": True,
+        "source": "lumibot_tws",
+        "summary": {"netliquidation": {"value": 1000, "currency": "NZD"}},
+        "ledger": {"NZD": {"cashbalance": 100}},
+        "positions": [
+            {
+                "symbol": "AAPL",
+                "security_type": "STK",
+                "currency": "USD",
+                "exchange": "",
+                "conid": 0,
+                "quantity": 2,
+                "market_price": 200,
+                "market_value": 400,
+                "average_cost": 190,
+                "unrealized_pnl": 20,
+                "realized_pnl": None,
+                "sector": "",
+                "group": "",
+                "timestamp": 0,
+            }
+        ],
+    }
+
+
+def raw_history(account_id="U1234567"):
+    return {
+        "account_id": account_id,
+        "read_only": True,
+        "source": "lumibot_tws",
+        "symbol": "AAPL",
+        "currency": "USD",
+        "candles": [
+            {
+                "date": "2026-10-05",
+                "open": 198,
+                "high": 202,
+                "low": 197,
+                "close": 200,
+                "volume": 1000,
             }
         ],
     }
@@ -708,6 +759,63 @@ class ProxyTests(unittest.TestCase):
             [("pa/performance", {"acctIds": ["U1234567"], "period": "1M"})],
         )
 
+    def test_command_market_data_client_runs_lumibot_portfolio_and_history(self):
+        calls = []
+
+        def runner(command, **kwargs):
+            calls.append((command, kwargs))
+            payload = (
+                raw_portfolio()
+                if command[-1] == "marketmonk-portfolio"
+                else raw_history()
+            )
+            return SimpleNamespace(
+                returncode=0,
+                stdout=json.dumps(payload),
+                stderr="",
+            )
+
+        client = CommandMarketDataClient(
+            config(data_command=("/opt/ibkrbot/lumibot/bin/ibkr-lumibot",)),
+            runner=runner,
+        )
+
+        portfolio = client.portfolio()
+        history = client.historical("AAPL", 10)
+
+        self.assertEqual(portfolio["source"], "lumibot_tws")
+        self.assertNotIn("account_id", portfolio)
+        self.assertEqual(history["candles"][-1]["date"], "2026-10-05")
+        self.assertNotIn("account_id", history)
+        self.assertEqual(
+            calls[0][0],
+            ["/opt/ibkrbot/lumibot/bin/ibkr-lumibot", "marketmonk-portfolio"],
+        )
+        self.assertEqual(
+            calls[1][0],
+            [
+                "/opt/ibkrbot/lumibot/bin/ibkr-lumibot",
+                "marketmonk-historical",
+                "--symbol",
+                "AAPL",
+                "--years",
+                "10",
+            ],
+        )
+
+    def test_command_market_data_client_rejects_wrong_account(self):
+        client = CommandMarketDataClient(
+            config(data_command=("ibkr-lumibot",)),
+            runner=lambda *args, **kwargs: SimpleNamespace(
+                returncode=0,
+                stdout=json.dumps(raw_portfolio("U9999999")),
+                stderr="",
+            ),
+        )
+
+        with self.assertRaisesRegex(IbkrError, "wrong account"):
+            client.portfolio()
+
     def test_command_performance_client_normalizes_helper_output(self):
         calls = []
 
@@ -859,6 +967,48 @@ class ProxyTests(unittest.TestCase):
 
         with self.assertRaisesRegex(IbkrError, "wrong account"):
             client.transactions(3650)
+
+    def test_native_backend_delegates_market_data_without_direct_ib_connection(self):
+        data_client = SimpleNamespace(
+            ensure_account_visible=lambda: "U1234567",
+            portfolio=lambda: {**raw_portfolio(), "account_id": None},
+            historical=lambda symbol, years: {
+                **raw_history(),
+                "account_id": None,
+                "symbol": symbol,
+            },
+        )
+        client = NativeIbkrClient(
+            config(backend="native", data_command=("ibkr-lumibot",)),
+            performance_client=FakeClient(),
+            data_client=data_client,
+            ib_factory=FakeNativeIb,
+        )
+
+        self.assertIs(client._ib_factory, FakeNativeIb)
+        self.assertEqual(client.ensure_account_visible(), "U1234567")
+        self.assertEqual(client.portfolio()["source"], "lumibot_tws")
+        self.assertEqual(client.historical("AAPL", 10)["source"], "lumibot_tws")
+
+    def test_client_portal_delegates_market_data_without_gateway_calls(self):
+        calls = []
+        data_client = SimpleNamespace(
+            ensure_account_visible=lambda: "U1234567",
+            portfolio=lambda: calls.append("portfolio") or raw_portfolio(),
+            historical=lambda symbol, years: calls.append((symbol, years))
+            or raw_history(),
+        )
+        client = ClientPortalIbkrClient(
+            config(data_command=("ibkr-lumibot",)),
+            data_client=data_client,
+        )
+        client._get = lambda endpoint: self.fail(
+            f"direct Client Portal call is forbidden after cutover: {endpoint}"
+        )
+
+        self.assertEqual(client.portfolio()["source"], "lumibot_tws")
+        self.assertEqual(client.historical("AAPL", 1)["symbol"], "AAPL")
+        self.assertEqual(calls, ["portfolio", ("AAPL", 1)])
 
     def test_native_backend_prefers_configured_performance_command(self):
         client = NativeIbkrClient(

@@ -44,6 +44,7 @@ class Config:
     tws_host: str
     tws_port: int
     tws_client_id: int
+    data_command: tuple[str, ...] | None
     performance_command: tuple[str, ...] | None
     transactions_command: tuple[str, ...] | None
     performance_cache_database: str | None = None
@@ -64,6 +65,8 @@ class Config:
         tws_host = os.getenv("IBKR_TWS_HOST", "127.0.0.1").strip()
         tws_port = int(os.getenv("IBKR_TWS_PORT", "4001"))
         tws_client_id = int(os.getenv("IBKR_TWS_CLIENT_ID", "97"))
+        data_command_raw = os.getenv("MARKET_MONK_IBKR_DATA_COMMAND", "").strip()
+        data_command = tuple(shlex.split(data_command_raw)) if data_command_raw else None
         performance_command_raw = os.getenv(
             "MARKET_MONK_IBKR_PERFORMANCE_COMMAND", ""
         ).strip()
@@ -100,6 +103,10 @@ class Config:
             raise ValueError("IBKR_TWS_HOST must not be empty")
         if tws_client_id < 0:
             raise ValueError("IBKR_TWS_CLIENT_ID must be non-negative")
+        if data_command == ():
+            raise ValueError(
+                "MARKET_MONK_IBKR_DATA_COMMAND must contain an executable"
+            )
         if performance_command == ():
             raise ValueError(
                 "MARKET_MONK_IBKR_PERFORMANCE_COMMAND must contain an executable"
@@ -134,6 +141,7 @@ class Config:
             tws_host=tws_host,
             tws_port=tws_port,
             tws_client_id=tws_client_id,
+            data_command=data_command,
             performance_command=performance_command,
             transactions_command=transactions_command,
             performance_cache_database=performance_cache_database,
@@ -153,8 +161,14 @@ class ClientPortalIbkrClient:
         config: Config,
         performance_client: Any | None = None,
         transactions_client: Any | None = None,
+        data_client: Any | None = None,
     ):
         self._config = config
+        self._data_client = (
+            data_client
+            if data_client is not None
+            else CommandMarketDataClient(config) if config.data_command else None
+        )
         context = ssl.create_default_context()
         if not config.verify_gateway_tls:
             context.check_hostname = False
@@ -176,6 +190,8 @@ class ClientPortalIbkrClient:
             self._transactions_client = None
 
     def ensure_account_visible(self) -> str:
+        if getattr(self, "_data_client", None) is not None:
+            return self._data_client.ensure_account_visible()
         accounts = self._get("portfolio/accounts")
         if not isinstance(accounts, list):
             raise IbkrError("IBKR returned an invalid account list")
@@ -183,6 +199,8 @@ class ClientPortalIbkrClient:
         return _select_account(visible, self._config.account_id)
 
     def portfolio(self) -> dict[str, Any]:
+        if getattr(self, "_data_client", None) is not None:
+            return self._data_client.portfolio()
         raw_account = self.ensure_account_visible()
         account = quote(raw_account, safe="")
         positions = self._get(f"portfolio2/{account}/positions")
@@ -211,6 +229,8 @@ class ClientPortalIbkrClient:
         self, symbol: str, years: int, *, intraday_days: int | None = None,
         _positions=None,
     ) -> dict[str, Any]:
+        if intraday_days is None and getattr(self, "_data_client", None) is not None:
+            return self._data_client.historical(symbol, years)
         if _positions is None:
             raw_account = self.ensure_account_visible()
             account = quote(raw_account, safe="")
@@ -462,6 +482,94 @@ class SqlAlchemyPerformanceCache:
             return None
         return payload
 
+class CommandMarketDataClient:
+    def __init__(
+        self,
+        config: Config,
+        runner: Callable[..., Any] = subprocess.run,
+    ):
+        if not config.data_command:
+            raise ValueError("MARKET_MONK_IBKR_DATA_COMMAND is not configured")
+        if not config.account_id:
+            raise ValueError(
+                "IBKR_ACCOUNT_ID is required for command-backed MarketMonk data"
+            )
+        self._config = config
+        self._runner = runner
+        self._portfolio_cache: tuple[float, dict[str, Any]] | None = None
+
+    def ensure_account_visible(self) -> str:
+        self.portfolio()
+        return self._config.account_id or ""
+
+    def portfolio(self) -> dict[str, Any]:
+        now = time.monotonic()
+        cached = self._portfolio_cache
+        if cached is not None and now - cached[0] < 15:
+            return cached[1]
+        result = self._run(["marketmonk-portfolio"], timeout=150)
+        self._verify_account(result)
+        if (
+            result.get("read_only") is not True
+            or not isinstance(result.get("summary"), dict)
+            or not isinstance(result.get("ledger"), dict)
+            or not isinstance(result.get("positions"), list)
+        ):
+            raise IbkrError("LumiBot portfolio helper returned incomplete data")
+        self._portfolio_cache = (now, result)
+        return result
+
+    def historical(self, symbol: str, years: int) -> dict[str, Any]:
+        result = self._run(
+            [
+                "marketmonk-historical",
+                "--symbol",
+                symbol,
+                "--years",
+                str(years),
+            ],
+            timeout=150,
+        )
+        self._verify_account(result)
+        if (
+            result.get("read_only") is not True
+            or str(result.get("symbol", "")).upper() != symbol.upper()
+            or not isinstance(result.get("candles"), list)
+        ):
+            raise IbkrError("LumiBot historical helper returned incomplete data")
+        return result
+
+    def _run(self, args: list[str], *, timeout: int) -> dict[str, Any]:
+        try:
+            completed = self._runner(
+                [*self._config.data_command, *args],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise IbkrError("Cannot run LumiBot MarketMonk data helper") from error
+        if completed.returncode != 0:
+            detail = completed.stderr.strip().splitlines()
+            suffix = f": {detail[-1]}" if detail else ""
+            raise IbkrError(
+                "LumiBot MarketMonk data helper failed "
+                f"with exit status {completed.returncode}{suffix}"
+            )
+        try:
+            result = json.loads(completed.stdout)
+        except (json.JSONDecodeError, TypeError) as error:
+            raise IbkrError("LumiBot MarketMonk data helper returned invalid JSON") from error
+        if not isinstance(result, dict):
+            raise IbkrError("LumiBot MarketMonk data helper returned invalid JSON")
+        return result
+
+    def _verify_account(self, result: dict[str, Any]) -> None:
+        helper_account = result.pop("account_id", None)
+        if helper_account != self._config.account_id:
+            raise IbkrError("LumiBot MarketMonk data helper returned the wrong account")
+
 
 class CommandPerformanceClient:
     def __init__(
@@ -607,8 +715,14 @@ class NativeIbkrClient:
         ib_factory: Callable[[], Any] | None = None,
         performance_client: Any | None = None,
         transactions_client: Any | None = None,
+        data_client: Any | None = None,
     ):
         self._config = config
+        self._data_client = (
+            data_client
+            if data_client is not None
+            else CommandMarketDataClient(config) if config.data_command else None
+        )
         if performance_client is not None:
             self._performance_client = performance_client
         elif config.performance_command:
@@ -637,10 +751,14 @@ class NativeIbkrClient:
         self._connection_lock = threading.Lock()
 
     def ensure_account_visible(self) -> str:
+        if self._data_client is not None:
+            return self._data_client.ensure_account_visible()
         with self._session() as ib:
             return self._select_account(ib)
 
     def portfolio(self) -> dict[str, Any]:
+        if self._data_client is not None:
+            return self._data_client.portfolio()
         with self._session() as ib:
             try:
                 account = self._select_account(ib)
@@ -667,6 +785,8 @@ class NativeIbkrClient:
     def historical(
         self, symbol: str, years: int, *, intraday_days: int | None = None
     ) -> dict[str, Any]:
+        if intraday_days is None and getattr(self, "_data_client", None) is not None:
+            return self._data_client.historical(symbol, years)
         with self._session() as ib:
             try:
                 account = self._select_account(ib)
