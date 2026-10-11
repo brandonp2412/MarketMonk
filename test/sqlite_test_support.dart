@@ -1,11 +1,8 @@
-import 'dart:io';
-
 import 'package:drift/native.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/legacy_preferences_migration.dart';
-import 'package:market_monk/legacy_profile_database.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/profile_data_repository.dart';
@@ -13,7 +10,6 @@ import 'package:market_monk/sqlite_settings.dart';
 
 export 'package:market_monk/sqlite_settings.dart';
 
-Directory? _profileDirectory;
 Database? _profileDataTestDatabase;
 
 /// Seeds isolated real SQLite stores from a legacy fixture.
@@ -121,10 +117,7 @@ Future<void> seedTestTrade({
   );
 }
 
-/// Uses independent file connections so reopening exercises persistence.
+/// Shares the in-memory unified database with the settings test fixture.
 AccountManager testAccountManager() => AccountManager(
-      profileDatabaseFactory: (name) => LegacyProfileDatabase.connect(
-        NativeDatabase(File('${_profileDirectory!.path}/$name.sqlite')),
-      ),
       database: _profileDataTestDatabase!,
     );

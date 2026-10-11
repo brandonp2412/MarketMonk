@@ -1,13 +1,10 @@
-import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/market_data_store.dart';
-import 'package:market_monk/legacy_profile_database.dart' as legacy;
 import 'package:market_monk/utils.dart';
 import 'package:yahoo_finance_data_reader/yahoo_finance_data_reader.dart';
-import 'test_log_support.dart';
 
 YahooFinanceCandleData _yahooCandle(DateTime date, {double close = 100}) {
   return YahooFinanceCandleData(
@@ -31,87 +28,6 @@ DateTime _expectedMarketDay() {
 
 void main() {
   setUp(clearAllSyncCache);
-
-  test('legacy profile candles merge globally by canonical symbol and day',
-      () async {
-    allowMultipleDriftDatabasesForTest();
-    final target = Database.connect(NativeDatabase.memory());
-    final defaultProfile =
-        legacy.LegacyProfileDatabase.connect(NativeDatabase.memory());
-    final secondProfile =
-        legacy.LegacyProfileDatabase.connect(NativeDatabase.memory());
-    addTearDown(target.close);
-    addTearDown(defaultProfile.close);
-    addTearDown(secondProfile.close);
-
-    await target.candles.insertOne(
-      CandlesCompanion.insert(
-        symbol: 'MSFT',
-        date: DateTime(2026, 1, 2),
-        open: const Value(200),
-        high: const Value(205),
-        low: const Value(198),
-        close: const Value(204),
-        adjClose: const Value(204),
-        volume: const Value(9000),
-      ),
-    );
-
-    await defaultProfile.candles.insertOne(
-      legacy.CandlesCompanion.insert(
-        symbol: ' aapl ',
-        date: DateTime(2026, 1, 2, 15),
-        close: const Value(100),
-      ),
-    );
-    await defaultProfile.candles.insertOne(
-      legacy.CandlesCompanion.insert(
-        symbol: 'msft',
-        date: DateTime(2026, 1, 2, 8),
-        close: const Value(199),
-      ),
-    );
-    await secondProfile.candles.insertOne(
-      legacy.CandlesCompanion.insert(
-        symbol: 'AAPL',
-        date: DateTime(2026, 1, 2, 7),
-        open: const Value(99),
-        high: const Value(103),
-        low: const Value(98),
-        close: const Value(102),
-        adjClose: const Value(102),
-        volume: const Value(5000),
-      ),
-    );
-
-    final result = await mergeLegacyCandles(
-      target: target,
-      legacyDatabases: [defaultProfile, secondProfile],
-    );
-
-    final rows = await (target.candles.select()
-          ..orderBy([(row) => OrderingTerm.asc(row.symbol)]))
-        .get();
-
-    expect(result.scannedRows, 3);
-    expect(rows, hasLength(2));
-    expect(rows.map((row) => row.symbol), ['AAPL', 'MSFT']);
-    expect(rows.first.date, DateTime(2026, 1, 2));
-    expect(rows.first.close, 102);
-    expect(rows.first.volume, 5000);
-    expect(
-      rows.last.close,
-      204,
-      reason: 'a weaker legacy row must not overwrite better global data',
-    );
-
-    final secondPass = await mergeLegacyCandles(
-      target: target,
-      legacyDatabases: [defaultProfile, secondProfile],
-    );
-    expect(secondPass.writtenRows, 0);
-    expect(await target.select(target.candles).get(), hasLength(2));
-  });
 
   test('raw and normalized symbol currency metadata share the global store',
       () async {

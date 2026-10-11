@@ -46,9 +46,8 @@ class MarketMonkLogicalBackup {
 
 /// Physical SQLite payload carried by an archive.
 ///
-/// The current app writes one database per profile. The unified-database shape is
-/// already understood by the archive layer so the eventual database cutover can
-/// replace only the storage adapter instead of changing the backup format again.
+/// New backups contain the unified database. Older per-profile layouts remain
+/// readable so existing backup archives can still be restored.
 class MarketMonkBackupStorage {
   const MarketMonkBackupStorage._({
     required this.layout,
