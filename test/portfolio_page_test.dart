@@ -194,6 +194,15 @@ void main() {
 
       expect(find.text('VOO'), findsOneWidget);
       expect(find.text('VANGUARD S&P 500 ETF'), findsOneWidget);
+      final mobileDonut = tester.widget<MarketDonutChart>(
+        find.byType(MarketDonutChart),
+      );
+      expect(mobileDonut.radius, 60);
+      expect(mobileDonut.selectedRadius, 75);
+      expect(
+        mobileDonut.centerSpaceRadius + mobileDonut.selectedRadius,
+        lessThanOrEqualTo(260 / 2),
+      );
 
       accounts.requestIbkrRefresh();
       await tester.pump();

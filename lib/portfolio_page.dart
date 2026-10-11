@@ -955,8 +955,8 @@ class PortfolioPageState extends State<PortfolioPage>
                       setState(() => touchedIndex = index);
                     },
                     centerSpaceRadius: 55,
-                    radius: 75,
-                    selectedRadius: 90,
+                    radius: 60,
+                    selectedRadius: 75,
                   ),
                   if (selectedIndex != null)
                     IgnorePointer(
