@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/desktop_context_menu.dart';
@@ -23,9 +23,17 @@ import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+
+bool get _supportsFileSharing => switch (defaultTargetPlatform) {
+      TargetPlatform.android ||
+      TargetPlatform.iOS ||
+      TargetPlatform.macOS ||
+      TargetPlatform.windows =>
+        true,
+      _ => false,
+    };
 
 class _LoadedPortfolio {
   final List<Position> positions;
@@ -471,11 +479,10 @@ class PortfolioPageState extends State<PortfolioPage>
     await _syncAllInBackground();
   }
 
-  Future<void> _exportCsv(
-    BuildContext context,
+  ({String fileName, Uint8List bytes}) _portfolioCsv(
+    String accountName,
     List<Position> positions,
-  ) async {
-    final accountName = context.read<AccountManager>().activeAccount;
+  ) {
     final buf = StringBuffer();
     buf.writeln(
       'Symbol,Name,Shares,Avg Cost,Current Price,Current Value,Cost Basis,Unrealized P/L,% Change,Last Purchase Date',
@@ -497,31 +504,46 @@ class PortfolioPageState extends State<PortfolioPage>
       buf.writeln(cells.join(','));
     }
 
-    final safeName = accountName.replaceAll(RegExp(r'[^\w\-]'), '_');
-    final fileName = 'positions_$safeName.csv';
-    final csv = buf.toString();
+    final safeName = accountName.replaceAll(RegExp(r'[^\w-]'), '_');
+    return (
+      fileName: 'positions_$safeName.csv',
+      bytes: Uint8List.fromList(utf8.encode(buf.toString())),
+    );
+  }
+
+  Future<void> _exportCsv(
+    BuildContext context,
+    List<Position> positions,
+  ) async {
+    final accountName = context.read<AccountManager>().activeAccount;
+    final csv = _portfolioCsv(accountName, positions);
+    final path = await FilePicker.saveFile(
+      fileName: csv.fileName,
+      bytes: csv.bytes,
+      type: FileType.custom,
+      allowedExtensions: ['csv'],
+    );
+    if (path == null) return;
     if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
-      final path = await FilePicker.saveFile(
-        fileName: fileName,
-        bytes: Uint8List.fromList(utf8.encode(csv)),
-        type: FileType.custom,
-        allowedExtensions: ['csv'],
-      );
-      if (path == null) return;
-      await File(path).writeAsString(csv);
-    } else {
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/$fileName');
-      await file.writeAsString(csv);
-      if (!context.mounted) return;
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(file.path, mimeType: 'text/csv')],
-          subject: 'Portfolio Positions',
-        ),
-      );
+      await File(path).writeAsBytes(csv.bytes);
     }
     talker.info('Exported portfolio CSV with ${positions.length} positions');
+  }
+
+  Future<void> _shareCsv(
+    BuildContext context,
+    List<Position> positions,
+  ) async {
+    if (!_supportsFileSharing) return;
+    final accountName = context.read<AccountManager>().activeAccount;
+    final csv = _portfolioCsv(accountName, positions);
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile.fromData(csv.bytes, mimeType: 'text/csv')],
+        fileNameOverrides: [csv.fileName],
+        subject: 'Portfolio Positions',
+      ),
+    );
   }
 
   @override
@@ -865,7 +887,14 @@ class PortfolioPageState extends State<PortfolioPage>
                 netLiquidation: netLiquidation,
                 totalGain: totalGain,
                 totalGainPct: totalGainPct,
-                onExport: () => _exportCsv(context, positions),
+                onExport: () => runDetachedTask(
+                  _exportCsv(context, positions),
+                  'Failed to export portfolio CSV',
+                ),
+                onShare: () => runDetachedTask(
+                  _shareCsv(context, positions),
+                  'Failed to share portfolio CSV',
+                ),
               ),
             ),
           ),
@@ -1087,6 +1116,11 @@ class PortfolioPageState extends State<PortfolioPage>
                       _exportCsv(context, positions),
                       'Failed to export portfolio CSV',
                     );
+                  } else if (value == '__share__' && _supportsFileSharing) {
+                    runDetachedTask(
+                      _shareCsv(context, positions),
+                      'Failed to share portfolio CSV',
+                    );
                   } else if (value.startsWith('cur:')) {
                     runDetachedTask(
                       settings.setDisplayCurrency(value.substring(4)),
@@ -1128,6 +1162,17 @@ class PortfolioPageState extends State<PortfolioPage>
                       ],
                     ),
                   ),
+                  if (_supportsFileSharing)
+                    PopupMenuItem(
+                      value: '__share__',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.share_rounded, size: 20),
+                          const SizedBox(width: 8),
+                          Text(context.l10n.text('Share CSV')),
+                        ],
+                      ),
+                    ),
                 ],
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -1647,6 +1692,7 @@ class _SummaryCard extends StatelessWidget {
   final double totalGain;
   final double totalGainPct;
   final VoidCallback onExport;
+  final VoidCallback onShare;
 
   const _SummaryCard({
     required this.totalValue,
@@ -1654,6 +1700,7 @@ class _SummaryCard extends StatelessWidget {
     required this.totalGain,
     required this.totalGainPct,
     required this.onExport,
+    required this.onShare,
   });
 
   @override
@@ -1692,6 +1739,8 @@ class _SummaryCard extends StatelessWidget {
               onSelected: (value) {
                 if (value == '__export__') {
                   onExport();
+                } else if (value == '__share__' && _supportsFileSharing) {
+                  onShare();
                 } else if (value.startsWith('cur:')) {
                   runDetachedTask(
                     settings.setDisplayCurrency(value.substring(4)),
@@ -1733,6 +1782,17 @@ class _SummaryCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (_supportsFileSharing)
+                  PopupMenuItem(
+                    value: '__share__',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.share_rounded, size: 20),
+                        const SizedBox(width: 8),
+                        Text(context.l10n.text('Share CSV')),
+                      ],
+                    ),
+                  ),
               ],
               child: Row(
                 mainAxisSize: MainAxisSize.min,

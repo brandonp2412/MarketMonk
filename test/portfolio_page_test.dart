@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/database.dart';
@@ -510,4 +511,46 @@ void main() {
       expect(tester.takeException(), null);
     },
   );
+
+  for (final (platform, size, shareSupported) in [
+    (TargetPlatform.linux, const Size(1200, 900), false),
+    (TargetPlatform.windows, const Size(1200, 900), true),
+    (TargetPlatform.linux, const Size(700, 900), false),
+    (TargetPlatform.android, const Size(700, 900), true),
+  ]) {
+    testWidgets('portfolio CSV actions for $platform at ${size.width}px', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = platform;
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      addTearDown(() {
+        debugDefaultTargetPlatformOverride = null;
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      await seedTestSqlite({});
+      final accounts = await configuredAccounts();
+      await accounts.cachePortfolio(
+        'Default',
+        [cachedPosition()],
+        const IbkrAccountValue(value: 5500, currency: 'USD'),
+      );
+      final pending = Completer<IbkrPortfolioSnapshot>();
+      await tester.pumpWidget(
+        app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byType(PopupMenuButton<String>).first);
+      await tester.pumpAndSettle();
+      debugDefaultTargetPlatformOverride = null;
+      expect(find.text('Export CSV'), findsOneWidget);
+      expect(
+        find.text('Share CSV'),
+        shareSupported ? findsOneWidget : findsNothing,
+      );
+      expect(tester.takeException(), null);
+    });
+  }
 }
