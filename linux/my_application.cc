@@ -106,12 +106,6 @@ static void my_application_activate(GApplication* application) {
 #endif
   if (use_header_bar) {
     self->gtk_settings = gtk_settings_get_for_screen(gtk_window_get_screen(window));
-    g_autofree gchar* theme_name = nullptr;
-    g_object_get(self->gtk_settings, "gtk-theme-name", &theme_name, nullptr);
-    if (g_strcmp0(theme_name, "Adwaita-dark") == 0) {
-      g_object_set(self->gtk_settings, "gtk-theme-name", "Adwaita",
-                   "gtk-application-prefer-dark-theme", TRUE, nullptr);
-    }
     g_object_get(self->gtk_settings, "gtk-application-prefer-dark-theme",
                  &self->default_prefer_dark, nullptr);
     g_dbus_proxy_new_for_bus(
