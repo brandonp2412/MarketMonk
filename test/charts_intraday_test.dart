@@ -6,8 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/ibkr_api.dart';
-import 'package:market_monk/main.dart';
 import 'package:market_monk/intraday_market_data.dart';
+import 'package:market_monk/main.dart';
 import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/ticker_line.dart';
@@ -198,12 +198,6 @@ void main() {
     expect(chart.series.single.points.first.y, 0);
     expect(chart.series.single.points.last.y, closeTo(11, 1e-8));
     expect(chart.xLabels.first, contains(RegExp(r'\d{2}:\d{2}')));
-    expect(
-      find.text(
-        'Estimated intraday portfolio and stock prices · Local time',
-      ),
-      findsOneWidget,
-    );
   });
 
   testWidgets('portfolio 5d weights every holding and offers intraday 1d',
@@ -258,7 +252,6 @@ void main() {
     expect(chart.series.single.points.first.y, 945);
     expect(chart.series.single.points.last.y, 1000);
     expect(chart.xLabels.first, contains(RegExp(r'\d{2}:\d{2}')));
-    expect(find.textContaining('Estimated intraday portfolio'), findsOneWidget);
     expect(find.textContaining('TWR'), findsNothing);
     await tester.tap(find.byKey(const Key('chart-period-1d')));
     await tester.pumpAndSettle();

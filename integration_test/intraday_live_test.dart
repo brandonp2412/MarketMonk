@@ -7,8 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/background_network_coordinator.dart';
+import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/settings_state.dart';
@@ -213,12 +213,6 @@ void main() {
         );
       }
       expect(chart()!.xLabels.first, contains(RegExp(r'\d{2}:\d{2}')));
-      expect(
-        find.text(
-          'Estimated intraday portfolio · Current holdings and exchange rates; cash held constant.',
-        ),
-        findsOneWidget,
-      );
       debugPrint(
         'LIVE portfolio 5d cold load ${coldLoad.elapsedMilliseconds} ms',
       );

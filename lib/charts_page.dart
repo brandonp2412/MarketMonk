@@ -4,19 +4,19 @@ import 'package:drafter/drafter.dart';
 import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/candle_ticker.dart';
 import 'package:market_monk/chart_colors.dart';
 import 'package:market_monk/database.dart';
+import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
+import 'package:market_monk/ibkr_cash_out_pnl.dart';
 import 'package:market_monk/intraday_market_data.dart';
 import 'package:market_monk/intraday_portfolio.dart';
-import 'package:market_monk/ibkr_cash_out_pnl.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/main.dart';
@@ -2268,21 +2268,6 @@ class ChartsPageState extends State<ChartsPage>
   ) {
     return [
       _buildFavoritesRow(),
-      if (_usesIntraday)
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: Text(
-            _selectedFavorites.isEmpty
-                ? context.l10n.text(
-                    'Estimated intraday portfolio · Current holdings and exchange rates; cash held constant.',
-                  )
-                : context.l10n.text(
-                    'Estimated intraday portfolio and stock prices · Local time',
-                  ),
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ),
       if (_usesIntraday)
         for (final warning in _portfolioIntradayWarnings.values)
           Padding(
