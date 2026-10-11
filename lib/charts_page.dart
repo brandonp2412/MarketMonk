@@ -1732,6 +1732,7 @@ class ChartsPageState extends State<ChartsPage>
   Widget _buildSearchBar() {
     final hasText = _searchController.text.isNotEmpty;
     final desktop = isDesktopLayout(context);
+    final settings = context.watch<SettingsState>();
     final leading = hasText
         ? IconButton(
             icon: const Icon(Icons.arrow_back),
@@ -1771,18 +1772,43 @@ class ChartsPageState extends State<ChartsPage>
               tooltip: context.l10n.text('Refresh'),
               icon: const Icon(Icons.refresh_rounded),
             ),
-          if (!desktop)
-            IconButton(
-              onPressed: () => Navigator.push(
-                context,
-                adaptivePageRoute(
+          PopupMenuButton<String>(
+            key: const Key('chart-menu-button'),
+            icon: const Icon(Icons.more_vert),
+            tooltip: context.l10n.text('Show menu'),
+            onSelected: (value) {
+              if (value == '__settings__') {
+                Navigator.push(
                   context,
-                  builder: (_) => const SettingsPage(),
+                  adaptivePageRoute(
+                    context,
+                    builder: (_) => const SettingsPage(),
+                  ),
+                );
+              } else if (value.startsWith('currency:')) {
+                runDetachedTask(
+                  settings.setDisplayCurrency(value.substring(9)),
+                  'Failed to change display currency',
+                );
+              }
+            },
+            itemBuilder: (context) => [
+              for (final currencyCode in settings.visibleCurrencies)
+                CheckedPopupMenuItem<String>(
+                  value: 'currency:$currencyCode',
+                  checked: currencyCode == settings.displayCurrency,
+                  child: Text(currencyCode),
+                ),
+              const PopupMenuDivider(),
+              PopupMenuItem<String>(
+                value: '__settings__',
+                child: ListTile(
+                  leading: const Icon(Icons.settings),
+                  title: Text(context.l10n.text('Settings')),
                 ),
               ),
-              tooltip: context.l10n.text('Settings'),
-              icon: const Icon(Icons.settings),
-            ),
+            ],
+          ),
         ],
       ),
     );
@@ -2267,7 +2293,7 @@ class ChartsPageState extends State<ChartsPage>
             child: Text('$symbol: ${_favoriteIntradayErrors[symbol]}'),
           ),
       _buildPortfolioChart(context, settings, accountColors),
-      _buildPortfolioSummary(context, settings, accountColors),
+      _buildPortfolioSummary(context, accountColors),
     ];
   }
 
@@ -2667,7 +2693,6 @@ class ChartsPageState extends State<ChartsPage>
 
   Widget _buildPortfolioSummary(
     BuildContext context,
-    SettingsState settings,
     List<Color> accountColors,
   ) {
     final accounts = context.read<AccountManager>().accounts;
@@ -2693,35 +2718,6 @@ class ChartsPageState extends State<ChartsPage>
               entry.value,
               accountColors,
             ),
-          const SizedBox(height: 8),
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              DropdownButton<String>(
-                value: settings.displayCurrency,
-                isDense: true,
-                underline: const SizedBox(),
-                items: settings.visibleCurrencies
-                    .map(
-                      (currencyCode) => DropdownMenuItem(
-                        value: currencyCode,
-                        child: Text(currencyCode),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    runDetachedTask(
-                      settings.setDisplayCurrency(value),
-                      'Failed to change display currency',
-                    );
-                  }
-                },
-              ),
-            ],
-          ),
         ],
       ),
     );

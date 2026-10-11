@@ -26,6 +26,68 @@ void main() {
     expect(small[1], closeTo(20, 1e-9));
   });
 
+  for (final width in [400.0, 1400.0]) {
+    testWidgets('Charts menu selects currency and opens settings at $width',
+        (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = Size(width, 900);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      await seedTestSqlite({
+        'visibleCurrencies': ['NZD', 'USD'],
+        'displayCurrency': 'NZD',
+      });
+      final accounts = testAccountManager();
+      await accounts.init();
+      final settings = SettingsState(localCurrencyDetector: () async => 'NZD');
+      await settings.initialized;
+      addTearDown(settings.dispose);
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: settings),
+            ChangeNotifierProvider.value(value: accounts),
+          ],
+          child: const MyApp(),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      final menu = find.byKey(const Key('chart-menu-button'));
+      expect(menu, findsOneWidget);
+      expect(find.byType(DropdownButton<String>), findsNothing);
+      await tester.tap(menu);
+      await tester.pumpAndSettle();
+      expect(find.text('NZD'), findsOneWidget);
+      expect(find.text('USD'), findsOneWidget);
+      final selected = tester.widget<CheckedPopupMenuItem<String>>(
+        find.widgetWithText(CheckedPopupMenuItem<String>, 'NZD'),
+      );
+      expect(selected.checked, true);
+      await tester.tap(
+        find.widgetWithText(CheckedPopupMenuItem<String>, 'USD'),
+      );
+      await tester.pumpAndSettle();
+      expect(settings.displayCurrency, 'USD');
+
+      await tester.tap(menu);
+      await tester.pumpAndSettle();
+      final updated = tester.widget<CheckedPopupMenuItem<String>>(
+        find.widgetWithText(CheckedPopupMenuItem<String>, 'USD'),
+      );
+      expect(updated.checked, true);
+      await tester.tap(
+        find.widgetWithText(PopupMenuItem<String>, 'Settings'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Appearance'), findsWidgets);
+      expect(tester.takeException(), null);
+    });
+  }
+
   testWidgets('short charts do not scroll just to clear the floating dock',
       (tester) async {
     tester.view.devicePixelRatio = 1;
