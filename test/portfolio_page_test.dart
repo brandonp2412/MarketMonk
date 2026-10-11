@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
@@ -13,6 +15,7 @@ import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'sqlite_test_support.dart';
 import 'test_log_support.dart';
 
@@ -94,10 +97,14 @@ PortfolioPage _portfolioPage({
   Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? ibkrLoader,
   Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
       ibkrPerformanceLoader,
+  Future<ShareResult> Function(ShareParams)? shareFile,
+  Future<void> Function(File, List<int>)? writeShareFile,
 }) =>
     PortfolioPage(
       ibkrLoader: ibkrLoader,
       ibkrPerformanceLoader: ibkrPerformanceLoader ?? _performanceLoader,
+      shareFile: shareFile,
+      writeShareFile: writeShareFile,
     );
 
 void main() {
@@ -569,6 +576,83 @@ void main() {
       expect(tester.takeException(), null);
     },
   );
+
+  for (final fails in [false, true]) {
+    testWidgets(
+        'Android share CSV ${fails ? 'shows errors' : 'passes a named file'}', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(700, 900);
+      final temp = Directory.systemTemp.createTempSync('market-monk-share-');
+      const paths = MethodChannel('plugins.flutter.io/path_provider');
+      final calls = <ShareParams>[];
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(paths, (call) async {
+        if (call.method == 'getTemporaryDirectory') return temp.path;
+        return null;
+      });
+      addTearDown(() {
+        messenger.setMockMethodCallHandler(paths, null);
+        debugDefaultTargetPlatformOverride = null;
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+        temp.deleteSync(recursive: true);
+      });
+
+      await seedTestSqlite({});
+      final accounts = await configuredAccounts();
+      await accounts.cachePortfolio(
+        'Default',
+        [cachedPosition()],
+        const IbkrAccountValue(value: 5500, currency: 'USD'),
+      );
+      final pending = Completer<IbkrPortfolioSnapshot>();
+      await tester.pumpWidget(
+        app(
+          accounts,
+          _portfolioPage(
+            ibkrLoader: (_) => pending.future,
+            shareFile: (params) async {
+              calls.add(params);
+              if (fails) throw PlatformException(code: 'share-failed');
+              return ShareResult.unavailable;
+            },
+            writeShareFile: (file, data) async {
+              file.writeAsBytesSync(data, flush: true);
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.byType(PopupMenuButton<String>).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Share CSV'));
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+      await tester.pump();
+      debugDefaultTargetPlatformOverride = null;
+
+      expect(calls, hasLength(1));
+      final params = calls.single;
+      final file = params.files!.single;
+      expect(file.path, '${temp.path}/positions_Default.csv');
+      expect(file.mimeType, 'text/csv');
+      expect(params.title, 'Share CSV');
+      final csv = File(file.path).readAsStringSync();
+      expect(csv, contains('Symbol,Name,Shares,Avg Cost'));
+      expect(csv, contains('VOO'));
+      expect(
+        find.text('Couldn’t share CSV'),
+        fails ? findsOneWidget : findsNothing,
+      );
+      expect(tester.takeException(), null);
+    });
+  }
 
   for (final (platform, size, shareSupported) in [
     (TargetPlatform.linux, const Size(1200, 900), false),

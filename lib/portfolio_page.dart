@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/ticker_context_actions.dart';
 import 'package:market_monk/adaptive_layout.dart';
@@ -52,6 +53,8 @@ class PortfolioPage extends StatefulWidget {
   final Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? _ibkrLoader;
   final Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
       _ibkrPerformanceLoader;
+  final Future<ShareResult> Function(ShareParams)? _shareFile;
+  final Future<void> Function(File, List<int>)? _writeShareFile;
 
   const PortfolioPage({
     super.key,
@@ -59,8 +62,12 @@ class PortfolioPage extends StatefulWidget {
     Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? ibkrLoader,
     Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
         ibkrPerformanceLoader,
+    Future<ShareResult> Function(ShareParams)? shareFile,
+    Future<void> Function(File, List<int>)? writeShareFile,
   })  : _ibkrLoader = ibkrLoader,
-        _ibkrPerformanceLoader = ibkrPerformanceLoader;
+        _ibkrPerformanceLoader = ibkrPerformanceLoader,
+        _shareFile = shareFile,
+        _writeShareFile = writeShareFile;
 
   @override
   State<PortfolioPage> createState() => PortfolioPageState();
@@ -537,15 +544,32 @@ class PortfolioPageState extends State<PortfolioPage>
     List<Position> positions,
   ) async {
     if (!_supportsFileSharing) return;
-    final accountName = context.read<AccountManager>().activeAccount;
-    final csv = _portfolioCsv(accountName, positions);
-    await SharePlus.instance.share(
-      ShareParams(
-        files: [XFile.fromData(csv.bytes, mimeType: 'text/csv')],
-        fileNameOverrides: [csv.fileName],
-        subject: 'Portfolio Positions',
-      ),
-    );
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final failureMessage = context.l10n.text('Couldn’t share CSV');
+    final shareTitle = context.l10n.text('Share CSV');
+    try {
+      final accountName = context.read<AccountManager>().activeAccount;
+      final csv = _portfolioCsv(accountName, positions);
+      final directory = await getTemporaryDirectory();
+      final file = File('${directory.path}/${csv.fileName}');
+      if (widget._writeShareFile case final writer?) {
+        await writer(file, csv.bytes);
+      } else {
+        await file.writeAsBytes(csv.bytes, flush: true);
+      }
+      await (widget._shareFile ?? SharePlus.instance.share)(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'text/csv')],
+          subject: 'Portfolio Positions',
+          title: shareTitle,
+        ),
+      );
+    } catch (error, stackTrace) {
+      talker.handle(error, stackTrace, 'Failed to share portfolio CSV');
+      if (messenger?.mounted ?? false) {
+        messenger!.showSnackBar(SnackBar(content: Text(failureMessage)));
+      }
+    }
   }
 
   @override
