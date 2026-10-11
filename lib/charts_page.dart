@@ -116,6 +116,7 @@ class ChartsPageState extends State<ChartsPage>
   Stream<List<CandleTicker>>? _stockStream;
   late final _intradayData = widget._intradayData ?? IntradayMarketData();
   IntradaySeries? _intradaySeries;
+  List<CandleTicker> _stockDailyPreview = const [];
   int _stockLoadGeneration = 0;
 
   bool get _usesIntraday =>
@@ -126,6 +127,8 @@ class ChartsPageState extends State<ChartsPage>
   Map<String, Map<DateTime, double>> _portfolioCashFlowsByAccount = {};
   final _intradayPortfolioCache = <String, _CachedIntradayPortfolio>{};
   final _portfolioIntradayWarnings = <String, String>{};
+  final _portfolioDailyPreviewAccounts = <String>{};
+  bool _portfolioIntradayRefining = false;
   String? _portfolioError;
   bool _portfolioLoading = true;
   bool _chartPeriodLoaded = false;
@@ -861,6 +864,8 @@ class ChartsPageState extends State<ChartsPage>
       _portfolioIntradayWarnings
         ..clear()
         ..addAll(cached.warnings);
+      _portfolioDailyPreviewAccounts.clear();
+      _portfolioIntradayRefining = false;
       _portfolioReturnSeriesByAccount.clear();
       _portfolioCashFlowsByAccount.clear();
       _portfolioError = cached.error;
@@ -900,6 +905,29 @@ class ChartsPageState extends State<ChartsPage>
     return future;
   }
 
+  Map<String, List<_DateValue>> _cachedFiveDayPortfolioPreviews(
+    AccountManager accountManager,
+  ) {
+    if (!_usesIntraday || days != 5) return {};
+    final previews = <String, List<_DateValue>>{};
+    for (final name in accountManager.accounts) {
+      final portfolio = accountManager.portfolioCacheFor(name);
+      final performance = accountManager.ibkrPerformanceCacheFor(name, '1Y');
+      if (portfolio == null || performance == null) continue;
+      final preview = _buildBrokerPerformanceSeries(
+        performance,
+        _LoadedChartPortfolio(
+          positions: portfolio.positions,
+          currentValue: portfolio.netLiquidation,
+          currentValueUsd: portfolio.netLiquidationUsd,
+          asOfDate: portfolio.asOfDate,
+        ),
+      ).series;
+      if (preview.isNotEmpty) previews[name] = preview;
+    }
+    return previews;
+  }
+
   Future<void> _performLoadAllPortfolios({
     bool refreshIbkrPerformance = false,
     bool forceIbkrPerformanceRefresh = false,
@@ -914,16 +942,40 @@ class ChartsPageState extends State<ChartsPage>
     final generation = ++_portfolioLoadGeneration;
     final accountManager = context.read<AccountManager>();
     final accounts = accountManager.accounts;
+    final fiveDayPreview = _usesIntraday && days == 5;
+    final cachedPreviews = _cachedFiveDayPortfolioPreviews(accountManager);
 
+    final newSeries = <String, List<_DateValue>>{
+      for (final name in accounts) name: cachedPreviews[name] ?? [],
+    };
     setState(() {
       _portfolioError = null;
       _portfolioIntradayWarnings.clear();
-      _portfolioLoading = _portfolioSeriesByAccount.isEmpty;
+      _portfolioDailyPreviewAccounts
+        ..clear()
+        ..addAll(cachedPreviews.keys);
+      _portfolioIntradayRefining = fiveDayPreview;
+      if (cachedPreviews.isNotEmpty) {
+        _portfolioSeriesByAccount = Map.of(newSeries);
+      }
+      _portfolioLoading = _portfolioSeriesByAccount.values.every(
+        (series) => series.isEmpty,
+      );
     });
 
-    final newSeries = <String, List<_DateValue>>{
-      for (final name in accounts) name: [],
-    };
+    bool isCurrent() =>
+        mounted && widget.isActive && generation == _portfolioLoadGeneration;
+
+    void publishPreview(String accountName, List<_DateValue> preview) {
+      if (!isCurrent() || preview.isEmpty) return;
+      newSeries[accountName] = preview;
+      setState(() {
+        _portfolioDailyPreviewAccounts.add(accountName);
+        _portfolioSeriesByAccount = Map.of(newSeries);
+        _portfolioLoading = false;
+      });
+    }
+
     final newReturns = <String, List<_DateValue>>{};
     final newFlows = <String, Map<DateTime, double>>{};
     String? firstError;
@@ -949,6 +1001,19 @@ class ChartsPageState extends State<ChartsPage>
           return;
         }
         if (_usesIntraday) {
+          if (fiveDayPreview && newSeries[accountName]!.isEmpty) {
+            try {
+              final preview = await _buildPortfolioSeries(
+                accountName,
+                loaded.positions,
+                currentPortfolioValueUsd: loaded.currentValueUsd,
+              );
+              publishPreview(accountName, preview.series);
+            } catch (error, stackTrace) {
+              talker.handle(error, stackTrace, 'Daily preview unavailable');
+            }
+          }
+          if (!isCurrent()) return;
           final series = await _buildIntradayPortfolioSeries(
             accountName,
             loaded,
@@ -956,10 +1021,15 @@ class ChartsPageState extends State<ChartsPage>
             generation: generation,
             forceRefresh: forceIbkrPortfolioRefresh,
           );
-          if (!mounted ||
-              !widget.isActive ||
-              generation != _portfolioLoadGeneration) return;
-          newSeries[accountName] = series;
+          if (!isCurrent()) return;
+          if (series.isNotEmpty) {
+            newSeries[accountName] = series;
+            setState(() {
+              _portfolioDailyPreviewAccounts.remove(accountName);
+              _portfolioSeriesByAccount = Map.of(newSeries);
+              _portfolioLoading = false;
+            });
+          }
           return;
         }
         if (ibkrConfig.isConfigured && years <= 1) {
@@ -1005,7 +1075,7 @@ class ChartsPageState extends State<ChartsPage>
         );
         newSeries[accountName] = fallback.series;
       } catch (error) {
-        newSeries[accountName] = [];
+        newSeries[accountName] ??= [];
         firstError ??= error.toString();
       }
     }
@@ -1029,7 +1099,9 @@ class ChartsPageState extends State<ChartsPage>
       _portfolioCashFlowsByAccount = newFlows;
       _portfolioError = firstError;
       _portfolioLoading = false;
+      _portfolioIntradayRefining = false;
       if (_usesIntraday &&
+          _portfolioDailyPreviewAccounts.isEmpty &&
           newSeries.values.any((series) => series.isNotEmpty)) {
         if (_intradayPortfolioCache.length >= 16)
           _intradayPortfolioCache.remove(_intradayPortfolioCache.keys.first);
@@ -1488,6 +1560,7 @@ class ChartsPageState extends State<ChartsPage>
       _networkLoading = true;
       _stockError = null;
       _intradaySeries = null;
+      _stockDailyPreview = const [];
       _nativeCurrency = symbolCurrency(symbol);
       _centDivisor = symbolCentDivisor(symbol);
     });
@@ -1501,6 +1574,12 @@ class ChartsPageState extends State<ChartsPage>
         generation == _stockLoadGeneration;
     try {
       if (intraday) {
+        if (selectedDays == 5) {
+          runDetachedTask(
+            _loadFiveDayStockPreview(symbol, generation),
+            'Failed to load daily stock preview',
+          );
+        }
         final series = await _intradayData.fetch(
           symbol,
           days: selectedDays,
@@ -1535,6 +1614,48 @@ class ChartsPageState extends State<ChartsPage>
     } finally {
       if (isCurrent()) setState(() => _networkLoading = false);
     }
+  }
+
+  Future<void> _loadFiveDayStockPreview(String symbol, int generation) async {
+    final after = DateTime.now().subtract(const Duration(days: 14));
+    final rows = await (marketDataDatabase.candles.select()
+          ..where(
+            (candle) =>
+                candle.symbol.equals(canonicalMarketSymbol(symbol)) &
+                candle.date.isBiggerThanValue(after),
+          )
+          ..orderBy([(candle) => OrderingTerm.desc(candle.date)])
+          ..limit(5))
+        .get();
+    if (rows.isEmpty) return;
+    await fetchSymbolCurrencyAndRate(symbol);
+    try {
+      requireUsdRate(symbolCurrency(symbol));
+    } on StateError {
+      return;
+    }
+    if (!mounted ||
+        !widget.isActive ||
+        !_usesIntraday ||
+        days != 5 ||
+        _mode != _ChartMode.stock ||
+        _selectedSymbol != symbol ||
+        generation != _stockLoadGeneration ||
+        _intradaySeries != null ||
+        rows.isEmpty) {
+      return;
+    }
+    setState(() {
+      _stockDailyPreview = [
+        for (final row in rows.reversed)
+          CandleTicker(
+            candle: CandlesCompanion(
+              date: Value(row.date),
+              close: Value(row.close),
+            ),
+          ),
+      ];
+    });
   }
 
   DateTime _requiredCandleStart() {
@@ -1642,6 +1763,8 @@ class ChartsPageState extends State<ChartsPage>
       _portfolioLoads.clear();
       _backgroundSyncs.clear();
       _portfolioSeriesByAccount.clear();
+      _portfolioDailyPreviewAccounts.clear();
+      _portfolioIntradayRefining = false;
       _portfolioReturnSeriesByAccount.clear();
       _portfolioCashFlowsByAccount.clear();
       _portfolioLoading = true;
@@ -2093,15 +2216,24 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   List<Widget> _buildStockContent(SettingsState settings) {
-    final intradaySnapshot = AsyncSnapshot.withData(ConnectionState.done, [
-      for (final bar in _intradaySeries?.candles ?? <IbkrHistoricalCandle>[])
-        CandleTicker(
-          candle: CandlesCompanion(
-            date: Value(bar.date.toLocal()),
-            close: Value(bar.close),
-          ),
-        ),
-    ]);
+    final dailyPreview = _usesIntraday &&
+        days == 5 &&
+        _intradaySeries == null &&
+        _stockDailyPreview.isNotEmpty;
+    final intradaySnapshot = AsyncSnapshot.withData(
+      ConnectionState.done,
+      _intradaySeries == null
+          ? _stockDailyPreview
+          : [
+              for (final bar in _intradaySeries!.candles)
+                CandleTicker(
+                  candle: CandlesCompanion(
+                    date: Value(bar.date.toLocal()),
+                    close: Value(bar.close),
+                  ),
+                ),
+            ],
+    );
     return [
       if (_usesIntraday)
         _buildStockChart(context, intradaySnapshot, settings)
@@ -2111,6 +2243,18 @@ class ChartsPageState extends State<ChartsPage>
           stream: _stockStream,
           builder: (context, snapshot) =>
               _buildStockChart(context, snapshot, settings),
+        ),
+      if (dailyPreview)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            _networkLoading
+                ? 'Daily preview · loading 15-minute prices'
+                : 'Daily preview · intraday prices unavailable',
+            key: const Key('stock-five-day-preview'),
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
         ),
       if (_usesIntraday && _intradaySeries != null)
         Padding(
@@ -2217,7 +2361,7 @@ class ChartsPageState extends State<ChartsPage>
           spots: spots,
           showRollingAverage: _showRollingAverage,
           nativeCurrency: _nativeCurrency,
-          intraday: _usesIntraday,
+          intraday: _usesIntraday && _intradaySeries != null,
         ),
       ),
     );
@@ -2321,6 +2465,20 @@ class ChartsPageState extends State<ChartsPage>
   ) {
     return [
       _buildFavoritesRow(),
+      if (_usesIntraday &&
+          days == 5 &&
+          _portfolioDailyPreviewAccounts.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            _portfolioIntradayRefining
+                ? 'Daily preview · loading 15-minute prices'
+                : 'Daily preview · intraday prices unavailable',
+            key: const Key('portfolio-five-day-preview'),
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
       if (_usesIntraday)
         for (final warning in _portfolioIntradayWarnings.values)
           Padding(
@@ -2469,8 +2627,9 @@ class ChartsPageState extends State<ChartsPage>
                   periodStart: _requiredCandleStart(),
                   periodDays: days,
                   visibleRange: _customChartRange,
-                  intraday:
-                      _usesIntraday && _selectedFavorites.contains(symbol),
+                  intraday: _usesIntraday &&
+                      _selectedFavorites.contains(symbol) &&
+                      (days != 5 || _favoriteIntraday.containsKey(symbol)),
                   intradaySeries: _favoriteIntraday[symbol],
                   isActive: widget.isActive,
                   selected: _selectedFavorites.contains(symbol),
@@ -2494,19 +2653,20 @@ class ChartsPageState extends State<ChartsPage>
         '${widget.isActive}|$_selectedFavorites|$years|$months|$days';
     if (_favoriteChartStreamKey != streamKey) {
       _favoriteChartStreamKey = streamKey;
-      _favoriteChartStream =
-          widget.isActive && !_usesIntraday && _selectedFavorites.isNotEmpty
-              ? (marketDataDatabase.candles.select()
-                    ..where(
-                      (candle) =>
-                          candle.symbol.isIn(
-                            _selectedFavorites.map(canonicalMarketSymbol),
-                          ) &
-                          candle.date.isBiggerThanValue(_requiredCandleStart()),
-                    )
-                    ..orderBy([(candle) => OrderingTerm.asc(candle.date)]))
-                  .watch()
-              : null;
+      _favoriteChartStream = widget.isActive &&
+              (!_usesIntraday || days == 5) &&
+              _selectedFavorites.isNotEmpty
+          ? (marketDataDatabase.candles.select()
+                ..where(
+                  (candle) =>
+                      candle.symbol.isIn(
+                        _selectedFavorites.map(canonicalMarketSymbol),
+                      ) &
+                      candle.date.isBiggerThanValue(_requiredCandleStart()),
+                )
+                ..orderBy([(candle) => OrderingTerm.asc(candle.date)]))
+              .watch()
+          : null;
     }
     return StreamBuilder<List<StoredCandle>>(
       key: ValueKey(streamKey),
@@ -2567,8 +2727,9 @@ class ChartsPageState extends State<ChartsPage>
                 bar.close / symbolCentDivisor(symbol),
               ),
           ];
+          continue;
         }
-        continue;
+        if (days != 5) continue;
       }
       var candles = favoriteCandles
           .where((candle) => candle.symbol == canonicalMarketSymbol(symbol))
@@ -2673,8 +2834,17 @@ class ChartsPageState extends State<ChartsPage>
       );
     }
 
+    final dailyOnly = _usesIntraday &&
+        days == 5 &&
+        visibleSeries.keys.every(
+          (name) => accounts.contains(name)
+              ? _portfolioDailyPreviewAccounts.contains(name)
+              : !_favoriteIntraday.containsKey(name),
+        );
     final formatter = DateFormat(
-      _usesIntraday ? '${settings.dateFormat} HH:mm' : settings.dateFormat,
+      _usesIntraday && !dailyOnly
+          ? '${settings.dateFormat} HH:mm'
+          : settings.dateFormat,
     );
     final visibleKeys = visibleSeries.keys.toList();
 
