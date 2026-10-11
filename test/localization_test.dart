@@ -28,7 +28,7 @@ void main() {
       expect(appTranslations.keys.toSet(), translatedLanguages);
 
       final completeKeys = appTranslations['es']!.keys.toSet();
-      expect(completeKeys, hasLength(185));
+      expect(completeKeys, hasLength(184));
       expect(
         appTranslations['hi']!.keys.toSet(),
         completeKeys,

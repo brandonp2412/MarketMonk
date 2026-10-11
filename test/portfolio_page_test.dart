@@ -216,8 +216,14 @@ void main() {
           matching: find.byType(Positioned),
         ),
       );
-      expect(positioned.top, 24);
-      expect(positioned.right, 24);
+      expect(positioned.top, 48);
+      expect(positioned.left, 0);
+      expect(positioned.right, 0);
+      expect(
+        tester.getCenter(loadingIndicator).dx,
+        tester.getCenter(find.byType(Scaffold)).dx,
+      );
+      expect(tester.getCenter(loadingIndicator).dy, 60);
 
       pending.complete(snapshotFor('*****6552', 'VOO'));
       await tester.pumpAndSettle();
@@ -225,6 +231,47 @@ void main() {
       expect(find.bySemanticsLabel('Loading portfolio'), findsNothing);
     },
   );
+
+  testWidgets('mobile portfolio lists positions without a filter field', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(700, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({});
+    final accounts = await configuredAccounts();
+    await accounts.cachePortfolio(
+      'Default',
+      [
+        cachedPosition(),
+        Position(
+          symbol: 'AAPL',
+          name: 'Apple',
+          nativeCurrency: 'USD',
+          netShares: 2,
+          avgCost: 100,
+          currentPrice: 150,
+          firstBuyDate: DateTime(2025),
+          lastBuyDate: DateTime(2026),
+        ),
+      ],
+      const IbkrAccountValue(value: 5800, currency: 'USD'),
+    );
+    final pending = Completer<IbkrPortfolioSnapshot>();
+    await tester.pumpWidget(
+      app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
+    );
+    await tester.pump();
+
+    expect(find.byType(TextField), findsNothing);
+    expect(find.text('VOO'), findsOneWidget);
+    expect(find.text('AAPL'), findsOneWidget);
+    expect(find.byType(MarketDonutChart), findsOneWidget);
+    expect(tester.takeException(), null);
+  });
 
   testWidgets(
     'slow IBKR performance refresh does not keep portfolio loading',
@@ -432,7 +479,7 @@ void main() {
     expect(find.text('Account value'), findsOneWidget);
     expect(find.text('Allocation'), findsOneWidget);
     expect(find.text('Return by holding'), findsOneWidget);
-    expect(find.text('Filter holdings...'), findsNothing);
+    expect(find.byType(TextField), findsNothing);
     expect(find.byType(Card), findsNWidgets(2));
     final refresh = find.byTooltip('Refresh');
     expect(refresh, findsOneWidget);

@@ -85,10 +85,8 @@ class PortfolioPageState extends State<PortfolioPage>
   bool _isLoadingPortfolio = false;
   Object? _loadError;
   int? touchedIndex;
-  final _filterController = TextEditingController();
   final _allocationScrollController = ScrollController();
   final _returnScrollController = ScrollController();
-  String _filterText = '';
   String _lastAccount = '';
   int _lastIbkrRefreshVersion = -1;
   IbkrAccountConfig _lastIbkrConfig = const IbkrAccountConfig();
@@ -169,7 +167,6 @@ class PortfolioPageState extends State<PortfolioPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _filterController.dispose();
     _allocationScrollController.dispose();
     _returnScrollController.dispose();
     super.dispose();
@@ -598,14 +595,17 @@ class PortfolioPageState extends State<PortfolioPage>
                 children: [
                   body,
                   Positioned(
-                    top: 24,
-                    right: 24,
-                    child: Semantics(
-                      label: context.l10n.text('Loading portfolio'),
-                      child: const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                    top: 48,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Semantics(
+                        label: context.l10n.text('Loading portfolio'),
+                        child: const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2.5),
+                        ),
                       ),
                     ),
                   ),
@@ -847,17 +847,6 @@ class PortfolioPageState extends State<PortfolioPage>
             secondPosition.currentValue.compareTo(firstPosition.currentValue),
       );
 
-    final query = _filterText.toLowerCase();
-    final filtered = query.isEmpty
-        ? sorted
-        : sorted
-            .where(
-              (position) =>
-                  position.symbol.toLowerCase().contains(query) ||
-                  position.name.toLowerCase().contains(query),
-            )
-            .toList();
-
     final colors = _buildColors(context, sorted.length);
     // Holdings can change while this page is kept alive (for example, after
     // switching accounts). Do not use a selection from the previous list.
@@ -924,21 +913,6 @@ class PortfolioPageState extends State<PortfolioPage>
               ),
             ),
           ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-              child: _FilterRow(
-                controller: _filterController,
-                filterText: _filterText,
-                onChanged: (value) =>
-                    setState(() => _filterText = value.trim()),
-                onClear: () => setState(() {
-                  _filterText = '';
-                  _filterController.clear();
-                }),
-              ),
-            ),
-          ),
           SliverPersistentHeader(
             pinned: true,
             delegate: _PieHeaderDelegate(
@@ -990,23 +964,21 @@ class PortfolioPageState extends State<PortfolioPage>
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverList.builder(
-              itemCount: filtered.length,
+              itemCount: sorted.length,
               itemBuilder: (context, index) {
-                final position = filtered[index];
-                final sortedIndex = sorted.indexOf(position);
+                final position = sorted[index];
                 final val = position.currentValue;
                 final pct = totalValue > 0 ? val / totalValue * 100 : 0.0;
                 return _LegendTile(
-                  color: colors[sortedIndex >= 0 ? sortedIndex : index],
+                  color: colors[index],
                   symbol: position.symbol,
                   name: position.name,
                   value: val,
                   allocationPct: pct,
                   changePct: position.change,
-                  isHighlighted: sortedIndex == selectedIndex,
+                  isHighlighted: index == selectedIndex,
                   onTap: () => setState(
-                    () => touchedIndex =
-                        touchedIndex == sortedIndex ? null : sortedIndex,
+                    () => touchedIndex = touchedIndex == index ? null : index,
                   ),
                 );
               },
@@ -1838,48 +1810,6 @@ class _SummaryCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _FilterRow extends StatelessWidget {
-  final TextEditingController controller;
-  final String filterText;
-  final ValueChanged<String> onChanged;
-  final VoidCallback onClear;
-
-  const _FilterRow({
-    required this.controller,
-    required this.filterText,
-    required this.onChanged,
-    required this.onClear,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: TextField(
-            controller: controller,
-            onChanged: onChanged,
-            decoration: InputDecoration(
-              hintText: context.l10n.text('Filter holdings...'),
-              prefixIcon: const Icon(Icons.search),
-              isDense: true,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              suffixIcon: filterText.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: onClear,
-                    )
-                  : null,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
