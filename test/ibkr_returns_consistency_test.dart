@@ -4,7 +4,6 @@ import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/ibkr_api.dart';
-import 'package:market_monk/ibkr_cash_out_pnl.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
@@ -75,7 +74,7 @@ void main() {
     );
   });
 
-  testWidgets('1y chart matches portfolio inception cash-out return',
+  testWidgets('chart shows broker returns rather than cash-out P/L',
       (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1200, 900);
@@ -124,7 +123,6 @@ void main() {
       returns: const [0, -0.00014719, -0.00063536],
     );
     await accounts.cacheIbkrPerformance('Default', performance);
-    final cashOut = calculateIbkrCashOutPnl(performance, nav);
     await tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -142,12 +140,9 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-    final expectedReturn = cashOut.percent!.toStringAsFixed(2);
-    expect(
-      find.text('+$expectedReturn% · Total P/L'),
-      findsOneWidget,
-    );
-    expect(find.text(r'+$939.36'), findsOneWidget);
+    expect(find.text('-0.06%'), findsOneWidget);
+    expect(find.textContaining('TWR'), findsNothing);
+    expect(find.textContaining('Total P/L'), findsNothing);
     expect(tester.takeException(), null);
   });
 }

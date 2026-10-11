@@ -14,7 +14,6 @@ import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
-import 'package:market_monk/ibkr_cash_out_pnl.dart';
 import 'package:market_monk/intraday_market_data.dart';
 import 'package:market_monk/intraday_portfolio.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
@@ -120,9 +119,8 @@ class ChartsPageState extends State<ChartsPage>
       years == 0 && months == 0 && (days == 1 || days == 5);
 
   Map<String, List<_DateValue>> _portfolioSeriesByAccount = {};
-  Map<String, double> _portfolioReturnsByAccount = {};
-  Map<String, double> _portfolioReturnAmountsByAccount = {};
-  Map<String, bool> _portfolioCashOutByAccount = {};
+  Map<String, List<_DateValue>> _portfolioReturnSeriesByAccount = {};
+  Map<String, Map<DateTime, double>> _portfolioCashFlowsByAccount = {};
   final _intradayPortfolioCache = <String, _CachedIntradayPortfolio>{};
   final _portfolioIntradayWarnings = <String, String>{};
   String? _portfolioError;
@@ -258,9 +256,8 @@ class ChartsPageState extends State<ChartsPage>
     if (years > 1 || (years == 1 && (months > 0 || days > 0))) return;
 
     final cachedSeries = <String, List<_DateValue>>{};
-    final cachedReturns = <String, double>{};
-    final cachedReturnAmounts = <String, double>{};
-    final cachedCashOuts = <String, bool>{};
+    final cachedReturns = <String, List<_DateValue>>{};
+    final cachedFlows = <String, Map<DateTime, double>>{};
 
     for (final accountName in accountManager.accounts) {
       final config = accountManager.ibkrConfigFor(accountName);
@@ -295,16 +292,14 @@ class ChartsPageState extends State<ChartsPage>
       if (brokerSeries.series.isEmpty) return;
 
       cachedSeries[accountName] = brokerSeries.series;
-      cachedReturns[accountName] = brokerSeries.twrPercent;
-      cachedReturnAmounts[accountName] = brokerSeries.returnAmount;
-      cachedCashOuts[accountName] = brokerSeries.isCashOut;
+      cachedReturns[accountName] = brokerSeries.returnSeries;
+      cachedFlows[accountName] = brokerSeries.cashFlowsByDate;
     }
 
     if (cachedSeries.length != accountManager.accounts.length) return;
     _portfolioSeriesByAccount = cachedSeries;
-    _portfolioReturnsByAccount = cachedReturns;
-    _portfolioReturnAmountsByAccount = cachedReturnAmounts;
-    _portfolioCashOutByAccount = cachedCashOuts;
+    _portfolioReturnSeriesByAccount = cachedReturns;
+    _portfolioCashFlowsByAccount = cachedFlows;
     _portfolioLoading = false;
   }
 
@@ -315,8 +310,9 @@ class ChartsPageState extends State<ChartsPage>
     bool refreshIbkr = false,
     bool forceIbkrRefresh = false,
   }) async {
-    final trades =
-        await profileDataRepository.readTradesForAccount(accountName);
+    final trades = await profileDataRepository.readTradesForAccount(
+      accountName,
+    );
     if (ibkrConfig.enabled) {
       final cached = accountManager.portfolioCacheFor(accountName);
       final cacheFresh = accountManager.isPortfolioCacheFresh(accountName);
@@ -466,8 +462,9 @@ class ChartsPageState extends State<ChartsPage>
     IbkrAccountConfig ibkrConfig,
   ) async {
     try {
-      final trades =
-          await profileDataRepository.readTradesForAccount(accountName);
+      final trades = await profileDataRepository.readTradesForAccount(
+        accountName,
+      );
       if (!mounted || !widget.isActive) return;
       final symbols = trades.map((trade) => trade.symbol).toSet();
       for (final symbol in symbols) {
@@ -588,8 +585,9 @@ class ChartsPageState extends State<ChartsPage>
       if (ibkrConfig.enabled) continue;
 
       try {
-        final trades =
-            await profileDataRepository.readTradesForAccount(accountName);
+        final trades = await profileDataRepository.readTradesForAccount(
+          accountName,
+        );
         if (!mounted || !widget.isActive) return;
         for (final symbol in trades.map((trade) => trade.symbol).toSet()) {
           if (!mounted || !widget.isActive) return;
@@ -806,9 +804,8 @@ class ChartsPageState extends State<ChartsPage>
   Future<
       ({
         List<_DateValue> series,
-        double twrPercent,
-        double returnAmount,
-        bool isCashOut
+        List<_DateValue> returnSeries,
+        Map<DateTime, double> cashFlowsByDate,
       })?> _loadBrokerPerformanceSeries(
     String accountName,
     IbkrAccountConfig ibkrConfig,
@@ -827,7 +824,9 @@ class ChartsPageState extends State<ChartsPage>
         forceRefresh: forceRefresh,
       );
       final brokerSeries = _buildBrokerPerformanceSeries(performance, loaded);
-      return brokerSeries.series.isEmpty ? null : brokerSeries;
+      return brokerSeries.series.isEmpty || brokerSeries.returnSeries.length < 2
+          ? null
+          : brokerSeries;
     } catch (error) {
       talker.warning(
         'IBKR performance history unavailable; '
@@ -852,9 +851,8 @@ class ChartsPageState extends State<ChartsPage>
       _portfolioIntradayWarnings
         ..clear()
         ..addAll(cached.warnings);
-      _portfolioReturnsByAccount.clear();
-      _portfolioReturnAmountsByAccount.clear();
-      _portfolioCashOutByAccount.clear();
+      _portfolioReturnSeriesByAccount.clear();
+      _portfolioCashFlowsByAccount.clear();
       _portfolioError = cached.error;
       _portfolioLoading = false;
     });
@@ -916,9 +914,8 @@ class ChartsPageState extends State<ChartsPage>
     final newSeries = <String, List<_DateValue>>{
       for (final name in accounts) name: [],
     };
-    final newReturns = <String, double>{};
-    final newReturnAmounts = <String, double>{};
-    final newCashOuts = <String, bool>{};
+    final newReturns = <String, List<_DateValue>>{};
+    final newFlows = <String, Map<DateTime, double>>{};
     String? firstError;
 
     Future<void> loadAccount(String accountName) async {
@@ -971,9 +968,8 @@ class ChartsPageState extends State<ChartsPage>
           }
           if (brokerSeries != null) {
             newSeries[accountName] = brokerSeries.series;
-            newReturns[accountName] = brokerSeries.twrPercent;
-            newReturnAmounts[accountName] = brokerSeries.returnAmount;
-            newCashOuts[accountName] = brokerSeries.isCashOut;
+            newReturns[accountName] = brokerSeries.returnSeries;
+            newFlows[accountName] = brokerSeries.cashFlowsByDate;
             return;
           }
         }
@@ -1019,9 +1015,8 @@ class ChartsPageState extends State<ChartsPage>
     }
     setState(() {
       _portfolioSeriesByAccount = newSeries;
-      _portfolioReturnsByAccount = newReturns;
-      _portfolioReturnAmountsByAccount = newReturnAmounts;
-      _portfolioCashOutByAccount = newCashOuts;
+      _portfolioReturnSeriesByAccount = newReturns;
+      _portfolioCashFlowsByAccount = newFlows;
       _portfolioError = firstError;
       _portfolioLoading = false;
       if (_usesIntraday &&
@@ -1128,8 +1123,9 @@ class ChartsPageState extends State<ChartsPage>
     final after = days > 0
         ? DateTime(now.year, now.month, now.day - days - 4)
         : DateTime(now.year - years, now.month - months, now.day - 1);
-    final trades =
-        await profileDataRepository.readTradesForAccount(accountName);
+    final trades = await profileDataRepository.readTradesForAccount(
+      accountName,
+    );
     final currentHoldingsReplay = trades.isEmpty;
     final currentHoldingsValueUsd = positions.fold<double>(
       0,
@@ -1256,19 +1252,17 @@ class ChartsPageState extends State<ChartsPage>
 
   ({
     List<_DateValue> series,
-    double twrPercent,
-    double returnAmount,
-    bool isCashOut
+    List<_DateValue> returnSeries,
+    Map<DateTime, double> cashFlowsByDate,
   }) _buildBrokerPerformanceSeries(
     IbkrPerformanceSeries performance,
     _LoadedChartPortfolio loaded,
   ) {
     if (performance.nav.isEmpty || performance.dates.isEmpty) {
       return (
-        series: const [],
-        twrPercent: 0,
-        returnAmount: 0,
-        isCashOut: false
+        series: <_DateValue>[],
+        returnSeries: <_DateValue>[],
+        cashFlowsByDate: <DateTime, double>{},
       );
     }
 
@@ -1300,25 +1294,16 @@ class ChartsPageState extends State<ChartsPage>
           date.weekday == DateTime.sunday) {
         continue;
       }
-      points.add(
-        _DateValue(
-          date,
-          performance.nav[index] / basePerUsd,
-        ),
-      );
+      points.add(_DateValue(date, performance.nav[index] / basePerUsd));
     }
-    points.sort(
-      (firstPoint, secondPoint) => firstPoint.date.compareTo(secondPoint.date),
-    );
+    points.sort((a, b) => a.date.compareTo(b.date));
     if (points.isEmpty) {
       return (
-        series: const [],
-        twrPercent: 0,
-        returnAmount: 0,
-        isCashOut: false
+        series: <_DateValue>[],
+        returnSeries: <_DateValue>[],
+        cashFlowsByDate: <DateTime, double>{},
       );
     }
-
     final anchor = points.last.date;
     int baselineIndex;
     if (days > 0) {
@@ -1331,66 +1316,44 @@ class ChartsPageState extends State<ChartsPage>
         anchor.day,
       );
       baselineIndex = 0;
-      for (var index = 0; index < points.length; index++) {
-        if (!points[index].date.isAfter(cutoff)) baselineIndex = index;
+      for (var i = 0; i < points.length; i++) {
+        if (!points[i].date.isAfter(cutoff)) baselineIndex = i;
       }
     }
-
-    final historicalSeries = points.sublist(baselineIndex);
-    final baselineDate = historicalSeries.first.date;
-    final historicalEndDate = historicalSeries.last.date;
-    final cashFlows = performance.cashFlows.length == performance.dates.length
-        ? performance.cashFlows
-        : List<double>.filled(performance.dates.length, 0);
-    var externalFlowsUsd = 0.0;
-    for (var index = 0; index < performance.dates.length; index++) {
-      final date = performance.dates[index];
-      if (date.isAfter(baselineDate) && !date.isAfter(historicalEndDate)) {
-        externalFlowsUsd += cashFlows[index] / basePerUsd;
-      }
-    }
-    var returnAmount = historicalSeries.last.value -
-        historicalSeries.first.value -
-        externalFlowsUsd;
-
-    final series = historicalSeries;
-
-    var startReturn = 0.0;
-    var endReturn = 0.0;
-    for (var index = 0; index < performance.returnDates.length; index++) {
-      final value = performance.returns[index];
-      if (!performance.returnDates[index].isAfter(baselineDate)) {
-        startReturn = value;
-      }
-      endReturn = value;
-    }
-    final denominator = 1 + startReturn;
-    final twr = denominator == 0 ? 0.0 : ((1 + endReturn) / denominator) - 1;
-    // Inception-to-date cash-out P/L is the Portfolio headline metric, not
-    // time-weighted return. Use the same calculation when this chart covers
-    // the account's entire history, so the two screens agree.
-    if (baselineIndex == 0 && loaded.currentValue != null) {
-      try {
-        final cashOut = calculateIbkrCashOutPnl(
-          performance,
-          loaded.currentValue!,
+    final series = points.sublist(baselineIndex);
+    final cashFlowsByDate = <DateTime, double>{};
+    if (performance.cashFlows.length == performance.dates.length) {
+      for (var i = 0; i < performance.dates.length; i++) {
+        final date = performance.dates[i];
+        cashFlowsByDate.update(
+          date,
+          (amount) => amount + performance.cashFlows[i] / basePerUsd,
+          ifAbsent: () => performance.cashFlows[i] / basePerUsd,
         );
-        returnAmount = cashOut.profitLoss / basePerUsd;
-        return (
-          series: series,
-          twrPercent: cashOut.percent ?? 0,
-          returnAmount: returnAmount,
-          isCashOut: true,
-        );
-      } on StateError {
-        // Partial broker history cannot produce an inception return.
+      }
+    }
+
+    // Broker returns are cumulative, cash-flow-adjusted fractions. NAV is
+    // retained for currency tooltips; comparison charts use return factors.
+    final returnSeries = <_DateValue>[];
+    if (performance.returnDates.length == performance.returns.length &&
+        performance.returnDates.isNotEmpty) {
+      var returnIndex = 0;
+      var cumulative = 0.0;
+      for (final point in series) {
+        while (returnIndex < performance.returnDates.length &&
+            !performance.returnDates[returnIndex].isAfter(point.date)) {
+          cumulative = performance.returns[returnIndex++];
+        }
+        if (cumulative.isFinite && cumulative > -1) {
+          returnSeries.add(_DateValue(point.date, 1 + cumulative));
+        }
       }
     }
     return (
       series: series,
-      twrPercent: twr * 100,
-      returnAmount: returnAmount,
-      isCashOut: false
+      returnSeries: returnSeries,
+      cashFlowsByDate: cashFlowsByDate,
     );
   }
 
@@ -1557,9 +1520,7 @@ class ChartsPageState extends State<ChartsPage>
     const weekExpression = CustomExpression<String>(
       "STRFTIME('%Y-%m-%W', DATE(\"date\", 'unixepoch', 'localtime'))",
     );
-    Iterable<Expression<Object>> groupBy = [
-      marketDataDatabase.candles.date,
-    ];
+    Iterable<Expression<Object>> groupBy = [marketDataDatabase.candles.date];
     if (years > 0 || months > 5) groupBy = [weekExpression];
 
     final capturedDays = days;
@@ -1585,7 +1546,9 @@ class ChartsPageState extends State<ChartsPage>
           .map(
             (result) => CandleTicker(
               candle: CandlesCompanion(
-                date: Value(result.read(marketDataDatabase.candles.date)!),
+                date: Value(
+                  result.read(marketDataDatabase.candles.date)!,
+                ),
                 close: Value(
                   result.read(marketDataDatabase.candles.close)!,
                 ),
@@ -1611,6 +1574,16 @@ class ChartsPageState extends State<ChartsPage>
     return (start, end);
   }
 
+  List<_DateValue> _visibleValues(List<_DateValue> values) {
+    final range = _customChartRange;
+    if (range == null) return values;
+    return [
+      for (final point in values)
+        if (!point.date.isBefore(range.$1) && !point.date.isAfter(range.$2))
+          point,
+    ];
+  }
+
   void _setChartRange(List<DateTime> dates, (int, int)? range) {
     setState(() {
       _customChartRange =
@@ -1629,9 +1602,8 @@ class ChartsPageState extends State<ChartsPage>
       _portfolioLoads.clear();
       _backgroundSyncs.clear();
       _portfolioSeriesByAccount.clear();
-      _portfolioReturnsByAccount.clear();
-      _portfolioReturnAmountsByAccount.clear();
-      _portfolioCashOutByAccount.clear();
+      _portfolioReturnSeriesByAccount.clear();
+      _portfolioCashFlowsByAccount.clear();
       _portfolioLoading = true;
       years = selectedYears;
       months = selectedMonths;
@@ -1772,12 +1744,7 @@ class ChartsPageState extends State<ChartsPage>
           );
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-        desktop ? 24 : 8,
-        8,
-        desktop ? 24 : 8,
-        4,
-      ),
+      padding: EdgeInsets.fromLTRB(desktop ? 24 : 8, 8, desktop ? 24 : 8, 4),
       child: SearchBar(
         key: const Key('chart-search-bar'),
         constraints: const BoxConstraints(
@@ -2039,18 +2006,15 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   List<Widget> _buildStockContent(SettingsState settings) {
-    final intradaySnapshot = AsyncSnapshot.withData(
-      ConnectionState.done,
-      [
-        for (final bar in _intradaySeries?.candles ?? <IbkrHistoricalCandle>[])
-          CandleTicker(
-            candle: CandlesCompanion(
-              date: Value(bar.date.toLocal()),
-              close: Value(bar.close),
-            ),
+    final intradaySnapshot = AsyncSnapshot.withData(ConnectionState.done, [
+      for (final bar in _intradaySeries?.candles ?? <IbkrHistoricalCandle>[])
+        CandleTicker(
+          candle: CandlesCompanion(
+            date: Value(bar.date.toLocal()),
+            close: Value(bar.close),
           ),
-      ],
-    );
+        ),
+    ]);
     return [
       if (_usesIntraday)
         _buildStockChart(context, intradaySnapshot, settings)
@@ -2291,9 +2255,7 @@ class ChartsPageState extends State<ChartsPage>
         ? Icons.radio_button_checked
         : Icons.radio_button_unchecked;
     final label = context.l10n.text('Rolling average');
-    void toggle() => setState(
-          () => _showRollingAverage = !_showRollingAverage,
-        );
+    void toggle() => setState(() => _showRollingAverage = !_showRollingAverage);
 
     return Semantics(
       key: const Key('chart-rolling-average'),
@@ -2322,8 +2284,10 @@ class ChartsPageState extends State<ChartsPage>
                   borderRadius: BorderRadius.circular(12),
                   onTap: toggle,
                   child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2344,11 +2308,7 @@ class ChartsPageState extends State<ChartsPage>
                                 ),
                               ),
                             ),
-                            Icon(
-                              icon,
-                              size: 14,
-                              color: colors.primary,
-                            ),
+                            Icon(icon, size: 14, color: colors.primary),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -2419,6 +2379,7 @@ class ChartsPageState extends State<ChartsPage>
                   symbol: symbol,
                   periodStart: _requiredCandleStart(),
                   periodDays: days,
+                  visibleRange: _customChartRange,
                   intraday:
                       _usesIntraday && _selectedFavorites.contains(symbol),
                   intradaySeries: _favoriteIntraday[symbol],
@@ -2444,19 +2405,19 @@ class ChartsPageState extends State<ChartsPage>
         '${widget.isActive}|$_selectedFavorites|$years|$months|$days';
     if (_favoriteChartStreamKey != streamKey) {
       _favoriteChartStreamKey = streamKey;
-      _favoriteChartStream = widget.isActive &&
-              !_usesIntraday &&
-              _selectedFavorites.isNotEmpty
-          ? (marketDataDatabase.candles.select()
-                ..where(
-                  (candle) =>
-                      candle.symbol
-                          .isIn(_selectedFavorites.map(canonicalMarketSymbol)) &
-                      candle.date.isBiggerThanValue(_requiredCandleStart()),
-                )
-                ..orderBy([(candle) => OrderingTerm.asc(candle.date)]))
-              .watch()
-          : null;
+      _favoriteChartStream =
+          widget.isActive && !_usesIntraday && _selectedFavorites.isNotEmpty
+              ? (marketDataDatabase.candles.select()
+                    ..where(
+                      (candle) =>
+                          candle.symbol.isIn(
+                            _selectedFavorites.map(canonicalMarketSymbol),
+                          ) &
+                          candle.date.isBiggerThanValue(_requiredCandleStart()),
+                    )
+                    ..orderBy([(candle) => OrderingTerm.asc(candle.date)]))
+                  .watch()
+              : null;
     }
     return StreamBuilder<List<StoredCandle>>(
       key: ValueKey(streamKey),
@@ -2591,10 +2552,17 @@ class ChartsPageState extends State<ChartsPage>
       final color = _selectedFavorites.contains(entry.key)
           ? _favoriteColor(entry.key)
           : accountColors[accountIndex.clamp(0, accountColors.length - 1)];
+      final returnByDate = {
+        for (final point
+            in _portfolioReturnSeriesByAccount[entry.key] ?? <_DateValue>[])
+          point.date: point.value,
+      };
+      final comparisonValues = [
+        for (final point in entry.value)
+          returnByDate[point.date] ?? point.value,
+      ];
       final displayValues = scaleForComparison
-          ? scalePortfolioSeriesForComparison(
-              entry.value.map((point) => point.value),
-            )
+          ? scalePortfolioSeriesForComparison(comparisonValues)
           : entry.value.map((point) => point.value).toList(growable: false);
       chartSeries.add(
         MarketLineChartSeries(
@@ -2608,7 +2576,7 @@ class ChartsPageState extends State<ChartsPage>
                 dateIndex[entry.value[index].date]!.toDouble(),
                 displayValues[index],
                 comparisonValue:
-                    scaleForComparison ? entry.value[index].value : null,
+                    scaleForComparison ? comparisonValues[index] : null,
                 column: dateIndex[entry.value[index].date]!,
               ),
           ],
@@ -2658,7 +2626,12 @@ class ChartsPageState extends State<ChartsPage>
                 )
               : fmtCurrency(actualValue ?? mark.value);
           final dateLabel = date == null ? '' : formatter.format(date);
-          return dateLabel.isEmpty ? valueLabel : '$valueLabel · $dateLabel';
+          final returnLabel = scaleForComparison
+              ? '${mark.value >= 0 ? '+' : ''}${mark.value.toStringAsFixed(2)}% · '
+              : '';
+          return dateLabel.isEmpty
+              ? '$returnLabel$valueLabel'
+              : '$returnLabel$valueLabel · $dateLabel';
         },
         curveLines: settings.curveLines,
         curveSmoothness: settings.curveSmoothness,
@@ -2741,19 +2714,38 @@ class ChartsPageState extends State<ChartsPage>
   ) {
     final idx = accounts.indexOf(accountName);
     final dotColor = accountColors[idx.clamp(0, accountColors.length - 1)];
-    final brokerReturn = _portfolioReturnsByAccount[accountName];
-    final brokerReturnAmount = _portfolioReturnAmountsByAccount[accountName];
-    final isCashOut = _portfolioCashOutByAccount[accountName] ?? false;
-    final hasHistory = brokerReturn != null || series.length > 1;
-    final pct = brokerReturn ??
-        (hasHistory
-            ? safePercentChange(series.first.value, series.last.value)
-            : 0.0);
+    final accountReturns = _portfolioReturnSeriesByAccount[accountName];
+    final visibleSeries = _visibleValues(series);
+    final visibleReturns = _visibleValues(accountReturns ?? <_DateValue>[]);
+    final hasHistory = accountReturns != null
+        ? visibleReturns.length > 1
+        : visibleSeries.length > 1;
+    final pct = hasHistory
+        ? safePercentChange(
+            accountReturns != null
+                ? visibleReturns.first.value
+                : visibleSeries.first.value,
+            accountReturns != null
+                ? visibleReturns.last.value
+                : visibleSeries.last.value,
+          )
+        : 0.0;
     final returnColor = hasHistory
         ? (pct >= 0 ? Colors.green : Colors.redAccent)
         : Theme.of(context).colorScheme.onSurfaceVariant;
-    final change =
-        brokerReturnAmount ?? (series.last.value - series.first.value);
+    final flows = _portfolioCashFlowsByAccount[accountName];
+    final externalFlows = flows == null || visibleSeries.length < 2
+        ? 0.0
+        : flows.entries
+            .where(
+              (entry) =>
+                  entry.key.isAfter(visibleSeries.first.date) &&
+                  !entry.key.isAfter(visibleSeries.last.date),
+            )
+            .fold<double>(0.0, (total, entry) => total + entry.value);
+    final change = visibleSeries.length > 1
+        ? visibleSeries.last.value - visibleSeries.first.value - externalFlows
+        : 0.0;
     final isHidden = _hiddenAccounts.contains(accountName);
     final accountManager = context.read<AccountManager>();
     final cachedPortfolio = accountManager.portfolioCacheFor(accountName);
@@ -2777,13 +2769,7 @@ class ChartsPageState extends State<ChartsPage>
 
     Widget returnLabel() => Text(
           (hasHistory
-              ? <String>[
-                  if (pct >= 0) '+',
-                  pct.toStringAsFixed(2),
-                  '%',
-                  if (brokerReturn != null)
-                    isCashOut ? ' · Total P/L' : ' · TWR',
-                ].join()
+              ? <String>[if (pct >= 0) '+', pct.toStringAsFixed(2), '%'].join()
               : context.l10n.text('History unavailable')),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -2862,11 +2848,7 @@ class ChartsPageState extends State<ChartsPage>
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    valueText,
-                    const SizedBox(height: 2),
-                    changeText,
-                  ],
+                  children: [valueText, const SizedBox(height: 2), changeText],
                 ),
               ),
             ),
@@ -2927,10 +2909,7 @@ class _PeriodChip extends StatelessWidget {
             child: Center(
               child: AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 200),
-                style: TextStyle(
-                  color: colorScheme.onSurface,
-                  fontSize: 13,
-                ),
+                style: TextStyle(color: colorScheme.onSurface, fontSize: 13),
                 child: Text(label),
               ),
             ),
@@ -2980,10 +2959,7 @@ class _ActionChip extends StatelessWidget {
                 const SizedBox(width: 6),
                 Text(
                   label,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: colorScheme.onSurface,
-                  ),
+                  style: TextStyle(fontSize: 13, color: colorScheme.onSurface),
                 ),
               ],
             ),
@@ -3000,6 +2976,7 @@ class _FavoriteCard extends StatelessWidget {
   final String symbol;
   final DateTime periodStart;
   final int periodDays;
+  final (DateTime, DateTime)? visibleRange;
   final bool intraday;
   final IntradaySeries? intradaySeries;
   final bool isActive;
@@ -3011,6 +2988,7 @@ class _FavoriteCard extends StatelessWidget {
     required this.symbol,
     required this.periodStart,
     required this.periodDays,
+    this.visibleRange,
     required this.intraday,
     this.intradaySeries,
     required this.isActive,
@@ -3113,12 +3091,25 @@ class _FavoriteCard extends StatelessWidget {
                       if (candles == null || candles.isEmpty) {
                         return const SizedBox(height: 14, width: 14);
                       }
+                      final range = visibleRange;
+                      final visibleCandles = range == null
+                          ? candles
+                          : candles
+                              .where(
+                                (candle) =>
+                                    !candle.date.isBefore(range.$1) &&
+                                    !candle.date.isAfter(range.$2),
+                              )
+                              .toList();
+                      if (visibleCandles.isEmpty) {
+                        return const SizedBox(height: 14, width: 14);
+                      }
                       final centDivisor = symbolCentDivisor(symbol);
-                      final price = candles.first.close / centDivisor;
-                      final pct = candles.length > 1
+                      final price = visibleCandles.first.close / centDivisor;
+                      final pct = visibleCandles.length > 1
                           ? safePercentChange(
-                              candles.last.close,
-                              candles.first.close,
+                              visibleCandles.last.close,
+                              visibleCandles.first.close,
                             )
                           : null;
                       final changeColor =
