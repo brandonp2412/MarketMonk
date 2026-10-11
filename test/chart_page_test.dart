@@ -472,8 +472,8 @@ void main() {
         'ibkrAccountConfigs':
             '{"Default":{"enabled":true,"baseUrl":"https://ibkr.example.test","token":"secret-token"}}',
         'chartPeriodYears': 0,
-        'chartPeriodMonths': 0,
-        'chartPeriodDays': 5,
+        'chartPeriodMonths': 1,
+        'chartPeriodDays': 0,
       });
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(1200, 1000);
@@ -534,7 +534,7 @@ void main() {
           ),
         ),
       );
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       final chart =
           tester.widget<MarketLineChart>(find.byType(MarketLineChart));

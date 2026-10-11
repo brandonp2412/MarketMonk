@@ -1324,7 +1324,8 @@ class ChartsPageState extends State<ChartsPage>
         currentValueUsd.isFinite &&
         currentValueUsd > 0 &&
         points.isNotEmpty) {
-      final snapshotDate = DateTime(asOfDate.year, asOfDate.month, asOfDate.day);
+      final snapshotDate =
+          DateTime(asOfDate.year, asOfDate.month, asOfDate.day);
       if (snapshotDate.isAfter(points.last.date)) {
         points.add(_DateValue(snapshotDate, currentValueUsd));
       }

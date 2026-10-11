@@ -113,7 +113,9 @@ class IntradayMarketData {
         final slowAt = _slowPortfolioBatchAt[(config, days)];
         final batchSlow = slowAt != null &&
             _now().difference(slowAt) < const Duration(minutes: 5);
-        if (config.isConfigured && !batchSlow && (!batchFresh || forceRefresh)) {
+        if (config.isConfigured &&
+            !batchSlow &&
+            (!batchFresh || forceRefresh)) {
           try {
             final result = await _ibkrFetch(config, canonicalSymbol, days)
                 .timeout(_brokerTimeout);
@@ -153,8 +155,7 @@ class IntradayMarketData {
     try {
       return await backgroundNetworkCoordinator
           .coalesce('market.intradayPortfolio', (this, config, days), () async {
-        final series =
-            await fetch(config, days).timeout(_brokerTimeout);
+        final series = await fetch(config, days).timeout(_brokerTimeout);
         final fetchedAt = _now();
         _slowPortfolioBatchAt.remove((config, days));
         for (final item in series) {
