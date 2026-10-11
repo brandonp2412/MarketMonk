@@ -1195,11 +1195,8 @@ class HoldingsPageState extends State<HoldingsPage>
             child: Card(
               margin: EdgeInsets.zero,
               clipBehavior: Clip.antiAlias,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final tableWidth = constraints.maxWidth < 1240
-                      ? 1240.0
-                      : constraints.maxWidth;
+              child: Builder(
+                builder: (context) {
                   return Scrollbar(
                     key: const Key('desktop-holdings-horizontal-scrollbar'),
                     controller: _desktopTableHorizontalScrollController,
@@ -1210,8 +1207,8 @@ class HoldingsPageState extends State<HoldingsPage>
                       key: const Key('desktop-holdings-horizontal-scroll'),
                       controller: _desktopTableHorizontalScrollController,
                       scrollDirection: Axis.horizontal,
-                      child: SizedBox(
-                        width: tableWidth,
+                      child: Align(
+                        alignment: Alignment.topLeft,
                         child: Scrollbar(
                           controller: _desktopTableScrollController,
                           child: SingleChildScrollView(
@@ -1238,7 +1235,7 @@ class HoldingsPageState extends State<HoldingsPage>
                               columnSpacing: 24,
                               columns: [
                                 DataColumn(
-                                  columnWidth: const FixedColumnWidth(280),
+                                  columnWidth: const IntrinsicColumnWidth(),
                                   label: Text(context.l10n.text('Holding')),
                                   onSort: (_, __) =>
                                       _setDesktopSort(_HoldingsSort.symbol),

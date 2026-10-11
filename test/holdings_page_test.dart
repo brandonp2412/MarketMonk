@@ -180,8 +180,8 @@ void main() {
     expect(tester.takeException(), null);
   });
 
-  for (final width in [879.0, 960.0]) {
-    testWidgets('desktop holdings at ${width}px shows all scrollable columns',
+  for (final width in [879.0, 960.0, 1400.0, 1920.0]) {
+    testWidgets('desktop holdings at ${width}px sizes holding to its content',
         (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = Size(width, 900);
@@ -239,6 +239,17 @@ void main() {
             tester.getTopLeft(find.text('Holding')).dx,
         lessThan(350),
       );
+      expect(
+        tester
+            .widget<DataTable>(find.byType(DataTable))
+            .columns
+            .first
+            .columnWidth,
+        isA<IntrinsicColumnWidth>(),
+      );
+      final gapAfterHolding = tester.getTopLeft(find.text('Shares')).dx -
+          tester.getTopRight(find.text('VANGUARD S&P 500 ETF')).dx;
+      expect(gapAfterHolding, inInclusiveRange(0, 60));
       final marketValueMetric = find.descendant(
         of: find.byKey(const Key('desktop-holdings-metrics')),
         matching: find.text('Market value'),
@@ -247,10 +258,13 @@ void main() {
         tester.getTopLeft(marketValueMetric).dy,
         tester.getTopLeft(find.text('Cost basis')).dy,
       );
-      expect(
-        tester.getTopLeft(find.text('Open positions')).dy,
-        greaterThan(tester.getTopLeft(marketValueMetric).dy),
-      );
+      final positionsDy = tester.getTopLeft(find.text('Open positions')).dy;
+      final marketValueDy = tester.getTopLeft(marketValueMetric).dy;
+      if (width < 1100) {
+        expect(positionsDy, greaterThan(marketValueDy));
+      } else {
+        expect((positionsDy - marketValueDy).abs(), lessThan(24));
+      }
 
       final horizontalScrollbar = tester.widget<Scrollbar>(
         find.byKey(const Key('desktop-holdings-horizontal-scrollbar')),
@@ -262,19 +276,26 @@ void main() {
       expect(horizontalScroll.scrollDirection, Axis.horizontal);
       expect(horizontalScroll.controller?.hasClients, true);
       final controller = horizontalScroll.controller!;
-      expect(controller.position.maxScrollExtent, greaterThan(0));
-      expect(tester.getSize(find.byType(DataTable)).width, greaterThan(1200));
-      final initialOffset = controller.offset;
-      await tester.drag(
-        find.byKey(const Key('desktop-holdings-horizontal-scroll')),
-        const Offset(-360, 0),
-      );
-      await tester.pumpAndSettle();
-      expect(controller.offset, greaterThan(initialOffset));
+      if (width < 1100) {
+        expect(controller.position.maxScrollExtent, greaterThan(0));
+        expect(
+          tester.getSize(find.byType(DataTable)).width,
+          greaterThan(width),
+        );
+        final initialOffset = controller.offset;
+        await tester.drag(
+          find.byKey(const Key('desktop-holdings-horizontal-scroll')),
+          const Offset(-360, 0),
+        );
+        await tester.pumpAndSettle();
+        expect(controller.offset, greaterThan(initialOffset));
+        controller.jumpTo(controller.position.maxScrollExtent);
+        await tester.pumpAndSettle();
+      } else {
+        expect(controller.position.maxScrollExtent, 0);
+        expect(tester.getSize(find.byType(DataTable)).width, lessThan(width));
+      }
       expect(tester.takeException(), null);
-
-      controller.jumpTo(controller.position.maxScrollExtent);
-      await tester.pumpAndSettle();
       expect(tester.getCenter(find.text('Return')).dx, lessThan(width));
       await tester.tap(find.text('Return'));
       await tester.pump();
