@@ -80,6 +80,7 @@ class PortfolioPageState extends State<PortfolioPage>
   int? touchedIndex;
   final _filterController = TextEditingController();
   final _allocationScrollController = ScrollController();
+  final _returnScrollController = ScrollController();
   String _filterText = '';
   String _lastAccount = '';
   int _lastIbkrRefreshVersion = -1;
@@ -163,6 +164,7 @@ class PortfolioPageState extends State<PortfolioPage>
     WidgetsBinding.instance.removeObserver(this);
     _filterController.dispose();
     _allocationScrollController.dispose();
+    _returnScrollController.dispose();
     super.dispose();
   }
 
@@ -1203,21 +1205,21 @@ class PortfolioPageState extends State<PortfolioPage>
             _buildRefreshWarning(context),
           ],
           const SizedBox(height: 20),
-          Row(
-            children: [
+          desktopMetricGrid(
+            key: const Key('desktop-portfolio-metrics'),
+            minCardWidth: 270,
+            cards: [
               _DesktopPortfolioMetric(
                 label: context.l10n.text('Account value'),
                 value: accountValue,
                 icon: Icons.account_balance_wallet_outlined,
               ),
-              const SizedBox(width: 12),
               _DesktopPortfolioMetric(
                 label: context.l10n.text('Market value'),
                 value: fmtCurrency(totalValue),
                 detail: context.l10n.text('Open stock positions'),
                 icon: Icons.show_chart_rounded,
               ),
-              const SizedBox(width: 12),
               _DesktopPortfolioMetric(
                 label: context.l10n.text(
                   isCashOut ? 'Total P/L' : 'Unrealized P/L',
@@ -1230,7 +1232,6 @@ class PortfolioPageState extends State<PortfolioPage>
                     ? Icons.trending_up_rounded
                     : Icons.trending_down_rounded,
               ),
-              const SizedBox(width: 12),
               _DesktopPortfolioMetric(
                 label: context.l10n.text('Positions'),
                 value: positions.length.toString(),
@@ -1272,6 +1273,8 @@ class PortfolioPageState extends State<PortfolioPage>
                             child: LayoutBuilder(
                               builder: (context, constraints) {
                                 final holdingsList = Scrollbar(
+                                  key:
+                                      const Key('desktop-allocation-scrollbar'),
                                   controller: _allocationScrollController,
                                   child: ListView.separated(
                                     controller: _allocationScrollController,
@@ -1383,18 +1386,24 @@ class PortfolioPageState extends State<PortfolioPage>
                           ),
                           const SizedBox(height: 14),
                           Expanded(
-                            child: ListView.separated(
-                              itemCount: byReturn.length,
-                              separatorBuilder: (_, __) => Divider(
-                                height: 1,
-                                color: colorScheme.outlineVariant.withValues(
-                                  alpha: 0.7,
+                            child: Scrollbar(
+                              key: const Key('desktop-return-scrollbar'),
+                              controller: _returnScrollController,
+                              child: ListView.separated(
+                                controller: _returnScrollController,
+                                padding: const EdgeInsets.only(right: 12),
+                                itemCount: byReturn.length,
+                                separatorBuilder: (_, __) => Divider(
+                                  height: 1,
+                                  color: colorScheme.outlineVariant.withValues(
+                                    alpha: 0.7,
+                                  ),
                                 ),
+                                itemBuilder: (context, index) {
+                                  final position = byReturn[index];
+                                  return _DesktopReturnRow(position: position);
+                                },
                               ),
-                              itemBuilder: (context, index) {
-                                final position = byReturn[index];
-                                return _DesktopReturnRow(position: position);
-                              },
                             ),
                           ),
                         ],

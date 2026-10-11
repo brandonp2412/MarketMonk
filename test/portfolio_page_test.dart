@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
@@ -417,16 +418,29 @@ void main() {
       ),
       findsNothing,
     );
-    final scrollbar = tester.widget<Scrollbar>(find.byType(Scrollbar));
+    final scrollbar = tester.widget<Scrollbar>(
+      find.byKey(const Key('desktop-allocation-scrollbar')),
+    );
     expect(scrollbar.controller == null, false);
     expect(scrollbar.controller!.hasClients, true);
     final allocationList = tester.widget<ListView>(
       find.descendant(
-        of: find.byType(Scrollbar),
+        of: find.byKey(const Key('desktop-allocation-scrollbar')),
         matching: find.byType(ListView),
       ),
     );
     expect(allocationList.padding, const EdgeInsets.only(right: 12));
+    final returnScrollbar = tester.widget<Scrollbar>(
+      find.byKey(const Key('desktop-return-scrollbar')),
+    );
+    expect(returnScrollbar.controller?.hasClients, true);
+    final returnList = tester.widget<ListView>(
+      find.descendant(
+        of: find.byKey(const Key('desktop-return-scrollbar')),
+        matching: find.byType(ListView),
+      ),
+    );
+    expect(returnList.padding, allocationList.padding);
     final pieFinder = find.byType(MarketDonutChart).first;
     final pie = tester.widget<MarketDonutChart>(pieFinder);
     expect(pie.radius, 75);
@@ -435,6 +449,50 @@ void main() {
         .dy;
     final pieTop = tester.getTopLeft(pieFinder).dy;
     expect(pieTop - subtitleBottom, greaterThanOrEqualTo(28));
+    expect(tester.takeException(), null);
+  });
+
+  testWidgets('desktop portfolio summary cards keep readable widths', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1000, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({});
+    final accounts = await configuredAccounts();
+    await accounts.cachePortfolio(
+      'Default',
+      [cachedPosition()],
+      const IbkrAccountValue(value: 5500, currency: 'USD'),
+    );
+    final pending = Completer<IbkrPortfolioSnapshot>();
+    await tester.pumpWidget(
+      app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const Key('desktop-portfolio-metrics')), findsOneWidget);
+    expect(
+      (tester.getTopLeft(find.text('Account value')).dy -
+              tester.getTopLeft(find.text('Market value')).dy)
+          .abs(),
+      lessThan(24),
+    );
+    expect(
+      tester.getTopLeft(find.text('Positions')).dy,
+      greaterThan(tester.getTopLeft(find.text('Account value')).dy),
+    );
+    expect(
+      tester
+          .renderObject<RenderParagraph>(
+            find.text('Open stock positions'),
+          )
+          .didExceedMaxLines,
+      false,
+    );
     expect(tester.takeException(), null);
   });
 

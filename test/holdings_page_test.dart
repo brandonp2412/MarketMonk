@@ -227,6 +227,19 @@ void main() {
     expect(find.text('Price'), findsNothing);
     expect(find.text('P/L'), findsOneWidget);
     expect(find.text('Return'), findsOneWidget);
+    expect(find.byKey(const Key('desktop-holdings-metrics')), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Market value')).dy,
+      tester.getTopLeft(find.text('Cost basis')).dy,
+    );
+    expect(
+      tester.getTopLeft(find.text('Open positions')).dy,
+      greaterThan(tester.getTopLeft(find.text('Market value')).dy),
+    );
+    expect(
+      tester.getSize(find.byType(DataTable)).width,
+      greaterThanOrEqualTo(900),
+    );
     expect(tester.takeException(), null);
 
     await tester.tap(find.text('Return'));

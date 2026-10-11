@@ -1145,37 +1145,45 @@ class HoldingsPageState extends State<HoldingsPage>
       child: Column(
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _desktopMetric(
-                context,
-                label: context.l10n.text('Market value'),
-                value: fmtCurrency(totalValue),
-              ),
-              const SizedBox(width: 12),
-              _desktopMetric(
-                context,
-                label: context.l10n.text('Cost basis'),
-                value: fmtCurrency(totalCost),
-              ),
-              const SizedBox(width: 12),
-              _desktopMetric(
-                context,
-                label: context.l10n.text(
-                  cashOutSummary == null ? 'Unrealized P/L' : 'Total P/L',
+              Expanded(
+                child: desktopMetricGrid(
+                  key: const Key('desktop-holdings-metrics'),
+                  minCardWidth: 235,
+                  cards: [
+                    _desktopMetric(
+                      context,
+                      label: context.l10n.text('Market value'),
+                      value: fmtCurrency(totalValue),
+                    ),
+                    _desktopMetric(
+                      context,
+                      label: context.l10n.text('Cost basis'),
+                      value: fmtCurrency(totalCost),
+                    ),
+                    _desktopMetric(
+                      context,
+                      label: context.l10n.text(
+                        cashOutSummary == null ? 'Unrealized P/L' : 'Total P/L',
+                      ),
+                      value:
+                          '${totalUnrealized >= 0 ? '+' : ''}${fmtCurrency(totalUnrealized)}',
+                      detail:
+                          '${totalUnrealizedPct >= 0 ? '+' : ''}${totalUnrealizedPct.toStringAsFixed(2)}%',
+                      valueColor: totalUnrealized >= 0
+                          ? Colors.green
+                          : Colors.redAccent,
+                    ),
+                    _desktopMetric(
+                      context,
+                      label: context.l10n.text('Open positions'),
+                      value: open.length.toString(),
+                      detail:
+                          '$winners positive · ${open.length - winners} negative',
+                    ),
+                  ],
                 ),
-                value:
-                    '${totalUnrealized >= 0 ? '+' : ''}${fmtCurrency(totalUnrealized)}',
-                detail:
-                    '${totalUnrealizedPct >= 0 ? '+' : ''}${totalUnrealizedPct.toStringAsFixed(2)}%',
-                valueColor:
-                    totalUnrealized >= 0 ? Colors.green : Colors.redAccent,
-              ),
-              const SizedBox(width: 12),
-              _desktopMetric(
-                context,
-                label: context.l10n.text('Open positions'),
-                value: open.length.toString(),
-                detail: '$winners positive · ${open.length - winners} negative',
               ),
               const SizedBox(width: 4),
               Tooltip(
@@ -1204,7 +1212,9 @@ class HoldingsPageState extends State<HoldingsPage>
                         }
                       : sortColumnIndex;
                   final tableWidth = compactTable
-                      ? constraints.maxWidth
+                      ? constraints.maxWidth < 900
+                          ? 900.0
+                          : constraints.maxWidth
                       : constraints.maxWidth < 1240
                           ? 1240.0
                           : constraints.maxWidth;
