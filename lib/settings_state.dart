@@ -13,7 +13,8 @@ import 'package:market_monk/utils.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/sqlite_settings.dart';
 
-const _defaultSeedColor = Color(0xFF2B7A78);
+/// Golden monk icon color used as the default app theme seed.
+const defaultSeedColor = Color(0xFFFFB52E);
 
 int _colorToInt(Color color) =>
     ((color.a * 255).round() << 24) |
@@ -68,7 +69,7 @@ class SettingsState extends ChangeNotifier {
   bool curveLines = false;
   double curveSmoothness = 0.35;
   String dateFormat = 'd/M/yy';
-  Color seedColor = _defaultSeedColor;
+  Color seedColor = defaultSeedColor;
   String displayCurrency = 'USD';
   List<String> visibleCurrencies = ['USD'];
   bool showMarketClosed = false;
@@ -173,7 +174,7 @@ class SettingsState extends ChangeNotifier {
     curveSmoothness = prefs.getDouble('curveSmoothness') ?? 0.35;
     dateFormat = prefs.getString('dateFormat') ?? 'd/M/yy';
     final colorVal = prefs.getInt('seedColor');
-    seedColor = colorVal != null ? Color(colorVal) : _defaultSeedColor;
+    seedColor = colorVal != null ? Color(colorVal) : defaultSeedColor;
 
     final homeCurrency = await _detectLocalCurrency();
     final savedCurrencies = prefs.getStringList('visibleCurrencies');

@@ -1569,7 +1569,8 @@ class _IbkrSettingsDialogState extends State<_IbkrSettingsDialog> {
 
 class _ColorPicker extends StatelessWidget {
   static const _colors = [
-    Color(0xFF2B7A78), // default teal
+    defaultSeedColor,
+    Color(0xFF2B7A78), // teal
     Color(0xFF6750A4), // purple
     Color(0xFF1976D2), // blue
     Color(0xFF388E3C), // green
@@ -1619,7 +1620,13 @@ class _ColorPicker extends StatelessWidget {
                     ),
                   ),
                   child: isSelected
-                      ? const Icon(Icons.check, color: Colors.white, size: 20)
+                      ? Icon(
+                          Icons.check,
+                          color: color.computeLuminance() > 0.5
+                              ? Colors.black
+                              : Colors.white,
+                          size: 20,
+                        )
                       : null,
                 ),
               );
