@@ -282,6 +282,47 @@ void main() {
     expect(requests, 6);
   });
 
+  testWidgets('changing periods never claims holdings are missing trades', (
+    tester,
+  ) async {
+    await mountChart(
+      tester,
+      IntradayMarketData(yahooGet: (_) async => _prices(100, currency: 'USD')),
+      initialSymbol: null,
+      configureAccounts: (accounts) async {
+        await accounts.setIbkrConfig(
+          'Default',
+          const IbkrAccountConfig(enabled: true),
+        );
+        await accounts.cachePortfolio(
+          'Default',
+          [
+            Position(
+              symbol: 'AAPL',
+              name: 'Apple',
+              nativeCurrency: 'USD',
+              netShares: 2,
+              avgCost: 50,
+              currentPrice: 100,
+              firstBuyDate: DateTime(2025),
+              lastBuyDate: DateTime(2026),
+            ),
+          ],
+          const IbkrAccountValue(value: 1000, currency: 'USD'),
+        );
+      },
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(MarketLineChart), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('chart-period-2y')));
+    await tester.pump();
+    expect(find.text('No trades yet'), findsNothing);
+    await tester.pumpAndSettle();
+    expect(find.text('No trades yet'), findsNothing);
+    expect(find.text('Historical prices unavailable'), findsWidgets);
+  });
+
   testWidgets('portfolio starts independent holding requests concurrently', (
     tester,
   ) async {

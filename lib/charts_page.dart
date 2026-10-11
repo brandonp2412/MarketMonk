@@ -958,9 +958,8 @@ class ChartsPageState extends State<ChartsPage>
       if (cachedPreviews.isNotEmpty) {
         _portfolioSeriesByAccount = Map.of(newSeries);
       }
-      _portfolioLoading = _portfolioSeriesByAccount.values.every(
-        (series) => series.isEmpty,
-      );
+      _portfolioLoading = cachedPreviews.isEmpty &&
+          _portfolioSeriesByAccount.values.every((series) => series.isEmpty);
     });
 
     bool isCurrent() =>
@@ -2749,29 +2748,49 @@ class ChartsPageState extends State<ChartsPage>
       final allEmpty = _portfolioSeriesByAccount.values.every(
         (series) => series.isEmpty,
       );
+      final hasCachedHoldings = accounts.any(
+        (name) =>
+            accountManager.portfolioCacheFor(name)?.positions.isNotEmpty ??
+            false,
+      );
+      final pricesUnavailable = allEmpty && hasCachedHoldings;
       return SizedBox(
         height: height,
         child: AppEmptyState(
           icon: allEmpty
               ? Icons.candlestick_chart_rounded
               : Icons.visibility_off_rounded,
-          title: allEmpty
-              ? context.l10n.text('No trades yet')
-              : context.l10n.text('All portfolios are hidden'),
-          message: allEmpty
-              ? context.l10n.text(
-                  'Search for a stock to start building your portfolio history.',
-                )
-              : context.l10n.text(
-                  'Show your portfolios again to restore the chart.',
-                ),
-          actionLabel: allEmpty
-              ? context.l10n.text('Search stocks')
-              : context.l10n.text('Show all'),
-          actionIcon:
-              allEmpty ? Icons.search_rounded : Icons.visibility_rounded,
+          title: pricesUnavailable
+              ? context.l10n.text('Historical prices unavailable')
+              : allEmpty
+                  ? context.l10n.text('No trades yet')
+                  : context.l10n.text('All portfolios are hidden'),
+          message: pricesUnavailable
+              ? context.l10n.text('No market data found')
+              : allEmpty
+                  ? context.l10n.text(
+                      'Search for a stock to start building your portfolio history.',
+                    )
+                  : context.l10n.text(
+                      'Show your portfolios again to restore the chart.',
+                    ),
+          actionLabel: pricesUnavailable
+              ? context.l10n.text('Refresh')
+              : allEmpty
+                  ? context.l10n.text('Search stocks')
+                  : context.l10n.text('Show all'),
+          actionIcon: pricesUnavailable
+              ? Icons.refresh_rounded
+              : allEmpty
+                  ? Icons.search_rounded
+                  : Icons.visibility_rounded,
           onAction: () {
-            if (allEmpty) {
+            if (pricesUnavailable) {
+              runDetachedTask(
+                _refreshCurrentChart(),
+                'Failed to refresh chart',
+              );
+            } else if (allEmpty) {
               setState(() => _mode = _ChartMode.searching);
               _searchFocus.requestFocus();
             } else {
