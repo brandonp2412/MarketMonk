@@ -519,6 +519,26 @@ class IbkrApiClient {
     );
   }
 
+  /// Loads all held stocks' intraday bars in one broker session.
+  Future<List<IbkrHistoricalSeries>> fetchIntradayPortfolio({int days = 1}) {
+    if (days != 1 && days != 5) throw ArgumentError.value(days, 'days');
+    return backgroundNetworkCoordinator
+        .coalesce('ibkr.intradayPortfolio', (config, days), () async {
+      final response = await _request(
+        '/v1/intraday/portfolio',
+        queryParameters: {'days': '$days'},
+      );
+      final body = _decodeJsonObject(response, '/v1/intraday/portfolio');
+      if (body['interval'] != (days == 1 ? '1m' : '15m')) {
+        throw StateError('IBKR returned an unexpected intraday interval');
+      }
+      return [
+        for (final raw in body['series'] as List<dynamic>)
+          IbkrHistoricalSeries.fromJson(raw as Map<String, dynamic>),
+      ];
+    });
+  }
+
   Map<String, dynamic> _decodeJsonObject(http.Response response, String path) {
     final body = response.body.trim();
     if (body.isEmpty) {

@@ -117,6 +117,10 @@ class FakeClient:
         result["candles"][0]["date"] = "2026-08-28T14:30:00+00:00"
         return result
 
+    def intraday_portfolio(self, days):
+        return {"series": [self.intraday("AAPL", days)], "errors": {},
+                "interval": "1m" if days == 1 else "15m"}
+
     def historical(self, symbol, years):
         return {
             "read_only": True,
@@ -354,6 +358,46 @@ class FakeNativeIb:
 
 
 class ProxyTests(unittest.TestCase):
+    def test_native_portfolio_intraday_reuses_one_connection_for_all_holdings(self):
+        class CountingIb(FakeNativeIb):
+            connects = 0
+            histories = 0
+            def connect(self, *args, **kwargs):
+                self.connects += 1
+                return super().connect(*args, **kwargs)
+            def portfolio(self, account):
+                first = super().portfolio(account)[0]
+                second = SimpleNamespace(**vars(first))
+                second.contract = SimpleNamespace(**vars(first.contract))
+                second.contract.symbol = "MSFT"
+                return [first, second]
+            def reqHistoricalData(self, *args, **kwargs):
+                self.histories += 1
+                return super().reqHistoricalData(*args, **kwargs)
+        fake = CountingIb()
+        client = NativeIbkrClient(config(backend="native"), ib_factory=lambda: fake)
+        result = client.intraday_portfolio(5)
+        self.assertEqual([item["symbol"] for item in result["series"]], ["AAPL", "MSFT"])
+        self.assertEqual(result["errors"], {})
+        self.assertEqual(fake.connects, 1)
+        self.assertEqual(fake.histories, 2)
+        self.assertTrue(fake.disconnected)
+
+    def test_web_portfolio_intraday_reads_accounts_and_positions_once(self):
+        class MultipleStocks(RecordingIbkrClient):
+            def _get(self, endpoint):
+                result = super()._get(endpoint)
+                if endpoint.endswith("/positions"):
+                    return result + [dict(result[0], description="MSFT", conid=123)]
+                return result
+        client = MultipleStocks()
+        result = client.intraday_portfolio(1)
+        self.assertEqual(len(result["series"]), 2)
+        self.assertEqual(client.endpoints.count("portfolio/accounts"), 1)
+        self.assertEqual(client.endpoints.count("portfolio2/U1234567/positions"), 1)
+        self.assertEqual(result["interval"], "1m")
+
+
     def test_native_requests_share_one_connection_at_a_time(self):
         from concurrent.futures import ThreadPoolExecutor
 
@@ -892,6 +936,20 @@ class ProxyTests(unittest.TestCase):
             body = json.loads(response.read())
             self.assertEqual(body["interval"], "1m" if days == 1 else "15m")
             self.assertEqual(body["candles"][0]["date"], "2026-08-28T14:30:00+00:00")
+
+        connection.request("GET", "/v1/intraday/portfolio?days=5")
+        response = connection.getresponse()
+        self.assertEqual(response.status, 401)
+        response.read()
+        for days in ("30", "bad", "1", "5"):
+            connection.request("GET", f"/v1/intraday/portfolio?days={days}",
+                               headers={"Authorization": f"Bearer {'x' * 32}"})
+            response = connection.getresponse()
+            self.assertEqual(response.status, 200 if days in ("1", "5") else 400)
+            body = json.loads(response.read())
+            if response.status == 200:
+                self.assertEqual(body["series"][0]["symbol"], "AAPL")
+                self.assertEqual(body["interval"], "1m" if days == "1" else "15m")
 
     def test_http_api_requires_bearer_and_returns_portfolio(self):
         server = ThreadingHTTPServer(

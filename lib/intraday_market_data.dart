@@ -42,7 +42,7 @@ class IntradaySeries {
   }
 }
 
-/// Loads short stock ranges from IBKR with Yahoo fallback and a minute cache.
+/// Loads short stock ranges from IBKR with Yahoo fallback and a five-minute cache.
 class IntradayMarketData {
   final Future<http.Response> Function(Uri) _yahooGet;
   final Future<IbkrHistoricalSeries> Function(
@@ -50,6 +50,9 @@ class IntradayMarketData {
     String,
     int,
   ) _ibkrFetch;
+  final Future<List<IbkrHistoricalSeries>> Function(IbkrAccountConfig, int)?
+      _ibkrPortfolioFetch;
+  final _portfolioBatchAt = <(IbkrAccountConfig, int), DateTime>{};
   final DateTime Function() _now;
   final _cache = <(String, int, IbkrAccountConfig),
       ({DateTime fetchedAt, IntradaySeries series})>{};
@@ -59,11 +62,18 @@ class IntradayMarketData {
     Future<http.Response> Function(Uri)? yahooGet,
     Future<IbkrHistoricalSeries> Function(IbkrAccountConfig, String, int)?
         ibkrFetch,
+    Future<List<IbkrHistoricalSeries>> Function(IbkrAccountConfig, int)?
+        ibkrPortfolioFetch,
     DateTime Function()? now,
   })  : _yahooGet = yahooGet ?? _getYahoo,
         _ibkrFetch = ibkrFetch ??
             ((config, symbol, days) =>
                 IbkrApiClient(config).fetchIntradayCandles(symbol, days: days)),
+        _ibkrPortfolioFetch = ibkrPortfolioFetch ??
+            (ibkrFetch == null
+                ? ((config, days) =>
+                    IbkrApiClient(config).fetchIntradayPortfolio(days: days))
+                : null),
         _now = now ?? DateTime.now;
 
   static Future<http.Response> _getYahoo(Uri uri) =>
@@ -84,7 +94,7 @@ class IntradayMarketData {
     final cached = _cache[key];
     if (!forceRefresh &&
         cached != null &&
-        _now().difference(cached.fetchedAt) < const Duration(minutes: 1)) {
+        _now().difference(cached.fetchedAt) < const Duration(minutes: 5)) {
       return Future.value(cached.series);
     }
     return backgroundNetworkCoordinator.coalesce<IntradaySeries>(
@@ -92,7 +102,10 @@ class IntradayMarketData {
       (this, key),
       () async {
         IntradaySeries? series;
-        if (config.isConfigured) {
+        final batchAt = _portfolioBatchAt[(config, days)];
+        final batchFresh = batchAt != null &&
+            _now().difference(batchAt) < const Duration(minutes: 5);
+        if (config.isConfigured && (!batchFresh || forceRefresh)) {
           try {
             final result = await _ibkrFetch(config, canonicalSymbol, days)
                 .timeout(const Duration(seconds: 45));
@@ -110,11 +123,52 @@ class IntradayMarketData {
           }
         }
         series ??= await _fetchYahoo(canonicalSymbol, days);
-        if (_cache.length >= 64) _cache.remove(_cache.keys.first);
+        if (_cache.length >= 256) _cache.remove(_cache.keys.first);
         _cache[key] = (fetchedAt: _now(), series: series);
         return series;
       },
     );
+  }
+
+  /// Seeds held-stock prices with one request, retaining compatibility with older proxies.
+  Future<bool> prefetchPortfolio(
+    IbkrAccountConfig config, {
+    required int days,
+    bool forceRefresh = false,
+  }) async {
+    final fetch = _ibkrPortfolioFetch;
+    if (!config.isConfigured || fetch == null) return false;
+    final previous = _portfolioBatchAt[(config, days)];
+    if (!forceRefresh &&
+        previous != null &&
+        _now().difference(previous) < const Duration(minutes: 5)) return true;
+    try {
+      return await backgroundNetworkCoordinator
+          .coalesce('market.intradayPortfolio', (this, config, days), () async {
+        final series =
+            await fetch(config, days).timeout(const Duration(seconds: 90));
+        final fetchedAt = _now();
+        for (final item in series) {
+          final normalized = IntradaySeries(
+            currency: item.currency,
+            source: 'IBKR',
+            candles: item.candles,
+          );
+          if (_cache.length >= 256) _cache.remove(_cache.keys.first);
+          _cache[(item.symbol.trim().toUpperCase(), days, config)] =
+              (fetchedAt: fetchedAt, series: normalized);
+        }
+        _portfolioBatchAt[(config, days)] = fetchedAt;
+        return true;
+      });
+    } catch (error, stackTrace) {
+      talker.handle(
+        error,
+        stackTrace,
+        'IBKR batch intraday unavailable; using individual requests',
+      );
+      return false;
+    }
   }
 
   Future<IntradaySeries> _fetchYahoo(String symbol, int days) =>

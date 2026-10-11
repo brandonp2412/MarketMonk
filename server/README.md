@@ -123,3 +123,5 @@ python3 -m unittest -v test_ibkr_proxy.py
 ```
 
 Native TWS requests share a connection lock for the full connect/read/disconnect cycle. This prevents overlapping portfolio and historical requests from opening simultaneous connections with the configured client ID, which TWS rejects with error 326.
+
+`GET /v1/intraday/portfolio?days=1|5` returns `series` for all held stocks plus per-symbol `errors`. It shares one native TWS session, or one Client Portal account/positions lookup, across the batch. Authentication and range validation match `/v1/intraday`; individual endpoints remain available for stock charts and older app versions.

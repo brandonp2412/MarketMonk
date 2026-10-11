@@ -206,11 +206,15 @@ class ClientPortalIbkrClient:
         return self.historical(symbol, 1, intraday_days=days)
 
     def historical(
-        self, symbol: str, years: int, *, intraday_days: int | None = None
+        self, symbol: str, years: int, *, intraday_days: int | None = None,
+        _positions=None,
     ) -> dict[str, Any]:
-        raw_account = self.ensure_account_visible()
-        account = quote(raw_account, safe="")
-        positions = self._get(f"portfolio2/{account}/positions")
+        if _positions is None:
+            raw_account = self.ensure_account_visible()
+            account = quote(raw_account, safe="")
+            positions = self._get(f"portfolio2/{account}/positions")
+        else:
+            positions = _positions
         if not isinstance(positions, list):
             raise IbkrError("IBKR returned an invalid position list")
         position = next(
@@ -269,6 +273,27 @@ class ClientPortalIbkrClient:
                 if intraday_days else {}
             ),
         }
+
+    def intraday_portfolio(self, days):
+        if days not in (1, 5):
+            raise IbkrError("intraday days must be 1 or 5")
+        account = quote(self.ensure_account_visible(), safe="")
+        positions = self._get(f"portfolio2/{account}/positions")
+        if not isinstance(positions, list):
+            raise IbkrError("IBKR returned an invalid position list")
+        series = []
+        errors = {}
+        for item in positions:
+            if str(item.get("secType", "")).upper() != "STK":
+                continue
+            symbol = str(item.get("description", "")).strip().upper()
+            try:
+                series.append(self.historical(symbol, 1, intraday_days=days,
+                                              _positions=positions))
+            except Exception as error:
+                errors[symbol] = str(error)
+        return {"read_only": True, "series": series, "errors": errors,
+                "interval": "1m" if days == 1 else "15m"}
 
     def performance(self, period: str) -> dict[str, Any]:
         performance_client = getattr(self, "_performance_client", None)
@@ -654,43 +679,67 @@ class NativeIbkrClient:
                 if not str(getattr(contract, "exchange", "")).strip():
                     contract.exchange = "SMART"
 
-                duration = f"{years} Y"
-                bar_size = "1 day"
-                if intraday_days is not None:
-                    duration = "1 D" if intraday_days == 1 else "1 W"
-                    bar_size = "1 min" if intraday_days == 1 else "15 mins"
-                bars = ib.reqHistoricalData(
-                    contract,
-                    endDateTime="",
-                    durationStr=duration,
-                    barSizeSetting=bar_size,
-                    whatToShow="TRADES",
-                    useRTH=True,
-                    formatDate=2 if intraday_days else 1,
-                    timeout=30,
-                )
-                if not bars:
-                    raise IbkrError(f"IBKR returned no historical candles for {symbol}")
-
-                currency = str(getattr(contract, "currency", "") or "USD").strip()
-                return {
-                    "read_only": True,
-                    "source": "native",
-                    "symbol": str(getattr(contract, "symbol", symbol)).strip(),
-                    "currency": currency,
-                    "candles": [
-                        _normalize_historical_bar(bar, intraday=intraday_days is not None)
-                        for bar in bars
-                    ],
-                    **(
-                        {"interval": "1m" if intraday_days == 1 else "15m"}
-                        if intraday_days else {}
-                    ),
-                }
+                return self._read_historical(ib, item, symbol, years, intraday_days)
             except IbkrError:
                 raise
             except Exception as error:
                 raise IbkrError(f"IBKR TWS API historical read failed: {error}") from error
+
+    def _read_historical(self, ib, item, symbol, years, intraday_days):
+        contract = item.contract
+        duration = f"{years} Y"
+        bar_size = "1 day"
+        if intraday_days is not None:
+            duration = "1 D" if intraday_days == 1 else "1 W"
+            bar_size = "1 min" if intraday_days == 1 else "15 mins"
+        bars = ib.reqHistoricalData(
+            contract,
+            endDateTime="",
+            durationStr=duration,
+            barSizeSetting=bar_size,
+            whatToShow="TRADES",
+            useRTH=True,
+            formatDate=2 if intraday_days else 1,
+            timeout=30,
+        )
+        if not bars:
+            raise IbkrError(f"IBKR returned no historical candles for {symbol}")
+
+        currency = str(getattr(contract, "currency", "") or "USD").strip()
+        return {
+            "read_only": True,
+            "source": "native",
+            "symbol": str(getattr(contract, "symbol", symbol)).strip(),
+            "currency": currency,
+            "candles": [
+                _normalize_historical_bar(bar, intraday=intraday_days is not None)
+                for bar in bars
+            ],
+            **(
+                {"interval": "1m" if intraday_days == 1 else "15m"}
+                if intraday_days else {}
+            ),
+        }
+
+    def intraday_portfolio(self, days):
+        if days not in (1, 5):
+            raise IbkrError("intraday days must be 1 or 5")
+        series = []
+        errors = {}
+        with self._session() as ib:
+            account = self._select_account(ib)
+            for item in ib.portfolio(account):
+                if str(getattr(item.contract, "secType", "")).upper() != "STK":
+                    continue
+                symbol = str(item.contract.symbol).strip().upper()
+                if not str(getattr(item.contract, "exchange", "")).strip():
+                    item.contract.exchange = "SMART"
+                try:
+                    series.append(self._read_historical(ib, item, symbol, 1, days))
+                except Exception as error:
+                    errors[symbol] = str(error)
+        return {"read_only": True, "series": series, "errors": errors,
+                "interval": "1m" if days == 1 else "15m"}
 
     def performance(self, period: str) -> dict[str, Any]:
         return self._performance_client.performance(period)
@@ -771,6 +820,17 @@ def make_handler(client: Any, token: str) -> type[BaseHTTPRequestHandler]:
                     self._json(200, {"status": "ok", "source": "ibkr"})
                 elif parsed.path == "/v1/portfolio":
                     self._json(200, client.portfolio())
+                elif parsed.path == "/v1/intraday/portfolio":
+                    query = parse_qs(parsed.query)
+                    try:
+                        days = int((query.get("days") or ["1"])[0])
+                    except ValueError:
+                        self._json(400, {"error": "invalid days"})
+                        return
+                    if days not in (1, 5):
+                        self._json(400, {"error": "intraday days must be 1 or 5"})
+                        return
+                    self._json(200, client.intraday_portfolio(days))
                 elif parsed.path == "/v1/intraday":
                     query = parse_qs(parsed.query)
                     symbol = (query.get("symbol") or [""])[0].strip()

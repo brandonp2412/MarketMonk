@@ -208,13 +208,19 @@ void main() {
 
   testWidgets('portfolio 5d weights every holding and offers intraday 1d',
       (tester) async {
+    var requests = 0;
+    var now = DateTime.utc(2026, 10, 10);
     final loader = IntradayMarketData(
-      yahooGet: (uri) async => _prices(
-        uri.path.endsWith('AAPL') ? 100 : 50,
-        currency: 'USD',
-        count: uri.queryParameters['range'] == '5d' ? 12 : 3,
-        intervalSeconds: uri.queryParameters['range'] == '5d' ? 900 : 60,
-      ),
+      now: () => now,
+      yahooGet: (uri) async {
+        requests++;
+        return _prices(
+          uri.path.endsWith('AAPL') ? 100 : 50,
+          currency: 'USD',
+          count: uri.queryParameters['range'] == '5d' ? 12 : 3,
+          intervalSeconds: uri.queryParameters['range'] == '5d' ? 900 : 60,
+        );
+      },
     );
     await mountChart(
       tester,
@@ -260,6 +266,21 @@ void main() {
     expect(chart.series.single.points, hasLength(3));
     expect(chart.series.single.points.first.y, 990);
     expect(chart.series.single.points.last.y, 1000);
+    expect(requests, 4);
+    now = now.add(const Duration(minutes: 10));
+    await tester.tap(find.byKey(const Key('chart-period-5d')));
+    await tester.pump();
+    chart = tester.widget<MarketLineChart>(find.byType(MarketLineChart));
+    expect(chart.series.single.points, hasLength(12));
+    expect(find.bySemanticsLabel('Loading portfolio'), findsNothing);
+    await tester.pumpAndSettle();
+    expect(requests, 4);
+    await tester.tap(find.byKey(const Key('chart-period-1d')));
+    await tester.pumpAndSettle();
+    expect(requests, 4);
+    await tester.tap(find.byTooltip('Refresh'));
+    await tester.pumpAndSettle();
+    expect(requests, 6);
   });
 
   testWidgets('inactive charts do not request intraday bars', (tester) async {

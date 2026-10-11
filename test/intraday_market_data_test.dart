@@ -138,7 +138,8 @@ void main() {
     });
   }
 
-  test('cache expires after a minute and forced refresh bypasses it', () async {
+  test('cache expires after five minutes and forced refresh bypasses it',
+      () async {
     var now = DateTime.utc(2026, 10, 9, 14);
     var calls = 0;
     final loader = IntradayMarketData(
@@ -153,11 +154,39 @@ void main() {
     expect(calls, 1);
     await loader.fetch('AAPL', forceRefresh: true);
     expect(calls, 2);
-    now = now.add(const Duration(minutes: 1));
+    now = now.add(const Duration(minutes: 5));
     await loader.fetch('AAPL');
     expect(calls, 3);
     await loader.fetch('AAPL', days: 5);
     expect(calls, 4);
+  });
+
+  test(
+      'portfolio batch seeds individual prices without repeated broker requests',
+      () async {
+    var batches = 0;
+    var individual = 0;
+    final loader = IntradayMarketData(
+      ibkrPortfolioFetch: (_, days) async {
+        batches++;
+        return [_ibkrSeries()];
+      },
+      ibkrFetch: (_, symbol, days) async {
+        individual++;
+        return _ibkrSeries();
+      },
+      yahooGet: (_) async => throw StateError('Yahoo should not be requested'),
+    );
+    expect(await loader.prefetchPortfolio(_config, days: 5), isTrue);
+    final series = await loader.fetch('AAPL', config: _config, days: 5);
+    expect(series.source, 'IBKR');
+    expect(await loader.prefetchPortfolio(_config, days: 5), isTrue);
+    expect(batches, 1);
+    expect(individual, 0);
+    await loader.prefetchPortfolio(_config, days: 5, forceRefresh: true);
+    expect(batches, 2);
+    await loader.prefetchPortfolio(_config, days: 1);
+    expect(batches, 3);
   });
 
   test('account config changes do not reuse another account cache', () async {

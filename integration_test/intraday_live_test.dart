@@ -8,6 +8,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:market_monk/charts_page.dart';
+import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/settings_state.dart';
@@ -198,6 +199,7 @@ void main() {
       }
       final prefs = await SqliteSettings.getInstance();
       await prefs.setInt('chartPeriodDays', 5);
+      final coldLoad = Stopwatch()..start();
       await mount();
       await _waitFor(
         tester,
@@ -217,7 +219,14 @@ void main() {
         ),
         findsOneWidget,
       );
+      debugPrint(
+        'LIVE portfolio 5d cold load ${coldLoad.elapsedMilliseconds} ms',
+      );
+      final fiveDayCounts = {
+        for (final series in chart()!.series) series.name: series.points.length,
+      };
       await capture('ibkr-portfolio-5d');
+      final firstOneDay = Stopwatch()..start();
       await tester.tap(find.byKey(const Key('chart-period-1d')));
       await _waitFor(
         tester,
@@ -230,7 +239,51 @@ void main() {
           'LIVE portfolio 1d ${series.name} rendered ${series.points.length} points',
         );
       }
+      final oneDayCounts = {
+        for (final series in chart()!.series) series.name: series.points.length,
+      };
       await capture('ibkr-portfolio-1d');
+      debugPrint(
+        'LIVE portfolio 1d cold load ${firstOneDay.elapsedMilliseconds} ms',
+      );
+      int priceRequests() => [
+            'market.intradayPortfolio',
+            'ibkr.intradayPortfolio',
+            'market.intraday',
+            'ibkr.intraday',
+            'yahoo.intraday',
+          ].fold(
+            0,
+            (sum, category) =>
+                sum + backgroundNetworkCoordinator.startedCount(category),
+          );
+      final requests = priceRequests();
+      for (final period in ['5d', '1d']) {
+        final switchTime = Stopwatch()..start();
+        await tester.tap(find.byKey(Key('chart-period-$period')));
+        await tester.pump();
+        expect(chart()?.series.length, configs.length);
+        expect(
+          chart()!.series.every(
+                (series) =>
+                    series.points.length ==
+                    (period == '5d'
+                        ? fiveDayCounts
+                        : oneDayCounts)[series.name],
+              ),
+          isTrue,
+        );
+        expect(find.bySemanticsLabel('Loading portfolio'), findsNothing);
+        debugPrint(
+          'LIVE cached portfolio $period visible in ${switchTime.elapsedMilliseconds} ms',
+        );
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(priceRequests(), requests);
+        await capture('ibkr-portfolio-$period-cached');
+      }
+      debugPrint(
+        'LIVE cached 5d and 1d switches made zero additional price requests',
+      );
     }
     await tester.pumpWidget(const SizedBox());
     settings.dispose();

@@ -45,6 +45,13 @@ class _LoadedChartPortfolio {
   });
 }
 
+class _CachedIntradayPortfolio {
+  final Map<String, List<_DateValue>> series;
+  final Map<String, String> warnings;
+  final String? error;
+  const _CachedIntradayPortfolio(this.series, this.warnings, this.error);
+}
+
 class ChartsPage extends StatefulWidget {
   final bool isActive;
 
@@ -116,6 +123,7 @@ class ChartsPageState extends State<ChartsPage>
   Map<String, double> _portfolioReturnsByAccount = {};
   Map<String, double> _portfolioReturnAmountsByAccount = {};
   Map<String, bool> _portfolioCashOutByAccount = {};
+  final _intradayPortfolioCache = <String, _CachedIntradayPortfolio>{};
   final _portfolioIntradayWarnings = <String, String>{};
   String? _portfolioError;
   bool _portfolioLoading = true;
@@ -135,7 +143,8 @@ class ChartsPageState extends State<ChartsPage>
   int _portfolioLoadGeneration = 0;
   AccountManager? _accountManager;
   final Map<(bool, bool), Future<void>> _backgroundSyncs = {};
-  final Map<(bool, bool, bool, bool), Future<void>> _portfolioLoads = {};
+  final Map<(bool, bool, bool, bool, String), Future<void>> _portfolioLoads =
+      {};
 
   @override
   void initState() {
@@ -502,6 +511,8 @@ class ChartsPageState extends State<ChartsPage>
     if (ibkrChanged) clearAllSyncCache();
 
     if (accountsChanged || ibkrChanged) {
+      _portfolioLoads.clear();
+      _backgroundSyncs.clear();
       runDetachedTask(
         _syncCandlesInBackground(
           refreshPerformance: true,
@@ -617,6 +628,7 @@ class ChartsPageState extends State<ChartsPage>
 
     try {
       clearAllSyncCache();
+      _intradayPortfolioCache.clear();
       await _refreshAllPortfolioCandles();
       await _syncFavoriteCandles(forceRefresh: true);
       await _loadAllPortfolios(
@@ -825,6 +837,30 @@ class ChartsPageState extends State<ChartsPage>
     }
   }
 
+  String get _intradayPortfolioCacheKey {
+    final manager = context.read<AccountManager>();
+    return '$days|${manager.ibkrRefreshVersion}|${context.read<SettingsState>().tradesVersion}|'
+        '${manager.accounts.map((name) => '$name:${manager.ibkrConfigFor(name).hashCode}').join(',')}';
+  }
+
+  bool _restoreIntradayPortfolio() {
+    if (!_usesIntraday) return false;
+    final cached = _intradayPortfolioCache[_intradayPortfolioCacheKey];
+    if (cached == null) return false;
+    setState(() {
+      _portfolioSeriesByAccount = Map.of(cached.series);
+      _portfolioIntradayWarnings
+        ..clear()
+        ..addAll(cached.warnings);
+      _portfolioReturnsByAccount.clear();
+      _portfolioReturnAmountsByAccount.clear();
+      _portfolioCashOutByAccount.clear();
+      _portfolioError = cached.error;
+      _portfolioLoading = false;
+    });
+    return true;
+  }
+
   Future<void> _loadAllPortfolios({
     bool refreshIbkrPerformance = false,
     bool forceIbkrPerformanceRefresh = false,
@@ -836,6 +872,7 @@ class ChartsPageState extends State<ChartsPage>
       forceIbkrPerformanceRefresh,
       refreshIbkrPortfolio,
       forceIbkrPortfolioRefresh,
+      '$years|$months|$_intradayPortfolioCacheKey',
     );
     final existing = _portfolioLoads[key];
     if (existing != null) return existing;
@@ -862,6 +899,10 @@ class ChartsPageState extends State<ChartsPage>
     bool forceIbkrPortfolioRefresh = false,
   }) async {
     if (!mounted || !widget.isActive || !_chartPeriodLoaded) return;
+    if (!forceIbkrPortfolioRefresh &&
+        !forceIbkrPerformanceRefresh &&
+        _restoreIntradayPortfolio()) return;
+    final rangeCacheKey = _intradayPortfolioCacheKey;
     final generation = ++_portfolioLoadGeneration;
     final accountManager = context.read<AccountManager>();
     final accounts = accountManager.accounts;
@@ -872,13 +913,15 @@ class ChartsPageState extends State<ChartsPage>
       _portfolioLoading = _portfolioSeriesByAccount.isEmpty;
     });
 
-    final newSeries = <String, List<_DateValue>>{};
+    final newSeries = <String, List<_DateValue>>{
+      for (final name in accounts) name: [],
+    };
     final newReturns = <String, double>{};
     final newReturnAmounts = <String, double>{};
     final newCashOuts = <String, bool>{};
     String? firstError;
 
-    for (final accountName in accounts) {
+    Future<void> loadAccount(String accountName) async {
       if (!mounted ||
           !widget.isActive ||
           generation != _portfolioLoadGeneration) {
@@ -910,7 +953,7 @@ class ChartsPageState extends State<ChartsPage>
               !widget.isActive ||
               generation != _portfolioLoadGeneration) return;
           newSeries[accountName] = series;
-          continue;
+          return;
         }
         if (ibkrConfig.isConfigured && years <= 1) {
           final brokerSeries = await _loadBrokerPerformanceSeries(
@@ -931,7 +974,7 @@ class ChartsPageState extends State<ChartsPage>
             newReturns[accountName] = brokerSeries.twrPercent;
             newReturnAmounts[accountName] = brokerSeries.returnAmount;
             newCashOuts[accountName] = brokerSeries.isCashOut;
-            continue;
+            return;
           }
         }
         if (ibkrConfig.enabled) {
@@ -947,7 +990,7 @@ class ChartsPageState extends State<ChartsPage>
           } else {
             newSeries[accountName] = [];
           }
-          continue;
+          return;
         }
 
         final fallback = await _buildPortfolioSeries(
@@ -958,6 +1001,14 @@ class ChartsPageState extends State<ChartsPage>
       } catch (error) {
         newSeries[accountName] = [];
         firstError ??= error.toString();
+      }
+    }
+
+    if (_usesIntraday) {
+      await Future.wait(accounts.map(loadAccount));
+    } else {
+      for (final account in accounts) {
+        await loadAccount(account);
       }
     }
 
@@ -973,6 +1024,16 @@ class ChartsPageState extends State<ChartsPage>
       _portfolioCashOutByAccount = newCashOuts;
       _portfolioError = firstError;
       _portfolioLoading = false;
+      if (_usesIntraday &&
+          newSeries.values.any((series) => series.isNotEmpty)) {
+        if (_intradayPortfolioCache.length >= 16)
+          _intradayPortfolioCache.remove(_intradayPortfolioCache.keys.first);
+        _intradayPortfolioCache[rangeCacheKey] = _CachedIntradayPortfolio(
+          Map.of(newSeries),
+          Map.of(_portfolioIntradayWarnings),
+          firstError,
+        );
+      }
     });
   }
 
@@ -986,6 +1047,12 @@ class ChartsPageState extends State<ChartsPage>
     final selectedDays = days;
     final holdings = <IntradayPortfolioHolding>[];
     final unavailable = <String>[];
+    final prefetched = loaded.positions.isNotEmpty &&
+        await _intradayData.prefetchPortfolio(
+          config,
+          days: selectedDays,
+          forceRefresh: forceRefresh,
+        );
     for (final position in loaded.positions) {
       if (!mounted ||
           !widget.isActive ||
@@ -996,7 +1063,7 @@ class ChartsPageState extends State<ChartsPage>
           position.symbol,
           days: selectedDays,
           config: config,
-          forceRefresh: forceRefresh,
+          forceRefresh: forceRefresh && !prefetched,
         );
         await fetchSymbolCurrencyAndRate(
           position.symbol,
@@ -1580,12 +1647,13 @@ class ChartsPageState extends State<ChartsPage>
         'Failed to backfill favorite period',
       );
     }
+    final restored = _mode != _ChartMode.stock && _restoreIntradayPortfolio();
     if (_mode == _ChartMode.stock && _selectedSymbol != null) {
       runDetachedTask(
         _loadSelectedStock(),
         'Failed to load selected chart period',
       );
-    } else {
+    } else if (!restored) {
       runDetachedTask(
         () async {
           await _syncCandlesInBackground();
