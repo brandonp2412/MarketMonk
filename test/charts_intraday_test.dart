@@ -40,10 +40,10 @@ http.Response _prices(
                     'high': [for (var i = 0; i < count; i++) first + i],
                     'low': [for (var i = 0; i < count; i++) first + i],
                     'close': [for (var i = 0; i < count; i++) first + i],
-                  }
+                  },
                 ],
               },
-            }
+            },
           ],
           'error': null,
         },
@@ -106,28 +106,35 @@ void main() {
   }
 
   testWidgets(
-      '1d renders all minute prices and local times without daily writes',
-      (tester) async {
-    final loader = IntradayMarketData(yahooGet: (_) async => _prices(100));
-    await mountChart(tester, loader);
-    await tester.pumpAndSettle();
-    final ticker = tester.widget<TickerLine>(find.byType(TickerLine));
-    expect(ticker.intraday, isTrue);
-    expect(ticker.nativeCurrency, 'GBP');
-    expect(ticker.spots.map((point) => point.y), [1, 1.01, 1.02]);
-    expect(
-      ticker.dates.first,
-      DateTime.fromMillisecondsSinceEpoch(1791552600000, isUtc: true).toLocal(),
-    );
-    final chart = tester.widget<MarketLineChart>(find.byType(MarketLineChart));
-    expect(chart.xLabels.first, contains(RegExp(r'\d{2}:\d{2}')));
-    expect(find.text('Yahoo · 1 min · Local time'), findsOneWidget);
-    expect(await testDatabase.select(testDatabase.candles).get(), isEmpty);
-    expect(tester.takeException(), isNull);
-  });
+    '1d renders all minute prices and local times without daily writes',
+    (tester) async {
+      final loader = IntradayMarketData(yahooGet: (_) async => _prices(100));
+      await mountChart(tester, loader);
+      await tester.pumpAndSettle();
+      final ticker = tester.widget<TickerLine>(find.byType(TickerLine));
+      expect(ticker.intraday, isTrue);
+      expect(ticker.nativeCurrency, 'GBP');
+      expect(ticker.spots.map((point) => point.y), [1, 1.01, 1.02]);
+      expect(
+        ticker.dates.first,
+        DateTime.fromMillisecondsSinceEpoch(
+          1791552600000,
+          isUtc: true,
+        ).toLocal(),
+      );
+      final chart = tester.widget<MarketLineChart>(
+        find.byType(MarketLineChart),
+      );
+      expect(chart.xLabels.first, contains(RegExp(r'\d{2}:\d{2}')));
+      expect(find.text('Yahoo · 1 min · Local time'), findsOneWidget);
+      expect(await testDatabase.select(testDatabase.candles).get(), isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
-  testWidgets('late 1d response cannot replace the selected 5d chart',
-      (tester) async {
+  testWidgets('late 1d response cannot replace the selected 5d chart', (
+    tester,
+  ) async {
     final minute = Completer<http.Response>();
     final loader = IntradayMarketData(
       yahooGet: (uri) async {
@@ -151,13 +158,14 @@ void main() {
     expect(find.text('Yahoo · 15 min · Local time'), findsOneWidget);
   });
 
-  testWidgets('unavailable intraday data shows a retryable error',
-      (tester) async {
+  testWidgets('unavailable intraday data shows a retryable error', (
+    tester,
+  ) async {
     var calls = 0;
     final loader = IntradayMarketData(
       yahooGet: (_) async {
         calls++;
-        return calls == 1 ? http.Response('rate limited', 429) : _prices(100);
+        return calls <= 3 ? http.Response('rate limited', 429) : _prices(100);
       },
     );
     await mountChart(tester, loader);
@@ -169,18 +177,15 @@ void main() {
     await tester.tap(find.byTooltip('Refresh'));
     await tester.pumpAndSettle();
     expect(find.byType(TickerLine), findsOneWidget);
-    expect(calls, 2);
+    expect(calls, 4);
   });
 
-  testWidgets('favorite 5d chart preserves all intraday observations',
-      (tester) async {
+  testWidgets('favorite 5d chart preserves all intraday observations', (
+    tester,
+  ) async {
     final loader = IntradayMarketData(
-      yahooGet: (_) async => _prices(
-        100,
-        currency: 'USD',
-        count: 12,
-        intervalSeconds: 900,
-      ),
+      yahooGet: (_) async =>
+          _prices(100, currency: 'USD', count: 12, intervalSeconds: 900),
     );
     await mountChart(
       tester,
@@ -200,8 +205,9 @@ void main() {
     expect(chart.xLabels.first, contains(RegExp(r'\d{2}:\d{2}')));
   });
 
-  testWidgets('portfolio 5d weights every holding and offers intraday 1d',
-      (tester) async {
+  testWidgets('portfolio 5d weights every holding and offers intraday 1d', (
+    tester,
+  ) async {
     var requests = 0;
     var now = DateTime.utc(2026, 10, 10);
     final loader = IntradayMarketData(

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -30,8 +31,12 @@ class IntradaySeries {
     final byTimestamp = <int, IbkrHistoricalCandle>{};
     for (final candle in candles) {
       if (!candle.date.isUtc ||
-          ![candle.open, candle.high, candle.low, candle.close]
-              .every((price) => price.isFinite && price > 0)) {
+          ![
+            candle.open,
+            candle.high,
+            candle.low,
+            candle.close,
+          ].every((price) => price.isFinite && price > 0)) {
         continue;
       }
       byTimestamp[candle.date.millisecondsSinceEpoch] = candle;
@@ -46,11 +51,11 @@ class IntradaySeries {
 /// Loads short stock ranges from IBKR with Yahoo fallback and a five-minute cache.
 class IntradayMarketData {
   final Future<http.Response> Function(Uri) _yahooGet;
-  final Future<IbkrHistoricalSeries> Function(
-    IbkrAccountConfig,
-    String,
-    int,
-  ) _ibkrFetch;
+  final Future<void> Function(Duration) _retryDelay;
+  final Queue<Completer<void>> _yahooWaiters = Queue();
+  int _activeYahooRequests = 0;
+  final Future<IbkrHistoricalSeries> Function(IbkrAccountConfig, String, int)
+      _ibkrFetch;
   final Future<List<IbkrHistoricalSeries>> Function(IbkrAccountConfig, int)?
       _ibkrPortfolioFetch;
   final _portfolioBatchAt = <(IbkrAccountConfig, int), DateTime>{};
@@ -63,6 +68,7 @@ class IntradayMarketData {
   /// Allows provider requests and time to be substituted for deterministic tests.
   IntradayMarketData({
     Future<http.Response> Function(Uri)? yahooGet,
+    Future<void> Function(Duration)? retryDelay,
     Future<IbkrHistoricalSeries> Function(IbkrAccountConfig, String, int)?
         ibkrFetch,
     Future<List<IbkrHistoricalSeries>> Function(IbkrAccountConfig, int)?
@@ -70,6 +76,7 @@ class IntradayMarketData {
     DateTime Function()? now,
     Duration brokerTimeout = const Duration(seconds: 12),
   })  : _yahooGet = yahooGet ?? _getYahoo,
+        _retryDelay = retryDelay ?? Future.delayed,
         _ibkrFetch = ibkrFetch ??
             ((config, symbol, days) =>
                 IbkrApiClient(config).fetchIntradayCandles(symbol, days: days)),
@@ -117,8 +124,11 @@ class IntradayMarketData {
             !batchSlow &&
             (!batchFresh || forceRefresh)) {
           try {
-            final result = await _ibkrFetch(config, canonicalSymbol, days)
-                .timeout(_brokerTimeout);
+            final result = await _ibkrFetch(
+              config,
+              canonicalSymbol,
+              days,
+            ).timeout(_brokerTimeout);
             series = IntradaySeries(
               currency: result.currency,
               source: 'IBKR',
@@ -153,24 +163,29 @@ class IntradayMarketData {
         previous != null &&
         _now().difference(previous) < const Duration(minutes: 5)) return true;
     try {
-      return await backgroundNetworkCoordinator
-          .coalesce('market.intradayPortfolio', (this, config, days), () async {
-        final series = await fetch(config, days).timeout(_brokerTimeout);
-        final fetchedAt = _now();
-        _slowPortfolioBatchAt.remove((config, days));
-        for (final item in series) {
-          final normalized = IntradaySeries(
-            currency: item.currency,
-            source: 'IBKR',
-            candles: item.candles,
-          );
-          if (_cache.length >= 256) _cache.remove(_cache.keys.first);
-          _cache[(item.symbol.trim().toUpperCase(), days, config)] =
-              (fetchedAt: fetchedAt, series: normalized);
-        }
-        _portfolioBatchAt[(config, days)] = fetchedAt;
-        return true;
-      });
+      return await backgroundNetworkCoordinator.coalesce(
+        'market.intradayPortfolio',
+        (this, config, days),
+        () async {
+          final series = await fetch(config, days).timeout(_brokerTimeout);
+          final fetchedAt = _now();
+          _slowPortfolioBatchAt.remove((config, days));
+          for (final item in series) {
+            final normalized = IntradaySeries(
+              currency: item.currency,
+              source: 'IBKR',
+              candles: item.candles,
+            );
+            if (_cache.length >= 256) _cache.remove(_cache.keys.first);
+            _cache[(item.symbol.trim().toUpperCase(), days, config)] = (
+              fetchedAt: fetchedAt,
+              series: normalized,
+            );
+          }
+          _portfolioBatchAt[(config, days)] = fetchedAt;
+          return true;
+        },
+      );
     } catch (error, stackTrace) {
       if (error is TimeoutException) {
         _slowPortfolioBatchAt[(config, days)] = _now();
@@ -184,7 +199,48 @@ class IntradayMarketData {
     }
   }
 
-  Future<IntradaySeries> _fetchYahoo(String symbol, int days) =>
+  Future<http.Response> _limitedYahooGet(Uri uri) async {
+    if (_activeYahooRequests >= 2) {
+      final waiter = Completer<void>();
+      _yahooWaiters.addLast(waiter);
+      await waiter.future;
+    } else {
+      _activeYahooRequests++;
+    }
+    try {
+      return await _yahooGet(uri).timeout(const Duration(seconds: 15));
+    } finally {
+      if (_yahooWaiters.isNotEmpty) {
+        _yahooWaiters.removeFirst().complete();
+      } else {
+        _activeYahooRequests--;
+      }
+    }
+  }
+
+  Future<http.Response> _requestYahooWithRetry(Uri uri) async {
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        final requestUri =
+            attempt == 0 ? uri : uri.replace(host: 'query2.finance.yahoo.com');
+        final response = await _limitedYahooGet(requestUri);
+        if (response.statusCode == 200 ||
+            attempt == 2 ||
+            !{429, 500, 502, 503, 504}.contains(response.statusCode)) {
+          return response;
+        }
+      } catch (_) {
+        if (attempt == 2) rethrow;
+      }
+      await _retryDelay(Duration(milliseconds: 400 * (1 << attempt)));
+    }
+    throw StateError('Yahoo intraday request failed after retries');
+  }
+
+  Future<IntradaySeries> _fetchYahoo(
+    String symbol,
+    int days,
+  ) =>
       backgroundNetworkCoordinator.observe('yahoo.intraday', () async {
         // Yahoo's chart endpoint accepts range and intraday interval parameters.
         // https://github.com/ranaroussi/yfinance/blob/main/yfinance/scrapers/history.py
@@ -197,8 +253,7 @@ class IntradayMarketData {
             'includePrePost': 'false',
           },
         );
-        final response =
-            await _yahooGet(uri).timeout(const Duration(seconds: 15));
+        final response = await _requestYahooWithRetry(uri);
         if (response.statusCode != 200) {
           throw StateError(
             'Yahoo intraday returned HTTP ${response.statusCode}',

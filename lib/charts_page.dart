@@ -1052,6 +1052,7 @@ class ChartsPageState extends State<ChartsPage>
     final selectedDays = days;
     final holdings = <IntradayPortfolioHolding>[];
     final unavailable = <String>[];
+    final failureReasons = <String>[];
     final prefetched = loaded.positions.isNotEmpty &&
         await _intradayData.prefetchPortfolio(
           config,
@@ -1078,6 +1079,7 @@ class ChartsPageState extends State<ChartsPage>
         );
       } catch (error, stackTrace) {
         unavailable.add(position.symbol);
+        failureReasons.add(error.toString().replaceFirst('Bad state: ', ''));
         talker.handle(
           error,
           stackTrace,
@@ -1105,8 +1107,10 @@ class ChartsPageState extends State<ChartsPage>
           '$accountName: prices unavailable for ${unavailable.join(', ')}; these holdings stay constant.';
     }
     if (holdings.isEmpty && loaded.positions.isNotEmpty) {
+      final firstReason =
+          failureReasons.isEmpty ? '' : ': ${failureReasons.first}';
       throw StateError(
-        'No intraday portfolio prices available for $accountName',
+        'No intraday portfolio prices available for $accountName$firstReason',
       );
     }
     final nav = loaded.currentValue;
@@ -1324,8 +1328,11 @@ class ChartsPageState extends State<ChartsPage>
         currentValueUsd.isFinite &&
         currentValueUsd > 0 &&
         points.isNotEmpty) {
-      final snapshotDate =
-          DateTime(asOfDate.year, asOfDate.month, asOfDate.day);
+      final snapshotDate = DateTime(
+        asOfDate.year,
+        asOfDate.month,
+        asOfDate.day,
+      );
       if (snapshotDate.isAfter(points.last.date)) {
         points.add(_DateValue(snapshotDate, currentValueUsd));
       }
@@ -2201,7 +2208,9 @@ class ChartsPageState extends State<ChartsPage>
             for (final candle in candles) candle.date.value,
           ]),
           onRangeChanged: (range) => _setChartRange(
-            [for (final candle in candles) candle.date.value],
+            [
+              for (final candle in candles) candle.date.value,
+            ],
             range,
           ),
           dates: candles.map((candle) => candle.date.value),
