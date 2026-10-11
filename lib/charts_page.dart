@@ -36,11 +36,13 @@ class _LoadedChartPortfolio {
   final List<Position> positions;
   final IbkrAccountValue? currentValue;
   final double? currentValueUsd;
+  final DateTime? asOfDate;
 
   const _LoadedChartPortfolio({
     required this.positions,
     required this.currentValue,
     required this.currentValueUsd,
+    this.asOfDate,
   });
 }
 
@@ -288,6 +290,7 @@ class ChartsPageState extends State<ChartsPage>
           positions: cachedPortfolio.positions,
           currentValue: currentValue,
           currentValueUsd: currentValueUsd,
+          asOfDate: cachedPortfolio.asOfDate,
         ),
       );
       if (brokerSeries.series.isEmpty) return;
@@ -335,6 +338,7 @@ class ChartsPageState extends State<ChartsPage>
           positions: cached.positions,
           currentValue: currentValue,
           currentValueUsd: currentValueUsd,
+          asOfDate: cached.asOfDate,
         );
       }
       if (!ibkrConfig.isConfigured) {
@@ -343,6 +347,7 @@ class ChartsPageState extends State<ChartsPage>
             positions: cached.positions,
             currentValue: cached.netLiquidation,
             currentValueUsd: cached.netLiquidationUsd,
+            asOfDate: cached.asOfDate,
           );
         }
         throw StateError('IBKR portfolio source is not fully configured');
@@ -352,6 +357,7 @@ class ChartsPageState extends State<ChartsPage>
           positions: cached?.positions ?? const [],
           currentValue: cached?.netLiquidation,
           currentValueUsd: cached?.netLiquidationUsd,
+          asOfDate: cached?.asOfDate,
         );
       }
 
@@ -373,11 +379,13 @@ class ChartsPageState extends State<ChartsPage>
               positions,
               snapshot.netLiquidation,
               netLiquidationUsd: currentValueUsd,
+              asOfDate: snapshot.asOfDate,
             );
             return _LoadedChartPortfolio(
               positions: positions,
               currentValue: currentValue,
               currentValueUsd: currentValueUsd,
+              asOfDate: snapshot.asOfDate,
             );
           } finally {
             _ibkrLoads.removeWhere((key, value) => key == loadKey);
@@ -393,6 +401,7 @@ class ChartsPageState extends State<ChartsPage>
             positions: cached.positions,
             currentValue: cached.netLiquidation,
             currentValueUsd: cached.netLiquidationUsd,
+            asOfDate: cached.asOfDate,
           );
         }
         rethrow;
@@ -1305,6 +1314,21 @@ class ChartsPageState extends State<ChartsPage>
       points.add(_DateValue(date, performance.nav[index] / basePerUsd));
     }
     points.sort((a, b) => a.date.compareTo(b.date));
+    final asOfDate = loaded.asOfDate;
+    final currentValueUsd = loaded.currentValueUsd ??
+        (loaded.currentValue == null
+            ? null
+            : loaded.currentValue!.value / basePerUsd);
+    if (asOfDate != null &&
+        currentValueUsd != null &&
+        currentValueUsd.isFinite &&
+        currentValueUsd > 0 &&
+        points.isNotEmpty) {
+      final snapshotDate = DateTime(asOfDate.year, asOfDate.month, asOfDate.day);
+      if (snapshotDate.isAfter(points.last.date)) {
+        points.add(_DateValue(snapshotDate, currentValueUsd));
+      }
+    }
     if (points.isEmpty) {
       return (
         series: <_DateValue>[],

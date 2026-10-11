@@ -72,7 +72,7 @@ void main() {
         requestedUri = uri;
         requestedHeaders = headers;
         return http.Response(
-          '''{"account":"****1234","read_only":true,"summary":{"netliquidation":{"value":324961.06,"currency":"NZD"},"netliquidationbycurrency":{"value":191853.54,"currency":"USD"}},"ledger":{},"positions":[{"symbol":"AAPL","security_type":"STK","currency":"USD","exchange":"NASDAQ","conid":265598,"quantity":10,"market_price":200,"market_value":2000,"average_cost":150,"unrealized_pnl":500,"realized_pnl":25}]}''',
+          '''{"account":"****1234","read_only":true,"as_of_date":"2026-10-05","summary":{"netliquidation":{"value":324961.06,"currency":"NZD"},"netliquidationbycurrency":{"value":191853.54,"currency":"USD"}},"ledger":{},"positions":[{"symbol":"AAPL","security_type":"STK","currency":"USD","exchange":"NASDAQ","conid":265598,"quantity":10,"market_price":200,"market_value":2000,"average_cost":150,"unrealized_pnl":500,"realized_pnl":25}]}''',
           200,
         );
       },
@@ -86,6 +86,7 @@ void main() {
     );
     expect(requestedHeaders?['Authorization'], 'Bearer secret-token');
     expect(snapshot.account, '****1234');
+    expect(snapshot.asOfDate, DateTime(2026, 10, 5));
     expect(snapshot.positions, hasLength(1));
     expect(snapshot.positions.single.symbol, 'AAPL');
     expect(snapshot.positions.single.marketValue, 2000);

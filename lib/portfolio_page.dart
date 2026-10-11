@@ -40,11 +40,13 @@ class _LoadedPortfolio {
   final List<Position> positions;
   final IbkrAccountValue? netLiquidation;
   final double? netLiquidationUsd;
+  final DateTime? asOfDate;
 
   const _LoadedPortfolio({
     required this.positions,
     required this.netLiquidation,
     required this.netLiquidationUsd,
+    this.asOfDate,
   });
 }
 
@@ -187,6 +189,7 @@ class PortfolioPageState extends State<PortfolioPage>
         positions: cached?.positions ?? _positions,
         netLiquidation: cached?.netLiquidation ?? _netLiquidation,
         netLiquidationUsd: cached?.netLiquidationUsd,
+        asOfDate: cached?.asOfDate,
       );
     }
     if (!config.enabled) {
@@ -217,6 +220,7 @@ class PortfolioPageState extends State<PortfolioPage>
         positions: cached.positions,
         netLiquidation: cached.netLiquidation,
         netLiquidationUsd: cached.netLiquidationUsd,
+        asOfDate: cached.asOfDate,
       );
     }
 
@@ -236,6 +240,7 @@ class PortfolioPageState extends State<PortfolioPage>
         positions: cached?.positions ?? _positions,
         netLiquidation: cached?.netLiquidation ?? _netLiquidation,
         netLiquidationUsd: cached?.netLiquidationUsd,
+        asOfDate: cached?.asOfDate,
       );
     }
     final loadKey = (accountName, config);
@@ -252,6 +257,7 @@ class PortfolioPageState extends State<PortfolioPage>
       positions: await computeIbkrPositions(snapshot.positions, trades),
       netLiquidation: snapshot.netLiquidation,
       netLiquidationUsd: snapshot.netLiquidationUsd?.value,
+      asOfDate: snapshot.asOfDate,
     );
   }
 
@@ -361,6 +367,7 @@ class PortfolioPageState extends State<PortfolioPage>
           loaded.positions,
           loaded.netLiquidation,
           netLiquidationUsd: loaded.netLiquidationUsd,
+          asOfDate: loaded.asOfDate,
         );
       }
       if (!mounted ||

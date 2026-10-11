@@ -465,6 +465,87 @@ void main() {
     },
   );
 
+  testWidgets(
+    'IBKR chart appends broker as-of NAV after stale performance history',
+    (WidgetTester tester) async {
+      await seedTestSqlite({
+        'ibkrAccountConfigs':
+            '{"Default":{"enabled":true,"baseUrl":"https://ibkr.example.test","token":"secret-token"}}',
+        'chartPeriodYears': 0,
+        'chartPeriodMonths': 0,
+        'chartPeriodDays': 5,
+      });
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = const Size(1200, 1000);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+        allRatesFromUsd.remove('NZD');
+      });
+
+      allRatesFromUsd['NZD'] = 1.7;
+      final accounts = testAccountManager();
+      await accounts.init();
+      final historyStart = DateTime(2026, 9, 23);
+      await accounts.cachePortfolio(
+        'Default',
+        [
+          Position(
+            symbol: 'VOO',
+            name: 'VANGUARD S&P 500 ETF',
+            nativeCurrency: 'USD',
+            netShares: 10,
+            avgCost: 500,
+            currentPrice: 550,
+            firstBuyDate: DateTime(2025),
+            lastBuyDate: DateTime(2026),
+          ),
+        ],
+        const IbkrAccountValue(value: 10000, currency: 'NZD'),
+        asOfDate: DateTime(2026, 10, 5),
+      );
+      await accounts.cacheIbkrPerformance(
+        'Default',
+        IbkrPerformanceSeries(
+          period: '1Y',
+          measure: 'TWR',
+          currency: 'NZD',
+          startDate: historyStart,
+          startNav: 9000,
+          dates: [DateTime(2026, 9, 24), DateTime(2026, 9, 25)],
+          nav: const [9200, 9500],
+          returnDates: [historyStart, DateTime(2026, 9, 25)],
+          returns: const [0, 0.05],
+        ),
+      );
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(
+              create: (_) => SettingsState(
+                localCurrencyDetector: () async => 'USD',
+              ),
+            ),
+            ChangeNotifierProvider.value(value: accounts),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(body: ChartsPage()),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final chart =
+          tester.widget<MarketLineChart>(find.byType(MarketLineChart));
+      final spots = chart.series.single.points;
+      expect(spots, hasLength(4));
+      expect(spots.last.y, closeTo(10000 / 1.7, 1e-6));
+
+      await tester.pumpAndSettle();
+    },
+  );
+
   testWidgets('IBKR chart retries broker history without synthetic fallback', (
     WidgetTester tester,
   ) async {

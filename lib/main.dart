@@ -78,12 +78,14 @@ class CachedPortfolioData {
   final List<Position> positions;
   final IbkrAccountValue? netLiquidation;
   final double? netLiquidationUsd;
+  final DateTime? asOfDate;
   final DateTime cachedAt;
 
   const CachedPortfolioData({
     required this.positions,
     required this.netLiquidation,
     this.netLiquidationUsd,
+    this.asOfDate,
     required this.cachedAt,
   });
 
@@ -112,6 +114,7 @@ class CachedPortfolioData {
                 'currency': netLiquidation!.currency,
               },
         'netLiquidationUsd': netLiquidationUsd,
+        'asOfDate': asOfDate?.toIso8601String(),
         'cachedAt': cachedAt.toIso8601String(),
       };
 
@@ -152,6 +155,7 @@ class CachedPortfolioData {
             )
           : null,
       netLiquidationUsd: (json['netLiquidationUsd'] as num?)?.toDouble(),
+      asOfDate: DateTime.tryParse(json['asOfDate'] as String? ?? ''),
       cachedAt: DateTime.tryParse(json['cachedAt'] as String? ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),
     );
@@ -457,6 +461,7 @@ class AccountManager extends ChangeNotifier {
     List<Position> positions,
     IbkrAccountValue? netLiquidation, {
     double? netLiquidationUsd,
+    DateTime? asOfDate,
   }) =>
       _serializeStorage(
         () => _cachePortfolio(
@@ -464,6 +469,7 @@ class AccountManager extends ChangeNotifier {
           positions,
           netLiquidation,
           netLiquidationUsd: netLiquidationUsd,
+          asOfDate: asOfDate,
         ),
       );
 
@@ -472,6 +478,7 @@ class AccountManager extends ChangeNotifier {
     List<Position> positions,
     IbkrAccountValue? netLiquidation, {
     double? netLiquidationUsd,
+    DateTime? asOfDate,
   }) async {
     final profileId = _profileIdsByName[name];
     if (profileId == null) return;
@@ -479,6 +486,7 @@ class AccountManager extends ChangeNotifier {
       positions: List.unmodifiable(positions),
       netLiquidation: netLiquidation,
       netLiquidationUsd: netLiquidationUsd,
+      asOfDate: asOfDate,
       cachedAt: DateTime.now(),
     );
     await _database.writeIbkrCache(

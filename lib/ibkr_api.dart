@@ -336,12 +336,14 @@ class IbkrAccountValue {
 /// Current read-only snapshot returned by the MarketMonk IBKR API.
 class IbkrPortfolioSnapshot {
   final String account;
+  final DateTime? asOfDate;
   final List<IbkrPosition> positions;
   final Map<String, dynamic> summary;
   final Map<String, dynamic> ledger;
 
   const IbkrPortfolioSnapshot({
     required this.account,
+    this.asOfDate,
     required this.positions,
     required this.summary,
     required this.ledger,
@@ -380,6 +382,7 @@ class IbkrPortfolioSnapshot {
         .toList();
     return IbkrPortfolioSnapshot(
       account: json['account'] as String? ?? '',
+      asOfDate: DateTime.tryParse(json['as_of_date'] as String? ?? ''),
       positions: positions,
       summary: (json['summary'] as Map<String, dynamic>?) ?? const {},
       ledger: (json['ledger'] as Map<String, dynamic>?) ?? const {},

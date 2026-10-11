@@ -412,6 +412,7 @@ class HoldingsPageState extends State<HoldingsPage>
         positions,
         snapshot.netLiquidation,
         netLiquidationUsd: snapshot.netLiquidationUsd?.value,
+        asOfDate: snapshot.asOfDate,
       );
       return positions;
     } catch (error) {
@@ -429,6 +430,7 @@ class HoldingsPageState extends State<HoldingsPage>
     List<Position> positions,
     IbkrAccountValue? netLiquidation, {
     double? netLiquidationUsd,
+    DateTime? asOfDate,
   }) async {
     try {
       await accounts.cachePortfolio(
@@ -436,6 +438,7 @@ class HoldingsPageState extends State<HoldingsPage>
         positions,
         netLiquidation,
         netLiquidationUsd: netLiquidationUsd,
+        asOfDate: asOfDate,
       );
     } catch (error, stack) {
       _reportError(error, stack, 'saving the holdings cache');
