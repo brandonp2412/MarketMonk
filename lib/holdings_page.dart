@@ -20,7 +20,15 @@ import 'package:market_monk/trade_history_page.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 
-enum _HoldingsSort { symbol, value, returnPct, unrealized }
+enum _HoldingsSort {
+  symbol,
+  shares,
+  avgCost,
+  price,
+  value,
+  unrealized,
+  returnPct
+}
 
 /// A summary of a symbol: open position (if any) + full trade history.
 class SymbolSummary {
@@ -838,15 +846,25 @@ class HoldingsPageState extends State<HoldingsPage>
                       decoration: InputDecoration(
                         hintText: context.l10n.text('Search...'),
                         prefixIcon: const Icon(Icons.search),
-                        suffixIcon: _search.text.isEmpty
-                            ? null
-                            : IconButton(
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_search.text.isNotEmpty)
+                              IconButton(
                                 onPressed: () {
                                   _search.clear();
                                   _onSearchChanged();
                                 },
                                 icon: const Icon(Icons.close),
                               ),
+                            IconButton(
+                              key: const Key('desktop-holdings-refresh'),
+                              tooltip: context.l10n.text('Refresh'),
+                              onPressed: _refreshCandles,
+                              icon: const Icon(Icons.refresh_rounded),
+                            ),
+                          ],
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -959,26 +977,29 @@ class HoldingsPageState extends State<HoldingsPage>
   List<SymbolSummary> _sortDesktopSummaries(List<SymbolSummary> summaries) {
     final sorted = [...summaries];
     int compare(SymbolSummary a, SymbolSummary b) {
-      final multiplier = _desktopSortAscending ? 1 : -1;
-      switch (_desktopSort) {
-        case _HoldingsSort.symbol:
-          return multiplier * a.symbol.compareTo(b.symbol);
-        case _HoldingsSort.value:
-          return multiplier *
-              (a.position?.currentValue ?? 0).compareTo(
-                b.position?.currentValue ?? 0,
-              );
-        case _HoldingsSort.returnPct:
-          return multiplier *
-              (a.position?.change ?? double.negativeInfinity).compareTo(
-                b.position?.change ?? double.negativeInfinity,
-              );
-        case _HoldingsSort.unrealized:
-          return multiplier *
-              (a.position?.unrealizedPL ?? double.negativeInfinity).compareTo(
-                b.position?.unrealizedPL ?? double.negativeInfinity,
-              );
+      if (_desktopSort != _HoldingsSort.symbol) {
+        if (a.position == null) return b.position == null ? 0 : 1;
+        if (b.position == null) return -1;
       }
+
+      final comparison = switch (_desktopSort) {
+        _HoldingsSort.symbol => a.symbol.compareTo(b.symbol),
+        _HoldingsSort.shares =>
+          a.position!.netShares.compareTo(b.position!.netShares),
+        _HoldingsSort.avgCost =>
+          a.position!.avgCost.compareTo(b.position!.avgCost),
+        _HoldingsSort.price =>
+          a.position!.currentPrice.compareTo(b.position!.currentPrice),
+        _HoldingsSort.value =>
+          a.position!.currentValue.compareTo(b.position!.currentValue),
+        _HoldingsSort.unrealized =>
+          a.position!.unrealizedPL.compareTo(b.position!.unrealizedPL),
+        _HoldingsSort.returnPct =>
+          a.position!.change.compareTo(b.position!.change),
+      };
+      return comparison == 0
+          ? a.symbol.compareTo(b.symbol)
+          : (_desktopSortAscending ? comparison : -comparison);
     }
 
     sorted.sort(compare);
@@ -1139,22 +1160,6 @@ class HoldingsPageState extends State<HoldingsPage>
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
       child: Column(
         children: [
-          Row(
-            children: [
-              Text(
-                context.l10n.text('Holdings'),
-                style: theme.textTheme.titleLarge,
-              ),
-              const Spacer(),
-              IconButton.filledTonal(
-                key: const Key('desktop-holdings-refresh'),
-                tooltip: context.l10n.text('Refresh'),
-                onPressed: _refreshCandles,
-                icon: const Icon(Icons.refresh_rounded),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
           desktopMetricGrid(
             key: const Key('desktop-holdings-metrics'),
             minCardWidth: 235,
@@ -1220,6 +1225,9 @@ class HoldingsPageState extends State<HoldingsPage>
                                 showCheckboxColumn: _selecting && !ibkrManaged,
                                 sortColumnIndex: switch (_desktopSort) {
                                   _HoldingsSort.symbol => 0,
+                                  _HoldingsSort.shares => 1,
+                                  _HoldingsSort.avgCost => 2,
+                                  _HoldingsSort.price => 3,
                                   _HoldingsSort.value => 4,
                                   _HoldingsSort.unrealized => 5,
                                   _HoldingsSort.returnPct => 6,
@@ -1235,7 +1243,7 @@ class HoldingsPageState extends State<HoldingsPage>
                                 dataRowMinHeight: 62,
                                 dataRowMaxHeight: 70,
                                 horizontalMargin: 18,
-                                columnSpacing: 24,
+                                columnSpacing: 20,
                                 columns: [
                                   DataColumn(
                                     columnWidth: const IntrinsicColumnWidth(),
@@ -1247,16 +1255,22 @@ class HoldingsPageState extends State<HoldingsPage>
                                     columnWidth: const IntrinsicColumnWidth(),
                                     numeric: true,
                                     label: Text(context.l10n.text('Shares')),
+                                    onSort: (_, __) =>
+                                        _setDesktopSort(_HoldingsSort.shares),
                                   ),
                                   DataColumn(
                                     numeric: true,
                                     label: Text(context.l10n.text('Avg cost')),
+                                    onSort: (_, __) =>
+                                        _setDesktopSort(_HoldingsSort.avgCost),
                                   ),
                                   DataColumn(
                                     columnWidth:
                                         const IntrinsicColumnWidth(flex: 1),
                                     numeric: true,
                                     label: Text(context.l10n.text('Price')),
+                                    onSort: (_, __) =>
+                                        _setDesktopSort(_HoldingsSort.price),
                                   ),
                                   DataColumn(
                                     columnWidth:

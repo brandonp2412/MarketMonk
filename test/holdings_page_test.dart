@@ -128,6 +128,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.byType(DataTable), findsOneWidget);
+    expect(find.text('Holdings'), findsOneWidget);
     expect(find.text('VOO'), findsOneWidget);
     final mouse = await tester.createGesture(
       kind: PointerDeviceKind.mouse,
@@ -178,6 +179,95 @@ void main() {
     await tester.pump();
 
     expect(tester.takeException(), null);
+  });
+
+  testWidgets('desktop holdings can sort every column in both directions',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1400, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({});
+    allRatesFromUsd
+      ..clear()
+      ..['USD'] = 1;
+    final accounts = testAccountManager();
+    await accounts.init();
+    final positions = [
+      Position(
+        symbol: 'AAA',
+        name: 'Alpha',
+        nativeCurrency: 'USD',
+        netShares: 5,
+        avgCost: 20,
+        currentPrice: 15,
+        firstBuyDate: DateTime(2025),
+        lastBuyDate: DateTime(2026),
+      ),
+      Position(
+        symbol: 'ZZZ',
+        name: 'Zulu',
+        nativeCurrency: 'USD',
+        netShares: 2,
+        avgCost: 50,
+        currentPrice: 100,
+        firstBuyDate: DateTime(2025),
+        lastBuyDate: DateTime(2026),
+      ),
+    ];
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: HoldingsPage(positionsLoader: (_) async => positions),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    for (final (columnIndex, descendingFirst) in [
+      (0, 'AAA'),
+      (1, 'AAA'),
+      (2, 'ZZZ'),
+      (3, 'ZZZ'),
+      (4, 'ZZZ'),
+      (5, 'ZZZ'),
+      (6, 'ZZZ'),
+    ]) {
+      var table = tester.widget<DataTable>(find.byType(DataTable));
+      expect(table.columns[columnIndex].onSort, isNotNull);
+      table.columns[columnIndex].onSort!(columnIndex, false);
+      await tester.pump();
+      table = tester.widget<DataTable>(find.byType(DataTable));
+      expect(table.sortColumnIndex, columnIndex);
+      final firstDy = tester.getTopLeft(find.text(descendingFirst)).dy;
+      final secondDy = tester
+          .getTopLeft(
+            find.text(descendingFirst == 'AAA' ? 'ZZZ' : 'AAA'),
+          )
+          .dy;
+      expect(firstDy, lessThan(secondDy));
+
+      table.columns[columnIndex].onSort!(columnIndex, true);
+      await tester.pump();
+      table = tester.widget<DataTable>(find.byType(DataTable));
+      expect(table.sortAscending, isNot(columnIndex == 0));
+      expect(
+        tester.getTopLeft(find.text(descendingFirst)).dy,
+        greaterThan(
+          tester
+              .getTopLeft(
+                find.text(descendingFirst == 'AAA' ? 'ZZZ' : 'AAA'),
+              )
+              .dy,
+        ),
+      );
+    }
   });
 
   for (final width in [879.0, 960.0, 1400.0, 1920.0, 2560.0]) {
@@ -236,14 +326,11 @@ void main() {
       expect(find.byKey(const Key('desktop-holdings-metrics')), findsOneWidget);
       expect(find.byKey(const Key('desktop-holdings-refresh')), findsOneWidget);
       expect(
-        tester
-            .getBottomLeft(find.byKey(const Key('desktop-holdings-refresh')))
-            .dy,
-        lessThan(
-          tester
-              .getTopLeft(find.byKey(const Key('desktop-holdings-metrics')))
-              .dy,
+        find.ancestor(
+          of: find.byKey(const Key('desktop-holdings-refresh')),
+          matching: find.byType(TextField),
         ),
+        findsOneWidget,
       );
       expect(
         tester.getTopLeft(find.text('Shares')).dx -
