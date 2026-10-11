@@ -200,6 +200,15 @@ void main() {
 
       expect(find.text('VOO'), findsOneWidget);
       expect(find.bySemanticsLabel('Loading portfolio'), findsOneWidget);
+      final loadingIndicator = find.byType(CircularProgressIndicator);
+      final positioned = tester.widget<Positioned>(
+        find.ancestor(
+          of: loadingIndicator,
+          matching: find.byType(Positioned),
+        ),
+      );
+      expect(positioned.top, 24);
+      expect(positioned.right, 24);
 
       pending.complete(snapshotFor('*****6552', 'VOO'));
       await tester.pumpAndSettle();

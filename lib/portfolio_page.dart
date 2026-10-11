@@ -598,8 +598,8 @@ class PortfolioPageState extends State<PortfolioPage>
                 children: [
                   body,
                   Positioned(
-                    top: 16,
-                    right: 16,
+                    top: 24,
+                    right: 24,
                     child: Semantics(
                       label: context.l10n.text('Loading portfolio'),
                       child: const SizedBox(
