@@ -1140,53 +1140,52 @@ class HoldingsPageState extends State<HoldingsPage>
       child: Column(
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: desktopMetricGrid(
-                  key: const Key('desktop-holdings-metrics'),
-                  minCardWidth: 235,
-                  cards: [
-                    _desktopMetric(
-                      context,
-                      label: context.l10n.text('Market value'),
-                      value: fmtCurrency(totalValue),
-                    ),
-                    _desktopMetric(
-                      context,
-                      label: context.l10n.text('Cost basis'),
-                      value: fmtCurrency(totalCost),
-                    ),
-                    _desktopMetric(
-                      context,
-                      label: context.l10n.text(
-                        cashOutSummary == null ? 'Unrealized P/L' : 'Total P/L',
-                      ),
-                      value:
-                          '${totalUnrealized >= 0 ? '+' : ''}${fmtCurrency(totalUnrealized)}',
-                      detail:
-                          '${totalUnrealizedPct >= 0 ? '+' : ''}${totalUnrealizedPct.toStringAsFixed(2)}%',
-                      valueColor: totalUnrealized >= 0
-                          ? Colors.green
-                          : Colors.redAccent,
-                    ),
-                    _desktopMetric(
-                      context,
-                      label: context.l10n.text('Open positions'),
-                      value: open.length.toString(),
-                      detail:
-                          '$winners positive · ${open.length - winners} negative',
-                    ),
-                  ],
-                ),
+              Text(
+                context.l10n.text('Holdings'),
+                style: theme.textTheme.titleLarge,
               ),
-              const SizedBox(width: 4),
-              Tooltip(
-                message: context.l10n.text('Refresh'),
-                child: IconButton(
-                  onPressed: _refreshCandles,
-                  icon: const Icon(Icons.refresh_rounded),
+              const Spacer(),
+              IconButton.filledTonal(
+                key: const Key('desktop-holdings-refresh'),
+                tooltip: context.l10n.text('Refresh'),
+                onPressed: _refreshCandles,
+                icon: const Icon(Icons.refresh_rounded),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          desktopMetricGrid(
+            key: const Key('desktop-holdings-metrics'),
+            minCardWidth: 235,
+            cards: [
+              _desktopMetric(
+                context,
+                label: context.l10n.text('Market value'),
+                value: fmtCurrency(totalValue),
+              ),
+              _desktopMetric(
+                context,
+                label: context.l10n.text('Cost basis'),
+                value: fmtCurrency(totalCost),
+              ),
+              _desktopMetric(
+                context,
+                label: context.l10n.text(
+                  cashOutSummary == null ? 'Unrealized P/L' : 'Total P/L',
                 ),
+                value:
+                    '${totalUnrealized >= 0 ? '+' : ''}${fmtCurrency(totalUnrealized)}',
+                detail:
+                    '${totalUnrealizedPct >= 0 ? '+' : ''}${totalUnrealizedPct.toStringAsFixed(2)}%',
+                valueColor:
+                    totalUnrealized >= 0 ? Colors.green : Colors.redAccent,
+              ),
+              _desktopMetric(
+                context,
+                label: context.l10n.text('Open positions'),
+                value: open.length.toString(),
+                detail: '$winners positive · ${open.length - winners} negative',
               ),
             ],
           ),
@@ -1197,253 +1196,270 @@ class HoldingsPageState extends State<HoldingsPage>
               clipBehavior: Clip.antiAlias,
               child: Builder(
                 builder: (context) {
-                  return Scrollbar(
-                    key: const Key('desktop-holdings-horizontal-scrollbar'),
-                    controller: _desktopTableHorizontalScrollController,
-                    thumbVisibility: true,
-                    notificationPredicate: (notification) =>
-                        notification.depth == 0,
-                    child: SingleChildScrollView(
-                      key: const Key('desktop-holdings-horizontal-scroll'),
+                  return LayoutBuilder(
+                    builder: (context, constraints) => Scrollbar(
+                      key: const Key('desktop-holdings-horizontal-scrollbar'),
                       controller: _desktopTableHorizontalScrollController,
-                      scrollDirection: Axis.horizontal,
-                      child: Align(
-                        alignment: Alignment.topLeft,
-                        child: Scrollbar(
-                          controller: _desktopTableScrollController,
-                          child: SingleChildScrollView(
+                      thumbVisibility: true,
+                      notificationPredicate: (notification) =>
+                          notification.depth == 0,
+                      child: SingleChildScrollView(
+                        key: const Key('desktop-holdings-horizontal-scroll'),
+                        controller: _desktopTableHorizontalScrollController,
+                        scrollDirection: Axis.horizontal,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minWidth: (constraints.maxWidth - 8)
+                                .clamp(0, double.infinity),
+                          ),
+                          child: Scrollbar(
                             controller: _desktopTableScrollController,
-                            child: DataTable(
-                              showCheckboxColumn: _selecting && !ibkrManaged,
-                              sortColumnIndex: switch (_desktopSort) {
-                                _HoldingsSort.symbol => 0,
-                                _HoldingsSort.value => 4,
-                                _HoldingsSort.unrealized => 5,
-                                _HoldingsSort.returnPct => 6,
-                              },
-                              sortAscending: _desktopSortAscending,
-                              headingRowColor: WidgetStatePropertyAll(
-                                theme.colorScheme.surfaceContainerLow,
-                              ),
-                              headingTextStyle:
-                                  theme.textTheme.labelMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                              dataRowMinHeight: 62,
-                              dataRowMaxHeight: 70,
-                              horizontalMargin: 18,
-                              columnSpacing: 24,
-                              columns: [
-                                DataColumn(
-                                  columnWidth: const IntrinsicColumnWidth(),
-                                  label: Text(context.l10n.text('Holding')),
-                                  onSort: (_, __) =>
-                                      _setDesktopSort(_HoldingsSort.symbol),
+                            child: SingleChildScrollView(
+                              controller: _desktopTableScrollController,
+                              child: DataTable(
+                                showCheckboxColumn: _selecting && !ibkrManaged,
+                                sortColumnIndex: switch (_desktopSort) {
+                                  _HoldingsSort.symbol => 0,
+                                  _HoldingsSort.value => 4,
+                                  _HoldingsSort.unrealized => 5,
+                                  _HoldingsSort.returnPct => 6,
+                                },
+                                sortAscending: _desktopSortAscending,
+                                headingRowColor: WidgetStatePropertyAll(
+                                  theme.colorScheme.surfaceContainerLow,
                                 ),
-                                DataColumn(
-                                  numeric: true,
-                                  label: Text(context.l10n.text('Shares')),
+                                headingTextStyle:
+                                    theme.textTheme.labelMedium?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
                                 ),
-                                DataColumn(
-                                  numeric: true,
-                                  label: Text(context.l10n.text('Avg cost')),
-                                ),
-                                DataColumn(
-                                  numeric: true,
-                                  label: Text(context.l10n.text('Price')),
-                                ),
-                                DataColumn(
-                                  numeric: true,
-                                  label: Text(
-                                    context.l10n.text(
-                                      'Market value',
+                                dataRowMinHeight: 62,
+                                dataRowMaxHeight: 70,
+                                horizontalMargin: 18,
+                                columnSpacing: 24,
+                                columns: [
+                                  DataColumn(
+                                    columnWidth: const IntrinsicColumnWidth(),
+                                    label: Text(context.l10n.text('Holding')),
+                                    onSort: (_, __) =>
+                                        _setDesktopSort(_HoldingsSort.symbol),
+                                  ),
+                                  DataColumn(
+                                    columnWidth: const IntrinsicColumnWidth(),
+                                    numeric: true,
+                                    label: Text(context.l10n.text('Shares')),
+                                  ),
+                                  DataColumn(
+                                    numeric: true,
+                                    label: Text(context.l10n.text('Avg cost')),
+                                  ),
+                                  DataColumn(
+                                    columnWidth:
+                                        const IntrinsicColumnWidth(flex: 1),
+                                    numeric: true,
+                                    label: Text(context.l10n.text('Price')),
+                                  ),
+                                  DataColumn(
+                                    columnWidth:
+                                        const IntrinsicColumnWidth(flex: 1),
+                                    numeric: true,
+                                    label: Text(
+                                      context.l10n.text(
+                                        'Market value',
+                                      ),
+                                    ),
+                                    onSort: (_, __) =>
+                                        _setDesktopSort(_HoldingsSort.value),
+                                  ),
+                                  DataColumn(
+                                    columnWidth:
+                                        const IntrinsicColumnWidth(flex: 1),
+                                    numeric: true,
+                                    label: Text(context.l10n.text('P/L')),
+                                    onSort: (_, __) => _setDesktopSort(
+                                      _HoldingsSort.unrealized,
                                     ),
                                   ),
-                                  onSort: (_, __) =>
-                                      _setDesktopSort(_HoldingsSort.value),
-                                ),
-                                DataColumn(
-                                  numeric: true,
-                                  label: Text(context.l10n.text('P/L')),
-                                  onSort: (_, __) =>
-                                      _setDesktopSort(_HoldingsSort.unrealized),
-                                ),
-                                DataColumn(
-                                  numeric: true,
-                                  label: Text(context.l10n.text('Return')),
-                                  onSort: (_, __) =>
-                                      _setDesktopSort(_HoldingsSort.returnPct),
-                                ),
-                              ],
-                              rows: [
-                                for (final summary in sorted)
-                                  (() {
-                                    final position = summary.position;
-                                    final isClosed = position == null;
-                                    final returnPct = position?.change ?? 0;
-                                    final pnl = position?.unrealizedPL;
-                                    final pnlText = pnl == null
-                                        ? '—'
-                                        : '${pnl >= 0 ? '+' : ''}${fmtCurrency(pnl)}';
-                                    final shares = position == null
-                                        ? '—'
-                                        : position.netShares.toStringAsFixed(
-                                            position.netShares ==
-                                                    position.netShares
-                                                        .roundToDouble()
-                                                ? 0
-                                                : 3,
-                                          );
-                                    final changeColor = isClosed
-                                        ? theme.colorScheme.onSurfaceVariant
-                                        : returnPct >= 0
-                                            ? Colors.green
-                                            : Colors.redAccent;
-                                    final pnlColor = pnl == null
-                                        ? null
-                                        : pnl >= 0
-                                            ? Colors.green
-                                            : Colors.redAccent;
+                                  DataColumn(
+                                    columnWidth:
+                                        const IntrinsicColumnWidth(flex: 1),
+                                    numeric: true,
+                                    label: Text(context.l10n.text('Return')),
+                                    onSort: (_, __) => _setDesktopSort(
+                                      _HoldingsSort.returnPct,
+                                    ),
+                                  ),
+                                ],
+                                rows: [
+                                  for (final summary in sorted)
+                                    (() {
+                                      final position = summary.position;
+                                      final isClosed = position == null;
+                                      final returnPct = position?.change ?? 0;
+                                      final pnl = position?.unrealizedPL;
+                                      final pnlText = pnl == null
+                                          ? '—'
+                                          : '${pnl >= 0 ? '+' : ''}${fmtCurrency(pnl)}';
+                                      final shares = position == null
+                                          ? '—'
+                                          : position.netShares.toStringAsFixed(
+                                              position.netShares ==
+                                                      position.netShares
+                                                          .roundToDouble()
+                                                  ? 0
+                                                  : 3,
+                                            );
+                                      final changeColor = isClosed
+                                          ? theme.colorScheme.onSurfaceVariant
+                                          : returnPct >= 0
+                                              ? Colors.green
+                                              : Colors.redAccent;
+                                      final pnlColor = pnl == null
+                                          ? null
+                                          : pnl >= 0
+                                              ? Colors.green
+                                              : Colors.redAccent;
 
-                                    return DataRow(
-                                      selected: _selectedSymbols.contains(
-                                        summary.symbol,
-                                      ),
-                                      onSelectChanged:
-                                          _selecting && !ibkrManaged
-                                              ? (_) => toggleSelection(summary)
-                                              : null,
-                                      cells: [
-                                        DataCell(
-                                          DesktopContextMenu(
-                                            actionsBuilder: () =>
-                                                _holdingActions(
-                                              summary,
-                                              ibkrManaged,
-                                            ),
-                                            child: Row(
-                                              children: [
-                                                Icon(
-                                                  isClosed
-                                                      ? Icons.history_rounded
-                                                      : returnPct >= 0
-                                                          ? Icons
-                                                              .trending_up_rounded
-                                                          : Icons
-                                                              .trending_down_rounded,
-                                                  size: 20,
-                                                  color: changeColor,
-                                                ),
-                                                const SizedBox(width: 10),
-                                                Expanded(
-                                                  child: Column(
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment
-                                                            .center,
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Row(
-                                                        children: [
-                                                          Flexible(
-                                                            child: Text(
-                                                              summary.symbol,
-                                                              overflow:
-                                                                  TextOverflow
-                                                                      .ellipsis,
-                                                              style: theme
-                                                                  .textTheme
-                                                                  .titleSmall
-                                                                  ?.copyWith(),
-                                                            ),
-                                                          ),
-                                                          if (isClosed) ...[
-                                                            const SizedBox(
-                                                              width: 8,
-                                                            ),
-                                                            Text(
-                                                              context.l10n.text(
-                                                                'Closed',
-                                                              ),
-                                                              style: theme
-                                                                  .textTheme
-                                                                  .labelSmall
-                                                                  ?.copyWith(
-                                                                color: theme
-                                                                    .colorScheme
-                                                                    .onSurfaceVariant,
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ],
-                                                      ),
-                                                      Text(
-                                                        summary.name,
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                        style: theme
-                                                            .textTheme.bodySmall
-                                                            ?.copyWith(
-                                                          color: theme
-                                                              .colorScheme
-                                                              .onSurfaceVariant,
-                                                        ),
-                                                      ),
-                                                    ],
+                                      return DataRow(
+                                        selected: _selectedSymbols.contains(
+                                          summary.symbol,
+                                        ),
+                                        onSelectChanged: _selecting &&
+                                                !ibkrManaged
+                                            ? (_) => toggleSelection(summary)
+                                            : null,
+                                        cells: [
+                                          DataCell(
+                                            DesktopContextMenu(
+                                              actionsBuilder: () =>
+                                                  _holdingActions(
+                                                summary,
+                                                ibkrManaged,
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    isClosed
+                                                        ? Icons.history_rounded
+                                                        : returnPct >= 0
+                                                            ? Icons
+                                                                .trending_up_rounded
+                                                            : Icons
+                                                                .trending_down_rounded,
+                                                    size: 20,
+                                                    color: changeColor,
                                                   ),
-                                                ),
-                                              ],
+                                                  const SizedBox(width: 10),
+                                                  Expanded(
+                                                    child: Column(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .center,
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Row(
+                                                          children: [
+                                                            Flexible(
+                                                              child: Text(
+                                                                summary.symbol,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                                style: theme
+                                                                    .textTheme
+                                                                    .titleSmall
+                                                                    ?.copyWith(),
+                                                              ),
+                                                            ),
+                                                            if (isClosed) ...[
+                                                              const SizedBox(
+                                                                width: 8,
+                                                              ),
+                                                              Text(
+                                                                context.l10n
+                                                                    .text(
+                                                                  'Closed',
+                                                                ),
+                                                                style: theme
+                                                                    .textTheme
+                                                                    .labelSmall
+                                                                    ?.copyWith(
+                                                                  color: theme
+                                                                      .colorScheme
+                                                                      .onSurfaceVariant,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ],
+                                                        ),
+                                                        Text(
+                                                          summary.name,
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                          style: theme.textTheme
+                                                              .bodySmall
+                                                              ?.copyWith(
+                                                            color: theme
+                                                                .colorScheme
+                                                                .onSurfaceVariant,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
+                                            onTap: _selecting
+                                                ? null
+                                                : () => _openDetail(summary),
                                           ),
-                                          onTap: _selecting
-                                              ? null
-                                              : () => _openDetail(summary),
-                                        ),
-                                        textCell(shares, summary: summary),
-                                        textCell(
-                                          position == null
-                                              ? '—'
-                                              : fmtNativeCurrency(
-                                                  position.avgCost,
-                                                  position.nativeCurrency,
-                                                ),
-                                          summary: summary,
-                                        ),
-                                        textCell(
-                                          position == null
-                                              ? '—'
-                                              : fmtNativeCurrency(
-                                                  position.currentPrice,
-                                                  position.nativeCurrency,
-                                                ),
-                                          summary: summary,
-                                        ),
-                                        textCell(
-                                          position == null
-                                              ? '—'
-                                              : fmtCurrency(
-                                                  position.currentValue,
-                                                ),
-                                          summary: summary,
-                                        ),
-                                        textCell(
-                                          pnlText,
-                                          summary: summary,
-                                          color: pnlColor,
-                                        ),
-                                        textCell(
-                                          position == null
-                                              ? '—'
-                                              : '${returnPct >= 0 ? '+' : ''}${returnPct.toStringAsFixed(2)}%',
-                                          summary: summary,
-                                          color: changeColor,
-                                        ),
-                                      ],
-                                    );
-                                  })(),
-                              ],
+                                          textCell(shares, summary: summary),
+                                          textCell(
+                                            position == null
+                                                ? '—'
+                                                : fmtNativeCurrency(
+                                                    position.avgCost,
+                                                    position.nativeCurrency,
+                                                  ),
+                                            summary: summary,
+                                          ),
+                                          textCell(
+                                            position == null
+                                                ? '—'
+                                                : fmtNativeCurrency(
+                                                    position.currentPrice,
+                                                    position.nativeCurrency,
+                                                  ),
+                                            summary: summary,
+                                          ),
+                                          textCell(
+                                            position == null
+                                                ? '—'
+                                                : fmtCurrency(
+                                                    position.currentValue,
+                                                  ),
+                                            summary: summary,
+                                          ),
+                                          textCell(
+                                            pnlText,
+                                            summary: summary,
+                                            color: pnlColor,
+                                          ),
+                                          textCell(
+                                            position == null
+                                                ? '—'
+                                                : '${returnPct >= 0 ? '+' : ''}${returnPct.toStringAsFixed(2)}%',
+                                            summary: summary,
+                                            color: changeColor,
+                                          ),
+                                        ],
+                                      );
+                                    })(),
+                                ],
+                              ),
                             ),
                           ),
                         ),

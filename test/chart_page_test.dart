@@ -26,6 +26,45 @@ void main() {
     expect(small[1], closeTo(20, 1e-9));
   });
 
+  testWidgets('short charts do not scroll just to clear the floating dock',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create: (_) => SettingsState(
+              localCurrencyDetector: () async => 'USD',
+            ),
+          ),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: const MyApp(),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final scroll = find.byKey(const Key('charts-main-scroll'));
+    expect(scroll, findsOneWidget);
+    final scrollable = tester.state<ScrollableState>(
+      find.descendant(of: scroll, matching: find.byType(Scrollable)).first,
+    );
+    expect(scrollable.position.maxScrollExtent, 0);
+    await tester.drag(scroll, const Offset(0, -120));
+    await tester.pump();
+    expect(scrollable.position.pixels, 0);
+    expect(tester.takeException(), null);
+  });
+
   testWidgets('inactive kept-alive charts do not fetch in background',
       (tester) async {
     await seedTestSqlite({});

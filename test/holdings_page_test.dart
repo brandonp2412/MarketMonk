@@ -180,7 +180,7 @@ void main() {
     expect(tester.takeException(), null);
   });
 
-  for (final width in [879.0, 960.0, 1400.0, 1920.0]) {
+  for (final width in [879.0, 960.0, 1400.0, 1920.0, 2560.0]) {
     testWidgets('desktop holdings at ${width}px sizes holding to its content',
         (tester) async {
       tester.view.devicePixelRatio = 1;
@@ -234,6 +234,17 @@ void main() {
         expect(find.text(header), findsWidgets);
       }
       expect(find.byKey(const Key('desktop-holdings-metrics')), findsOneWidget);
+      expect(find.byKey(const Key('desktop-holdings-refresh')), findsOneWidget);
+      expect(
+        tester
+            .getBottomLeft(find.byKey(const Key('desktop-holdings-refresh')))
+            .dy,
+        lessThan(
+          tester
+              .getTopLeft(find.byKey(const Key('desktop-holdings-metrics')))
+              .dy,
+        ),
+      );
       expect(
         tester.getTopLeft(find.text('Shares')).dx -
             tester.getTopLeft(find.text('Holding')).dx,
@@ -293,7 +304,14 @@ void main() {
         await tester.pumpAndSettle();
       } else {
         expect(controller.position.maxScrollExtent, 0);
-        expect(tester.getSize(find.byType(DataTable)).width, lessThan(width));
+        final tableWidth = tester.getSize(find.byType(DataTable)).width;
+        final viewportWidth = tester
+            .getSize(
+              find.byKey(const Key('desktop-holdings-horizontal-scroll')),
+            )
+            .width;
+        expect(tableWidth, greaterThanOrEqualTo(viewportWidth - 16));
+        expect(tableWidth, lessThan(width));
       }
       expect(tester.takeException(), null);
       expect(tester.getCenter(find.text('Return')).dx, lessThan(width));

@@ -104,6 +104,7 @@ class ChartsPageState extends State<ChartsPage>
   // laid out at a degenerate size, e.g. before the Linux window is realized).
   final _overlayKey = GlobalKey();
   double _overlayHeight = 80.0;
+  double _chartBottomPadding = 0;
 
   int years = 1;
   int months = 0;
@@ -1930,30 +1931,51 @@ class ChartsPageState extends State<ChartsPage>
 
   Widget _buildChartContent(SettingsState settings, List<Color> accountColors) {
     final desktop = isDesktopLayout(context);
-    return RefreshIndicator(
-      // The search field is a floating overlay above this scroll view. Offset
-      // pull-to-refresh so its progress indicator is never painted underneath
-      // that overlay.
-      edgeOffset: _overlayHeight + 8,
-      triggerMode: RefreshIndicatorTriggerMode.anywhere,
-      onRefresh: _refreshCurrentChart,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.only(
-          top: _overlayHeight + 8,
-          bottom: desktop ? 24 : bottomNavScrollClearance,
-        ),
-        children: [
-          _buildTimeChips(),
-          if (settings.showMarketClosed && _isMarketClosed()) ...[
-            const SizedBox(height: 8),
-            _buildMarketClosedBanner(settings),
+    return NotificationListener<ScrollMetricsNotification>(
+      onNotification: (notification) {
+        if (desktop ||
+            notification.depth != 0 ||
+            notification.metrics.axis != Axis.vertical) {
+          return false;
+        }
+        final desiredPadding =
+            notification.metrics.maxScrollExtent > _chartBottomPadding + 0.5
+                ? bottomNavScrollClearance
+                : 0.0;
+        if (desiredPadding != _chartBottomPadding) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _chartBottomPadding != desiredPadding) {
+              setState(() => _chartBottomPadding = desiredPadding);
+            }
+          });
+        }
+        return false;
+      },
+      child: RefreshIndicator(
+        edgeOffset: _overlayHeight + 8,
+        triggerMode: RefreshIndicatorTriggerMode.anywhere,
+        onRefresh: _refreshCurrentChart,
+        child: ListView(
+          key: const Key('charts-main-scroll'),
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: ClampingScrollPhysics(),
+          ),
+          padding: EdgeInsets.only(
+            top: _overlayHeight + 8,
+            bottom: desktop ? 24 : _chartBottomPadding,
+          ),
+          children: [
+            _buildTimeChips(),
+            if (settings.showMarketClosed && _isMarketClosed()) ...[
+              const SizedBox(height: 8),
+              _buildMarketClosedBanner(settings),
+            ],
+            if (_mode == _ChartMode.stock)
+              ..._buildStockContent(settings)
+            else
+              ..._buildPortfolioContent(settings, accountColors),
           ],
-          if (_mode == _ChartMode.stock)
-            ..._buildStockContent(settings)
-          else
-            ..._buildPortfolioContent(settings, accountColors),
-        ],
+        ),
       ),
     );
   }
