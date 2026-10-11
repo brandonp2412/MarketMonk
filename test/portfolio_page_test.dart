@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:csv/csv.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -110,9 +111,9 @@ PortfolioPage _portfolioPage({
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  Position cachedPosition() => Position(
+  Position cachedPosition({String name = 'VANGUARD S&P 500 ETF'}) => Position(
         symbol: 'VOO',
-        name: 'VANGUARD S&P 500 ETF',
+        name: name,
         nativeCurrency: 'USD',
         netShares: 10,
         avgCost: 500,
@@ -671,7 +672,7 @@ void main() {
       final accounts = await configuredAccounts();
       await accounts.cachePortfolio(
         'Default',
-        [cachedPosition()],
+        [cachedPosition(name: 'Vanguard, "Special"\nETF')],
         const IbkrAccountValue(value: 5500, currency: 'USD'),
       );
       final pending = Completer<IbkrPortfolioSnapshot>();
@@ -711,6 +712,11 @@ void main() {
       final csv = File(file.path).readAsStringSync();
       expect(csv, contains('Symbol,Name,Shares,Avg Cost'));
       expect(csv, contains('VOO'));
+      final rows = Csv(fieldDelimiter: ',').decode(csv);
+      expect(rows[1][0], 'VOO');
+      expect(rows[1][1], 'Vanguard, "Special"\nETF');
+      expect(rows[1][2], '10.000000');
+      expect(csv.endsWith('\n'), isTrue);
       expect(
         find.text('Couldn’t share CSV'),
         fails ? findsOneWidget : findsNothing,

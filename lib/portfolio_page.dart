@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -496,31 +497,40 @@ class PortfolioPageState extends State<PortfolioPage>
     String accountName,
     List<Position> positions,
   ) {
-    final buf = StringBuffer();
-    buf.writeln(
-      'Symbol,Name,Shares,Avg Cost,Current Price,Current Value,Cost Basis,Unrealized P/L,% Change,Last Purchase Date',
-    );
     final dateFmt = DateFormat('yyyy-MM-dd');
-    for (final position in positions) {
-      final cells = [
-        position.symbol,
-        '"${position.name.replaceAll('"', '""')}"',
-        position.netShares.toStringAsFixed(6),
-        position.avgCost.toStringAsFixed(4),
-        position.currentPrice.toStringAsFixed(4),
-        position.currentValue.toStringAsFixed(2),
-        position.costBasis.toStringAsFixed(2),
-        position.unrealizedPL.toStringAsFixed(2),
-        position.change.toStringAsFixed(2),
-        dateFmt.format(position.lastBuyDate),
-      ];
-      buf.writeln(cells.join(','));
-    }
+    final rows = <List<dynamic>>[
+      [
+        'Symbol',
+        'Name',
+        'Shares',
+        'Avg Cost',
+        'Current Price',
+        'Current Value',
+        'Cost Basis',
+        'Unrealized P/L',
+        '% Change',
+        'Last Purchase Date',
+      ],
+      for (final position in positions)
+        [
+          position.symbol,
+          position.name,
+          position.netShares.toStringAsFixed(6),
+          position.avgCost.toStringAsFixed(4),
+          position.currentPrice.toStringAsFixed(4),
+          position.currentValue.toStringAsFixed(2),
+          position.costBasis.toStringAsFixed(2),
+          position.unrealizedPL.toStringAsFixed(2),
+          position.change.toStringAsFixed(2),
+          dateFmt.format(position.lastBuyDate),
+        ],
+    ];
+    final content = '${Csv(lineDelimiter: '\n').encode(rows)}\n';
 
     final safeName = accountName.replaceAll(RegExp(r'[^\w-]'), '_');
     return (
       fileName: 'positions_$safeName.csv',
-      bytes: Uint8List.fromList(utf8.encode(buf.toString())),
+      bytes: Uint8List.fromList(utf8.encode(content)),
     );
   }
 

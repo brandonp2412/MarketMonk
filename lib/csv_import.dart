@@ -1,3 +1,4 @@
+import 'package:csv/csv.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/logging.dart';
 
@@ -270,59 +271,15 @@ Future<int> importTrades(
   return count;
 }
 
-/// Minimal CSV parser that handles quoted fields containing commas and newlines.
+/// Normalizes broker CSV records while delegating CSV syntax to package:csv.
 List<List<String>> _parseCsv(String content) {
-  // Strip leading UTF-8 BOM(s) (\uFEFF)
   var text = content;
   while (text.isNotEmpty && text.codeUnitAt(0) == 0xFEFF) {
     text = text.substring(1);
   }
-
-  final rows = <List<String>>[];
-  var currentRow = <String>[];
-  final buffer = StringBuffer();
-  var inQuotes = false;
-
-  for (var characterIndex = 0; characterIndex < text.length; characterIndex++) {
-    final char = text[characterIndex];
-
-    if (inQuotes) {
-      if (char == '"') {
-        if (characterIndex + 1 < text.length &&
-            text[characterIndex + 1] == '"') {
-          buffer.write('"');
-          characterIndex++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        buffer.write(char);
-      }
-    } else {
-      if (char == '"') {
-        inQuotes = true;
-      } else if (char == ',') {
-        currentRow.add(buffer.toString());
-        buffer.clear();
-      } else if (char == '\n') {
-        currentRow.add(buffer.toString());
-        buffer.clear();
-        if (currentRow.any((field) => field.isNotEmpty)) {
-          rows.add(List.from(currentRow));
-        }
-        currentRow = [];
-      } else if (char != '\r') {
-        buffer.write(char);
-      }
-    }
-  }
-
-  if (buffer.isNotEmpty || currentRow.isNotEmpty) {
-    currentRow.add(buffer.toString());
-    if (currentRow.any((field) => field.isNotEmpty)) {
-      rows.add(currentRow);
-    }
-  }
-
-  return rows;
+  return Csv(fieldDelimiter: ',')
+      .decode(text)
+      .map((row) => row.map((value) => value.toString()).toList())
+      .where((row) => row.any((field) => field.isNotEmpty))
+      .toList();
 }

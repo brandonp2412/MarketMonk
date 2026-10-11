@@ -48,6 +48,19 @@ const _ibkrCsvMinimal =
     '"U1234","","","USD","CASH","","NZD.USD","NZD.USD","99999","","","","","","","","","","","","","1","","","","","ExchTrade","999","888","xxx","yyy","","","","0","","","N/A","0","20260413;150000","20260413;150000","20260413","20260413","20260413","IDEALFX","BUY","100","0.58","58","-58","0","0","0","","","","","","","NZD","0","0","0","0","","","EXECUTION","","N","","0","","","","","","0.0","0.0"\n';
 
 void main() {
+  test('Tiger CSV handles BOM, CRLF, embedded quotes and newlines', () {
+    final content =
+        '\uFEFF${_tigerCsvMinimal.replaceAll('\n', '\r\n').replaceAll(
+              '"Meta Platforms, Inc. (META)"',
+              '"Meta ""Platforms"", Inc. (META)"',
+            )}';
+    final trades = TigerBrokersParser().parse(content).trades;
+    expect(trades, hasLength(3));
+    final meta = trades.singleWhere((trade) => trade.symbol == 'META');
+    expect(meta.name, 'Meta "Platforms", Inc.');
+    expect(meta.tradeDate, DateTime(2025, 4, 1));
+  });
+
   // ─── TigerBrokersParser — Trades section ───────────────────────────────────
   group('TigerBrokersParser — trades', () {
     late ParseResult result;
