@@ -1,0 +1,10 @@
+• Add more space to right of charts
+• Add setting for hiding $ amounts
+• Center Market Monk chart tooltip text
+• Complete Dutch localization
+• Complete Indonesian localization
+• Complete Polish localization
+• Complete Russian localization
+• Complete Thai localization
+• Complete Turkish localization
+• Complete Vietnamese localization
