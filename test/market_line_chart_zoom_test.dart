@@ -7,6 +7,8 @@ import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/portfolio_chart_scale.dart';
 
+const _multiLineScrubIntervalForTest = Duration(milliseconds: 50);
+
 void main() {
   Widget chart({
     double valueOffset = 0,
@@ -14,6 +16,7 @@ void main() {
     bool showRollingAverage = false,
     int pointCount = 10,
     List<MarketLineChartSeries>? series,
+    ValueChanged<int>? onTooltipIndex,
   }) =>
       MaterialApp(
         theme: ThemeData(platform: TargetPlatform.linux),
@@ -43,7 +46,10 @@ void main() {
                   xLabels: List.generate(pointCount, (i) => 'Day $i'),
                   pointCount: pointCount,
                   yLabelFormatter: (value) => value.toStringAsFixed(1),
-                  tooltipRowLabel: (mark) => 'Column ${mark.index}',
+                  tooltipRowLabel: (mark) {
+                    onTooltipIndex?.call(mark.index);
+                    return 'Column ${mark.index}';
+                  },
                   showRollingAverage: showRollingAverage,
                   curveLines: false,
                   curveSmoothness: 0,
@@ -120,6 +126,68 @@ void main() {
     await tester.tap(find.byTooltip('Reset zoom'));
     await tester.pump();
     expect(scene(tester).marks, hasLength(10));
+  });
+
+  testWidgets('mouse zoom drag keeps tooltip tracking the drag column',
+      (tester) async {
+    final tooltipIndexes = <int>[];
+    await tester.pumpWidget(chart(onTooltipIndex: tooltipIndexes.add));
+    final current = scene(tester);
+    final start = current.marks.firstWhere((mark) => mark.index == 2).center;
+    final end = current.marks.firstWhere((mark) => mark.index == 7).center;
+    final gesture = await tester.startGesture(
+      start,
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pump();
+
+    tooltipIndexes.clear();
+    await gesture.moveTo(end);
+    await tester.pump();
+
+    expect(tooltipIndexes, contains(7));
+    await gesture.up();
+    await tester.pump();
+    expect(scene(tester).marks.map((mark) => mark.index), [2, 3, 4, 5, 6, 7]);
+  });
+
+  testWidgets('multi-line long-press scrub coalesces rapid tooltip updates',
+      (tester) async {
+    final tooltipIndexes = <int>[];
+    final lines = [
+      for (var line = 0; line < 2; line++)
+        MarketLineChartSeries(
+          color: line == 0 ? Colors.blue : Colors.red,
+          points: [
+            for (var i = 0; i < 10; i++)
+              MarketLineChartPoint(i.toDouble(), i + line.toDouble()),
+          ],
+        ),
+    ];
+    await tester.pumpWidget(
+      chart(series: lines, onTooltipIndex: tooltipIndexes.add),
+    );
+    final current = scene(tester);
+    final start = current.marks.firstWhere((mark) => mark.index == 2).center;
+    final middle = current.marks.firstWhere((mark) => mark.index == 4).center;
+    final end = current.marks.firstWhere((mark) => mark.index == 7).center;
+    final gesture = await tester.startGesture(start);
+    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 10));
+
+    tooltipIndexes.clear();
+    await gesture.moveTo(middle);
+    await tester.pump();
+    expect(tooltipIndexes, contains(4));
+
+    tooltipIndexes.clear();
+    await gesture.moveTo(end);
+    await tester.pump();
+    expect(tooltipIndexes, isNot(contains(7)));
+
+    await tester.pump(_multiLineScrubIntervalForTest);
+    expect(tooltipIndexes, contains(7));
+    await gesture.up();
+    await tester.pump();
   });
 
   Future<void> rightClick(WidgetTester tester, Offset position) async {

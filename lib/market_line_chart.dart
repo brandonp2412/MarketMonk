@@ -64,6 +64,7 @@ const _tooltipFontSize = 10.0;
 const _tooltipSwatchSize = 8.0;
 const _tooltipSwatchGap = 6.0;
 const _activeDotRadius = 6.0;
+const _multiLineScrubInterval = Duration(milliseconds: 50);
 
 void _drawNeonDot(
   Canvas canvas, {
@@ -401,6 +402,8 @@ class _MarketLineChartInteractionState
   Offset? _dragStart;
   double? _dragX;
   int? _dragPointer;
+  Timer? _scrubThrottleTimer;
+  int? _pendingScrubIndex;
 
   (int, int)? get _range => widget.range ?? _zoom;
 
@@ -455,7 +458,50 @@ class _MarketLineChartInteractionState
     _activeIndex.value = ChartHitTest.nearestIndexAtX(scene, position.dx);
   }
 
+  void _activateScrub(Offset position, ChartScene scene) {
+    final index = ChartHitTest.nearestIndexAtX(scene, position.dx);
+    if (index == null) {
+      _clear();
+      return;
+    }
+    if (ChartHitTest.marksAtIndex(scene, index).length <= 1) {
+      _cancelScrubThrottle();
+      _activeIndex.value = index;
+      return;
+    }
+    if (_scrubThrottleTimer == null) {
+      _activeIndex.value = index;
+      _scrubThrottleTimer = Timer(
+        _multiLineScrubInterval,
+        _flushPendingScrubIndex,
+      );
+      return;
+    }
+    _pendingScrubIndex = index;
+  }
+
+  void _flushPendingScrubIndex() {
+    final index = _pendingScrubIndex;
+    _pendingScrubIndex = null;
+    if (index == null) {
+      _scrubThrottleTimer = null;
+      return;
+    }
+    _activeIndex.value = index;
+    _scrubThrottleTimer = Timer(
+      _multiLineScrubInterval,
+      _flushPendingScrubIndex,
+    );
+  }
+
+  void _cancelScrubThrottle() {
+    _scrubThrottleTimer?.cancel();
+    _scrubThrottleTimer = null;
+    _pendingScrubIndex = null;
+  }
+
   void _clear() {
+    _cancelScrubThrottle();
     _activeIndex.value = null;
   }
 
@@ -489,6 +535,7 @@ class _MarketLineChartInteractionState
 
   @override
   void dispose() {
+    _cancelScrubThrottle();
     _activeIndex.dispose();
     super.dispose();
   }
@@ -506,7 +553,9 @@ class _MarketLineChartInteractionState
 
         return MouseRegion(
           onHover: (event) => _activate(event.localPosition, scene),
-          onExit: (_) => _clear(),
+          onExit: (_) {
+            if (_dragPointer == null) _clear();
+          },
           child: Listener(
             behavior: HitTestBehavior.opaque,
             onPointerDown: (event) {
@@ -529,8 +578,8 @@ class _MarketLineChartInteractionState
               if (event.pointer != _dragPointer || _dragStart == null) return;
               setState(() {
                 _dragX = event.localPosition.dx;
-                _clear();
               });
+              _activate(event.localPosition, scene);
             },
             onPointerUp: (event) {
               if (event.pointer == _dragPointer) {
@@ -587,9 +636,13 @@ class _MarketLineChartInteractionState
               onLongPressStart: (details) =>
                   _activate(details.localPosition, scene),
               onLongPressMoveUpdate: (details) =>
-                  _activate(details.localPosition, scene),
-              onLongPressEnd: (_) => _clear(),
-              onLongPressCancel: _clear,
+                  _activateScrub(details.localPosition, scene),
+              onLongPressEnd: (_) {
+                if (_dragPointer == null) _clear();
+              },
+              onLongPressCancel: () {
+                if (_dragPointer == null) _clear();
+              },
               child: Stack(
                 fit: StackFit.expand,
                 children: [
