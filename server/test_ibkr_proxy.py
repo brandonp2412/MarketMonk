@@ -22,6 +22,7 @@ from ibkr_proxy import (
     NativeIbkrClient,
     _mask_account,
     _normalize_web_position,
+    _portfolio_snapshot_metadata,
     make_handler,
 )
 
@@ -604,6 +605,26 @@ class ProxyTests(unittest.TestCase):
         self.assertEqual(position["market_value"], 3105.84)
         self.assertEqual(position["average_cost"], 266.2)
         self.assertEqual(position["unrealized_pnl"], 88.5)
+
+    def test_provisional_portfolio_date_uses_latest_us_trading_weekday(self):
+        portfolio = raw_portfolio()
+        samples = [
+            ("2026-10-13T04:00:00+00:00", "2026-10-12"),  # Tue just after NY midnight
+            ("2026-10-12T12:00:00+00:00", "2026-10-09"),  # Mon premarket
+            ("2026-10-12T20:30:00+00:00", "2026-10-12"),  # Mon close
+            ("2026-10-11T17:00:00+00:00", "2026-10-09"),  # Sunday
+            ("2026-07-06T13:00:00+00:00", "2026-07-03"),  # EDT, premarket
+        ]
+        for observed, expected in samples:
+            with self.subTest(observed=observed):
+                result = _portfolio_snapshot_metadata(
+                    portfolio, observed_at=datetime.fromisoformat(observed)
+                )
+                self.assertEqual(result["snapshot_date"], expected)
+                self.assertEqual(result["observed_at"], observed)
+                self.assertEqual(result["positions"], portfolio["positions"])
+        self.assertNotIn("snapshot_date", portfolio)
+        self.assertNotIn("as_of_date", result)
 
     def test_masks_account(self):
         self.assertEqual(_mask_account("U1234567"), "****4567")
@@ -1209,6 +1230,8 @@ class ProxyTests(unittest.TestCase):
         body = json.loads(response.read())
         self.assertTrue(body["read_only"])
         self.assertEqual(body["account"], "****1234")
+        self.assertRegex(body["snapshot_date"], r"^20\d{2}-\d{2}-\d{2}$")
+        self.assertIsNotNone(datetime.fromisoformat(body["observed_at"]).tzinfo)
 
         connection.request(
             "GET",

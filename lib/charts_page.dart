@@ -2904,6 +2904,10 @@ class ChartsPageState extends State<ChartsPage>
                 )
               : fmtCurrency(actualValue ?? mark.value);
           final dateLabel = date == null ? '' : formatter.format(date);
+          if (date != null && _isIndicativePortfolioPoint(accountName, date)) {
+            // Returns are official only through the last PortfolioAnalyst day.
+            return '$valueLabel · $dateLabel · Indicative valuation';
+          }
           final returnLabel = scaleForComparison
               ? '${mark.value >= 0 ? '+' : ''}${mark.value.toStringAsFixed(2)}% · '
               : '';
@@ -2919,6 +2923,24 @@ class ChartsPageState extends State<ChartsPage>
             '${chartSeries.length} ${context.l10n.text('portfolios')}',
       ),
     );
+  }
+
+  bool _isIndicativePortfolioPoint(String accountName, DateTime date) {
+    final manager = context.read<AccountManager>();
+    final snapshotDate = manager.portfolioCacheFor(accountName)?.asOfDate;
+    final officialDates =
+        manager.ibkrPerformanceCacheFor(accountName, '1Y')?.dates;
+    if (snapshotDate == null ||
+        officialDates == null ||
+        officialDates.isEmpty) {
+      return false;
+    }
+    final observedDay = DateTime(
+      snapshotDate.year,
+      snapshotDate.month,
+      snapshotDate.day,
+    );
+    return observedDay == date && date.isAfter(officialDates.last);
   }
 
   Widget _buildPortfolioSummary(
@@ -2965,6 +2987,8 @@ class ChartsPageState extends State<ChartsPage>
     final accountReturns = _portfolioReturnSeriesByAccount[accountName];
     final visibleSeries = _visibleValues(series);
     final visibleReturns = _visibleValues(accountReturns ?? <_DateValue>[]);
+    final indicative = visibleSeries.isNotEmpty &&
+        _isIndicativePortfolioPoint(accountName, visibleSeries.last.date);
     final hasHistory = accountReturns != null
         ? visibleReturns.length > 1
         : visibleSeries.length > 1;
@@ -3017,7 +3041,12 @@ class ChartsPageState extends State<ChartsPage>
 
     Widget returnLabel() => Text(
           (hasHistory
-              ? <String>[if (pct >= 0) '+', pct.toStringAsFixed(2), '%'].join()
+              ? <String>[
+                  if (pct >= 0) '+',
+                  pct.toStringAsFixed(2),
+                  '%',
+                  if (indicative) ' · official',
+                ].join()
               : context.l10n.text('History unavailable')),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -3032,9 +3061,11 @@ class ChartsPageState extends State<ChartsPage>
       style: theme.textTheme.titleMedium!.copyWith(height: 1.1),
     );
     final changeText = Text(
-      hasHistory
-          ? (change >= 0 ? '+' : '') + fmtCurrency(change)
-          : context.l10n.text('Historical prices unavailable'),
+      indicative
+          ? 'Indicative valuation'
+          : hasHistory
+              ? (change >= 0 ? '+' : '') + fmtCurrency(change)
+              : context.l10n.text('Historical prices unavailable'),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(color: returnColor, fontSize: 13, height: 1.1),

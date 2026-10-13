@@ -382,7 +382,11 @@ class IbkrPortfolioSnapshot {
         .toList();
     return IbkrPortfolioSnapshot(
       account: json['account'] as String? ?? '',
-      asOfDate: DateTime.tryParse(json['as_of_date'] as String? ?? ''),
+      // Broker as-of dates take priority; snapshot_date is only an observed
+      // provisional US-equity chart date, not official PortfolioAnalyst NAV.
+      asOfDate: DateTime.tryParse(
+        (json['as_of_date'] ?? json['snapshot_date']) as String? ?? '',
+      ),
       positions: positions,
       summary: (json['summary'] as Map<String, dynamic>?) ?? const {},
       ledger: (json['ledger'] as Map<String, dynamic>?) ?? const {},

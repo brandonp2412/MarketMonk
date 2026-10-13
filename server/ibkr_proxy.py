@@ -18,7 +18,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time as clock_time, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -969,6 +969,30 @@ def make_client(config: Config) -> Any:
     return ClientPortalIbkrClient(config)
 
 
+def _portfolio_snapshot_metadata(portfolio: dict[str, Any], *, observed_at: datetime | None = None) -> dict[str, Any]:
+    """Attach a provisional US-equities chart date, never an IBKR settlement date.
+
+    PortfolioAnalyst publishes official dated NAV separately. A TWS/Portal
+    account snapshot has no broker valuation date; assign the most recent US
+    weekday with regular trading underway, and identify its observation time.
+    This is only a chart estimate (holidays may have no corresponding session).
+    """
+    observed = observed_at or datetime.now(timezone.utc)
+    if observed.tzinfo is None:
+        raise ValueError("Portfolio observation must be timezone-aware")
+    eastern = observed.astimezone(ZoneInfo("America/New_York"))
+    day = eastern.date()
+    if eastern.time() < clock_time(9, 30):
+        day -= timedelta(days=1)
+    while day.weekday() >= 5:
+        day -= timedelta(days=1)
+    return {
+        **portfolio,
+        "snapshot_date": day.isoformat(),
+        "observed_at": observed.astimezone(timezone.utc).isoformat(),
+    }
+
+
 def make_handler(client: Any, token: str) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         server_version = "MarketMonkIBKR/2"
@@ -986,7 +1010,7 @@ def make_handler(client: Any, token: str) -> type[BaseHTTPRequestHandler]:
                     client.ensure_account_visible()
                     self._json(200, {"status": "ok", "source": "ibkr"})
                 elif parsed.path == "/v1/portfolio":
-                    self._json(200, client.portfolio())
+                    self._json(200, _portfolio_snapshot_metadata(client.portfolio()))
                 elif parsed.path == "/v1/intraday/portfolio":
                     query = parse_qs(parsed.query)
                     try:

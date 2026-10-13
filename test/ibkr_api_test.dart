@@ -59,6 +59,24 @@ void main() {
     expect(requestedUri.toString(), 'http://127.0.0.1:8091/v1/health');
   });
 
+  test(
+      'portfolio observation date is provisional and broker dates take precedence',
+      () {
+    final provisional = IbkrPortfolioSnapshot.fromJson(const {
+      'account': '****1234',
+      'snapshot_date': '2026-10-12',
+      'positions': <Object>[],
+    });
+    expect(provisional.asOfDate, DateTime(2026, 10, 12));
+    final brokerDated = IbkrPortfolioSnapshot.fromJson(const {
+      'account': '****1234',
+      'snapshot_date': '2026-10-12',
+      'as_of_date': '2026-10-09',
+      'positions': <Object>[],
+    });
+    expect(brokerDated.asOfDate, DateTime(2026, 10, 9));
+  });
+
   test('IBKR client authenticates and parses portfolio snapshots', () async {
     Uri? requestedUri;
     Map<String, String>? requestedHeaders;
