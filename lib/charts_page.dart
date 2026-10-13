@@ -2754,8 +2754,11 @@ class ChartsPageState extends State<ChartsPage>
             false,
       );
       final pricesUnavailable = allEmpty && hasCachedHoldings;
-      return SizedBox(
-        height: height,
+      return ConstrainedBox(
+        constraints: BoxConstraints(
+          minHeight: height,
+          maxHeight: allEmpty ? height : double.infinity,
+        ),
         child: AppEmptyState(
           icon: allEmpty
               ? Icons.candlestick_chart_rounded

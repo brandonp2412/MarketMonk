@@ -4,6 +4,7 @@ import 'package:drafter/drafter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/charts_page.dart';
+import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/market_line_chart.dart';
@@ -384,6 +385,108 @@ void main() {
       await tester.pumpAndSettle();
     },
   );
+
+  testWidgets('hidden portfolios show the complete restore button on phones', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 740);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({
+      'ibkrAccountConfigs':
+          '{"Default":{"enabled":true,"baseUrl":"https://ibkr.example.test","token":"secret-token"}}',
+      'chartPeriodYears': 1,
+      'chartPeriodMonths': 0,
+      'chartPeriodDays': 0,
+    });
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.cachePortfolio(
+      'Default',
+      [
+        Position(
+          symbol: 'VOO',
+          name: 'VANGUARD S&P 500 ETF',
+          nativeCurrency: 'USD',
+          netShares: 1,
+          avgCost: 100,
+          currentPrice: 105,
+          firstBuyDate: DateTime.now().subtract(const Duration(days: 25)),
+          lastBuyDate: DateTime.now().subtract(const Duration(days: 25)),
+        ),
+      ],
+      const IbkrAccountValue(value: 105, currency: 'USD'),
+      netLiquidationUsd: 105,
+    );
+    await accounts.cacheIbkrPerformance(
+      'Default',
+      IbkrPerformanceSeries(
+        period: '1Y',
+        measure: 'TWR',
+        currency: 'USD',
+        startDate: DateTime.now().subtract(const Duration(days: 25)),
+        startNav: 100,
+        dates: [
+          DateTime.now().subtract(const Duration(days: 20)),
+          DateTime.now().subtract(const Duration(days: 10)),
+        ],
+        nav: const [101, 105],
+        returnDates: [
+          DateTime.now().subtract(const Duration(days: 25)),
+          DateTime.now().subtract(const Duration(days: 10)),
+        ],
+        returns: const [0, 0.05],
+      ),
+    );
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create: (_) =>
+                SettingsState(localCurrencyDetector: () async => 'USD'),
+          ),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: ChartsPage(
+              ibkrLoader: (_) async => throw StateError('offline'),
+              ibkrPerformanceLoader: (config, period) async =>
+                  throw StateError('offline'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(MarketLineChart), findsOneWidget);
+
+    final selector = find.byKey(const Key('chart-account-selector-Default'));
+    await tester.ensureVisible(selector);
+    await tester.tap(selector);
+    await tester.pumpAndSettle();
+
+    final emptyState = find.byType(AppEmptyState);
+    final showAll = find.widgetWithText(FilledButton, 'Show all');
+    expect(find.text('All portfolios are hidden'), findsOneWidget);
+    expect(showAll, findsOneWidget);
+    expect(
+      tester.getRect(showAll).bottom,
+      lessThanOrEqualTo(tester.getRect(emptyState).bottom),
+    );
+    expect(tester.getSize(emptyState).height, greaterThan(740 * 0.30));
+
+    await tester.ensureVisible(showAll);
+    await tester.tap(showAll);
+    await tester.pumpAndSettle();
+    expect(find.text('All portfolios are hidden'), findsNothing);
+    expect(find.byType(MarketLineChart), findsOneWidget);
+    expect(tester.takeException(), null);
+  });
 
   testWidgets(
     'IBKR chart does not synthesize a current-day point from live NAV',
