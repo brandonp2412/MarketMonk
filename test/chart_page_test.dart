@@ -644,8 +644,8 @@ void main() {
       final spots = chart.series.single.points;
       expect(spots, hasLength(4));
       expect(spots.last.y, closeTo(10000 / 1.7, 1e-6));
-      expect(find.text('Indicative valuation'), findsOneWidget);
-      expect(find.textContaining('official'), findsOneWidget);
+      expect(find.textContaining('Indicative valuation'), findsNothing);
+      expect(find.textContaining('official'), findsNothing);
 
       await tester.pumpAndSettle();
     },

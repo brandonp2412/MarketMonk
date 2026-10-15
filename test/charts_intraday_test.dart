@@ -443,7 +443,7 @@ void main() {
       },
     );
     await tester.pump();
-    expect(find.byKey(const Key('stock-five-day-preview')), findsOneWidget);
+    expect(find.textContaining('Daily preview'), findsNothing);
     expect(
       tester.widget<TickerLine>(find.byType(TickerLine)).spots,
       hasLength(5),
@@ -457,7 +457,7 @@ void main() {
       _prices(200, currency: 'GBp', count: 12, intervalSeconds: 900),
     );
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('stock-five-day-preview')), findsNothing);
+    expect(find.textContaining('Daily preview'), findsNothing);
     expect(
       tester.widget<TickerLine>(find.byType(TickerLine)).spots,
       hasLength(12),
@@ -488,7 +488,7 @@ void main() {
     await tester.pump();
     pending.complete(http.Response('not found', 404));
     await tester.pumpAndSettle();
-    expect(find.textContaining('intraday prices unavailable'), findsOneWidget);
+    expect(find.textContaining('intraday prices unavailable'), findsNothing);
     expect(
       tester.widget<TickerLine>(find.byType(TickerLine)).spots,
       hasLength(5),
@@ -558,8 +558,8 @@ void main() {
       );
       await tester.pump();
       expect(
-        find.byKey(const Key('portfolio-five-day-preview')),
-        findsOneWidget,
+        find.textContaining('Daily preview'),
+        findsNothing,
       );
       expect(
         tester
@@ -588,7 +588,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('portfolio-five-day-preview')), findsNothing);
+      expect(find.textContaining('Daily preview'), findsNothing);
       expect(
         tester
             .widget<MarketLineChart>(find.byType(MarketLineChart))

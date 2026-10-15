@@ -48,9 +48,8 @@ class _LoadedChartPortfolio {
 
 class _CachedIntradayPortfolio {
   final Map<String, List<_DateValue>> series;
-  final Map<String, String> warnings;
   final String? error;
-  const _CachedIntradayPortfolio(this.series, this.warnings, this.error);
+  const _CachedIntradayPortfolio(this.series, this.error);
 }
 
 class ChartsPage extends StatefulWidget {
@@ -126,9 +125,7 @@ class ChartsPageState extends State<ChartsPage>
   Map<String, List<_DateValue>> _portfolioReturnSeriesByAccount = {};
   Map<String, Map<DateTime, double>> _portfolioCashFlowsByAccount = {};
   final _intradayPortfolioCache = <String, _CachedIntradayPortfolio>{};
-  final _portfolioIntradayWarnings = <String, String>{};
   final _portfolioDailyPreviewAccounts = <String>{};
-  bool _portfolioIntradayRefining = false;
   String? _portfolioError;
   bool _portfolioLoading = true;
   bool _chartPeriodLoaded = false;
@@ -861,11 +858,7 @@ class ChartsPageState extends State<ChartsPage>
     if (cached == null) return false;
     setState(() {
       _portfolioSeriesByAccount = Map.of(cached.series);
-      _portfolioIntradayWarnings
-        ..clear()
-        ..addAll(cached.warnings);
       _portfolioDailyPreviewAccounts.clear();
-      _portfolioIntradayRefining = false;
       _portfolioReturnSeriesByAccount.clear();
       _portfolioCashFlowsByAccount.clear();
       _portfolioError = cached.error;
@@ -950,11 +943,9 @@ class ChartsPageState extends State<ChartsPage>
     };
     setState(() {
       _portfolioError = null;
-      _portfolioIntradayWarnings.clear();
       _portfolioDailyPreviewAccounts
         ..clear()
         ..addAll(cachedPreviews.keys);
-      _portfolioIntradayRefining = fiveDayPreview;
       if (cachedPreviews.isNotEmpty) {
         _portfolioSeriesByAccount = Map.of(newSeries);
       }
@@ -1098,7 +1089,6 @@ class ChartsPageState extends State<ChartsPage>
       _portfolioCashFlowsByAccount = newFlows;
       _portfolioError = firstError;
       _portfolioLoading = false;
-      _portfolioIntradayRefining = false;
       if (_usesIntraday &&
           _portfolioDailyPreviewAccounts.isEmpty &&
           newSeries.values.any((series) => series.isNotEmpty)) {
@@ -1106,7 +1096,6 @@ class ChartsPageState extends State<ChartsPage>
           _intradayPortfolioCache.remove(_intradayPortfolioCache.keys.first);
         _intradayPortfolioCache[rangeCacheKey] = _CachedIntradayPortfolio(
           Map.of(newSeries),
-          Map.of(_portfolioIntradayWarnings),
           firstError,
         );
       }
@@ -1122,7 +1111,6 @@ class ChartsPageState extends State<ChartsPage>
   }) async {
     final selectedDays = days;
     final holdings = <IntradayPortfolioHolding>[];
-    final unavailable = <String>[];
     final failureReasons = <String>[];
     final prefetched = loaded.positions.isNotEmpty &&
         await _intradayData.prefetchPortfolio(
@@ -1149,7 +1137,6 @@ class ChartsPageState extends State<ChartsPage>
           centDivisor: symbolCentDivisor(position.symbol),
         );
       } catch (error, stackTrace) {
-        unavailable.add(position.symbol);
         failureReasons.add(error.toString().replaceFirst('Bad state: ', ''));
         talker.handle(
           error,
@@ -1173,10 +1160,6 @@ class ChartsPageState extends State<ChartsPage>
     }
     if (!mounted || !widget.isActive || generation != _portfolioLoadGeneration)
       return [];
-    if (unavailable.isNotEmpty) {
-      _portfolioIntradayWarnings[accountName] =
-          '$accountName: prices unavailable for ${unavailable.join(', ')}; these holdings stay constant.';
-    }
     if (holdings.isEmpty && loaded.positions.isNotEmpty) {
       final firstReason =
           failureReasons.isEmpty ? '' : ': ${failureReasons.first}';
@@ -1763,7 +1746,6 @@ class ChartsPageState extends State<ChartsPage>
       _backgroundSyncs.clear();
       _portfolioSeriesByAccount.clear();
       _portfolioDailyPreviewAccounts.clear();
-      _portfolioIntradayRefining = false;
       _portfolioReturnSeriesByAccount.clear();
       _portfolioCashFlowsByAccount.clear();
       _portfolioLoading = true;
@@ -2215,10 +2197,6 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   List<Widget> _buildStockContent(SettingsState settings) {
-    final dailyPreview = _usesIntraday &&
-        days == 5 &&
-        _intradaySeries == null &&
-        _stockDailyPreview.isNotEmpty;
     final intradaySnapshot = AsyncSnapshot.withData(
       ConnectionState.done,
       _intradaySeries == null
@@ -2242,18 +2220,6 @@ class ChartsPageState extends State<ChartsPage>
           stream: _stockStream,
           builder: (context, snapshot) =>
               _buildStockChart(context, snapshot, settings),
-        ),
-      if (dailyPreview)
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            _networkLoading
-                ? 'Daily preview · loading 15-minute prices'
-                : 'Daily preview · intraday prices unavailable',
-            key: const Key('stock-five-day-preview'),
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
         ),
       if (_usesIntraday && _intradaySeries != null)
         Padding(
@@ -2464,26 +2430,6 @@ class ChartsPageState extends State<ChartsPage>
   ) {
     return [
       _buildFavoritesRow(),
-      if (_usesIntraday &&
-          days == 5 &&
-          _portfolioDailyPreviewAccounts.isNotEmpty)
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            _portfolioIntradayRefining
-                ? 'Daily preview · loading 15-minute prices'
-                : 'Daily preview · intraday prices unavailable',
-            key: const Key('portfolio-five-day-preview'),
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ),
-      if (_usesIntraday)
-        for (final warning in _portfolioIntradayWarnings.values)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(warning),
-          ),
       for (final symbol in _selectedFavorites)
         if (_usesIntraday && _favoriteIntradayErrors.containsKey(symbol))
           Padding(
@@ -2907,10 +2853,6 @@ class ChartsPageState extends State<ChartsPage>
                 )
               : fmtCurrency(actualValue ?? mark.value);
           final dateLabel = date == null ? '' : formatter.format(date);
-          if (date != null && _isIndicativePortfolioPoint(accountName, date)) {
-            // Returns are official only through the last PortfolioAnalyst day.
-            return '$valueLabel · $dateLabel · Indicative valuation';
-          }
           final returnLabel = scaleForComparison
               ? '${mark.value >= 0 ? '+' : ''}${mark.value.toStringAsFixed(2)}% · '
               : '';
@@ -2926,24 +2868,6 @@ class ChartsPageState extends State<ChartsPage>
             '${chartSeries.length} ${context.l10n.text('portfolios')}',
       ),
     );
-  }
-
-  bool _isIndicativePortfolioPoint(String accountName, DateTime date) {
-    final manager = context.read<AccountManager>();
-    final snapshotDate = manager.portfolioCacheFor(accountName)?.asOfDate;
-    final officialDates =
-        manager.ibkrPerformanceCacheFor(accountName, '1Y')?.dates;
-    if (snapshotDate == null ||
-        officialDates == null ||
-        officialDates.isEmpty) {
-      return false;
-    }
-    final observedDay = DateTime(
-      snapshotDate.year,
-      snapshotDate.month,
-      snapshotDate.day,
-    );
-    return observedDay == date && date.isAfter(officialDates.last);
   }
 
   Widget _buildPortfolioSummary(
@@ -2990,8 +2914,6 @@ class ChartsPageState extends State<ChartsPage>
     final accountReturns = _portfolioReturnSeriesByAccount[accountName];
     final visibleSeries = _visibleValues(series);
     final visibleReturns = _visibleValues(accountReturns ?? <_DateValue>[]);
-    final indicative = visibleSeries.isNotEmpty &&
-        _isIndicativePortfolioPoint(accountName, visibleSeries.last.date);
     final hasHistory = accountReturns != null
         ? visibleReturns.length > 1
         : visibleSeries.length > 1;
@@ -3048,7 +2970,6 @@ class ChartsPageState extends State<ChartsPage>
                   if (pct >= 0) '+',
                   pct.toStringAsFixed(2),
                   '%',
-                  if (indicative) ' · official',
                 ].join()
               : context.l10n.text('History unavailable')),
           maxLines: 1,
@@ -3064,11 +2985,9 @@ class ChartsPageState extends State<ChartsPage>
       style: theme.textTheme.titleMedium!.copyWith(height: 1.1),
     );
     final changeText = Text(
-      indicative
-          ? 'Indicative valuation'
-          : hasHistory
-              ? (change >= 0 ? '+' : '') + fmtCurrency(change)
-              : context.l10n.text('Historical prices unavailable'),
+      hasHistory
+          ? (change >= 0 ? '+' : '') + fmtCurrency(change)
+          : context.l10n.text('Historical prices unavailable'),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(color: returnColor, fontSize: 13, height: 1.1),
