@@ -189,6 +189,12 @@ jobs:
           submodules: recursive
           persist-credentials: false
 
+      - name: Regenerate rounded README screenshots
+        run: |
+          python3 -m venv /tmp/readme-images-venv
+          /tmp/readme-images-venv/bin/python -m pip install "Pillow>=11,<13"
+          /tmp/readme-images-venv/bin/python scripts/round-readme-screenshots.py
+
       - name: Configure Git
         run: |
           git config --local user.email "action@github.com"
@@ -319,7 +325,7 @@ jobs:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
           RELEASE_BUILD_NUMBER: ${{ steps.version.outputs.build_number }}
         run: |
-          git add pubspec.yaml assets/changelogs/ fastlane/metadata/android/en-US/images/
+          git add pubspec.yaml assets/changelogs/ fastlane/metadata/android/en-US/images/ docs/screenshots
           git commit -m "Bump version to ${RELEASE_VERSION}+${RELEASE_BUILD_NUMBER} [skip ci]"
           gh auth setup-git
           git pull --rebase origin main

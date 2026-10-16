@@ -28,12 +28,12 @@ Track stocks on any platform 📈
 
 <br />
 <p align="center">
-    <img alt="MarketMonk holdings overview" src="fastlane/metadata/android/en-US/images/phoneScreenshots/5_en-US.png" height="700"/>
-    <img alt="MarketMonk holding trade history" src="fastlane/metadata/android/en-US/images/phoneScreenshots/6_en-US.png" height="700"/>
-    <img alt="MarketMonk edit ticker screen" src="fastlane/metadata/android/en-US/images/phoneScreenshots/4_en-US.png" height="700"/>
-    <img alt="MarketMonk settings screen" src="fastlane/metadata/android/en-US/images/phoneScreenshots/3_en-US.png" height="700"/>
-    <img alt="MarketMonk stock chart" src="fastlane/metadata/android/en-US/images/phoneScreenshots/1_en-US.png" height="700"/>
-    <img alt="MarketMonk portfolio screen" src="fastlane/metadata/android/en-US/images/phoneScreenshots/2_en-US.png" height="700"/>
+    <img alt="MarketMonk holdings overview" src="docs/screenshots/5_en-US.png" height="700"/>
+    <img alt="MarketMonk holding trade history" src="docs/screenshots/6_en-US.png" height="700"/>
+    <img alt="MarketMonk edit ticker screen" src="docs/screenshots/4_en-US.png" height="700"/>
+    <img alt="MarketMonk settings screen" src="docs/screenshots/3_en-US.png" height="700"/>
+    <img alt="MarketMonk stock chart" src="docs/screenshots/1_en-US.png" height="700"/>
+    <img alt="MarketMonk portfolio screen" src="docs/screenshots/2_en-US.png" height="700"/>
 </p>
 
 # Donations
