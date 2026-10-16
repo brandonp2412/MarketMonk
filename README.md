@@ -1,11 +1,23 @@
+<div align="center">
+
+<img src="fastlane/metadata/android/en-US/images/icon.png" width="112" alt="MarketMonk app icon">
+
 # MarketMonk
 
 Track stocks on any platform 📈
 
-<p float="left">
+<p>
   <a href="https://github.com/brandonp2412/MarketMonk/releases/latest"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/brandonp2412/MarketMonk?style=for-the-badge&logoColor=ffffff&labelColor=2B7A78&color=151218"></a>
-    <a href="#"><img alt="Release downloads" src="https://img.shields.io/github/downloads/brandonp2412/MarketMonk/total.svg?style=for-the-badge&logoColor=ffffff&labelColor=2B7A78&color=151218"></a>
+  <a href="#"><img alt="Release downloads" src="https://img.shields.io/github/downloads/brandonp2412/MarketMonk/total.svg?style=for-the-badge&logoColor=ffffff&labelColor=2B7A78&color=151218"></a>
 </p>
+
+<p>
+  <a href="https://play.google.com/store/apps/details?id=com.codesail.market_monk"><img alt="Get it on Google Play" style="height: 80px !important" src="./docs/get-it-on-google-play.png"/></a>
+  <a href="https://f-droid.org/packages/com.codesail.market_monk"><img src="./docs/get-it-on-fdroid.png" alt="Get it on F-Droid" style="height: 80px !important"></a>
+  <a href="https://apps.microsoft.com/detail/9PP4HKV1CMWC?mode=direct"><img alt="Download MarketMonk from the Microsoft Store" src="./docs/download-msstore.svg" style="height: 80px !important"/></a>
+</p>
+
+</div>
 
 # Features
 
@@ -14,14 +26,8 @@ Track stocks on any platform 📈
 - 🏦 Optional read-only Interactive Brokers live portfolio source
 - ⚙️ Customize to your hearts desires
 
-<p float="left">
-<a href="https://play.google.com/store/apps/details?id=com.codesail.market_monk"><img alt="Get it on Google Play" style="height: 80px !important" src="./docs/get-it-on-google-play.png"/></a>
-<a href="https://f-droid.org/packages/com.codesail.market_monk"><img src="./docs/get-it-on-fdroid.png" alt="Get it on F-Droid" style="height: 80px !important"></a>
-<a href="https://apps.microsoft.com/detail/9PP4HKV1CMWC?mode=direct"><img alt="Download MarketMonk from the Microsoft Store" src="./docs/download-msstore.svg" style="height: 80px !important"/></a>
-</p>
-
 <br />
-<p float="left">
+<p align="center">
     <img alt="MarketMonk holdings overview" src="fastlane/metadata/android/en-US/images/phoneScreenshots/5_en-US.png" height="700"/>
     <img alt="MarketMonk holding trade history" src="fastlane/metadata/android/en-US/images/phoneScreenshots/6_en-US.png" height="700"/>
     <img alt="MarketMonk edit ticker screen" src="fastlane/metadata/android/en-US/images/phoneScreenshots/4_en-US.png" height="700"/>
