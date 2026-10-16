@@ -1,0 +1,204 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:market_monk/holdings_page.dart';
+import 'package:market_monk/utils.dart';
+import 'package:market_monk/ibkr_api.dart';
+import 'package:market_monk/settings_state.dart';
+import 'package:market_monk/trade_history_page.dart';
+import 'package:provider/provider.dart';
+
+import 'sqlite_test_support.dart';
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('IBKR history loads after opening an initially empty detail',
+      (tester) async {
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.setIbkrConfig(
+      'Default',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'test-token',
+      ),
+    );
+    final pending = Completer<IbkrTradeHistory>();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: TradeHistoryPage(
+            summary: SymbolSummary(
+              symbol: 'VOO',
+              name: 'Vanguard S&P 500',
+              position: null,
+              trades: const [],
+            ),
+            ibkrTradeHistoryLoader: (_) => pending.future,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.text('No trade history yet'), findsNothing);
+
+    pending.complete(
+      IbkrTradeHistory(
+        available: true,
+        trades: [
+          IbkrTrade(
+            symbol: 'VOO',
+            name: 'Vanguard S&P 500',
+            currency: 'USD',
+            conid: 42,
+            quantity: 10,
+            price: 500,
+            tradeType: 'open',
+            tradeDate: DateTime(2026, 10, 12),
+            realizedPnl: 0,
+            commission: 1,
+          ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('No trade history yet'), findsNothing);
+    expect(find.text('BUY'), findsOneWidget);
+    expect(find.textContaining('12 Oct 2026'), findsOneWidget);
+  });
+
+  testWidgets('failed IBKR history can be retried', (tester) async {
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.setIbkrConfig(
+      'Default',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'test-token',
+      ),
+    );
+    var calls = 0;
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: TradeHistoryPage(
+            summary: SymbolSummary(
+              symbol: 'VOO',
+              name: 'Vanguard S&P 500',
+              position: null,
+              trades: const [],
+            ),
+            ibkrTradeHistoryLoader: (_) async {
+              if (calls++ == 0) throw StateError('temporary gateway failure');
+              return const IbkrTradeHistory(available: true, trades: []);
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('IBKR trade history unavailable'), findsOneWidget);
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    expect(calls, 2);
+    expect(find.text('No trade history yet'), findsOneWidget);
+  });
+  testWidgets('unavailable holdings history is retried on reactivation',
+      (tester) async {
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.setIbkrConfig(
+      'Default',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'test-token',
+      ),
+    );
+    await accounts.cachePortfolio(
+      'Default',
+      [
+        Position(
+          symbol: 'VOO',
+          name: 'Vanguard S&P 500',
+          nativeCurrency: 'USD',
+          netShares: 10,
+          avgCost: 500,
+          currentPrice: 550,
+          firstBuyDate: DateTime(2025),
+          lastBuyDate: DateTime(2026),
+        ),
+      ],
+      const IbkrAccountValue(value: 5500, currency: 'USD'),
+    );
+    final active = ValueNotifier(true);
+    addTearDown(active.dispose);
+    var calls = 0;
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: ValueListenableBuilder<bool>(
+            valueListenable: active,
+            builder: (context, isActive, child) => HoldingsPage(
+              isActive: isActive,
+              ibkrTradeHistoryLoader: (_) async {
+                calls++;
+                if (calls == 1) {
+                  return const IbkrTradeHistory(available: false, trades: []);
+                }
+                return IbkrTradeHistory(
+                  available: true,
+                  trades: [
+                    IbkrTrade(
+                      symbol: 'VOO',
+                      name: 'Vanguard',
+                      currency: 'USD',
+                      conid: 42,
+                      quantity: 10,
+                      price: 500,
+                      tradeType: 'open',
+                      tradeDate: DateTime(2026, 10, 12),
+                      realizedPnl: 0,
+                      commission: 1,
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(calls, 1);
+    expect(find.text('VOO'), findsOneWidget);
+    active.value = false;
+    await tester.pumpAndSettle();
+    active.value = true;
+    await tester.pumpAndSettle();
+    expect(calls, 2);
+    await tester.tap(find.text('VOO'));
+    await tester.pumpAndSettle();
+    expect(find.text('BUY'), findsOneWidget);
+  });
+}

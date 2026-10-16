@@ -69,6 +69,24 @@ class SymbolSummary {
   }
 }
 
+/// Converts IBKR executions into trades without persisting broker history locally.
+List<Trade> tradesFromIbkr(List<IbkrTrade> brokerTrades) => [
+      for (var index = 0; index < brokerTrades.length; index++)
+        Trade(
+          id: -index - 1,
+          symbol: brokerTrades[index].symbol,
+          name: brokerTrades[index].name.isEmpty
+              ? brokerTrades[index].symbol
+              : brokerTrades[index].name,
+          quantity: brokerTrades[index].quantity,
+          price: brokerTrades[index].price,
+          tradeType: brokerTrades[index].tradeType,
+          tradeDate: brokerTrades[index].tradeDate,
+          realizedPL: brokerTrades[index].realizedPnl,
+          commission: brokerTrades[index].commission,
+        ),
+    ];
+
 class HoldingsPage extends StatefulWidget {
   final bool isActive;
   final Future<List<Position>> Function(List<Trade>)? _positionsLoader;
@@ -150,6 +168,8 @@ class HoldingsPageState extends State<HoldingsPage>
     final ibkrConfig = accounts.ibkrConfigFor(account);
     final refreshVersion = accounts.ibkrRefreshVersion;
     final accountChanged = _lastAccount.isNotEmpty && account != _lastAccount;
+    final configChanged =
+        _lastAccount.isNotEmpty && ibkrConfig != _lastIbkrConfig;
     final refreshRequested =
         _lastAccount.isNotEmpty && refreshVersion != _lastIbkrRefreshVersion;
 
@@ -159,7 +179,7 @@ class HoldingsPageState extends State<HoldingsPage>
       return;
     }
 
-    if (accountChanged) {
+    if (accountChanged || configChanged) {
       _ibkrTrades = [];
       _ibkrTradesAccount = null;
       _ibkrTradeHistoryAvailable = true;
@@ -179,8 +199,8 @@ class HoldingsPageState extends State<HoldingsPage>
     if (widget.isActive) {
       runDetachedTask(
         _preload(
-          refreshPortfolio: refreshRequested,
-          refreshTrades: refreshRequested,
+          refreshPortfolio: refreshRequested || configChanged,
+          refreshTrades: refreshRequested || configChanged,
         ),
         'Failed to refresh holdings preload',
       );
@@ -223,35 +243,18 @@ class HoldingsPageState extends State<HoldingsPage>
         final tradeHistory =
             await (widget._ibkrTradeHistoryLoader?.call(config) ??
                 IbkrApiClient(config).fetchTradeHistory());
-        final brokerTrades = tradeHistory.trades;
-        final trades = [
-          for (var index = 0; index < brokerTrades.length; index++)
-            Trade(
-              id: -index - 1,
-              symbol: brokerTrades[index].symbol,
-              name: brokerTrades[index].name.isEmpty
-                  ? brokerTrades[index].symbol
-                  : brokerTrades[index].name,
-              quantity: brokerTrades[index].quantity,
-              price: brokerTrades[index].price,
-              tradeType: brokerTrades[index].tradeType,
-              tradeDate: brokerTrades[index].tradeDate,
-              realizedPL: brokerTrades[index].realizedPnl,
-              commission: brokerTrades[index].commission,
-            ),
-        ];
+        final trades = tradesFromIbkr(tradeHistory.trades);
         if (mounted &&
             context.read<AccountManager>().activeAccount == accountName) {
-          _ibkrTrades = trades;
-          _ibkrTradesAccount = accountName;
+          if (tradeHistory.available) _ibkrTrades = trades;
+          _ibkrTradesAccount = tradeHistory.available ? accountName : null;
           _ibkrTradeHistoryAvailable = tradeHistory.available;
         }
-        return trades;
+        return tradeHistory.available ? trades : _ibkrTrades;
       } catch (error, stackTrace) {
         if (mounted &&
             context.read<AccountManager>().activeAccount == accountName) {
-          _ibkrTrades = [];
-          _ibkrTradesAccount = accountName;
+          _ibkrTradesAccount = null;
           _ibkrTradeHistoryAvailable = false;
         }
         talker.handle(
@@ -259,7 +262,7 @@ class HoldingsPageState extends State<HoldingsPage>
           stackTrace,
           'IBKR transaction history unavailable',
         );
-        return const <Trade>[];
+        return _ibkrTrades;
       }
     }();
     _ibkrTradesLoad = load;
@@ -1685,7 +1688,10 @@ class HoldingsPageState extends State<HoldingsPage>
         context,
         adaptivePageRoute(
           context,
-          builder: (_) => TradeHistoryPage(summary: s),
+          builder: (_) => TradeHistoryPage(
+            summary: s,
+            ibkrTradeHistoryLoader: widget._ibkrTradeHistoryLoader,
+          ),
         ),
       ),
     );

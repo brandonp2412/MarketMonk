@@ -6,6 +6,7 @@ import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/holdings_page.dart';
+import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/profile_data_repository.dart';
@@ -14,8 +15,14 @@ import 'package:provider/provider.dart';
 
 class TradeHistoryPage extends StatefulWidget {
   final SymbolSummary summary;
+  final Future<IbkrTradeHistory> Function(IbkrAccountConfig)?
+      ibkrTradeHistoryLoader;
 
-  const TradeHistoryPage({super.key, required this.summary});
+  const TradeHistoryPage({
+    super.key,
+    required this.summary,
+    this.ibkrTradeHistoryLoader,
+  });
 
   @override
   State<TradeHistoryPage> createState() => _TradeHistoryPageState();
@@ -24,11 +31,16 @@ class TradeHistoryPage extends StatefulWidget {
 class _TradeHistoryPageState extends State<TradeHistoryPage> {
   late final String _accountName;
   late Stream<List<Trade>> _tradesStream;
+  late Stream<List<Trade>> _ibkrTradesStream;
 
   @override
   void initState() {
     super.initState();
     _accountName = context.read<AccountManager>().activeAccount;
+    final config = context.read<AccountManager>().ibkrConfigFor(_accountName);
+    _ibkrTradesStream = config.enabled && widget.summary.trades.isEmpty
+        ? _loadBrokerTrades(config).asStream()
+        : Stream.value(widget.summary.trades);
     _tradesStream =
         profileDataRepository.watchTradesForAccount(_accountName).map((trades) {
       final filtered = trades
@@ -45,13 +57,30 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
     );
   }
 
+  Future<List<Trade>> _loadBrokerTrades(IbkrAccountConfig config) async {
+    final history = await (widget.ibkrTradeHistoryLoader?.call(config) ??
+        IbkrApiClient(config).fetchTradeHistory());
+    if (!history.available) {
+      throw StateError('IBKR transaction history is currently unavailable');
+    }
+    return tradesFromIbkr(history.trades)
+        .where((trade) => trade.symbol == widget.summary.symbol)
+        .toList()
+      ..sort((a, b) => b.tradeDate.compareTo(a.tradeDate));
+  }
+
+  void _retryBrokerTrades() {
+    final config = context.read<AccountManager>().ibkrConfigFor(_accountName);
+    setState(() => _ibkrTradesStream = _loadBrokerTrades(config).asStream());
+  }
+
   @override
   Widget build(BuildContext context) {
     final position = widget.summary.position;
     final ibkrManaged = context.watch<AccountManager>().ibkrConfigFor().enabled;
 
     return StreamBuilder<List<Trade>>(
-      stream: ibkrManaged ? Stream.value(widget.summary.trades) : _tradesStream,
+      stream: ibkrManaged ? _ibkrTradesStream : _tradesStream,
       builder: (context, snap) {
         final trades = snap.data ?? widget.summary.trades;
         final totalRealized =
@@ -208,33 +237,47 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                 ] else
                   SizedBox(
                     height: 300,
-                    child: AppEmptyState(
-                      icon: Icons.history_rounded,
-                      title: context.l10n.text('No trade history yet'),
-                      message: ibkrManaged
-                          ? context.l10n.text(
-                              widget.summary.brokerTradeHistoryAvailable
-                                  ? 'No completed IBKR trades were found in the available transaction history.'
-                                  : 'This IBKR connection provides live positions but does not currently provide transaction history.',
-                            )
-                          : context.l10n.text(
-                              'Add a trade to start building this ticker’s history.',
+                    child: ibkrManaged &&
+                            snap.connectionState == ConnectionState.waiting
+                        ? const Center(child: CircularProgressIndicator())
+                        : AppEmptyState(
+                            icon: Icons.history_rounded,
+                            title: context.l10n.text(
+                              snap.hasError
+                                  ? 'IBKR trade history unavailable'
+                                  : 'No trade history yet',
                             ),
-                      actionLabel:
-                          ibkrManaged ? null : context.l10n.text('Add trade'),
-                      actionIcon: Icons.add_rounded,
-                      onAction: ibkrManaged
-                          ? null
-                          : () => Navigator.push(
-                                context,
-                                adaptivePageRoute(
-                                  context,
-                                  builder: (_) => EditTickerPage(
-                                    symbol: widget.summary.symbol,
+                            message: ibkrManaged
+                                ? context.l10n.text(
+                                    snap.hasError
+                                        ? 'Could not load IBKR trade history. Retry to check again.'
+                                        : widget.summary
+                                                .brokerTradeHistoryAvailable
+                                            ? 'No completed IBKR trades were found in the available transaction history.'
+                                            : 'This IBKR connection provides live positions but does not currently provide transaction history.',
+                                  )
+                                : context.l10n.text(
+                                    'Add a trade to start building this ticker’s history.',
                                   ),
-                                ),
-                              ),
-                    ),
+                            actionLabel: ibkrManaged
+                                ? (snap.hasError
+                                    ? context.l10n.text('Retry')
+                                    : null)
+                                : context.l10n.text('Add trade'),
+                            actionIcon:
+                                ibkrManaged ? Icons.refresh : Icons.add_rounded,
+                            onAction: ibkrManaged
+                                ? (snap.hasError ? _retryBrokerTrades : null)
+                                : () => Navigator.push(
+                                      context,
+                                      adaptivePageRoute(
+                                        context,
+                                        builder: (_) => EditTickerPage(
+                                          symbol: widget.summary.symbol,
+                                        ),
+                                      ),
+                                    ),
+                          ),
                   ),
               ],
             ),
