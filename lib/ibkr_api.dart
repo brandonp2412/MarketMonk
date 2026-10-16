@@ -122,6 +122,19 @@ class IbkrTrade {
     required this.commission,
   });
 
+  Map<String, dynamic> toJson() => {
+        'symbol': symbol,
+        'name': name,
+        'currency': currency,
+        'conid': conid,
+        'quantity': quantity,
+        'price': price,
+        'trade_type': tradeType,
+        'trade_date': tradeDate.toIso8601String().substring(0, 10),
+        'realized_pnl': realizedPnl,
+        'commission': commission,
+      };
+
   factory IbkrTrade.fromJson(Map<String, dynamic> json) => IbkrTrade(
         symbol: json['symbol'] as String? ?? '',
         name: json['name'] as String? ?? '',
@@ -142,6 +155,11 @@ class IbkrTradeHistory {
   final List<IbkrTrade> trades;
 
   const IbkrTradeHistory({required this.available, required this.trades});
+
+  Map<String, dynamic> toJson() => {
+        'available': available,
+        'trades': trades.map((trade) => trade.toJson()).toList(),
+      };
 
   factory IbkrTradeHistory.fromJson(Map<String, dynamic> json) =>
       IbkrTradeHistory(
@@ -464,7 +482,7 @@ class IbkrApiClient {
         final response = await _request(
           '/v1/trades',
           queryParameters: {'days': '$days'},
-        );
+        ).timeout(const Duration(seconds: 75));
         return IbkrTradeHistory.fromJson(
           _decodeJsonObject(response, '/v1/trades'),
         );

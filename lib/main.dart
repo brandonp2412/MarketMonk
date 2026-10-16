@@ -190,6 +190,30 @@ class CachedIbkrPerformanceData {
       );
 }
 
+class CachedIbkrTradeHistoryData {
+  final IbkrTradeHistory history;
+  final DateTime cachedAt;
+
+  const CachedIbkrTradeHistoryData({
+    required this.history,
+    required this.cachedAt,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'history': history.toJson(),
+        'cachedAt': cachedAt.toIso8601String(),
+      };
+
+  factory CachedIbkrTradeHistoryData.fromJson(Map<String, dynamic> json) =>
+      CachedIbkrTradeHistoryData(
+        history: IbkrTradeHistory.fromJson(
+          json['history'] as Map<String, dynamic>,
+        ),
+        cachedAt: DateTime.tryParse(json['cachedAt'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+      );
+}
+
 /// Manages named portfolio profiles in the unified SQLite database.
 /// Account switches update profile identity/state without replacing the runtime database.
 class AccountManager extends ChangeNotifier {
@@ -201,8 +225,10 @@ class AccountManager extends ChangeNotifier {
       BackgroundNetworkCoordinator.ibkrPortfolioFreshness;
   static const ibkrPerformanceCacheMaxAge =
       BackgroundNetworkCoordinator.ibkrPerformanceFreshness;
+  static const ibkrTradeHistoryCacheMaxAge = Duration(minutes: 15);
 
   final Map<String, CachedPortfolioData> _portfolioCache = {};
+  final Map<String, CachedIbkrTradeHistoryData> _ibkrTradeHistoryCache = {};
   final Map<String, Map<String, CachedIbkrPerformanceData>>
       _ibkrPerformanceCache = {};
 
@@ -211,6 +237,7 @@ class AccountManager extends ChangeNotifier {
     final prefs = await SqliteSettings.getInstance();
     _ibkrConfigs.clear();
     _portfolioCache.clear();
+    _ibkrTradeHistoryCache.clear();
     _ibkrPerformanceCache.clear();
     _profileIdsByName.clear();
 
@@ -283,6 +310,7 @@ class AccountManager extends ChangeNotifier {
 
     _ibkrConfigs.remove(account);
     _portfolioCache.remove(account);
+    _ibkrTradeHistoryCache.remove(account);
     _ibkrPerformanceCache.remove(account);
 
     final config = await _database.readIbkrSettings(profileId);
@@ -300,6 +328,10 @@ class AccountManager extends ChangeNotifier {
         final value = json.decode(entry.payloadJson) as Map<String, dynamic>;
         if (entry.kind == 'portfolio' && entry.cacheKey == 'snapshot') {
           _portfolioCache[account] = CachedPortfolioData.fromJson(value);
+        } else if (entry.kind == 'trades' && entry.cacheKey == 'history') {
+          final cached = CachedIbkrTradeHistoryData.fromJson(value);
+          if (cached.history.available)
+            _ibkrTradeHistoryCache[account] = cached;
         } else if (entry.kind == 'performance') {
           _ibkrPerformanceCache.putIfAbsent(account, () => {})[entry.cacheKey] =
               CachedIbkrPerformanceData.fromJson(value);
@@ -353,6 +385,39 @@ class AccountManager extends ChangeNotifier {
     return cached != null &&
         backgroundNetworkCoordinator.isTimestampFresh(cached.cachedAt, maxAge);
   }
+
+  IbkrTradeHistory? ibkrTradeHistoryCacheFor(String name) =>
+      _ibkrTradeHistoryCache[name]?.history;
+
+  bool isIbkrTradeHistoryCacheFresh(String name) {
+    final cached = _ibkrTradeHistoryCache[name];
+    return cached != null &&
+        backgroundNetworkCoordinator.isTimestampFresh(
+          cached.cachedAt,
+          ibkrTradeHistoryCacheMaxAge,
+        );
+  }
+
+  /// Stores only successful broker trade-history responses for offline display.
+  Future<void> cacheIbkrTradeHistory(String name, IbkrTradeHistory history) =>
+      history.available
+          ? _serializeStorage(() async {
+              final profileId = _profileIdsByName[name];
+              if (profileId == null) return;
+              final cached = CachedIbkrTradeHistoryData(
+                history: history,
+                cachedAt: DateTime.now(),
+              );
+              await _database.writeIbkrCache(
+                profileId: profileId,
+                kind: 'trades',
+                cacheKey: 'history',
+                payloadJson: json.encode(cached.toJson()),
+                cachedAt: cached.cachedAt,
+              );
+              _ibkrTradeHistoryCache[name] = cached;
+            })
+          : Future<void>.value();
 
   IbkrPerformanceSeries? ibkrPerformanceCacheFor(String name, String period) =>
       _ibkrPerformanceCache[name]?[period]?.series;
@@ -458,6 +523,7 @@ class AccountManager extends ChangeNotifier {
     _ibkrConfigs[name] = config;
     if (changed) {
       _portfolioCache.remove(name);
+      _ibkrTradeHistoryCache.remove(name);
       _ibkrPerformanceCache.remove(name);
     }
     ibkrRefreshVersion++;

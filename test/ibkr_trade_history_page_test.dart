@@ -201,4 +201,119 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('BUY'), findsOneWidget);
   });
+  testWidgets('saved IBKR trades render immediately after app restart',
+      (tester) async {
+    await seedTestSqlite({});
+    final firstSession = testAccountManager();
+    await firstSession.init();
+    await firstSession.setIbkrConfig(
+      'Default',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'test-token',
+      ),
+    );
+    await firstSession.cachePortfolio(
+      'Default',
+      [
+        Position(
+          symbol: 'COHR',
+          name: 'Coherent',
+          nativeCurrency: 'USD',
+          netShares: 2,
+          avgCost: 100,
+          currentPrice: 120,
+          firstBuyDate: DateTime(2026, 1, 1),
+          lastBuyDate: DateTime(2026, 1, 1),
+        ),
+      ],
+      const IbkrAccountValue(value: 240, currency: 'USD'),
+    );
+    await firstSession.cacheIbkrTradeHistory(
+      'Default',
+      IbkrTradeHistory(
+        available: true,
+        trades: [
+          IbkrTrade(
+            symbol: 'COHR',
+            name: 'Coherent',
+            currency: 'USD',
+            conid: 42,
+            quantity: 2,
+            price: 100,
+            tradeType: 'open',
+            tradeDate: DateTime(2026, 1, 1),
+            realizedPnl: 0,
+            commission: 0,
+          ),
+        ],
+      ),
+    );
+    final restarted = testAccountManager();
+    await restarted.init();
+    expect(
+      restarted.ibkrTradeHistoryCacheFor('Default')?.trades.single.symbol,
+      'COHR',
+    );
+    var networkCalls = 0;
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: restarted),
+        ],
+        child: MaterialApp(
+          home: HoldingsPage(
+            ibkrTradeHistoryLoader: (_) {
+              networkCalls++;
+              return Future.value(
+                const IbkrTradeHistory(available: true, trades: []),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(networkCalls, 0);
+    await tester.tap(find.text('COHR'));
+    await tester.pumpAndSettle();
+    expect(find.text('BUY'), findsOneWidget);
+    expect(find.text('No trade history yet'), findsNothing);
+  });
+
+  test('failed responses never replace previously cached broker history',
+      () async {
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.cacheIbkrTradeHistory(
+      'Default',
+      IbkrTradeHistory(
+        available: true,
+        trades: [
+          IbkrTrade(
+            symbol: 'COHR',
+            name: 'Coherent',
+            currency: 'USD',
+            conid: 42,
+            quantity: 2,
+            price: 100,
+            tradeType: 'open',
+            tradeDate: DateTime(2026, 1, 1),
+            realizedPnl: 0,
+            commission: 0,
+          ),
+        ],
+      ),
+    );
+    await accounts.cacheIbkrTradeHistory(
+      'Default',
+      const IbkrTradeHistory(available: false, trades: []),
+    );
+    final restarted = testAccountManager();
+    await restarted.init();
+    expect(restarted.ibkrTradeHistoryCacheFor('Default')?.trades.length, 1);
+  });
 }

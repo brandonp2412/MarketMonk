@@ -179,10 +179,16 @@ class HoldingsPageState extends State<HoldingsPage>
       return;
     }
 
-    if (accountChanged || configChanged) {
-      _ibkrTrades = [];
-      _ibkrTradesAccount = null;
-      _ibkrTradeHistoryAvailable = true;
+    if (_lastAccount.isEmpty || accountChanged || configChanged) {
+      final cachedHistory = accounts.ibkrTradeHistoryCacheFor(account);
+      _ibkrTrades = ibkrConfig.enabled && cachedHistory != null
+          ? tradesFromIbkr(cachedHistory.trades)
+          : [];
+      _ibkrTradesAccount =
+          ibkrConfig.enabled && accounts.isIbkrTradeHistoryCacheFresh(account)
+              ? account
+              : null;
+      _ibkrTradeHistoryAvailable = cachedHistory?.available ?? true;
     }
     _lastAccount = account;
     _lastIbkrConfig = ibkrConfig;
@@ -245,15 +251,24 @@ class HoldingsPageState extends State<HoldingsPage>
                 IbkrApiClient(config).fetchTradeHistory());
         final trades = tradesFromIbkr(tradeHistory.trades);
         if (mounted &&
-            context.read<AccountManager>().activeAccount == accountName) {
-          if (tradeHistory.available) _ibkrTrades = trades;
+            accounts.activeAccount == accountName &&
+            accounts.ibkrConfigFor(accountName) == config) {
+          if (tradeHistory.available) {
+            _ibkrTrades = trades;
+            try {
+              await accounts.cacheIbkrTradeHistory(accountName, tradeHistory);
+            } catch (error, stackTrace) {
+              talker.handle(error, stackTrace, 'Failed to cache IBKR trades');
+            }
+          }
           _ibkrTradesAccount = tradeHistory.available ? accountName : null;
           _ibkrTradeHistoryAvailable = tradeHistory.available;
         }
         return tradeHistory.available ? trades : _ibkrTrades;
       } catch (error, stackTrace) {
         if (mounted &&
-            context.read<AccountManager>().activeAccount == accountName) {
+            accounts.activeAccount == accountName &&
+            accounts.ibkrConfigFor(accountName) == config) {
           _ibkrTradesAccount = null;
           _ibkrTradeHistoryAvailable = false;
         }

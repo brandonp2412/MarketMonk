@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:market_monk/database.dart';
@@ -354,6 +355,27 @@ void main() {
     expect(position.realizedToday, 25);
     expect(position.change, closeTo(33.3333, 0.001));
     expect(position.firstBuyDate, DateTime(2026, 1, 2));
+  });
+
+  testWidgets('stalled IBKR trade history ends with a timeout', (tester) async {
+    final pending = Completer<http.Response>();
+    final client = IbkrApiClient(
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'test-token',
+      ),
+      get: (uri, {headers}) => pending.future,
+    );
+    Object? failure;
+    final result = client.fetchTradeHistory().then<void>(
+          (_) {},
+          onError: (Object error) => failure = error,
+        );
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 76));
+    await result;
+    expect(failure, isA<TimeoutException>());
   });
 
   test('IBKR settings persist independently per MarketMonk account', () async {
