@@ -49,3 +49,4 @@ android/build/
 
 # Local Serena agent state
 .serena/
+/android/app/build/

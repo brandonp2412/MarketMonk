@@ -90,7 +90,7 @@ jobs:
           flutter precache
 
       - name: Get dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Run build_runner
         run: dart run build_runner build -d
@@ -388,7 +388,7 @@ jobs:
 
       - name: Get dependencies
         working-directory: /home/brandon/market_monk
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Run build_runner
         working-directory: /home/brandon/market_monk
@@ -473,7 +473,7 @@ jobs:
           flutter precache --linux
 
       - name: Get dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Run build_runner
         run: dart run build_runner build -d
@@ -514,7 +514,7 @@ jobs:
           flutter precache --windows
 
       - name: Get dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Run build_runner
         run: dart run build_runner build -d

@@ -153,12 +153,12 @@ class _SettingsPageState extends State<SettingsPage> {
       type: FileType.custom,
       allowedExtensions: const ['csv'],
     );
-    if (result == null || !context.mounted) return;
+    if (result.isEmpty || !context.mounted) return;
 
     ParseResult parsed;
     final contents = <String>[];
     try {
-      for (final pickedFile in result.files) {
+      for (final pickedFile in result) {
         final path = pickedFile.path;
         if (path == null) {
           throw StateError('Could not access ${pickedFile.name}');
@@ -283,9 +283,9 @@ class _SettingsPageState extends State<SettingsPage> {
       type: FileType.custom,
       allowedExtensions: const ['zip', 'sqlite'],
     );
-    if (!context.mounted || result == null) return;
+    if (!context.mounted || result.isEmpty) return;
 
-    final selectedPath = result.files.single.path;
+    final selectedPath = result.single.path;
     if (selectedPath == null) {
       toast(
         context,
@@ -341,7 +341,7 @@ class _SettingsPageState extends State<SettingsPage> {
       );
       if (result == null) return;
       if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
-        await archive.copy(result);
+        await archive.copy(result.toFilePath());
       }
     } catch (_) {
       if (context.mounted) {

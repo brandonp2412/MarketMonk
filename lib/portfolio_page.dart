@@ -548,7 +548,7 @@ class PortfolioPageState extends State<PortfolioPage>
     );
     if (path == null) return;
     if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
-      await File(path).writeAsBytes(csv.bytes);
+      await File(path.toFilePath()).writeAsBytes(csv.bytes);
     }
     talker.info('Exported portfolio CSV with ${positions.length} positions');
   }
