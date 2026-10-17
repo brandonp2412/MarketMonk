@@ -876,7 +876,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           onTap: () async {
             const url = 'https://github.com/brandonp2412/MarketMonk/releases';
-            if (await canLaunchUrlString(url)) await launchUrlString(url);
+            await launchUrlString(url);
           },
         ),
         ListTile(
@@ -886,7 +886,7 @@ class _SettingsPageState extends State<SettingsPage> {
           subtitle: const Text('Brandon Dick'),
           onTap: () async {
             const url = 'https://github.com/brandonp2412';
-            if (await canLaunchUrlString(url)) await launchUrlString(url);
+            await launchUrlString(url);
           },
         ),
         ListTile(
@@ -896,7 +896,7 @@ class _SettingsPageState extends State<SettingsPage> {
           subtitle: Text(context.l10n.text('Check it out on GitHub')),
           onTap: () async {
             const url = 'https://github.com/brandonp2412/MarketMonk';
-            if (await canLaunchUrlString(url)) await launchUrlString(url);
+            await launchUrlString(url);
           },
         ),
       ],
@@ -1339,7 +1339,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 if (Platform.isIOS || Platform.isMacOS) return;
                 const url =
                     'https://github.com/brandonp2412/MarketMonk/releases';
-                if (await canLaunchUrlString(url)) await launchUrlString(url);
+                await launchUrlString(url);
               },
             ),
             ListTile(
@@ -1352,7 +1352,7 @@ class _SettingsPageState extends State<SettingsPage> {
               onTap: () async {
                 if (Platform.isIOS || Platform.isMacOS) return;
                 const url = 'https://github.com/brandonp2412';
-                if (await canLaunchUrlString(url)) await launchUrlString(url);
+                await launchUrlString(url);
               },
             ),
             ListTile(
@@ -1366,7 +1366,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 if (Platform.isIOS || Platform.isMacOS) return;
                 const url =
                     'https://github.com/brandonp2412/MarketMonk?tab=MIT-1-ov-file#readme';
-                if (await canLaunchUrlString(url)) await launchUrlString(url);
+                await launchUrlString(url);
               },
             ),
             ListTile(
@@ -1380,7 +1380,7 @@ class _SettingsPageState extends State<SettingsPage> {
               onTap: () async {
                 if (Platform.isIOS || Platform.isMacOS) return;
                 const url = 'https://github.com/brandonp2412/MarketMonk';
-                if (await canLaunchUrlString(url)) await launchUrlString(url);
+                await launchUrlString(url);
               },
             ),
             ListTile(
@@ -1394,7 +1394,7 @@ class _SettingsPageState extends State<SettingsPage> {
               onTap: () async {
                 if (Platform.isIOS || Platform.isMacOS) return;
                 const url = 'https://github.com/sponsors/brandonp2412';
-                if (await canLaunchUrlString(url)) await launchUrlString(url);
+                await launchUrlString(url);
               },
             ),
           ],
