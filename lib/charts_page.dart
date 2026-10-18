@@ -22,6 +22,7 @@ import 'package:market_monk/main.dart';
 import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/portfolio_chart_scale.dart';
+import 'package:market_monk/provisional_portfolio.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
@@ -126,6 +127,7 @@ class ChartsPageState extends State<ChartsPage>
   Map<String, Map<DateTime, double>> _portfolioCashFlowsByAccount = {};
   final _intradayPortfolioCache = <String, _CachedIntradayPortfolio>{};
   final _portfolioDailyPreviewAccounts = <String>{};
+  final _provisionalStartByAccount = <String, DateTime>{};
   String? _portfolioError;
   bool _portfolioLoading = true;
   bool _chartPeriodLoaded = false;
@@ -968,6 +970,7 @@ class ChartsPageState extends State<ChartsPage>
 
     final newReturns = <String, List<_DateValue>>{};
     final newFlows = <String, Map<DateTime, double>>{};
+    final loadedAccounts = <String, _LoadedChartPortfolio>{};
     String? firstError;
 
     Future<void> loadAccount(String accountName) async {
@@ -990,6 +993,7 @@ class ChartsPageState extends State<ChartsPage>
             generation != _portfolioLoadGeneration) {
           return;
         }
+        loadedAccounts[accountName] = loaded;
         if (_usesIntraday) {
           if (fiveDayPreview && newSeries[accountName]!.isEmpty) {
             try {
@@ -1089,6 +1093,7 @@ class ChartsPageState extends State<ChartsPage>
       _portfolioCashFlowsByAccount = newFlows;
       _portfolioError = firstError;
       _portfolioLoading = false;
+      _provisionalStartByAccount.clear();
       if (_usesIntraday &&
           _portfolioDailyPreviewAccounts.isEmpty &&
           newSeries.values.any((series) => series.isNotEmpty)) {
@@ -1099,6 +1104,109 @@ class ChartsPageState extends State<ChartsPage>
           firstError,
         );
       }
+    });
+    if (!_usesIntraday) {
+      for (final entry in loadedAccounts.entries) {
+        final config = accountManager.ibkrConfigFor(entry.key);
+        if (!config.enabled || newReturns[entry.key]?.isEmpty != false)
+          continue;
+        runDetachedTask(
+          _loadProvisionalAccount(entry.key, entry.value, config, generation),
+          'Failed to update provisional portfolio prices',
+        );
+      }
+    }
+  }
+
+  Future<void> _loadProvisionalAccount(
+    String name,
+    _LoadedChartPortfolio loaded,
+    IbkrAccountConfig config,
+    int generation,
+  ) async {
+    bool isCurrent() =>
+        mounted &&
+        widget.isActive &&
+        generation == _portfolioLoadGeneration &&
+        !_usesIntraday;
+    final official = _portfolioSeriesByAccount[name];
+    if (official == null || official.isEmpty || loaded.positions.isEmpty)
+      return;
+    final anchor = official.last;
+    final now = DateTime.now();
+    if (anchor.date.isAfter(now) || now.difference(anchor.date).inDays > 14) {
+      return;
+    }
+    final positions = loaded.positions.where((p) => p.netShares != 0).toList();
+    if (positions.isEmpty) return;
+    final from = anchor.date.subtract(const Duration(days: 4));
+    for (var start = 0; start < positions.length; start += 4) {
+      if (!isCurrent()) return;
+      await Future.wait(
+        positions.skip(start).take(4).map((position) async {
+          try {
+            await syncCandles(
+              position.symbol,
+              ibkrConfig: config,
+              syncNamespace: name,
+              requiredFrom: from,
+            );
+          } catch (error) {
+            talker.warning(
+              'Provisional price unavailable for ${position.symbol}: $error',
+            );
+          }
+        }),
+      );
+    }
+    if (!isCurrent()) return;
+    final holdings = <ProvisionalHolding>[];
+    for (final position in positions) {
+      final rows = await (marketDataDatabase.candles.select()
+            ..where(
+              (c) =>
+                  c.symbol.equals(canonicalMarketSymbol(position.symbol)) &
+                  c.date.isBiggerThanValue(from),
+            )
+            ..orderBy([(c) => OrderingTerm.asc(c.date)]))
+          .get();
+      if (rows.isEmpty) return;
+      final rate = requireUsdRate(position.nativeCurrency);
+      final divisor = symbolCentDivisor(position.symbol);
+      holdings.add(
+        ProvisionalHolding(
+          shares: position.netShares,
+          closesUsd: {
+            for (final row in rows)
+              DateTime(row.date.year, row.date.month, row.date.day):
+                  row.close / divisor / rate,
+          },
+        ),
+      );
+    }
+    final projected = projectPortfolioFromCloses(
+      brokerDate: anchor.date,
+      brokerNavUsd: anchor.value,
+      holdings: holdings,
+      latestDate: now,
+    );
+    if (projected.isEmpty || !isCurrent()) return;
+    final originalReturns = _portfolioReturnSeriesByAccount[name] ?? [];
+    final baseReturn =
+        originalReturns.isEmpty ? null : originalReturns.last.value;
+    setState(() {
+      _portfolioSeriesByAccount[name] = [
+        ...official,
+        for (final point in projected) _DateValue(point.date, point.valueUsd),
+      ];
+      if (baseReturn != null && baseReturn.isFinite && baseReturn > 0) {
+        _portfolioReturnSeriesByAccount[name] = [
+          ...originalReturns,
+          for (final point in projected)
+            _DateValue(point.date, baseReturn * point.valueUsd / anchor.value),
+        ];
+      }
+      _provisionalStartByAccount[name] = projected.first.date;
     });
   }
 
@@ -1746,6 +1854,7 @@ class ChartsPageState extends State<ChartsPage>
       _backgroundSyncs.clear();
       _portfolioSeriesByAccount.clear();
       _portfolioDailyPreviewAccounts.clear();
+      _provisionalStartByAccount.clear();
       _portfolioReturnSeriesByAccount.clear();
       _portfolioCashFlowsByAccount.clear();
       _portfolioLoading = true;
@@ -2852,7 +2961,12 @@ class ChartsPageState extends State<ChartsPage>
                   symbolCurrency(accountName),
                 )
               : fmtCurrency(actualValue ?? mark.value);
-          final dateLabel = date == null ? '' : formatter.format(date);
+          final isEstimated = date != null &&
+              _provisionalStartByAccount[accountName] != null &&
+              !date.isBefore(_provisionalStartByAccount[accountName]!);
+          final dateLabel = date == null
+              ? ''
+              : '${formatter.format(date)}${isEstimated ? ' · Estimated' : ''}';
           final returnLabel = scaleForComparison
               ? '${mark.value >= 0 ? '+' : ''}${mark.value.toStringAsFixed(2)}% · '
               : '';
@@ -2896,6 +3010,12 @@ class ChartsPageState extends State<ChartsPage>
               entry.key,
               entry.value,
               accountColors,
+            ),
+          if (_provisionalStartByAccount.isNotEmpty)
+            Text(
+              '≈ Estimated from market prices; official IBKR values may differ.',
+              style: Theme.of(context).textTheme.bodySmall,
+              textAlign: TextAlign.center,
             ),
         ],
       ),
@@ -2959,9 +3079,13 @@ class ChartsPageState extends State<ChartsPage>
         }
       }
     }
-    final summaryValue = currentValueUsd != null && currentValueUsd.isFinite
-        ? currentValueUsd
-        : series.last.value;
+    final estimated = _provisionalStartByAccount[accountName] != null &&
+        !series.last.date.isBefore(_provisionalStartByAccount[accountName]!);
+    final summaryValue = estimated
+        ? series.last.value
+        : currentValueUsd != null && currentValueUsd.isFinite
+            ? currentValueUsd
+            : series.last.value;
     final theme = Theme.of(context);
 
     Widget returnLabel() => Text(
@@ -2978,7 +3102,7 @@ class ChartsPageState extends State<ChartsPage>
         );
 
     final valueText = Text(
-      fmtCurrency(summaryValue),
+      estimated ? '≈${fmtCurrency(summaryValue)}' : fmtCurrency(summaryValue),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       textAlign: TextAlign.right,
