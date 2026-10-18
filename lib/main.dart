@@ -23,8 +23,11 @@ import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
+import 'package:market_monk/update_notice.dart';
+import 'package:market_monk/whats_new.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:market_monk/sqlite_settings.dart';
 import 'package:market_monk/legacy_database_source.dart';
@@ -856,6 +859,53 @@ class _MyHomePageState extends State<MyHomePage> {
   var _currentIndex = 0;
 
   static const _tabs = ['ChartPage', 'PortfolioPage', 'HoldingsPage'];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showUpdateNotice());
+  }
+
+  Future<void> _showUpdateNotice() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final build = int.tryParse(info.buildNumber);
+      if (build == null) return;
+      final prefs = await SqliteSettings.getInstance();
+      const buildKey = 'last_seen_build_number';
+      const noticeKey = 'last_update_notice_ms';
+      final previousBuild = prefs.getInt(buildKey);
+      if (previousBuild == null || build > previousBuild) {
+        await prefs.setInt(buildKey, build);
+      }
+      if (!mounted) return;
+      final now = DateTime.now().millisecondsSinceEpoch;
+      if (!shouldShowUpdateNotice(
+        previousBuild: previousBuild,
+        currentBuild: build,
+        lastShownAtMs: prefs.getInt(noticeKey),
+        nowMs: now,
+      )) return;
+      await prefs.setInt(noticeKey, now);
+      if (!mounted) return;
+      toast(
+        context,
+        'New version ${info.version}',
+        SnackBarAction(
+          label: context.l10n.text("What's New"),
+          onPressed: () => Navigator.of(context).push(
+            adaptivePageRoute(context, builder: (_) => const WhatsNew()),
+          ),
+        ),
+      );
+    } catch (error, stackTrace) {
+      talker.handle(
+        error,
+        stackTrace,
+        'Unable to show MarketMonk update notice',
+      );
+    }
+  }
 
   @override
   void dispose() {
