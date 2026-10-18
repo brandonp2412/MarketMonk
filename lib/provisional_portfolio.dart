@@ -105,8 +105,8 @@ ProvisionalPortfolioPoint? projectPortfolioFromQuotes({
   if (newest.isAfter(now) ||
       now.difference(newest) > const Duration(days: 4) ||
       newest.difference(oldest) > const Duration(minutes: 30)) return null;
-  final localDate = newest.toLocal();
-  final quoteDay = DateTime(localDate.year, localDate.month, localDate.day);
+  final utcDate = newest.toUtc();
+  final quoteDay = DateTime(utcDate.year, utcDate.month, utcDate.day);
   if (!quoteDay.isAfter(brokerDate)) return null;
 
   var delta = 0.0;
@@ -131,7 +131,7 @@ ProvisionalPortfolioPoint? projectPortfolioFromQuotes({
   }
   final value = brokerNavUsd + delta;
   return value.isFinite && value > 0
-      ? ProvisionalPortfolioPoint(localDate, value)
+      ? ProvisionalPortfolioPoint(newest.toUtc(), value)
       : null;
 }
 
@@ -172,6 +172,6 @@ ProvisionalPortfolioPoint? projectPortfolioSinceSnapshot({
   }
   final value = brokerNavUsd + delta;
   return value.isFinite && value > 0 && delta.abs() > 0.000001
-      ? ProvisionalPortfolioPoint(newest.toLocal(), value)
+      ? ProvisionalPortfolioPoint(newest.toUtc(), value)
       : null;
 }

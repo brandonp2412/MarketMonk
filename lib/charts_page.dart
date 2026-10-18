@@ -1292,11 +1292,11 @@ class ChartsPageState extends State<ChartsPage>
         quotes: quotes,
         now: quoteNow,
       );
-      final lastQuoteLocal = quotes.last.observedAt.toLocal();
+      final lastQuoteUtc = quotes.last.observedAt.toUtc();
       final quoteDay = DateTime(
-        lastQuoteLocal.year,
-        lastQuoteLocal.month,
-        lastQuoteLocal.day,
+        lastQuoteUtc.year,
+        lastQuoteUtc.month,
+        lastQuoteUtc.day,
       );
       if (live == null &&
           quoteDay == anchor.date &&

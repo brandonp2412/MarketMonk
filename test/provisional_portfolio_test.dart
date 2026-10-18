@@ -105,7 +105,7 @@ void main() {
       ],
     );
     expect(estimate?.valueUsd, 10055);
-    expect(estimate?.date, observed.toLocal());
+    expect(estimate?.date, observed.toUtc());
   });
 
   test('does not project older or widely mismatched intraday quotes', () {
@@ -145,6 +145,25 @@ void main() {
       projection(observed, observed.add(const Duration(days: 5))),
       isNull,
     );
+  });
+
+  test('Friday US close is not treated as Saturday in Auckland', () {
+    final fridayClose = DateTime.utc(2026, 10, 16, 19, 59);
+    final estimate = projectPortfolioFromQuotes(
+      brokerDate: DateTime(2026, 10, 16),
+      brokerNavUsd: 10000,
+      holdings: [
+        ProvisionalHolding(
+          shares: 1,
+          closesUsd: {
+            DateTime(2026, 10, 16): 100,
+          },
+        ),
+      ],
+      quotes: [ProvisionalQuote(observedAt: fridayClose, priceUsd: 105)],
+      now: fridayClose.add(const Duration(minutes: 1)),
+    );
+    expect(estimate, isNull);
   });
 
   test('same-session prices adjust a broker snapshot only after it was read',
