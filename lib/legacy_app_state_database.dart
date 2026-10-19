@@ -72,13 +72,6 @@ class LegacyAppStateDatabase extends _$LegacyAppStateDatabase {
     });
   }
 
-  Future<void> seedProfilesIfEmpty(List<String> profiles) async {
-    final count = await appProfiles.count().getSingle();
-    if (count == 0) {
-      await replaceProfiles(profiles);
-    }
-  }
-
   Future<String?> readActiveProfile() async {
     final value = await readSetting(activeProfileSettingKey);
     return value is String ? value : null;
@@ -114,16 +107,6 @@ class LegacyAppStateDatabase extends _$LegacyAppStateDatabase {
         value: encoded.$2,
       ),
     );
-  }
-
-  Future<void> seedSettingIfMissing(String key, Object? value) async {
-    if (value == null) return;
-    final existing = await (select(appSettings)
-          ..where((row) => row.key.equals(key)))
-        .getSingleOrNull();
-    if (existing == null) {
-      await writeSetting(key, value);
-    }
   }
 
   (String, String) _encodeSetting(Object value) => switch (value) {
