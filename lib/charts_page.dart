@@ -155,7 +155,6 @@ class ChartsPageState extends State<ChartsPage>
       _loadPeriodThenPortfolios(),
       'Failed to initialize chart period and portfolios',
     );
-    _setColors();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _measureOverlay();
@@ -187,8 +186,6 @@ class ChartsPageState extends State<ChartsPage>
       );
     }
   }
-
-  void _setColors() {}
 
   void _measureOverlay() {
     final box = _overlayKey.currentContext?.findRenderObject() as RenderBox?;
