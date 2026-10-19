@@ -134,6 +134,7 @@ class ChartsPageState extends State<ChartsPage>
   bool _provisionalRefreshInFlight = false;
   String? _portfolioError;
   bool _portfolioLoading = true;
+  bool _periodChangePending = false;
   bool _chartPeriodLoaded = false;
   final Set<String> _hiddenAccounts = {};
   final Map<String, Future<_LoadedChartPortfolio>> _ibkrLoads = {};
@@ -881,6 +882,7 @@ class ChartsPageState extends State<ChartsPage>
       _portfolioCashFlowsByAccount.clear();
       _portfolioError = cached.error;
       _portfolioLoading = false;
+      _periodChangePending = false;
     });
     return true;
   }
@@ -1109,6 +1111,7 @@ class ChartsPageState extends State<ChartsPage>
       _portfolioCashFlowsByAccount = newFlows;
       _portfolioError = firstError;
       _portfolioLoading = false;
+      _periodChangePending = false;
       _provisionalStartByAccount.clear();
       if (_usesIntraday &&
           _portfolioDailyPreviewAccounts.isEmpty &&
@@ -2002,6 +2005,7 @@ class ChartsPageState extends State<ChartsPage>
       _portfolioReturnSeriesByAccount.clear();
       _portfolioCashFlowsByAccount.clear();
       _portfolioLoading = true;
+      _periodChangePending = _mode != _ChartMode.stock;
       years = selectedYears;
       months = selectedMonths;
       days = selectedDays;
@@ -2886,7 +2890,9 @@ class ChartsPageState extends State<ChartsPage>
   ) {
     final height = MediaQuery.of(context).size.height * 0.30;
 
-    if (_portfolioLoading && _selectedFavorites.isEmpty) {
+    if (_periodChangePending ||
+        (_portfolioLoading &&
+            _portfolioSeriesByAccount.values.every((series) => series.isEmpty))) {
       return SizedBox(
         height: height,
         child: Center(
@@ -3132,6 +3138,7 @@ class ChartsPageState extends State<ChartsPage>
     BuildContext context,
     List<Color> accountColors,
   ) {
+    if (_periodChangePending) return const SizedBox.shrink();
     final accounts = context.read<AccountManager>().accounts;
     final allSeries = {
       for (final entry in _portfolioSeriesByAccount.entries)

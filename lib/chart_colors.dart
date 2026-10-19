@@ -31,3 +31,34 @@ Color chartSeriesColor(ColorScheme colors, int index) {
         : primary.lightness.clamp(0.40, 0.48),
   ).toColor();
 }
+
+List<Color> portfolioHoldingColors(
+  ColorScheme scheme,
+  List<String> symbols, {
+  required int accountCount,
+  required List<String> favorites,
+}) {
+  final favoriteIndices = [
+    for (final symbol in symbols)
+      favorites.indexWhere(
+        (favorite) => favorite.toUpperCase() == symbol.toUpperCase(),
+      ),
+  ];
+  final reserved = <int>{
+    for (final index in favoriteIndices)
+      if (index >= 0) accountCount + index,
+  };
+  var nextIndex = 0;
+  final paletteIndices = <int>[];
+  for (final favoriteIndex in favoriteIndices) {
+    if (favoriteIndex >= 0) {
+      paletteIndices.add(accountCount + favoriteIndex);
+    } else {
+      while (reserved.contains(nextIndex)) {
+        nextIndex++;
+      }
+      paletteIndices.add(nextIndex++);
+    }
+  }
+  return [for (final index in paletteIndices) chartSeriesColor(scheme, index)];
+}
