@@ -1,39 +1,35 @@
 import 'package:flutter/material.dart';
 
-/// Consistent categorical accents for both charts and portfolio holdings.
-const _seriesPalette = <Color>[
-  Color(0xFF3E78A8),
-  Color(0xFFD58B43),
-  Color(0xFF269A94),
-  Color(0xFF9271B0),
-  Color(0xFFC9686E),
-  Color(0xFF659447),
-  Color(0xFFB36A9B),
-  Color(0xFF4C9FC2),
-  Color(0xFFAD8C45),
-  Color(0xFF6269A3),
-  Color(0xFFB86A4D),
-  Color(0xFF527E79),
-];
-
+/// Distinct series accents derived from the theme, with stable hues by index.
 Color chartSeriesColor(ColorScheme colors, int index) {
-  final base = _seriesPalette[index % _seriesPalette.length];
-  final cycle = index ~/ _seriesPalette.length;
-  final Color accent;
-  if (cycle == 0) {
-    accent = base;
-  } else {
-    final hsl = HSLColor.fromColor(base);
-    accent = hsl
-        .withHue((hsl.hue + cycle * 18) % 360)
-        .withLightness(
-          (hsl.lightness + (cycle.isOdd ? 0.09 : -0.07)).clamp(0.3, 0.7),
-        )
-        .toColor();
-  }
-  return colors.brightness == Brightness.dark
-      ? Color.lerp(accent, Colors.white, 0.2)!
-      : accent;
+  final primary = HSLColor.fromColor(colors.primary);
+  final dark = colors.brightness == Brightness.dark;
+  const hueOffsets = [
+    0.0,
+    150.0,
+    270.0,
+    60.0,
+    210.0,
+    315.0,
+    105.0,
+    30.0,
+    180.0,
+    285.0,
+    75.0,
+    240.0,
+  ];
+  final hue = (primary.hue +
+          hueOffsets[index % hueOffsets.length] +
+          (index ~/ hueOffsets.length) * 15) %
+      360;
+  return HSLColor.fromAHSL(
+    1,
+    hue,
+    primary.saturation.clamp(0.60, 0.85),
+    dark
+        ? primary.lightness.clamp(0.65, 0.75)
+        : primary.lightness.clamp(0.40, 0.48),
+  ).toColor();
 }
 
 List<Color> portfolioHoldingColors(
