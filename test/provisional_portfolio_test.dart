@@ -2,6 +2,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/provisional_portfolio.dart';
 
 void main() {
+  test('IBKR US session closes use the same local date as favourite candles',
+      () {
+    final session = DateTime(2026, 10, 16);
+    final close = DateTime.utc(2026, 10, 16, 21).toLocal();
+    final expected = DateTime(close.year, close.month, close.day);
+    expect(usSessionDisplayDay(session), expected);
+    expect(usSessionDateFromDisplayDay(expected), session);
+  });
+
   test('extends broker NAV using dated closes, including negative shares', () {
     final points = projectPortfolioFromCloses(
       brokerDate: DateTime(2026, 10, 15),
@@ -105,7 +114,7 @@ void main() {
       ],
     );
     expect(estimate?.valueUsd, 10055);
-    expect(estimate?.date, observed.toUtc());
+    expect(estimate?.date, observed.toLocal());
   });
 
   test('does not project older or widely mismatched intraday quotes', () {

@@ -1192,13 +1192,14 @@ class ChartsPageState extends State<ChartsPage>
             .toList();
     if (official.isEmpty) return;
     final anchor = official.last;
+    final brokerDay = usSessionDateFromDisplayDay(anchor.date);
     final now = DateTime.now();
     if (anchor.date.isAfter(now) || now.difference(anchor.date).inDays > 14) {
       return;
     }
     final positions = loaded.positions.where((p) => p.netShares != 0).toList();
     if (positions.isEmpty) return;
-    final from = anchor.date.subtract(const Duration(days: 4));
+    final from = brokerDay.subtract(const Duration(days: 4));
     for (var start = 0; start < positions.length; start += 4) {
       if (!isCurrent()) return;
       await Future.wait(
@@ -1243,12 +1244,15 @@ class ChartsPageState extends State<ChartsPage>
         ),
       );
     }
-    final projected = projectPortfolioFromCloses(
-      brokerDate: anchor.date,
-      brokerNavUsd: anchor.value,
-      holdings: holdings,
-      latestDate: now,
-    );
+    final projected = [
+      for (final point in projectPortfolioFromCloses(
+        brokerDate: brokerDay,
+        brokerNavUsd: anchor.value,
+        holdings: holdings,
+        latestDate: now,
+      ))
+        if (point.date.isAfter(anchor.date)) point,
+    ];
     final quotes = <ProvisionalQuote>[];
     await _intradayData.prefetchPortfolio(config, days: 1);
     for (var start = 0; start < positions.length; start += 4) {
@@ -1286,7 +1290,7 @@ class ChartsPageState extends State<ChartsPage>
     if (quotes.length == holdings.length) {
       final quoteNow = DateTime.now();
       var live = projectPortfolioFromQuotes(
-        brokerDate: anchor.date,
+        brokerDate: brokerDay,
         brokerNavUsd: anchor.value,
         holdings: holdings,
         quotes: quotes,
@@ -1299,7 +1303,7 @@ class ChartsPageState extends State<ChartsPage>
         lastQuoteUtc.day,
       );
       if (live == null &&
-          quoteDay == anchor.date &&
+          quoteDay == brokerDay &&
           loaded.cachedAt != null &&
           positions.every((position) => position.brokerMarketValue != null)) {
         live = projectPortfolioSinceSnapshot(
@@ -1603,7 +1607,10 @@ class ChartsPageState extends State<ChartsPage>
         performance.startDate!.weekday != DateTime.sunday &&
         !(performance.startNav == 0 && fundedFirstNav)) {
       points.add(
-        _DateValue(performance.startDate!, performance.startNav! / basePerUsd),
+        _DateValue(
+          usSessionDisplayDay(performance.startDate!),
+          performance.startNav! / basePerUsd,
+        ),
       );
     }
     for (var index = 0; index < performance.dates.length; index++) {
@@ -1612,7 +1619,12 @@ class ChartsPageState extends State<ChartsPage>
           date.weekday == DateTime.sunday) {
         continue;
       }
-      points.add(_DateValue(date, performance.nav[index] / basePerUsd));
+      points.add(
+        _DateValue(
+          usSessionDisplayDay(date),
+          performance.nav[index] / basePerUsd,
+        ),
+      );
     }
     points.sort((a, b) => a.date.compareTo(b.date));
     final asOfDate = loaded.asOfDate;
@@ -1625,11 +1637,7 @@ class ChartsPageState extends State<ChartsPage>
         currentValueUsd.isFinite &&
         currentValueUsd > 0 &&
         points.isNotEmpty) {
-      final snapshotDate = DateTime(
-        asOfDate.year,
-        asOfDate.month,
-        asOfDate.day,
-      );
+      final snapshotDate = usSessionDisplayDay(asOfDate);
       if (snapshotDate.isAfter(points.last.date)) {
         points.add(_DateValue(snapshotDate, currentValueUsd));
       }
@@ -1663,7 +1671,7 @@ class ChartsPageState extends State<ChartsPage>
       for (var i = 0; i < performance.dates.length; i++) {
         final date = performance.dates[i];
         cashFlowsByDate.update(
-          date,
+          usSessionDisplayDay(date),
           (amount) => amount + performance.cashFlows[i] / basePerUsd,
           ifAbsent: () => performance.cashFlows[i] / basePerUsd,
         );
@@ -1679,7 +1687,8 @@ class ChartsPageState extends State<ChartsPage>
       var cumulative = 0.0;
       for (final point in series) {
         while (returnIndex < performance.returnDates.length &&
-            !performance.returnDates[returnIndex].isAfter(point.date)) {
+            !usSessionDisplayDay(performance.returnDates[returnIndex])
+                .isAfter(point.date)) {
           cumulative = performance.returns[returnIndex++];
         }
         if (cumulative.isFinite && cumulative > -1) {

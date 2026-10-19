@@ -18,6 +18,8 @@ void main() {
   testWidgets(
       'Linux charts display estimates from cached real IBKR NAV and live prices',
       (tester) async {
+    final useLiveBroker =
+        Platform.environment['MARKET_MONK_E2E_LIVE_BROKER'] == '1';
     final settings = SettingsState();
     await settings.initialized;
     final accounts = app.AccountManager();
@@ -25,7 +27,9 @@ void main() {
     expect(accounts.accounts, containsAll(['Default', 'IBKR Bot']));
     for (final name in accounts.accounts) {
       expect(accounts.ibkrConfigFor(name).isConfigured, isTrue);
-      expect(accounts.portfolioCacheFor(name)?.positions, isNotEmpty);
+      if (!useLiveBroker) {
+        expect(accounts.portfolioCacheFor(name)?.positions, isNotEmpty);
+      }
       debugPrint(
         'E2E $name broker as-of: ${accounts.portfolioCacheFor(name)?.asOfDate}',
       );
@@ -36,8 +40,9 @@ void main() {
         accounts.ibkrConfigFor(name).baseUrl: name,
     };
     final historicalPortfolios = {
-      for (final name in accounts.accounts)
-        name: accounts.portfolioCacheFor(name)!,
+      if (!useLiveBroker)
+        for (final name in accounts.accounts)
+          name: accounts.portfolioCacheFor(name)!,
     };
     final historicalReturns = {
       for (final name in accounts.accounts)
@@ -99,15 +104,50 @@ void main() {
             key: screenshotKey,
             child: Scaffold(
               body: ChartsPage(
-                ibkrLoader: recordedSnapshot,
-                ibkrPerformanceLoader: (config, _) async =>
-                    historicalReturns[namesByUrl[config.baseUrl]]!,
+                ibkrLoader: useLiveBroker
+                    ? (config) async {
+                        final snapshot =
+                            await IbkrApiClient(config).fetchPortfolio();
+                        debugPrint(
+                          'E2E live broker snapshot: ${snapshot.asOfDate}',
+                        );
+                        return snapshot;
+                      }
+                    : recordedSnapshot,
+                ibkrPerformanceLoader: useLiveBroker
+                    ? null
+                    : (config, _) async =>
+                        historicalReturns[namesByUrl[config.baseUrl]]!,
               ),
             ),
           ),
         ),
       ),
     );
+
+    final favourite = find.text('^IXIC');
+    final favoriteDeadline = DateTime.now().add(const Duration(seconds: 30));
+    while (favourite.evaluate().isEmpty &&
+        DateTime.now().isBefore(favoriteDeadline)) {
+      await tester.pump(const Duration(milliseconds: 250));
+    }
+    expect(favourite, findsWidgets);
+    await tester.tap(favourite.first);
+    await tester.pump();
+
+    bool latestDatesMatch(MarketLineChart chart) {
+      final byName = {for (final series in chart.series) series.name: series};
+      if (![
+        'Default',
+        'IBKR Bot',
+        '^IXIC',
+      ].every((name) => byName[name]?.points.isNotEmpty == true)) return false;
+      final favouriteDate = chart.xLabels[byName['^IXIC']!.points.last.column!];
+      return ['Default', 'IBKR Bot'].every(
+        (name) =>
+            chart.xLabels[byName[name]!.points.last.column!] == favouriteDate,
+      );
+    }
 
     final deadline = DateTime.now().add(const Duration(minutes: 3));
     while (DateTime.now().isBefore(deadline)) {
@@ -116,16 +156,18 @@ void main() {
       if (chartFinder.evaluate().isNotEmpty) {
         final chart = tester.widget<MarketLineChart>(chartFinder.first);
         final names = chart.series.map((s) => s.name).toSet();
-        if (names.containsAll(['Default', 'IBKR Bot']) &&
-            ['Default', 'IBKR Bot'].every(
-              (name) => find
-                  .descendant(
-                    of: find.byKey(Key('chart-account-selector-$name')),
-                    matching: find.textContaining('≈'),
-                  )
-                  .evaluate()
-                  .isNotEmpty,
-            )) {
+        if (names.containsAll(['Default', 'IBKR Bot', '^IXIC']) &&
+            latestDatesMatch(chart) &&
+            (useLiveBroker ||
+                ['Default', 'IBKR Bot'].every(
+                  (name) => find
+                      .descendant(
+                        of: find.byKey(Key('chart-account-selector-$name')),
+                        matching: find.textContaining('≈'),
+                      )
+                      .evaluate()
+                      .isNotEmpty,
+                ))) {
           break;
         }
       }
@@ -134,9 +176,15 @@ void main() {
         tester.widget<MarketLineChart>(find.byType(MarketLineChart).first);
     for (final series in chart.series) {
       debugPrint(
-        'E2E ${series.name} graph points: ${series.points.length}, latest: ${series.points.last.y}',
+        'E2E ${series.name} ${chart.xLabels[series.points.last.column!]} '
+        'graph points: ${series.points.length}, latest: ${series.points.last.y}',
       );
     }
+    expect(
+      latestDatesMatch(chart),
+      isTrue,
+      reason: 'Both account endpoints must match the last favourite-stock date',
+    );
     for (final name in ['Default', 'IBKR Bot']) {
       expect(
         chart.series.any((s) => s.name == name && s.points.length > 2),
@@ -151,15 +199,16 @@ void main() {
         '/tmp/marketmonk-linux-e2e.png';
     await File(output).writeAsBytes(bytes!.buffer.asUint8List());
     debugPrint('E2E screenshot saved: $output');
-    for (final name in ['Default', 'IBKR Bot']) {
-      expect(
-        find.descendant(
-          of: find.byKey(Key('chart-account-selector-$name')),
-          matching: find.textContaining('≈'),
-        ),
-        findsOneWidget,
-        reason: '$name must display an estimated value',
-      );
-    }
+    if (!useLiveBroker)
+      for (final name in ['Default', 'IBKR Bot']) {
+        expect(
+          find.descendant(
+            of: find.byKey(Key('chart-account-selector-$name')),
+            matching: find.textContaining('≈'),
+          ),
+          findsOneWidget,
+          reason: '$name must display an estimated value',
+        );
+      }
   });
 }

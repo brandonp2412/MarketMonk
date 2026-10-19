@@ -1,3 +1,26 @@
+/// IBKR daily NAV is dated by the US trading session; favourite candle charts
+/// use the date of that session's close in the device's local timezone.
+/// 21:00 UTC is after the US cash close during both standard and daylight time.
+DateTime usSessionDisplayDay(DateTime sessionDate) {
+  final close = DateTime.utc(
+    sessionDate.year,
+    sessionDate.month,
+    sessionDate.day,
+    21,
+  ).toLocal();
+  return DateTime(close.year, close.month, close.day);
+}
+
+DateTime usSessionDateFromDisplayDay(DateTime displayDay) {
+  final previous = DateTime(
+    displayDay.year,
+    displayDay.month,
+    displayDay.day - 1,
+  );
+  if (usSessionDisplayDay(previous) == displayDay) return previous;
+  return DateTime(displayDay.year, displayDay.month, displayDay.day);
+}
+
 class ProvisionalHolding {
   final double shares;
   final Map<DateTime, double> closesUsd;
@@ -131,7 +154,7 @@ ProvisionalPortfolioPoint? projectPortfolioFromQuotes({
   }
   final value = brokerNavUsd + delta;
   return value.isFinite && value > 0
-      ? ProvisionalPortfolioPoint(newest.toUtc(), value)
+      ? ProvisionalPortfolioPoint(newest.toLocal(), value)
       : null;
 }
 
@@ -172,6 +195,6 @@ ProvisionalPortfolioPoint? projectPortfolioSinceSnapshot({
   }
   final value = brokerNavUsd + delta;
   return value.isFinite && value > 0 && delta.abs() > 0.000001
-      ? ProvisionalPortfolioPoint(newest.toUtc(), value)
+      ? ProvisionalPortfolioPoint(newest.toLocal(), value)
       : null;
 }

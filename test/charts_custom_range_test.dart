@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/charts_page.dart';
+import 'package:market_monk/provisional_portfolio.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/settings_state.dart';
@@ -208,7 +209,7 @@ void main() {
     for (var i = 0; i < dates.length; i++) {
       await seedTestCandle(
         'SPY',
-        dates[i],
+        usSessionDisplayDay(dates[i]),
         <double>[100, 110, 110, 115, 117, 120][i],
       );
     }
