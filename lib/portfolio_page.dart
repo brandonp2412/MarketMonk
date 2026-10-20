@@ -22,6 +22,7 @@ import 'package:market_monk/market_donut_chart.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
+import 'package:market_monk/sqlite_settings.dart';
 import 'package:market_monk/ticker_context_actions.dart';
 import 'package:market_monk/utils.dart';
 import 'package:path_provider/path_provider.dart';
@@ -88,6 +89,7 @@ class PortfolioPageState extends State<PortfolioPage>
   bool _isLoadingPortfolio = false;
   Object? _loadError;
   int? touchedIndex;
+  List<String> _chartFavorites = [];
   final _allocationScrollController = ScrollController();
   final _returnScrollController = ScrollController();
   String _lastAccount = '';
@@ -104,6 +106,7 @@ class PortfolioPageState extends State<PortfolioPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _stream = _buildStream(skipInitial: widget.isActive);
+    runDetachedTask(_loadChartFavorites(), 'Failed to load chart colors');
   }
 
   @override
@@ -114,6 +117,16 @@ class PortfolioPageState extends State<PortfolioPage>
     setState(() => _stream = _buildStream());
     if (widget.isActive) {
       runDetachedTask(_preload(), 'Failed to preload portfolio');
+      runDetachedTask(_loadChartFavorites(), 'Failed to load chart colors');
+    }
+  }
+
+  Future<void> _loadChartFavorites() async {
+    final prefs = await SqliteSettings.getInstance();
+    if (!mounted) return;
+    final favorites = prefs.getStringList('favoriteStocks') ?? [];
+    if (!listEquals(favorites, _chartFavorites)) {
+      setState(() => _chartFavorites = favorites);
     }
   }
 
@@ -864,7 +877,7 @@ class PortfolioPageState extends State<PortfolioPage>
             secondPosition.currentValue.compareTo(firstPosition.currentValue),
       );
 
-    final colors = _buildColors(context, sorted.length);
+    final colors = _buildColors(context, [for (final position in sorted) position.symbol]);
     // Holdings can change while this page is kept alive (for example, after
     // switching accounts). Do not use a selection from the previous list.
     final selectedIndex = touchedIndex != null &&
@@ -1432,12 +1445,13 @@ class PortfolioPageState extends State<PortfolioPage>
     );
   }
 
-  List<Color> _buildColors(BuildContext context, int count) {
-    return List.generate(
-      count,
-      (index) => chartSeriesColor(Theme.of(context).colorScheme, index),
-    );
-  }
+  List<Color> _buildColors(BuildContext context, List<String> symbols) =>
+      portfolioHoldingColors(
+        Theme.of(context).colorScheme,
+        symbols,
+        accountCount: context.read<AccountManager>().accounts.length,
+        favorites: _chartFavorites,
+      );
 }
 
 class _DesktopPortfolioMetric extends StatelessWidget {

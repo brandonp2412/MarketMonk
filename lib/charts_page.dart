@@ -22,6 +22,7 @@ import 'package:market_monk/main.dart';
 import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/portfolio_chart_scale.dart';
+import 'package:market_monk/provisional_portfolio.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
@@ -37,12 +38,14 @@ class _LoadedChartPortfolio {
   final IbkrAccountValue? currentValue;
   final double? currentValueUsd;
   final DateTime? asOfDate;
+  final DateTime? cachedAt;
 
   const _LoadedChartPortfolio({
     required this.positions,
     required this.currentValue,
     required this.currentValueUsd,
     this.asOfDate,
+    this.cachedAt,
   });
 }
 
@@ -126,8 +129,12 @@ class ChartsPageState extends State<ChartsPage>
   Map<String, Map<DateTime, double>> _portfolioCashFlowsByAccount = {};
   final _intradayPortfolioCache = <String, _CachedIntradayPortfolio>{};
   final _portfolioDailyPreviewAccounts = <String>{};
+  final _provisionalStartByAccount = <String, DateTime>{};
+  Timer? _provisionalRefreshTimer;
+  bool _provisionalRefreshInFlight = false;
   String? _portfolioError;
   bool _portfolioLoading = true;
+  bool _periodChangePending = false;
   bool _chartPeriodLoaded = false;
   final Set<String> _hiddenAccounts = {};
   final Map<String, Future<_LoadedChartPortfolio>> _ibkrLoads = {};
@@ -154,6 +161,13 @@ class ChartsPageState extends State<ChartsPage>
     runDetachedTask(
       _loadPeriodThenPortfolios(),
       'Failed to initialize chart period and portfolios',
+    );
+    _provisionalRefreshTimer = Timer.periodic(
+      const Duration(minutes: 5),
+      (_) => runDetachedTask(
+        _refreshProvisionalAccounts(),
+        'Failed to refresh provisional account quotes',
+      ),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -336,6 +350,7 @@ class ChartsPageState extends State<ChartsPage>
           currentValue: currentValue,
           currentValueUsd: currentValueUsd,
           asOfDate: cached.asOfDate,
+          cachedAt: cached.cachedAt,
         );
       }
       if (!ibkrConfig.isConfigured) {
@@ -345,6 +360,7 @@ class ChartsPageState extends State<ChartsPage>
             currentValue: cached.netLiquidation,
             currentValueUsd: cached.netLiquidationUsd,
             asOfDate: cached.asOfDate,
+            cachedAt: cached.cachedAt,
           );
         }
         throw StateError('IBKR portfolio source is not fully configured');
@@ -383,6 +399,7 @@ class ChartsPageState extends State<ChartsPage>
               currentValue: currentValue,
               currentValueUsd: currentValueUsd,
               asOfDate: snapshot.asOfDate,
+              cachedAt: accountManager.portfolioCacheFor(accountName)?.cachedAt,
             );
           } finally {
             _ibkrLoads.removeWhere((key, value) => key == loadKey);
@@ -399,6 +416,7 @@ class ChartsPageState extends State<ChartsPage>
             currentValue: cached.netLiquidation,
             currentValueUsd: cached.netLiquidationUsd,
             asOfDate: cached.asOfDate,
+            cachedAt: cached.cachedAt,
           );
         }
         rethrow;
@@ -572,6 +590,7 @@ class ChartsPageState extends State<ChartsPage>
   @override
   void dispose() {
     _accountManager?.removeListener(_handleAccountManagerChanged);
+    _provisionalRefreshTimer?.cancel();
     _searchController.dispose();
     _searchFocus.dispose();
     _yahooApi.dispose();
@@ -860,6 +879,7 @@ class ChartsPageState extends State<ChartsPage>
       _portfolioCashFlowsByAccount.clear();
       _portfolioError = cached.error;
       _portfolioLoading = false;
+      _periodChangePending = false;
     });
     return true;
   }
@@ -965,6 +985,7 @@ class ChartsPageState extends State<ChartsPage>
 
     final newReturns = <String, List<_DateValue>>{};
     final newFlows = <String, Map<DateTime, double>>{};
+    final loadedAccounts = <String, _LoadedChartPortfolio>{};
     String? firstError;
 
     Future<void> loadAccount(String accountName) async {
@@ -987,6 +1008,7 @@ class ChartsPageState extends State<ChartsPage>
             generation != _portfolioLoadGeneration) {
           return;
         }
+        loadedAccounts[accountName] = loaded;
         if (_usesIntraday) {
           if (fiveDayPreview && newSeries[accountName]!.isEmpty) {
             try {
@@ -1086,6 +1108,8 @@ class ChartsPageState extends State<ChartsPage>
       _portfolioCashFlowsByAccount = newFlows;
       _portfolioError = firstError;
       _portfolioLoading = false;
+      _periodChangePending = false;
+      _provisionalStartByAccount.clear();
       if (_usesIntraday &&
           _portfolioDailyPreviewAccounts.isEmpty &&
           newSeries.values.any((series) => series.isNotEmpty)) {
@@ -1096,6 +1120,232 @@ class ChartsPageState extends State<ChartsPage>
           firstError,
         );
       }
+    });
+    if (!_usesIntraday) {
+      for (final entry in loadedAccounts.entries) {
+        final config = accountManager.ibkrConfigFor(entry.key);
+        if (!config.enabled || newReturns[entry.key]?.isEmpty != false)
+          continue;
+        runDetachedTask(
+          _loadProvisionalAccount(entry.key, entry.value, config, generation),
+          'Failed to update provisional portfolio prices',
+        );
+      }
+    }
+  }
+
+  Future<void> _refreshProvisionalAccounts() async {
+    if (!mounted ||
+        !widget.isActive ||
+        _usesIntraday ||
+        _mode != _ChartMode.portfolio ||
+        _provisionalRefreshInFlight) return;
+    _provisionalRefreshInFlight = true;
+    try {
+      final manager = context.read<AccountManager>();
+      final generation = _portfolioLoadGeneration;
+      await Future.wait(
+        manager.accounts.map((name) async {
+          final config = manager.ibkrConfigFor(name);
+          final cached = manager.portfolioCacheFor(name);
+          if (!config.enabled ||
+              cached == null ||
+              !_portfolioSeriesByAccount.containsKey(name)) return;
+          await _loadProvisionalAccount(
+            name,
+            _LoadedChartPortfolio(
+              positions: cached.positions,
+              currentValue: cached.netLiquidation,
+              currentValueUsd: cached.netLiquidationUsd,
+              asOfDate: cached.asOfDate,
+              cachedAt: cached.cachedAt,
+            ),
+            config,
+            generation,
+          );
+        }),
+      );
+    } finally {
+      _provisionalRefreshInFlight = false;
+    }
+  }
+
+  Future<void> _loadProvisionalAccount(
+    String name,
+    _LoadedChartPortfolio loaded,
+    IbkrAccountConfig config,
+    int generation,
+  ) async {
+    bool isCurrent() =>
+        mounted &&
+        widget.isActive &&
+        generation == _portfolioLoadGeneration &&
+        !_usesIntraday;
+    final existing = _portfolioSeriesByAccount[name];
+    if (existing == null || existing.isEmpty || loaded.positions.isEmpty)
+      return;
+    final provisionalStart = _provisionalStartByAccount[name];
+    final official = provisionalStart == null
+        ? existing
+        : existing
+            .where((point) => point.date.isBefore(provisionalStart))
+            .toList();
+    if (official.isEmpty) return;
+    final anchor = official.last;
+    final brokerDay = usSessionDateFromDisplayDay(anchor.date);
+    final now = DateTime.now();
+    if (anchor.date.isAfter(now) || now.difference(anchor.date).inDays > 14) {
+      return;
+    }
+    final positions = loaded.positions.where((p) => p.netShares != 0).toList();
+    if (positions.isEmpty) return;
+    final from = brokerDay.subtract(const Duration(days: 4));
+    for (var start = 0; start < positions.length; start += 4) {
+      if (!isCurrent()) return;
+      await Future.wait(
+        positions.skip(start).take(4).map((position) async {
+          try {
+            await syncCandles(
+              position.symbol,
+              ibkrConfig: config,
+              syncNamespace: name,
+              requiredFrom: from,
+            );
+          } catch (error) {
+            talker.warning(
+              'Provisional price unavailable for ${position.symbol}: $error',
+            );
+          }
+        }),
+      );
+    }
+    if (!isCurrent()) return;
+    final holdings = <ProvisionalHolding>[];
+    for (final position in positions) {
+      final rows = await (marketDataDatabase.candles.select()
+            ..where(
+              (c) =>
+                  c.symbol.equals(canonicalMarketSymbol(position.symbol)) &
+                  c.date.isBiggerThanValue(from),
+            )
+            ..orderBy([(c) => OrderingTerm.asc(c.date)]))
+          .get();
+      if (rows.isEmpty) return;
+      final rate = requireUsdRate(position.nativeCurrency);
+      final divisor = symbolCentDivisor(position.symbol);
+      holdings.add(
+        ProvisionalHolding(
+          shares: position.netShares,
+          closesUsd: {
+            for (final row in rows)
+              DateTime(row.date.year, row.date.month, row.date.day):
+                  row.close / divisor / rate,
+          },
+        ),
+      );
+    }
+    final projected = [
+      for (final point in projectPortfolioFromCloses(
+        brokerDate: brokerDay,
+        brokerNavUsd: anchor.value,
+        holdings: holdings,
+        latestDate: now,
+      ))
+        if (point.date.isAfter(anchor.date)) point,
+    ];
+    final quotes = <ProvisionalQuote>[];
+    await _intradayData.prefetchPortfolio(config, days: 1);
+    for (var start = 0; start < positions.length; start += 4) {
+      if (!isCurrent()) return;
+      final batch = await Future.wait(
+        positions.skip(start).take(4).map((position) async {
+          try {
+            final intraday = await _intradayData.fetch(
+              position.symbol,
+              days: 1,
+              config: config,
+            );
+            await fetchSymbolCurrencyAndRate(
+              position.symbol,
+              rawCurrency: intraday.currency,
+            );
+            final last = intraday.candles.last;
+            return ProvisionalQuote(
+              observedAt: last.date,
+              priceUsd: last.close /
+                  symbolCentDivisor(position.symbol) /
+                  requireUsdRate(symbolCurrency(position.symbol)),
+            );
+          } catch (error) {
+            talker.warning(
+              'Live portfolio quote unavailable for ${position.symbol}: $error',
+            );
+            return null;
+          }
+        }),
+      );
+      quotes.addAll(batch.whereType<ProvisionalQuote>());
+    }
+    if (!isCurrent()) return;
+    if (quotes.length == holdings.length) {
+      final quoteNow = DateTime.now();
+      var live = projectPortfolioFromQuotes(
+        brokerDate: brokerDay,
+        brokerNavUsd: anchor.value,
+        holdings: holdings,
+        quotes: quotes,
+        now: quoteNow,
+      );
+      final lastQuoteUtc = quotes.last.observedAt.toUtc();
+      final quoteDay = DateTime(
+        lastQuoteUtc.year,
+        lastQuoteUtc.month,
+        lastQuoteUtc.day,
+      );
+      if (live == null &&
+          quoteDay == brokerDay &&
+          loaded.cachedAt != null &&
+          positions.every((position) => position.brokerMarketValue != null)) {
+        live = projectPortfolioSinceSnapshot(
+          snapshotAt: loaded.cachedAt!,
+          brokerNavUsd: anchor.value,
+          brokerMarketValuesUsd: [
+            for (final position in positions)
+              position.brokerMarketValue! /
+                  requireUsdRate(position.nativeCurrency),
+          ],
+          holdings: holdings,
+          quotes: quotes,
+          now: quoteNow,
+        );
+      }
+      if (live != null &&
+          (projected.isEmpty || live.date.isAfter(projected.last.date))) {
+        projected.add(live);
+      }
+    }
+    if (projected.isEmpty) return;
+    final originalReturns = [
+      for (final point
+          in _portfolioReturnSeriesByAccount[name] ?? <_DateValue>[])
+        if (provisionalStart == null || point.date.isBefore(provisionalStart))
+          point,
+    ];
+    final baseReturn =
+        originalReturns.isEmpty ? null : originalReturns.last.value;
+    setState(() {
+      _portfolioSeriesByAccount[name] = [
+        ...official,
+        for (final point in projected) _DateValue(point.date, point.valueUsd),
+      ];
+      if (baseReturn != null && baseReturn.isFinite && baseReturn > 0) {
+        _portfolioReturnSeriesByAccount[name] = [
+          ...originalReturns,
+          for (final point in projected)
+            _DateValue(point.date, baseReturn * point.valueUsd / anchor.value),
+        ];
+      }
+      _provisionalStartByAccount[name] = projected.first.date;
     });
   }
 
@@ -1357,7 +1607,10 @@ class ChartsPageState extends State<ChartsPage>
         performance.startDate!.weekday != DateTime.sunday &&
         !(performance.startNav == 0 && fundedFirstNav)) {
       points.add(
-        _DateValue(performance.startDate!, performance.startNav! / basePerUsd),
+        _DateValue(
+          usSessionDisplayDay(performance.startDate!),
+          performance.startNav! / basePerUsd,
+        ),
       );
     }
     for (var index = 0; index < performance.dates.length; index++) {
@@ -1366,7 +1619,12 @@ class ChartsPageState extends State<ChartsPage>
           date.weekday == DateTime.sunday) {
         continue;
       }
-      points.add(_DateValue(date, performance.nav[index] / basePerUsd));
+      points.add(
+        _DateValue(
+          usSessionDisplayDay(date),
+          performance.nav[index] / basePerUsd,
+        ),
+      );
     }
     points.sort((a, b) => a.date.compareTo(b.date));
     final asOfDate = loaded.asOfDate;
@@ -1379,11 +1637,7 @@ class ChartsPageState extends State<ChartsPage>
         currentValueUsd.isFinite &&
         currentValueUsd > 0 &&
         points.isNotEmpty) {
-      final snapshotDate = DateTime(
-        asOfDate.year,
-        asOfDate.month,
-        asOfDate.day,
-      );
+      final snapshotDate = usSessionDisplayDay(asOfDate);
       if (snapshotDate.isAfter(points.last.date)) {
         points.add(_DateValue(snapshotDate, currentValueUsd));
       }
@@ -1417,7 +1671,7 @@ class ChartsPageState extends State<ChartsPage>
       for (var i = 0; i < performance.dates.length; i++) {
         final date = performance.dates[i];
         cashFlowsByDate.update(
-          date,
+          usSessionDisplayDay(date),
           (amount) => amount + performance.cashFlows[i] / basePerUsd,
           ifAbsent: () => performance.cashFlows[i] / basePerUsd,
         );
@@ -1433,7 +1687,8 @@ class ChartsPageState extends State<ChartsPage>
       var cumulative = 0.0;
       for (final point in series) {
         while (returnIndex < performance.returnDates.length &&
-            !performance.returnDates[returnIndex].isAfter(point.date)) {
+            !usSessionDisplayDay(performance.returnDates[returnIndex])
+                .isAfter(point.date)) {
           cumulative = performance.returns[returnIndex++];
         }
         if (cumulative.isFinite && cumulative > -1) {
@@ -1743,9 +1998,11 @@ class ChartsPageState extends State<ChartsPage>
       _backgroundSyncs.clear();
       _portfolioSeriesByAccount.clear();
       _portfolioDailyPreviewAccounts.clear();
+      _provisionalStartByAccount.clear();
       _portfolioReturnSeriesByAccount.clear();
       _portfolioCashFlowsByAccount.clear();
       _portfolioLoading = true;
+      _periodChangePending = _mode != _ChartMode.stock;
       years = selectedYears;
       months = selectedMonths;
       days = selectedDays;
@@ -2630,7 +2887,9 @@ class ChartsPageState extends State<ChartsPage>
   ) {
     final height = MediaQuery.of(context).size.height * 0.30;
 
-    if (_portfolioLoading && _selectedFavorites.isEmpty) {
+    if (_periodChangePending ||
+        (_portfolioLoading &&
+            _portfolioSeriesByAccount.values.every((series) => series.isEmpty))) {
       return SizedBox(
         height: height,
         child: Center(
@@ -2849,7 +3108,12 @@ class ChartsPageState extends State<ChartsPage>
                   symbolCurrency(accountName),
                 )
               : fmtCurrency(actualValue ?? mark.value);
-          final dateLabel = date == null ? '' : formatter.format(date);
+          final isEstimated = date != null &&
+              _provisionalStartByAccount[accountName] != null &&
+              !date.isBefore(_provisionalStartByAccount[accountName]!);
+          final dateLabel = date == null
+              ? ''
+              : '${formatter.format(date)}${isEstimated ? ' · Estimated' : ''}';
           final returnLabel = scaleForComparison
               ? '${mark.value >= 0 ? '+' : ''}${mark.value.toStringAsFixed(2)}% · '
               : '';
@@ -2871,6 +3135,7 @@ class ChartsPageState extends State<ChartsPage>
     BuildContext context,
     List<Color> accountColors,
   ) {
+    if (_periodChangePending) return const SizedBox.shrink();
     final accounts = context.read<AccountManager>().accounts;
     final allSeries = {
       for (final entry in _portfolioSeriesByAccount.entries)
@@ -2893,6 +3158,12 @@ class ChartsPageState extends State<ChartsPage>
               entry.key,
               entry.value,
               accountColors,
+            ),
+          if (_provisionalStartByAccount.isNotEmpty)
+            Text(
+              '≈ Estimated from market prices; official IBKR values may differ.',
+              style: Theme.of(context).textTheme.bodySmall,
+              textAlign: TextAlign.center,
             ),
         ],
       ),
@@ -2956,9 +3227,13 @@ class ChartsPageState extends State<ChartsPage>
         }
       }
     }
-    final summaryValue = currentValueUsd != null && currentValueUsd.isFinite
-        ? currentValueUsd
-        : series.last.value;
+    final estimated = _provisionalStartByAccount[accountName] != null &&
+        !series.last.date.isBefore(_provisionalStartByAccount[accountName]!);
+    final summaryValue = estimated
+        ? series.last.value
+        : currentValueUsd != null && currentValueUsd.isFinite
+            ? currentValueUsd
+            : series.last.value;
     final theme = Theme.of(context);
 
     Widget returnLabel() => Text(
@@ -2975,7 +3250,7 @@ class ChartsPageState extends State<ChartsPage>
         );
 
     final valueText = Text(
-      fmtCurrency(summaryValue),
+      estimated ? '≈${fmtCurrency(summaryValue)}' : fmtCurrency(summaryValue),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       textAlign: TextAlign.right,

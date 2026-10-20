@@ -62,6 +62,8 @@ void main() {
     List<String> favorites = const [],
     int days = 1,
     Future<void> Function(AccountManager)? configureAccounts,
+    Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
+        ibkrPerformanceLoader,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1000, 900);
@@ -95,6 +97,7 @@ void main() {
             body: ChartsPage(
               initialSymbol: initialSymbol,
               intradayData: loader,
+              ibkrPerformanceLoader: ibkrPerformanceLoader,
               isActive: active,
             ),
           ),
@@ -321,6 +324,73 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('No trades yet'), findsNothing);
     expect(find.text('Historical prices unavailable'), findsWidgets);
+  });
+
+  testWidgets('period changes do not briefly show missing history', (
+    tester,
+  ) async {
+    final pendingPerformance = Completer<IbkrPerformanceSeries>();
+    await mountChart(
+      tester,
+      IntradayMarketData(yahooGet: (_) async => _prices(100, currency: 'USD')),
+      initialSymbol: null,
+      favorites: const ['AAPL'],
+      ibkrPerformanceLoader: (_, __) => pendingPerformance.future,
+      configureAccounts: (accounts) async {
+        await accounts.setIbkrConfig(
+          'Default',
+          const IbkrAccountConfig(
+            enabled: true,
+            baseUrl: 'https://ibkr.example.test',
+            token: 'test-token',
+          ),
+        );
+        await accounts.cachePortfolio(
+          'Default',
+          [
+            Position(
+              symbol: 'AAPL',
+              name: 'Apple',
+              nativeCurrency: 'USD',
+              netShares: 2,
+              avgCost: 50,
+              currentPrice: 100,
+              firstBuyDate: DateTime(2025),
+              lastBuyDate: DateTime(2026),
+            ),
+          ],
+          const IbkrAccountValue(value: 1000, currency: 'USD'),
+          netLiquidationUsd: 1000,
+        );
+      },
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('chart-period-1m')));
+    await tester.pump();
+
+    expect(find.text('Historical prices unavailable'), findsNothing);
+    expect(find.bySemanticsLabel('Loading portfolio'), findsOneWidget);
+
+    final recentMonday = DateTime.now().subtract(
+      Duration(days: DateTime.now().weekday - DateTime.monday),
+    );
+    final previousMonday = recentMonday.subtract(const Duration(days: 7));
+    pendingPerformance.complete(
+      IbkrPerformanceSeries(
+        period: '1Y',
+        startDate: previousMonday.subtract(const Duration(days: 7)),
+        startNav: 900,
+        measure: 'TWR',
+        currency: 'USD',
+        dates: [previousMonday, recentMonday],
+        nav: const [950, 1000],
+        returnDates: [previousMonday, recentMonday],
+        returns: const [0, 0.0526],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Historical prices unavailable'), findsNothing);
+    expect(find.byType(MarketLineChart), findsOneWidget);
   });
 
   testWidgets('portfolio starts independent holding requests concurrently', (
