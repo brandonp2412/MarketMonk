@@ -3327,7 +3327,7 @@ class ChartsPageState extends State<ChartsPage>
                     children: [
                       valueText,
                       const SizedBox(height: 2),
-                      changeText
+                      changeText,
                     ],
                   ),
                 ),
