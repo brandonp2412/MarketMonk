@@ -15,14 +15,12 @@ class BottomNav extends StatelessWidget {
   final List<String> tabs;
   final int currentIndex;
   final Function(int) onTap;
-  final Function(BuildContext, String)? onLongPress;
 
   const BottomNav({
     super.key,
     required this.tabs,
     required this.currentIndex,
     required this.onTap,
-    this.onLongPress,
   });
 
   @override
@@ -64,9 +62,6 @@ class BottomNav extends StatelessWidget {
                 child: GestureDetector(
                   key: Key(tab),
                   onTap: () => onTap(index),
-                  onLongPress: onLongPress != null
-                      ? () => onLongPress!(context, tab)
-                      : null,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 350),
                     curve: Curves.easeOutCubic,
