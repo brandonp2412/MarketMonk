@@ -1,3 +1,5 @@
+const showUpdateNoticesKey = 'show_update_notices';
+
 const updateNoticeIntervalMs = 14 * 24 * 60 * 60 * 1000;
 
 bool shouldShowUpdateNotice({

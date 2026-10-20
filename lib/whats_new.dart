@@ -1,3 +1,5 @@
+import 'package:market_monk/sqlite_settings.dart';
+import 'package:market_monk/update_notice.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -26,11 +28,31 @@ class _WhatsNewState extends State<WhatsNew> {
   int _page = 0;
   bool _isLoading = true;
   bool _loadFailed = false;
+  bool _showUpdateNotices = true;
 
   @override
   void initState() {
     super.initState();
     runDetachedTask(_loadChangelogs(), 'Failed to load changelog');
+    runDetachedTask(
+      _loadUpdateNoticePreference(),
+      'Failed to load update preference',
+    );
+  }
+
+  Future<void> _loadUpdateNoticePreference() async {
+    final prefs = await SqliteSettings.getInstance();
+    if (mounted) {
+      setState(() {
+        _showUpdateNotices = prefs.getBool(showUpdateNoticesKey) ?? true;
+      });
+    }
+  }
+
+  Future<void> _setUpdateNotices(bool enabled) async {
+    final prefs = await SqliteSettings.getInstance();
+    await prefs.setBool(showUpdateNoticesKey, enabled);
+    if (mounted) setState(() => _showUpdateNotices = enabled);
   }
 
   Future<void> _loadChangelogs() async {
@@ -185,7 +207,16 @@ class _WhatsNewState extends State<WhatsNew> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(context.l10n.text("What's New"))),
-      body: _buildBody(),
+      body: Column(
+        children: [
+          SwitchListTile.adaptive(
+            title: Text(context.l10n.text('Show update notices')),
+            value: _showUpdateNotices,
+            onChanged: _setUpdateNotices,
+          ),
+          Expanded(child: _buildBody()),
+        ],
+      ),
     );
   }
 }

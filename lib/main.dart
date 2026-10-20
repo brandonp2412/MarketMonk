@@ -878,7 +878,7 @@ class _MyHomePageState extends State<MyHomePage> {
       if (previousBuild == null || build > previousBuild) {
         await prefs.setInt(buildKey, build);
       }
-      if (!mounted) return;
+      if (!mounted || prefs.getBool(showUpdateNoticesKey) == false) return;
       final now = DateTime.now().millisecondsSinceEpoch;
       if (!shouldShowUpdateNotice(
         previousBuild: previousBuild,
