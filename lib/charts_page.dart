@@ -2889,7 +2889,8 @@ class ChartsPageState extends State<ChartsPage>
 
     if (_periodChangePending ||
         (_portfolioLoading &&
-            _portfolioSeriesByAccount.values.every((series) => series.isEmpty))) {
+            _portfolioSeriesByAccount.values
+                .every((series) => series.isEmpty))) {
       return SizedBox(
         height: height,
         child: Center(
@@ -3317,11 +3318,18 @@ class ChartsPageState extends State<ChartsPage>
                   overflow: TextOverflow.ellipsis,
                 ),
                 subtitle: returnLabel(),
-                trailing: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [valueText, const SizedBox(height: 2), changeText],
+                trailing: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 110),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      valueText,
+                      const SizedBox(height: 2),
+                      changeText
+                    ],
+                  ),
                 ),
               ),
             ),
