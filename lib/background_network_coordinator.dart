@@ -4,8 +4,6 @@ abstract final class RequestCategory {
   static const ibkrPerformance = 'ibkr.performance';
   static const ibkrTrades = 'ibkr.trades';
   static const ibkrHistorical = 'ibkr.historical';
-  static const yahooSearch = 'yahoo.search';
-  static const yahooSymbolMetadata = 'yahoo.symbolMetadata';
   static const yahooCandles = 'yahoo.candles';
   static const fxRate = 'fx.rate';
   static const marketCandles = 'market.candles';
@@ -82,10 +80,7 @@ class BackgroundNetworkCoordinator {
     return '$label: $details';
   }
 
-  Future<T> observe<T>(
-    String namespace,
-    Future<T> Function() request,
-  ) async {
+  Future<T> observe<T>(String namespace, Future<T> Function() request) async {
     _startedByNamespace.update(
       namespace,
       (count) => count + 1,
