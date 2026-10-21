@@ -2887,10 +2887,19 @@ class ChartsPageState extends State<ChartsPage>
   ) {
     final height = MediaQuery.of(context).size.height * 0.30;
 
-    if (_periodChangePending ||
-        (_portfolioLoading &&
-            _portfolioSeriesByAccount.values
-                .every((series) => series.isEmpty))) {
+    final hasFavoritePrices = _selectedFavorites.any(
+      (symbol) =>
+          _favoriteIntraday[symbol]?.candles.isNotEmpty == true ||
+          favoriteCandles.any(
+            (candle) => candle.symbol == canonicalMarketSymbol(symbol),
+          ),
+    );
+    if (!hasFavoritePrices &&
+        (_periodChangePending ||
+            (_portfolioLoading &&
+                _portfolioSeriesByAccount.values.every(
+                  (series) => series.isEmpty,
+                )))) {
       return SizedBox(
         height: height,
         child: Center(

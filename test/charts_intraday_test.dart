@@ -326,6 +326,80 @@ void main() {
     expect(find.text('Historical prices unavailable'), findsWidgets);
   });
 
+  testWidgets('cached favorite draws while broker history is pending', (
+    tester,
+  ) async {
+    final pendingPerformance = Completer<IbkrPerformanceSeries>();
+    final today = DateTime.now();
+    await mountChart(
+      tester,
+      IntradayMarketData(yahooGet: (_) async => _prices(100, currency: 'USD')),
+      initialSymbol: null,
+      days: 30,
+      favorites: const ['AAPL'],
+      ibkrPerformanceLoader: (_, __) => pendingPerformance.future,
+      configureAccounts: (accounts) async {
+        await accounts.setIbkrConfig(
+          'Default',
+          const IbkrAccountConfig(
+            enabled: true,
+            baseUrl: 'https://ibkr.example.test',
+            token: 'test-token',
+          ),
+        );
+        await accounts.cachePortfolio(
+          'Default',
+          [
+            Position(
+              symbol: 'AAPL',
+              name: 'Apple',
+              nativeCurrency: 'USD',
+              netShares: 2,
+              avgCost: 50,
+              currentPrice: 100,
+              firstBuyDate: DateTime(2025),
+              lastBuyDate: today,
+            ),
+          ],
+          const IbkrAccountValue(value: 1000, currency: 'USD'),
+          netLiquidationUsd: 1000,
+        );
+        await seedTestCandle(
+          'AAPL',
+          today.subtract(const Duration(days: 15)),
+          90,
+        );
+        await seedTestCandle(
+          'AAPL',
+          today.subtract(const Duration(days: 1)),
+          100,
+        );
+      },
+    );
+    await tester.tap(find.text('AAPL').first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.bySemanticsLabel('Loading portfolio'), findsNothing);
+    final chart = tester.widget<MarketLineChart>(find.byType(MarketLineChart));
+    expect(chart.series.where((line) => line.name == 'AAPL'), hasLength(1));
+
+    pendingPerformance.complete(
+      IbkrPerformanceSeries(
+        period: '1Y',
+        startDate: today.subtract(const Duration(days: 15)),
+        startNav: 900,
+        measure: 'TWR',
+        currency: 'USD',
+        dates: [today.subtract(const Duration(days: 15)), today],
+        nav: const [900, 1000],
+        returnDates: [today.subtract(const Duration(days: 15)), today],
+        returns: const [0, 0.1],
+      ),
+    );
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('period changes do not briefly show missing history', (
     tester,
   ) async {
