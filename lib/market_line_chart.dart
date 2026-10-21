@@ -6,6 +6,7 @@ import 'package:drafter/painting.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:market_monk/portfolio_chart_scale.dart';
 
 /// A chart value that can retain its absolute value for range comparisons.
@@ -64,7 +65,6 @@ const _tooltipFontSize = 10.0;
 const _tooltipSwatchSize = 8.0;
 const _tooltipSwatchGap = 6.0;
 const _activeDotRadius = 6.0;
-const _multiLineScrubInterval = Duration(milliseconds: 50);
 
 void _drawNeonDot(
   Canvas canvas, {
@@ -402,7 +402,7 @@ class _MarketLineChartInteractionState
   Offset? _dragStart;
   double? _dragX;
   int? _dragPointer;
-  Timer? _scrubThrottleTimer;
+  bool _scrubFrameScheduled = false;
   int? _pendingScrubIndex;
 
   (int, int)? get _range => widget.range ?? _zoom;
@@ -465,43 +465,23 @@ class _MarketLineChartInteractionState
       return;
     }
     if (ChartHitTest.marksAtIndex(scene, index).length <= 1) {
-      _cancelScrubThrottle();
+      _pendingScrubIndex = null;
       _activeIndex.value = index;
-      return;
-    }
-    if (_scrubThrottleTimer == null) {
-      _activeIndex.value = index;
-      _scrubThrottleTimer = Timer(
-        _multiLineScrubInterval,
-        _flushPendingScrubIndex,
-      );
       return;
     }
     _pendingScrubIndex = index;
-  }
-
-  void _flushPendingScrubIndex() {
-    final index = _pendingScrubIndex;
-    _pendingScrubIndex = null;
-    if (index == null) {
-      _scrubThrottleTimer = null;
-      return;
-    }
-    _activeIndex.value = index;
-    _scrubThrottleTimer = Timer(
-      _multiLineScrubInterval,
-      _flushPendingScrubIndex,
-    );
-  }
-
-  void _cancelScrubThrottle() {
-    _scrubThrottleTimer?.cancel();
-    _scrubThrottleTimer = null;
-    _pendingScrubIndex = null;
+    if (_scrubFrameScheduled) return;
+    _scrubFrameScheduled = true;
+    SchedulerBinding.instance.scheduleFrameCallback((_) {
+      _scrubFrameScheduled = false;
+      final pending = _pendingScrubIndex;
+      _pendingScrubIndex = null;
+      if (mounted && pending != null) _activeIndex.value = pending;
+    });
   }
 
   void _clear() {
-    _cancelScrubThrottle();
+    _pendingScrubIndex = null;
     _activeIndex.value = null;
   }
 
@@ -535,7 +515,7 @@ class _MarketLineChartInteractionState
 
   @override
   void dispose() {
-    _cancelScrubThrottle();
+    _pendingScrubIndex = null;
     _activeIndex.dispose();
     super.dispose();
   }

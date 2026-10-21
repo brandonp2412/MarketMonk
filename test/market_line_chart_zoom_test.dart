@@ -7,8 +7,6 @@ import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/portfolio_chart_scale.dart';
 
-const _multiLineScrubIntervalForTest = Duration(milliseconds: 50);
-
 void main() {
   Widget chart({
     double valueOffset = 0,
@@ -176,16 +174,15 @@ void main() {
 
     tooltipIndexes.clear();
     await gesture.moveTo(middle);
-    await tester.pump();
-    expect(tooltipIndexes, contains(4));
-
-    tooltipIndexes.clear();
     await gesture.moveTo(end);
     await tester.pump();
-    expect(tooltipIndexes, isNot(contains(7)));
-
-    await tester.pump(_multiLineScrubIntervalForTest);
     expect(tooltipIndexes, contains(7));
+    expect(tooltipIndexes, isNot(contains(4)));
+
+    tooltipIndexes.clear();
+    await gesture.moveTo(middle);
+    await tester.pump();
+    expect(tooltipIndexes, contains(4));
     await gesture.up();
     await tester.pump();
   });
