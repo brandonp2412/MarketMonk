@@ -441,7 +441,9 @@ class IbkrApiClient {
         RequestCategory.ibkrPortfolio,
         config,
         () async {
-          final response = await _request('/v1/portfolio');
+          final response = await _request('/v1/portfolio').timeout(
+            const Duration(seconds: 30),
+          );
           return IbkrPortfolioSnapshot.fromJson(
             _decodeJsonObject(response, '/v1/portfolio'),
           );

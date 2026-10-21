@@ -53,4 +53,31 @@ void main() {
     expect((await client.fetchPortfolio()).account, 'B');
     expect(calls, 2);
   });
+
+  testWidgets('stalled IBKR portfolio expires and allows a retry',
+      (tester) async {
+    final pending = Completer<http.Response>();
+    var calls = 0;
+    final client = IbkrApiClient(
+      config.copyWith(baseUrl: 'https://ibkr-timeout.example.test/'),
+      get: (uri, {headers}) {
+        calls++;
+        if (calls == 1) return pending.future;
+        return Future.value(
+          http.Response('{"account":"C","positions":[]}', 200),
+        );
+      },
+    );
+
+    final result = expectLater(
+      client.fetchPortfolio(),
+      throwsA(isA<TimeoutException>()),
+    );
+    await tester.pump(const Duration(seconds: 30));
+    await result;
+    expect((await client.fetchPortfolio()).account, 'C');
+    expect(calls, 2);
+    pending.complete(http.Response('{"account":"old","positions":[]}', 200));
+    await tester.pump();
+  });
 }

@@ -654,12 +654,15 @@ class ChartsPageState extends State<ChartsPage>
       clearAllSyncCache();
       _intradayPortfolioCache.clear();
       await _refreshAllPortfolioCandles();
-      await _syncFavoriteCandles(forceRefresh: true);
       await _loadAllPortfolios(
         refreshIbkrPortfolio: true,
         forceIbkrPortfolioRefresh: true,
       );
       if (mounted && widget.isActive) {
+        runDetachedTask(
+          _syncFavoriteCandles(forceRefresh: true),
+          'Failed to refresh favorite charts',
+        );
         runDetachedTask(
           _loadAllPortfolios(
             refreshIbkrPerformance: true,

@@ -877,7 +877,8 @@ class PortfolioPageState extends State<PortfolioPage>
             secondPosition.currentValue.compareTo(firstPosition.currentValue),
       );
 
-    final colors = _buildColors(context, [for (final position in sorted) position.symbol]);
+    final colors =
+        _buildColors(context, [for (final position in sorted) position.symbol]);
     // Holdings can change while this page is kept alive (for example, after
     // switching accounts). Do not use a selection from the previous list.
     final selectedIndex = touchedIndex != null &&
