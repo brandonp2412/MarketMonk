@@ -856,6 +856,7 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   final _pageController = PageController();
+  final _selectedPage = ValueNotifier<int>(0);
   var _currentIndex = 0;
 
   static const _tabs = ['ChartPage', 'PortfolioPage', 'HoldingsPage'];
@@ -910,10 +911,12 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void dispose() {
     _pageController.dispose();
+    _selectedPage.dispose();
     super.dispose();
   }
 
   void _selectPage(int index) {
+    _selectedPage.value = index;
     if (_pageController.hasClients) {
       unawaited(
         _pageController.animateToPage(
@@ -923,7 +926,6 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       );
     }
-    setState(() => _currentIndex = index);
   }
 
   void _selectDesktopPage(int index) {
@@ -931,7 +933,20 @@ class _MyHomePageState extends State<MyHomePage> {
     if (_pageController.hasClients) {
       _pageController.jumpToPage(index);
     }
+    _selectedPage.value = index;
     setState(() => _currentIndex = index);
+  }
+
+  bool _onPageScrollEnd(ScrollEndNotification notification) {
+    if (notification.depth != 0 ||
+        notification.metrics.axis != Axis.horizontal) {
+      return false;
+    }
+    final settledIndex = _pageController.page?.round() ?? _selectedPage.value;
+    if (settledIndex != _currentIndex) {
+      setState(() => _currentIndex = settledIndex);
+    }
+    return false;
   }
 
   @override
@@ -950,17 +965,20 @@ class _MyHomePageState extends State<MyHomePage> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final desktop = constraints.maxWidth >= desktopLayoutBreakpoint;
-            final pages = PageView(
-              controller: _pageController,
-              physics: desktop
-                  ? const NeverScrollableScrollPhysics()
-                  : const PageScrollPhysics(),
-              onPageChanged: (index) => setState(() => _currentIndex = index),
-              children: [
-                ChartsPage(isActive: _currentIndex == 0),
-                PortfolioPage(isActive: _currentIndex == 1),
-                HoldingsPage(isActive: _currentIndex == 2),
-              ],
+            final pages = NotificationListener<ScrollEndNotification>(
+              onNotification: _onPageScrollEnd,
+              child: PageView(
+                controller: _pageController,
+                physics: desktop
+                    ? const NeverScrollableScrollPhysics()
+                    : const PageScrollPhysics(),
+                onPageChanged: (index) => _selectedPage.value = index,
+                children: [
+                  ChartsPage(isActive: _currentIndex == 0),
+                  PortfolioPage(isActive: _currentIndex == 1),
+                  HoldingsPage(isActive: _currentIndex == 2),
+                ],
+              ),
             );
 
             final content = Stack(
@@ -971,10 +989,13 @@ class _MyHomePageState extends State<MyHomePage> {
                     bottom: 0,
                     left: 0,
                     right: 0,
-                    child: BottomNav(
-                      tabs: _tabs,
-                      currentIndex: _currentIndex,
-                      onTap: _selectPage,
+                    child: ValueListenableBuilder<int>(
+                      valueListenable: _selectedPage,
+                      builder: (context, selectedIndex, _) => BottomNav(
+                        tabs: _tabs,
+                        currentIndex: selectedIndex,
+                        onTap: _selectPage,
+                      ),
                     ),
                   ),
               ],

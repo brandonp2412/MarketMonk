@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/accounts_page.dart';
 import 'package:market_monk/bottom_nav.dart';
+import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:provider/provider.dart';
 
@@ -33,6 +35,49 @@ void main() {
     expect(find.text('Charts'), findsOneWidget);
     expect(find.bySemanticsLabel('Portfolio'), findsOneWidget);
     expect(find.bySemanticsLabel('Holdings'), findsOneWidget);
+  });
+
+  testWidgets('mobile pages activate only after the slide settles',
+      (tester) async {
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: const MyApp(),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('PortfolioPage')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 140));
+
+    expect(tester.widget<ChartsPage>(find.byType(ChartsPage)).isActive, isTrue);
+    expect(
+      tester.widget<PortfolioPage>(find.byType(PortfolioPage)).isActive,
+      isFalse,
+    );
+
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<PortfolioPage>(find.byType(PortfolioPage)).isActive,
+      isTrue,
+    );
+
+    await tester.fling(find.byType(PageView), const Offset(650, 0), 1200);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 80));
+    expect(
+      tester.widget<PortfolioPage>(find.byType(PortfolioPage)).isActive,
+      isTrue,
+    );
+    await tester.pumpAndSettle();
+    expect(tester.widget<ChartsPage>(find.byType(ChartsPage)).isActive, isTrue);
+    await _disposeTestApp(tester);
   });
 
   testWidgets('default account cannot be renamed', (WidgetTester tester) async {
