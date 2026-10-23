@@ -747,8 +747,8 @@ class PortfolioPageState extends State<PortfolioPage>
             Expanded(
               child: Text(
                 ibkrEnabled
-                    ? 'Couldn’t refresh IBKR. Showing the last loaded portfolio.'
-                    : 'Couldn’t refresh market data. Showing the last loaded portfolio.',
+                    ? 'Couldn’t refresh IBKR.'
+                    : 'Couldn’t refresh market data.',
               ),
             ),
             TextButton(

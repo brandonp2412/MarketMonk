@@ -84,8 +84,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "Noch kein Transaktionsverlauf",
     "No completed trades were returned by Interactive Brokers.":
         "Interactive Brokers hat keine abgeschlossenen Transaktionen zurückgegeben.",
-    "Add a trade to start building this ticker’s history.":
-        "Füge eine Transaktion hinzu, um den Verlauf dieses Tickers aufzubauen.",
     "Edit trade": "Transaktion bearbeiten",
     "Delete trade": "Transaktion löschen",
     "Delete this trade? This cannot be undone.":
@@ -157,8 +155,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "Dieses Projekt unterstützen",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "IBKR-Portfoliodaten verwenden",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "Für Positionen, aktuelle Bewertungen und den Verlauf gehaltener Aktien wird bevorzugt deine selbst gehostete IBKR-API verwendet. Yahoo bleibt die Ausweichquelle für nicht verfügbare Verlaufsdaten und andere Symbole.",
     "API URL": "API-URL",
     "Bearer token": "Bearer-Token",
     "Test": "Testen",
@@ -311,8 +307,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "ยังไม่มีประวัติการซื้อขาย",
     "No completed trades were returned by Interactive Brokers.":
         "Interactive Brokers ไม่ได้ส่งคืนรายการซื้อขายที่เสร็จสมบูรณ์",
-    "Add a trade to start building this ticker’s history.":
-        "เพิ่มการซื้อขายเพื่อเริ่มสร้างประวัติของสัญลักษณ์นี้",
     "Edit trade": "แก้ไขการซื้อขาย",
     "Delete trade": "ลบการซื้อขาย",
     "Delete this trade? This cannot be undone.":
@@ -380,8 +374,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "ช่วยสนับสนุนโครงการนี้",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "ใช้ข้อมูลพอร์ตโฟลิโอ IBKR",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "ตำแหน่ง มูลค่าปัจจุบัน และประวัติหุ้นที่ถือจะใช้ IBKR API ที่คุณโฮสต์เองเป็นหลัก โดย Yahoo จะเป็นแหล่งสำรองเมื่อไม่มีประวัติหรือสำหรับสัญลักษณ์อื่น",
     "API URL": "URL ของ API",
     "Bearer token": "โทเค็น Bearer",
     "Test": "ทดสอบ",
@@ -536,8 +528,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "Chưa có lịch sử giao dịch",
     "No completed trades were returned by Interactive Brokers.":
         "Interactive Brokers không trả về giao dịch nào đã hoàn tất.",
-    "Add a trade to start building this ticker’s history.":
-        "Thêm một giao dịch để bắt đầu tạo lịch sử cho mã này.",
     "Edit trade": "Sửa giao dịch",
     "Delete trade": "Xóa giao dịch",
     "Delete this trade? This cannot be undone.":
@@ -605,8 +595,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "Hỗ trợ dự án này",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "Dùng dữ liệu danh mục IBKR",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "Các vị thế, định giá hiện tại và lịch sử cổ phiếu đang nắm giữ sẽ ưu tiên API IBKR tự lưu trữ của bạn. Yahoo vẫn là nguồn dự phòng khi lịch sử không khả dụng và cho các mã khác.",
     "API URL": "URL API",
     "Bearer token": "Mã Bearer",
     "Test": "Kiểm tra",
@@ -761,8 +749,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "Aún no hay historial de operaciones",
     "No completed trades were returned by Interactive Brokers.":
         "Interactive Brokers no devolvió operaciones completadas.",
-    "Add a trade to start building this ticker’s history.":
-        "Añade una operación para empezar a crear el historial de este símbolo.",
     "Edit trade": "Editar operación",
     "Delete trade": "Eliminar operación",
     "Delete this trade? This cannot be undone.":
@@ -833,8 +819,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "Ayuda a apoyar este proyecto",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "Usar datos de cartera de IBKR",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "Las posiciones, valoraciones actuales y el historial de acciones en cartera usan preferentemente tu API de IBKR autoalojada. Yahoo sigue siendo la alternativa para historiales no disponibles y otros símbolos.",
     "API URL": "URL de la API",
     "Bearer token": "Token Bearer",
     "Test": "Probar",
@@ -992,8 +976,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "Aucun historique d’opérations pour le moment",
     "No completed trades were returned by Interactive Brokers.":
         "Interactive Brokers n’a renvoyé aucune opération terminée.",
-    "Add a trade to start building this ticker’s history.":
-        "Ajoutez une opération pour commencer à constituer l’historique de ce symbole.",
     "Edit trade": "Modifier l’opération",
     "Delete trade": "Supprimer l’opération",
     "Delete this trade? This cannot be undone.":
@@ -1064,8 +1046,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "Soutenir ce projet",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "Utiliser les données de portefeuille IBKR",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "Les positions, valorisations actuelles et l’historique des actions détenues utilisent en priorité votre API IBKR auto-hébergée. Yahoo reste la solution de secours pour les historiques indisponibles et les autres symboles.",
     "API URL": "URL de l’API",
     "Bearer token": "Jeton Bearer",
     "Test": "Tester",
@@ -1223,8 +1203,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "Brak historii transakcji",
     "No completed trades were returned by Interactive Brokers.":
         "Interactive Brokers nie zwrócił żadnych zakończonych transakcji.",
-    "Add a trade to start building this ticker’s history.":
-        "Dodaj transakcję, aby rozpocząć tworzenie historii tego symbolu.",
     "Edit trade": "Edytuj transakcję",
     "Delete trade": "Usuń transakcję",
     "Delete this trade? This cannot be undone.":
@@ -1295,8 +1273,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "Wesprzyj ten projekt",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "Używaj danych portfela IBKR",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "Pozycje, bieżące wyceny i historia posiadanych akcji korzystają w pierwszej kolejności z własnej instancji API IBKR. Yahoo pozostaje źródłem zapasowym dla niedostępnej historii i innych symboli.",
     "API URL": "Adres URL API",
     "Bearer token": "Token Bearer",
     "Test": "Testuj",
@@ -1454,8 +1430,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "Nessuna cronologia delle operazioni",
     "No completed trades were returned by Interactive Brokers.":
         "Interactive Brokers non ha restituito operazioni completate.",
-    "Add a trade to start building this ticker’s history.":
-        "Aggiungi un'operazione per iniziare a creare la cronologia di questo ticker.",
     "Edit trade": "Modifica operazione",
     "Delete trade": "Elimina operazione",
     "Delete this trade? This cannot be undone.":
@@ -1526,8 +1500,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "Aiuta a sostenere questo progetto",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "Usa i dati del portafoglio IBKR",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "Per posizioni, valutazioni correnti e cronologia dei titoli detenuti viene preferita la tua API IBKR self-hosted. Yahoo resta l'alternativa per la cronologia non disponibile e gli altri simboli.",
     "API URL": "URL API",
     "Bearer token": "Token bearer",
     "Test": "Test",
@@ -1683,8 +1655,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "Nog geen transactiegeschiedenis",
     "No completed trades were returned by Interactive Brokers.":
         "Interactive Brokers heeft geen voltooide transacties geretourneerd.",
-    "Add a trade to start building this ticker’s history.":
-        "Voeg een transactie toe om de geschiedenis van dit tickersymbool op te bouwen.",
     "Edit trade": "Transactie bewerken",
     "Delete trade": "Transactie verwijderen",
     "Delete this trade? This cannot be undone.":
@@ -1756,8 +1726,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "Help dit project ondersteunen",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "IBKR-portefeuillegegevens gebruiken",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "Posities, huidige waarderingen en geschiedenis van aangehouden aandelen gebruiken bij voorkeur je zelfgehoste IBKR-API. Yahoo blijft de fallback voor niet-beschikbare geschiedenis en andere symbolen.",
     "API URL": "API-URL",
     "Bearer token": "Bearer-token",
     "Test": "Testen",
@@ -1912,8 +1880,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "Ainda não há histórico de operações",
     "No completed trades were returned by Interactive Brokers.":
         "A Interactive Brokers não retornou operações concluídas.",
-    "Add a trade to start building this ticker’s history.":
-        "Adicione uma operação para começar a criar o histórico deste ativo.",
     "Edit trade": "Editar operação",
     "Delete trade": "Excluir operação",
     "Delete this trade? This cannot be undone.":
@@ -1984,8 +1950,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "Ajude a apoiar este projeto",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "Usar dados de carteira da IBKR",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "As posições, avaliações atuais e o histórico das ações em carteira usam preferencialmente sua API da IBKR auto-hospedada. O Yahoo continua sendo a alternativa para históricos indisponíveis e outros ativos.",
     "API URL": "URL da API",
     "Bearer token": "Token Bearer",
     "Test": "Testar",
@@ -2139,8 +2103,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "Ainda não há histórico de transações",
     "No completed trades were returned by Interactive Brokers.":
         "A Interactive Brokers não devolveu transações concluídas.",
-    "Add a trade to start building this ticker’s history.":
-        "Adicione uma transação para começar a criar o histórico deste título.",
     "Edit trade": "Editar transação",
     "Delete trade": "Eliminar transação",
     "Delete this trade? This cannot be undone.":
@@ -2211,8 +2173,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "Ajude a apoiar este projeto",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "Usar dados de portefólio da IBKR",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "As posições, as avaliações atuais e o histórico das ações detidas utilizam preferencialmente a sua API da IBKR alojada localmente. O Yahoo continua a ser a alternativa para históricos indisponíveis e outros símbolos.",
     "API URL": "URL da API",
     "Bearer token": "Token Bearer",
     "Test": "Testar",
@@ -2368,8 +2328,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "अभी कोई ट्रेड इतिहास नहीं है",
     "No completed trades were returned by Interactive Brokers.":
         "Interactive Brokers से कोई पूरा हुआ ट्रेड प्राप्त नहीं हुआ।",
-    "Add a trade to start building this ticker’s history.":
-        "इस टिकर का इतिहास बनाना शुरू करने के लिए एक ट्रेड जोड़ें।",
     "Edit trade": "ट्रेड संपादित करें",
     "Delete trade": "ट्रेड हटाएँ",
     "Delete this trade? This cannot be undone.":
@@ -2439,8 +2397,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "इस प्रोजेक्ट का समर्थन करें",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "IBKR पोर्टफोलियो डेटा का उपयोग करें",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "पोज़िशन, वर्तमान मूल्यांकन और रखे गए शेयरों के इतिहास के लिए आपके स्वयं-होस्ट किए गए IBKR API को प्राथमिकता दी जाती है। उपलब्ध न होने वाले इतिहास और अन्य प्रतीकों के लिए Yahoo बैकअप के रूप में रहता है।",
     "API URL": "API URL",
     "Bearer token": "Bearer टोकन",
     "Test": "जाँचें",
@@ -2590,8 +2546,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "取引履歴はまだありません",
     "No completed trades were returned by Interactive Brokers.":
         "Interactive Brokers から完了済みの取引が返されませんでした。",
-    "Add a trade to start building this ticker’s history.":
-        "取引を追加して、このティッカーの履歴を作成しましょう。",
     "Edit trade": "取引を編集",
     "Delete trade": "取引を削除",
     "Delete this trade? This cannot be undone.": "この取引を削除しますか？この操作は元に戻せません。",
@@ -2652,8 +2606,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "このプロジェクトを支援する",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "IBKRのポートフォリオデータを使用",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "ポジション、現在の評価額、保有銘柄の履歴にはセルフホストしたIBKR APIを優先して使用します。取得できない履歴やその他の銘柄にはYahooを代替として使用します。",
     "API URL": "API URL",
     "Bearer token": "Bearerトークン",
     "Test": "テスト",
@@ -2797,8 +2749,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "아직 거래 내역이 없습니다",
     "No completed trades were returned by Interactive Brokers.":
         "Interactive Brokers에서 완료된 거래를 반환하지 않았습니다.",
-    "Add a trade to start building this ticker’s history.":
-        "거래를 추가해 이 종목의 내역을 만들어 보세요.",
     "Edit trade": "거래 수정",
     "Delete trade": "거래 삭제",
     "Delete this trade? This cannot be undone.":
@@ -2860,8 +2810,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "이 프로젝트 후원하기",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "IBKR 포트폴리오 데이터 사용",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "포지션, 현재 평가액 및 보유 주식 내역에는 자체 호스팅 IBKR API를 우선 사용합니다. 이용할 수 없는 내역과 기타 종목에는 Yahoo를 대체 소스로 사용합니다.",
     "API URL": "API URL",
     "Bearer token": "Bearer 토큰",
     "Test": "테스트",
@@ -3012,8 +2960,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "Belum ada sejarah dagangan",
     "No completed trades were returned by Interactive Brokers.":
         "Tiada dagangan selesai dikembalikan oleh Interactive Brokers.",
-    "Add a trade to start building this ticker’s history.":
-        "Tambah dagangan untuk mula membina sejarah ticker ini.",
     "Edit trade": "Edit dagangan",
     "Delete trade": "Padam dagangan",
     "Delete this trade? This cannot be undone.":
@@ -3083,8 +3029,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "Bantu menyokong projek ini",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "Gunakan data portfolio IBKR",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "Bagi posisi, penilaian semasa dan sejarah saham yang dipegang, API IBKR hos sendiri anda akan diutamakan. Yahoo kekal sebagai pilihan sandaran untuk sejarah yang tidak tersedia dan simbol lain.",
     "API URL": "URL API",
     "Bearer token": "Token bearer",
     "Test": "Uji",
@@ -3240,8 +3184,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "Henüz işlem geçmişi yok",
     "No completed trades were returned by Interactive Brokers.":
         "Interactive Brokers tamamlanmış işlem döndürmedi.",
-    "Add a trade to start building this ticker’s history.":
-        "Bu sembolün geçmişini oluşturmaya başlamak için bir işlem ekleyin.",
     "Edit trade": "İşlemi düzenle",
     "Delete trade": "İşlemi sil",
     "Delete this trade? This cannot be undone.":
@@ -3312,8 +3254,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "Bu projeyi desteklemeye yardımcı olun",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "IBKR portföy verilerini kullan",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "Pozisyonlar, güncel değerlemeler ve elde tutulan hisselerin geçmişi için öncelikle kendi barındırdığınız IBKR API'si kullanılır. Kullanılamayan geçmiş ve diğer semboller için Yahoo yedek kaynak olarak kalır.",
     "API URL": "API URL'si",
     "Bearer token": "Bearer belirteci",
     "Test": "Test et",
@@ -3463,8 +3403,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "暂无交易历史",
     "No completed trades were returned by Interactive Brokers.":
         "Interactive Brokers 未返回任何已完成的交易。",
-    "Add a trade to start building this ticker’s history.":
-        "添加一笔交易以开始建立此股票代码的历史记录。",
     "Edit trade": "编辑交易",
     "Delete trade": "删除交易",
     "Delete this trade? This cannot be undone.": "删除此交易？此操作无法撤销。",
@@ -3525,8 +3463,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "支持此项目",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "使用 IBKR 投资组合数据",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "持仓、当前估值和所持股票历史数据将优先使用你自托管的 IBKR API。对于无法获取的历史数据和其他股票代码，仍会使用 Yahoo 作为备用来源。",
     "API URL": "API URL",
     "Bearer token": "Bearer 令牌",
     "Test": "测试",
@@ -3666,8 +3602,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "暫無交易紀錄",
     "No completed trades were returned by Interactive Brokers.":
         "Interactive Brokers 未返回任何已完成的交易。",
-    "Add a trade to start building this ticker’s history.":
-        "新增一筆交易以開始建立此股票代號的歷史紀錄。",
     "Edit trade": "編輯交易",
     "Delete trade": "刪除交易",
     "Delete this trade? This cannot be undone.": "刪除此交易？此操作無法復原。",
@@ -3728,8 +3662,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "支持此專案",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "使用 IBKR 投資組合資料",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "持倉、目前估值和所持股票歷史資料將優先使用你自行託管的 IBKR API。對於無法取得的歷史資料和其他股票代號，仍會使用 Yahoo 作為備援來源。",
     "API URL": "API URL",
     "Bearer token": "Bearer 權杖",
     "Test": "測試",
@@ -3875,8 +3807,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "لا يوجد سجل صفقات بعد",
     "No completed trades were returned by Interactive Brokers.":
         "لم تُرجع Interactive Brokers أي صفقات مكتملة.",
-    "Add a trade to start building this ticker’s history.":
-        "أضف صفقة لبدء إنشاء سجل هذا الرمز.",
     "Edit trade": "تعديل الصفقة",
     "Delete trade": "حذف الصفقة",
     "Delete this trade? This cannot be undone.":
@@ -3943,8 +3873,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "ساعد في دعم هذا المشروع",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "استخدام بيانات محفظة IBKR",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "ستفضّل المراكز والتقييمات الحالية وسجل الأسهم المحتفظ بها واجهة IBKR API المستضافة ذاتيًا. وستظل Yahoo خيارًا احتياطيًا للسجل غير المتاح والرموز الأخرى.",
     "API URL": "عنوان URL للواجهة البرمجية",
     "Bearer token": "رمز Bearer",
     "Test": "اختبار",
@@ -4101,8 +4029,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "Истории сделок пока нет",
     "No completed trades were returned by Interactive Brokers.":
         "Interactive Brokers не вернул завершённых сделок.",
-    "Add a trade to start building this ticker’s history.":
-        "Добавьте сделку, чтобы начать формировать историю этого тикера.",
     "Edit trade": "Изменить сделку",
     "Delete trade": "Удалить сделку",
     "Delete this trade? This cannot be undone.":
@@ -4173,8 +4099,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "Поддержать этот проект",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "Использовать данные портфеля IBKR",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "Для позиций, текущей стоимости и истории удерживаемых акций предпочтительно используется ваш самостоятельно размещённый API IBKR. Yahoo остаётся резервным источником для недоступной истории и других символов.",
     "API URL": "URL API",
     "Bearer token": "Bearer-токен",
     "Test": "Проверить",
@@ -4331,8 +4255,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "Belum ada riwayat transaksi",
     "No completed trades were returned by Interactive Brokers.":
         "Interactive Brokers tidak mengembalikan transaksi yang telah selesai.",
-    "Add a trade to start building this ticker’s history.":
-        "Tambahkan transaksi untuk mulai membangun riwayat ticker ini.",
     "Edit trade": "Edit transaksi",
     "Delete trade": "Hapus transaksi",
     "Delete this trade? This cannot be undone.":
@@ -4402,8 +4324,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "Bantu dukung proyek ini",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "Gunakan data portofolio IBKR",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "Posisi, valuasi saat ini, dan riwayat saham yang dimiliki akan mengutamakan API IBKR yang Anda host sendiri. Yahoo tetap menjadi cadangan untuk riwayat yang tidak tersedia dan simbol lainnya.",
     "API URL": "URL API",
     "Bearer token": "Token bearer",
     "Test": "Uji",
@@ -4559,8 +4479,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "এখনও কোনো ট্রেডের ইতিহাস নেই",
     "No completed trades were returned by Interactive Brokers.":
         "Interactive Brokers কোনো সম্পন্ন ট্রেড ফেরত দেয়নি।",
-    "Add a trade to start building this ticker’s history.":
-        "এই টিকারের ইতিহাস তৈরি শুরু করতে একটি ট্রেড যোগ করুন।",
     "Edit trade": "ট্রেড সম্পাদনা করুন",
     "Delete trade": "ট্রেড মুছুন",
     "Delete this trade? This cannot be undone.":
@@ -4627,8 +4545,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "এই প্রকল্পকে সহায়তা করুন",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "IBKR পোর্টফোলিও ডেটা ব্যবহার করুন",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "পজিশন, বর্তমান মূল্যায়ন এবং রাখা শেয়ারের ইতিহাসের জন্য আপনার স্ব-হোস্ট করা IBKR API অগ্রাধিকার পাবে। অনুপলব্ধ ইতিহাস ও অন্যান্য প্রতীকের জন্য Yahoo বিকল্প হিসেবে থাকবে।",
     "API URL": "API URL",
     "Bearer token": "Bearer টোকেন",
     "Test": "পরীক্ষা",
@@ -4783,8 +4699,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "ابھی کوئی ٹریڈ ہسٹری نہیں",
     "No completed trades were returned by Interactive Brokers.":
         "Interactive Brokers سے کوئی مکمل شدہ ٹریڈ نہیں ملی۔",
-    "Add a trade to start building this ticker’s history.":
-        "اس ٹکر کی ہسٹری بنانا شروع کرنے کے لیے ٹریڈ شامل کریں۔",
     "Edit trade": "ٹریڈ میں ترمیم کریں",
     "Delete trade": "ٹریڈ حذف کریں",
     "Delete this trade? This cannot be undone.":
@@ -4853,8 +4767,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "اس منصوبے کی حمایت کریں",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "IBKR پورٹ فولیو ڈیٹا استعمال کریں",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "پوزیشنز، موجودہ قدروں اور زیرِ ملکیت اسٹاک کی ہسٹری کے لیے آپ کی خود میزبانی شدہ IBKR API کو ترجیح دی جاتی ہے۔ دستیاب نہ ہونے والی ہسٹری اور دیگر علامتوں کے لیے Yahoo متبادل رہے گا۔",
     "API URL": "API URL",
     "Bearer token": "Bearer ٹوکن",
     "Test": "آزمائیں",
@@ -5009,8 +4921,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "هنوز تاریخچه معامله‌ای وجود ندارد",
     "No completed trades were returned by Interactive Brokers.":
         "هیچ معامله تکمیل‌شده‌ای از Interactive Brokers دریافت نشد.",
-    "Add a trade to start building this ticker’s history.":
-        "برای شروع ساخت تاریخچه این نماد، یک معامله اضافه کنید.",
     "Edit trade": "ویرایش معامله",
     "Delete trade": "حذف معامله",
     "Delete this trade? This cannot be undone.":
@@ -5081,8 +4991,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "حمایت از این پروژه",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "استفاده از داده‌های سبد IBKR",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "برای موقعیت‌ها، ارزش‌گذاری فعلی و تاریخچه سهام در اختیار، API خودمیزبان IBKR شما در اولویت است. Yahoo برای تاریخچه ناموجود و سایر نمادها به‌عنوان گزینه جایگزین باقی می‌ماند.",
     "API URL": "نشانی API",
     "Bearer token": "توکن Bearer",
     "Test": "آزمایش",
@@ -5238,8 +5146,6 @@ const appTranslations = <String, Map<String, String>>{
     "No trade history yet": "Історії угод ще немає",
     "No completed trades were returned by Interactive Brokers.":
         "Interactive Brokers не повернув завершених угод.",
-    "Add a trade to start building this ticker’s history.":
-        "Додайте угоду, щоб почати формувати історію цього тикера.",
     "Edit trade": "Редагувати угоду",
     "Delete trade": "Видалити угоду",
     "Delete this trade? This cannot be undone.":
@@ -5310,8 +5216,6 @@ const appTranslations = <String, Map<String, String>>{
     "Help support this project": "Підтримати цей проєкт",
     "Interactive Brokers — {account}": "Interactive Brokers — {account}",
     "Use IBKR portfolio data": "Використовувати дані портфеля IBKR",
-    "Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.":
-        "Для позицій, поточних оцінок та історії утримуваних акцій пріоритет надається вашому власному API IBKR. Yahoo використовується як резервне джерело для недоступної історії та інших символів.",
     "API URL": "URL API",
     "Bearer token": "Bearer-токен",
     "Test": "Перевірити",

@@ -247,18 +247,11 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                                   ? 'IBKR trade history unavailable'
                                   : 'No trade history yet',
                             ),
-                            message: ibkrManaged
+                            message: snap.hasError
                                 ? context.l10n.text(
-                                    snap.hasError
-                                        ? 'Could not load IBKR trade history. Retry to check again.'
-                                        : widget.summary
-                                                .brokerTradeHistoryAvailable
-                                            ? 'No completed IBKR trades were found in the available transaction history.'
-                                            : 'This IBKR connection provides live positions but does not currently provide transaction history.',
+                                    'Could not load IBKR trade history.',
                                   )
-                                : context.l10n.text(
-                                    'Add a trade to start building this ticker’s history.',
-                                  ),
+                                : null,
                             actionLabel: ibkrManaged
                                 ? (snap.hasError
                                     ? context.l10n.text('Retry')

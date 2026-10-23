@@ -1497,11 +1497,6 @@ class _IbkrSettingsDialogState extends State<_IbkrSettingsDialog> {
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(context.l10n.text('Use IBKR portfolio data')),
-                  subtitle: Text(
-                    context.l10n.text(
-                      'Positions, current valuations, and held-stock history prefer your self-hosted IBKR API. Yahoo remains the fallback for unavailable history and other symbols.',
-                    ),
-                  ),
                   value: _enabled,
                   onChanged: _checking
                       ? null

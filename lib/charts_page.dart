@@ -3121,12 +3121,7 @@ class ChartsPageState extends State<ChartsPage>
                   symbolCurrency(accountName),
                 )
               : fmtCurrency(actualValue ?? mark.value);
-          final isEstimated = date != null &&
-              _provisionalStartByAccount[accountName] != null &&
-              !date.isBefore(_provisionalStartByAccount[accountName]!);
-          final dateLabel = date == null
-              ? ''
-              : '${formatter.format(date)}${isEstimated ? ' · Estimated' : ''}';
+          final dateLabel = date == null ? '' : formatter.format(date);
           final returnLabel = scaleForComparison
               ? '${mark.value >= 0 ? '+' : ''}${mark.value.toStringAsFixed(2)}% · '
               : '';
@@ -3171,12 +3166,6 @@ class ChartsPageState extends State<ChartsPage>
               entry.key,
               entry.value,
               accountColors,
-            ),
-          if (_provisionalStartByAccount.isNotEmpty)
-            Text(
-              '≈ Estimated from market prices; official IBKR values may differ.',
-              style: Theme.of(context).textTheme.bodySmall,
-              textAlign: TextAlign.center,
             ),
         ],
       ),
@@ -3263,7 +3252,7 @@ class ChartsPageState extends State<ChartsPage>
         );
 
     final valueText = Text(
-      estimated ? '≈${fmtCurrency(summaryValue)}' : fmtCurrency(summaryValue),
+      fmtCurrency(summaryValue),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       textAlign: TextAlign.right,
