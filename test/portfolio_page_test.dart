@@ -274,6 +274,51 @@ void main() {
     expect(tester.takeException(), null);
   });
 
+  testWidgets('portfolio initial opens the profile picker and switches', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(700, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({});
+    final accounts = await configuredTwoAccounts();
+    for (final profile in accounts.accounts) {
+      await accounts.cachePortfolio(
+        profile,
+        [cachedPosition()],
+        const IbkrAccountValue(value: 5500, currency: 'USD'),
+      );
+    }
+
+    final pending = Completer<IbkrPortfolioSnapshot>();
+    await tester.pumpWidget(
+      app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
+    );
+    await tester.pump();
+
+    final picker = find.byKey(const Key('portfolio-profile-picker'));
+    expect(
+      find.descendant(of: picker, matching: find.text('D')),
+      findsOneWidget,
+    );
+
+    await tester.tap(picker);
+    await tester.pumpAndSettle();
+    expect(find.text('IBKR Bot'), findsOneWidget);
+
+    await tester.tap(find.text('IBKR Bot'));
+    await tester.pumpAndSettle();
+    expect(accounts.activeAccount, 'IBKR Bot');
+    expect(
+      find.descendant(of: picker, matching: find.text('I')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), null);
+  });
+
   testWidgets(
     'slow IBKR performance refresh does not keep portfolio loading',
     (tester) async {
@@ -693,7 +738,7 @@ void main() {
         ),
       );
       await tester.pump();
-      await tester.tap(find.byType(PopupMenuButton<String>).first);
+      await tester.tap(find.byKey(const Key('portfolio-currency-menu')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Share CSV'));
       await tester.pumpAndSettle();
@@ -755,7 +800,7 @@ void main() {
       );
       await tester.pump();
 
-      await tester.tap(find.byType(PopupMenuButton<String>).first);
+      await tester.tap(find.byKey(const Key('portfolio-currency-menu')));
       await tester.pumpAndSettle();
       debugDefaultTargetPlatformOverride = null;
       expect(find.text('Export CSV'), findsOneWidget);
