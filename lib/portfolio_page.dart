@@ -1112,7 +1112,16 @@ class PortfolioPageState extends State<PortfolioPage>
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const _ProfilePicker(),
+              _ProfilePicker(
+                onExport: () => runDetachedTask(
+                  _exportCsv(context, positions),
+                  'Failed to export portfolio CSV',
+                ),
+                onShare: () => runDetachedTask(
+                  _shareCsv(context, positions),
+                  'Failed to share portfolio CSV',
+                ),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -1142,53 +1151,16 @@ class PortfolioPageState extends State<PortfolioPage>
               const SizedBox(width: 4),
               PopupMenuButton<String>(
                 key: const Key('portfolio-currency-menu'),
-                onSelected: (value) {
-                  if (value == '__export__') {
-                    runDetachedTask(
-                      _exportCsv(context, positions),
-                      'Failed to export portfolio CSV',
-                    );
-                  } else if (value == '__share__' && _supportsFileSharing) {
-                    runDetachedTask(
-                      _shareCsv(context, positions),
-                      'Failed to share portfolio CSV',
-                    );
-                  } else if (value.startsWith('cur:')) {
-                    runDetachedTask(
-                      settings.setDisplayCurrency(value.substring(4)),
-                      'Failed to change display currency',
-                    );
-                  }
-                },
-                itemBuilder: (popupContext) => [
-                  ...settings.visibleCurrencies.map(
-                    (currencyCode) => CheckedPopupMenuItem(
-                      value: 'cur:$currencyCode',
+                onSelected: (value) => runDetachedTask(
+                  settings.setDisplayCurrency(value),
+                  'Failed to change display currency',
+                ),
+                itemBuilder: (_) => [
+                  for (final currencyCode in settings.visibleCurrencies)
+                    CheckedPopupMenuItem(
+                      value: currencyCode,
                       checked: currencyCode == settings.displayCurrency,
                       child: Text(currencyCode),
-                    ),
-                  ),
-                  const PopupMenuDivider(),
-                  PopupMenuItem(
-                    value: '__export__',
-                    child: Row(
-                      children: [
-                        const Icon(Icons.download_rounded, size: 20),
-                        const SizedBox(width: 8),
-                        Text(context.l10n.text('Export CSV')),
-                      ],
-                    ),
-                  ),
-                  if (_supportsFileSharing)
-                    PopupMenuItem(
-                      value: '__share__',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.share_rounded, size: 20),
-                          const SizedBox(width: 8),
-                          Text(context.l10n.text('Share CSV')),
-                        ],
-                      ),
                     ),
                 ],
                 child: Container(
@@ -1737,7 +1709,7 @@ class _SummaryCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Row(
           children: [
-            const _ProfilePicker(),
+            _ProfilePicker(onExport: onExport, onShare: onShare),
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1761,47 +1733,16 @@ class _SummaryCard extends StatelessWidget {
             const Spacer(),
             PopupMenuButton<String>(
               key: const Key('portfolio-currency-menu'),
-              onSelected: (value) {
-                if (value == '__export__') {
-                  onExport();
-                } else if (value == '__share__' && _supportsFileSharing) {
-                  onShare();
-                } else if (value.startsWith('cur:')) {
-                  runDetachedTask(
-                    settings.setDisplayCurrency(value.substring(4)),
-                    'Failed to change display currency',
-                  );
-                }
-              },
-              itemBuilder: (ctx) => [
-                ...settings.visibleCurrencies.map(
-                  (currencyCode) => CheckedPopupMenuItem(
-                    value: 'cur:$currencyCode',
+              onSelected: (value) => runDetachedTask(
+                settings.setDisplayCurrency(value),
+                'Failed to change display currency',
+              ),
+              itemBuilder: (_) => [
+                for (final currencyCode in settings.visibleCurrencies)
+                  CheckedPopupMenuItem(
+                    value: currencyCode,
                     checked: currencyCode == settings.displayCurrency,
                     child: Text(currencyCode),
-                  ),
-                ),
-                const PopupMenuDivider(),
-                PopupMenuItem(
-                  value: '__export__',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.download, size: 20),
-                      const SizedBox(width: 8),
-                      Text(context.l10n.text('Export CSV')),
-                    ],
-                  ),
-                ),
-                if (_supportsFileSharing)
-                  PopupMenuItem(
-                    value: '__share__',
-                    child: Row(
-                      children: [
-                        const Icon(Icons.share_rounded, size: 20),
-                        const SizedBox(width: 8),
-                        Text(context.l10n.text('Share CSV')),
-                      ],
-                    ),
                   ),
               ],
               child: Row(
@@ -1820,7 +1761,10 @@ class _SummaryCard extends StatelessWidget {
 }
 
 class _ProfilePicker extends StatelessWidget {
-  const _ProfilePicker();
+  final VoidCallback onExport;
+  final VoidCallback onShare;
+
+  const _ProfilePicker({required this.onExport, required this.onShare});
 
   @override
   Widget build(BuildContext context) {
@@ -1835,12 +1779,17 @@ class _ProfilePicker extends StatelessWidget {
     return PopupMenuButton<String>(
       key: const Key('portfolio-profile-picker'),
       tooltip: 'Switch profile: $activeProfile',
-      onSelected: (profile) {
-        if (profile == activeProfile) return;
-        runDetachedTask(
-          accounts.switchAccount(profile),
-          'Failed to switch account',
-        );
+      onSelected: (value) {
+        if (value == '__export__') {
+          onExport();
+        } else if (value == '__share__') {
+          onShare();
+        } else if (value != activeProfile) {
+          runDetachedTask(
+            accounts.switchAccount(value),
+            'Failed to switch account',
+          );
+        }
       },
       itemBuilder: (_) => [
         for (final profile in accounts.accounts)
@@ -1848,6 +1797,28 @@ class _ProfilePicker extends StatelessWidget {
             value: profile,
             checked: profile == activeProfile,
             child: Text(profile),
+          ),
+        const PopupMenuDivider(),
+        PopupMenuItem<String>(
+          value: '__export__',
+          child: Row(
+            children: [
+              const Icon(Icons.download_rounded, size: 20),
+              const SizedBox(width: 8),
+              Text(context.l10n.text('Export CSV')),
+            ],
+          ),
+        ),
+        if (_supportsFileSharing)
+          PopupMenuItem<String>(
+            value: '__share__',
+            child: Row(
+              children: [
+                const Icon(Icons.share_rounded, size: 20),
+                const SizedBox(width: 8),
+                Text(context.l10n.text('Share CSV')),
+              ],
+            ),
           ),
       ],
       child: SizedBox(

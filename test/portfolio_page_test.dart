@@ -738,7 +738,7 @@ void main() {
         ),
       );
       await tester.pump();
-      await tester.tap(find.byKey(const Key('portfolio-currency-menu')));
+      await tester.tap(find.byKey(const Key('portfolio-profile-picker')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Share CSV'));
       await tester.pumpAndSettle();
@@ -800,7 +800,7 @@ void main() {
       );
       await tester.pump();
 
-      await tester.tap(find.byKey(const Key('portfolio-currency-menu')));
+      await tester.tap(find.byKey(const Key('portfolio-profile-picker')));
       await tester.pumpAndSettle();
       debugDefaultTargetPlatformOverride = null;
       expect(find.text('Export CSV'), findsOneWidget);
