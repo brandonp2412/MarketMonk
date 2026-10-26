@@ -27,6 +27,7 @@ import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/sqlite_settings.dart';
+import 'package:market_monk/ticker_candlestick.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
@@ -97,6 +98,7 @@ class ChartsPageState extends State<ChartsPage>
   int _favoriteLoadGeneration = 0;
   bool _networkLoading = false;
   bool _showRollingAverage = false;
+  bool _showCandlesticks = false;
   String? _stockError;
   String _nativeCurrency = 'USD';
   double _centDivisor = 1.0;
@@ -219,12 +221,14 @@ class ChartsPageState extends State<ChartsPage>
     final periodYears = prefs.getInt('chartPeriodYears') ?? 1;
     final periodMonths = prefs.getInt('chartPeriodMonths') ?? 0;
     final periodDays = prefs.getInt('chartPeriodDays') ?? 0;
+    final showCandlesticks = prefs.getBool('chartCandlesticks') ?? false;
     if (!mounted) return;
 
     setState(() {
       years = periodYears;
       months = periodMonths;
       days = periodDays;
+      _showCandlesticks = showCandlesticks;
       _chartPeriodLoaded = true;
     });
 
@@ -1888,6 +1892,9 @@ class ChartsPageState extends State<ChartsPage>
           CandleTicker(
             candle: CandlesCompanion(
               date: Value(row.date),
+              open: Value(row.open),
+              high: Value(row.high),
+              low: Value(row.low),
               close: Value(row.close),
             ),
           ),
@@ -1914,6 +1921,37 @@ class ChartsPageState extends State<ChartsPage>
     }
     final after = _requiredCandleStart();
     final marketSymbol = canonicalMarketSymbol(symbol);
+
+    if (_showCandlesticks) {
+      final capturedDays = days;
+      _stockStream = (marketDataDatabase.candles.select()
+            ..where(
+              (candle) =>
+                  candle.symbol.equals(marketSymbol) &
+                  candle.date.isBiggerThanValue(after),
+            )
+            ..orderBy([(candle) => OrderingTerm.asc(candle.date)]))
+          .watch()
+          .map((rows) {
+        final selected = capturedDays > 0 && rows.length > capturedDays
+            ? rows.sublist(rows.length - capturedDays)
+            : rows;
+        return [
+          for (final row in selected)
+            CandleTicker(
+              candle: CandlesCompanion(
+                date: Value(row.date),
+                open: Value(row.open),
+                high: Value(row.high),
+                low: Value(row.low),
+                close: Value(row.close),
+              ),
+            ),
+        ];
+      });
+      setState(() {});
+      return;
+    }
 
     const weekExpression = CustomExpression<String>(
       "STRFTIME('%Y-%m-%W', DATE(\"date\", 'unixepoch', 'localtime'))",
@@ -2393,7 +2431,25 @@ class ChartsPageState extends State<ChartsPage>
             bottom: desktop ? 24 : _chartBottomPadding,
           ),
           children: [
-            _buildTimeChips(),
+            if (_mode == _ChartMode.stock)
+              Row(
+                children: [
+                  Expanded(child: _buildTimeChips()),
+                  IconButton(
+                    key: const Key('chart-candlestick-toggle'),
+                    tooltip: _showCandlesticks
+                        ? 'Show line chart'
+                        : 'Show candlesticks',
+                    isSelected: _showCandlesticks,
+                    icon: const Icon(Icons.candlestick_chart_outlined),
+                    selectedIcon: const Icon(Icons.candlestick_chart),
+                    onPressed: _toggleCandlesticks,
+                  ),
+                  const SizedBox(width: 8),
+                ],
+              )
+            else
+              _buildTimeChips(),
             if (settings.showMarketClosed && _isMarketClosed()) ...[
               const SizedBox(height: 8),
               _buildMarketClosedBanner(settings),
@@ -2405,6 +2461,20 @@ class ChartsPageState extends State<ChartsPage>
           ],
         ),
       ),
+    );
+  }
+
+  void _toggleCandlesticks() {
+    setState(() => _showCandlesticks = !_showCandlesticks);
+    if (!_usesIntraday && _selectedSymbol != null) {
+      _setStockStream(_selectedSymbol!);
+    }
+    runDetachedTask(
+      () async {
+        final prefs = await SqliteSettings.getInstance();
+        await prefs.setBool('chartCandlesticks', _showCandlesticks);
+      }(),
+      'Failed to save chart style',
     );
   }
 
@@ -2465,6 +2535,9 @@ class ChartsPageState extends State<ChartsPage>
                 CandleTicker(
                   candle: CandlesCompanion(
                     date: Value(bar.date.toLocal()),
+                    open: Value(bar.open),
+                    high: Value(bar.high),
+                    low: Value(bar.low),
                     close: Value(bar.close),
                   ),
                 ),
@@ -2475,7 +2548,7 @@ class ChartsPageState extends State<ChartsPage>
         _buildStockChart(context, intradaySnapshot, settings)
       else
         StreamBuilder(
-          key: ValueKey('stock-chart-$_stockLoadGeneration'),
+          key: ValueKey('stock-chart-$_stockLoadGeneration-$_showCandlesticks'),
           stream: _stockStream,
           builder: (context, snapshot) =>
               _buildStockChart(context, snapshot, settings),
@@ -2570,23 +2643,43 @@ class ChartsPageState extends State<ChartsPage>
       copyLabel: context.l10n.text('Copy symbol'),
       child: SizedBox(
         height: height,
-        child: TickerLine(
-          key: ValueKey('$_selectedSymbol|$years|$months|$days'),
-          range: _chartRangeFor([
-            for (final candle in candles) candle.date.value,
-          ]),
-          onRangeChanged: (range) => _setChartRange(
-            [
-              for (final candle in candles) candle.date.value,
-            ],
-            range,
-          ),
-          dates: candles.map((candle) => candle.date.value),
-          spots: spots,
-          showRollingAverage: _showRollingAverage,
-          nativeCurrency: _nativeCurrency,
-          intraday: _usesIntraday && _intradaySeries != null,
-        ),
+        child: _showCandlesticks
+            ? TickerCandlestick(
+                key: ValueKey('candles|$_selectedSymbol|$years|$months|$days'),
+                candles: [
+                  for (final candle in candles)
+                    if (_customChartRange == null ||
+                        (!candle.date.value.isBefore(_customChartRange!.$1) &&
+                            !candle.date.value.isAfter(_customChartRange!.$2)))
+                      PriceCandle(
+                        date: candle.date.value,
+                        open: candle.open.value / _centDivisor,
+                        high: candle.high.value / _centDivisor,
+                        low: candle.low.value / _centDivisor,
+                        close: candle.close.value / _centDivisor,
+                      ),
+                ],
+                nativeCurrency: _nativeCurrency,
+                intraday: _usesIntraday && _intradaySeries != null,
+                showRollingAverage: _showRollingAverage,
+              )
+            : TickerLine(
+                key: ValueKey('$_selectedSymbol|$years|$months|$days'),
+                range: _chartRangeFor([
+                  for (final candle in candles) candle.date.value,
+                ]),
+                onRangeChanged: (range) => _setChartRange(
+                  [
+                    for (final candle in candles) candle.date.value,
+                  ],
+                  range,
+                ),
+                dates: candles.map((candle) => candle.date.value),
+                spots: spots,
+                showRollingAverage: _showRollingAverage,
+                nativeCurrency: _nativeCurrency,
+                intraday: _usesIntraday && _intradaySeries != null,
+              ),
       ),
     );
   }
