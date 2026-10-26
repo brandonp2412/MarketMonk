@@ -86,7 +86,6 @@ class PortfolioPageState extends State<PortfolioPage>
   List<Position> _positions = [];
   IbkrAccountValue? _netLiquidation;
   bool _hasCachedPortfolio = false;
-  bool _isLoadingPortfolio = false;
   Object? _loadError;
   int? touchedIndex;
   List<String> _chartFavorites = [];
@@ -138,15 +137,9 @@ class PortfolioPageState extends State<PortfolioPage>
     final ibkrConfig = accounts.ibkrConfigFor(account);
     final refreshVersion = accounts.ibkrRefreshVersion;
     final cached = accounts.portfolioCacheFor(account);
-    final cacheFresh = accounts.isPortfolioCacheFresh(account);
     final hadAccount = _lastAccount.isNotEmpty;
     final refreshRequested =
         hadAccount && refreshVersion != _lastIbkrRefreshVersion;
-    final willLoadPortfolio = widget.isActive &&
-        (ibkrConfig.enabled
-            ? ibkrConfig.isConfigured &&
-                (refreshRequested || cached == null || !cacheFresh)
-            : true);
 
     if (account == _lastAccount &&
         ibkrConfig == _lastIbkrConfig &&
@@ -162,7 +155,6 @@ class PortfolioPageState extends State<PortfolioPage>
       _positions = cached?.positions ?? [];
       _netLiquidation = cached?.netLiquidation;
       _hasCachedPortfolio = cached != null;
-      _isLoadingPortfolio = willLoadPortfolio;
       touchedIndex = null;
     });
     if (widget.isActive) {
@@ -350,15 +342,8 @@ class PortfolioPageState extends State<PortfolioPage>
     final willFetchIbkr = config.enabled &&
         config.isConfigured &&
         (forceRefresh || cachedBefore == null || !cacheWasFresh);
-    final willLoadPortfolio = !config.enabled || willFetchIbkr;
     if (_loadError != null && mounted) {
       setState(() => _loadError = null);
-    }
-    if (willLoadPortfolio &&
-        mounted &&
-        accounts.activeAccount == accountName &&
-        !_isLoadingPortfolio) {
-      setState(() => _isLoadingPortfolio = true);
     }
     try {
       final trades =
@@ -408,12 +393,6 @@ class PortfolioPageState extends State<PortfolioPage>
         setState(() => _loadError = error);
       }
       talker.handle(error, stackTrace, 'Failed to preload portfolio positions');
-    } finally {
-      if (mounted &&
-          accounts.activeAccount == accountName &&
-          _isLoadingPortfolio) {
-        setState(() => _isLoadingPortfolio = false);
-      }
     }
   }
 
@@ -617,31 +596,7 @@ class PortfolioPageState extends State<PortfolioPage>
           child: StreamBuilder<_LoadedPortfolio>(
             key: ValueKey(_lastAccount),
             stream: _stream,
-            builder: (context, snapshot) {
-              final body = _buildBody(context, snapshot);
-              if (!_isLoadingPortfolio || !_hasCachedPortfolio) return body;
-              return Stack(
-                fit: StackFit.expand,
-                children: [
-                  body,
-                  Positioned(
-                    top: 48,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: Semantics(
-                        label: context.l10n.text('Loading portfolio'),
-                        child: const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2.5),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
+            builder: (context, snapshot) => _buildBody(context, snapshot),
           ),
         ),
       ),
@@ -805,14 +760,7 @@ class PortfolioPageState extends State<PortfolioPage>
     }
 
     if (positions.isEmpty && !snap.hasData && !_hasCachedPortfolio) {
-      return _refreshableState(
-        Center(
-          child: Semantics(
-            label: context.l10n.text('Loading portfolio'),
-            child: const CircularProgressIndicator(),
-          ),
-        ),
-      );
+      return _refreshableState(const SizedBox.shrink());
     }
 
     if (snap.hasData &&
@@ -1144,47 +1092,49 @@ class PortfolioPageState extends State<PortfolioPage>
               Tooltip(
                 message: context.l10n.text('Refresh'),
                 child: IconButton(
-                  onPressed: _isLoadingPortfolio ? null : _updateCandles,
+                  onPressed: _updateCandles,
                   icon: const Icon(Icons.refresh_rounded),
                 ),
               ),
-              const SizedBox(width: 4),
-              PopupMenuButton<String>(
-                key: const Key('portfolio-currency-menu'),
-                onSelected: (value) => runDetachedTask(
-                  settings.setDisplayCurrency(value),
-                  'Failed to change display currency',
-                ),
-                itemBuilder: (_) => [
-                  for (final currencyCode in settings.visibleCurrencies)
-                    CheckedPopupMenuItem(
-                      value: currencyCode,
-                      checked: currencyCode == settings.displayCurrency,
-                      child: Text(currencyCode),
-                    ),
-                ],
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
+              if (settings.visibleCurrencies.length > 1)
+                const SizedBox(width: 4),
+              if (settings.visibleCurrencies.length > 1)
+                PopupMenuButton<String>(
+                  key: const Key('portfolio-currency-menu'),
+                  onSelected: (value) => runDetachedTask(
+                    settings.setDisplayCurrency(value),
+                    'Failed to change display currency',
                   ),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: colorScheme.outlineVariant),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        settings.displayCurrency,
-                        style: theme.textTheme.labelLarge,
+                  itemBuilder: (_) => [
+                    for (final currencyCode in settings.visibleCurrencies)
+                      CheckedPopupMenuItem(
+                        value: currencyCode,
+                        checked: currencyCode == settings.displayCurrency,
+                        child: Text(currencyCode),
                       ),
-                      const SizedBox(width: 6),
-                      const Icon(Icons.expand_more_rounded, size: 20),
-                    ],
+                  ],
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: colorScheme.outlineVariant),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          settings.displayCurrency,
+                          style: theme.textTheme.labelLarge,
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.expand_more_rounded, size: 20),
+                      ],
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           if (hasRefreshWarning) ...[
@@ -1731,28 +1681,29 @@ class _SummaryCard extends StatelessWidget {
               ],
             ),
             const Spacer(),
-            PopupMenuButton<String>(
-              key: const Key('portfolio-currency-menu'),
-              onSelected: (value) => runDetachedTask(
-                settings.setDisplayCurrency(value),
-                'Failed to change display currency',
-              ),
-              itemBuilder: (_) => [
-                for (final currencyCode in settings.visibleCurrencies)
-                  CheckedPopupMenuItem(
-                    value: currencyCode,
-                    checked: currencyCode == settings.displayCurrency,
-                    child: Text(currencyCode),
-                  ),
-              ],
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(settings.displayCurrency),
-                  const Icon(Icons.arrow_drop_down),
+            if (settings.visibleCurrencies.length > 1)
+              PopupMenuButton<String>(
+                key: const Key('portfolio-currency-menu'),
+                onSelected: (value) => runDetachedTask(
+                  settings.setDisplayCurrency(value),
+                  'Failed to change display currency',
+                ),
+                itemBuilder: (_) => [
+                  for (final currencyCode in settings.visibleCurrencies)
+                    CheckedPopupMenuItem(
+                      value: currencyCode,
+                      checked: currencyCode == settings.displayCurrency,
+                      child: Text(currencyCode),
+                    ),
                 ],
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(settings.displayCurrency),
+                    const Icon(Icons.arrow_drop_down),
+                  ],
+                ),
               ),
-            ),
           ],
         ),
       ),

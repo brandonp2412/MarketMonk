@@ -2193,13 +2193,15 @@ class ChartsPageState extends State<ChartsPage>
               }
             },
             itemBuilder: (context) => [
-              for (final currencyCode in settings.visibleCurrencies)
-                CheckedPopupMenuItem<String>(
-                  value: 'currency:$currencyCode',
-                  checked: currencyCode == settings.displayCurrency,
-                  child: Text(currencyCode),
-                ),
-              const PopupMenuDivider(),
+              if (settings.visibleCurrencies.length > 1) ...[
+                for (final currencyCode in settings.visibleCurrencies)
+                  CheckedPopupMenuItem<String>(
+                    value: 'currency:$currencyCode',
+                    checked: currencyCode == settings.displayCurrency,
+                    child: Text(currencyCode),
+                  ),
+                const PopupMenuDivider(),
+              ],
               PopupMenuItem<String>(
                 value: '__settings__',
                 child: ListTile(

@@ -86,7 +86,7 @@ void main() {
     expect(prefs.getString('displayCurrency'), 'NZD');
   });
 
-  test('existing visible currencies are migrated to include USD', () async {
+  test('single saved currency stays enabled without USD', () async {
     await seedTestSqlite({
       'visibleCurrencies': ['NZD'],
       'displayCurrency': 'NZD',
@@ -96,20 +96,29 @@ void main() {
     final settings = SettingsState();
     await settings.initialized;
 
-    expect(settings.visibleCurrencies, ['NZD', 'USD']);
+    expect(settings.visibleCurrencies, ['NZD']);
+    expect(settings.displayCurrency, 'NZD');
+    expect(currency.currencyName, 'NZD');
+    expect(exchangeRate, 1.6);
+    expect(fmtCurrency(10), currency.format(16));
     final prefs = await SqliteSettings.getInstance();
-    expect(prefs.getStringList('visibleCurrencies'), ['NZD', 'USD']);
+    expect(prefs.getStringList('visibleCurrencies'), ['NZD']);
   });
 
-  test('USD remains available when visible currencies are changed', () async {
+  test('USD can be disabled and all values use the remaining currency',
+      () async {
     final settings = SettingsState();
     await settings.initialized;
 
     await settings.setVisibleCurrencies(['NZD']);
 
-    expect(settings.visibleCurrencies, ['NZD', 'USD']);
+    expect(settings.visibleCurrencies, ['NZD']);
+    expect(settings.displayCurrency, 'NZD');
+    expect(currency.currencyName, 'NZD');
+    expect(exchangeRate, 1.6);
+    expect(fmtCurrency(10), currency.format(16));
     final prefs = await SqliteSettings.getInstance();
-    expect(prefs.getStringList('visibleCurrencies'), ['NZD', 'USD']);
+    expect(prefs.getStringList('visibleCurrencies'), ['NZD']);
   });
 
   test('changing display currency switches the formatter immediately',

@@ -358,7 +358,7 @@ class _SettingsPageState extends State<SettingsPage> {
     BuildContext context,
     SettingsState settings,
   ) async {
-    var selected = Set<String>.from(settings.visibleCurrencies)..add('USD');
+    var selected = Set<String>.from(settings.visibleCurrencies);
 
     await showDialog<void>(
       context: context,
@@ -375,7 +375,8 @@ class _SettingsPageState extends State<SettingsPage> {
                       dense: true,
                       title: Text(currencyCode),
                       value: selected.contains(currencyCode),
-                      onChanged: currencyCode == 'USD'
+                      onChanged: selected.length == 1 &&
+                              selected.contains(currencyCode)
                           ? null
                           : (checked) {
                               setState(() {

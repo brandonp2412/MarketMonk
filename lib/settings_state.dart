@@ -116,21 +116,19 @@ class SettingsState extends ChangeNotifier {
     return currencyForLocale(WidgetsBinding.instance.platformDispatcher.locale);
   }
 
-  static List<String> _withUsd(Iterable<String> currencies) {
+  static List<String> _normalizeCurrencies(Iterable<String> currencies) {
     final normalized = <String>[];
     for (final code in currencies) {
-      if (code != 'USD' &&
-          supportedCurrencies.contains(code) &&
-          !normalized.contains(code)) {
+      if (supportedCurrencies.contains(code) && !normalized.contains(code)) {
         normalized.add(code);
       }
     }
-    normalized.add('USD');
+    if (normalized.isEmpty) normalized.add('USD');
     return normalized;
   }
 
   static List<String> _defaultVisibleCurrencies(String homeCurrency) =>
-      _withUsd([homeCurrency]);
+      _normalizeCurrencies([homeCurrency, 'USD']);
 
   Future<void> init() async {
     final prefs = await SqliteSettings.getInstance();
@@ -179,7 +177,7 @@ class SettingsState extends ChangeNotifier {
     final homeCurrency = await _detectLocalCurrency();
     final savedCurrencies = prefs.getStringList('visibleCurrencies');
     visibleCurrencies = (savedCurrencies != null && savedCurrencies.isNotEmpty)
-        ? _withUsd(savedCurrencies)
+        ? _normalizeCurrencies(savedCurrencies)
         : _defaultVisibleCurrencies(homeCurrency);
     if (savedCurrencies != null &&
         !listEquals(savedCurrencies, visibleCurrencies)) {
@@ -364,7 +362,7 @@ class SettingsState extends ChangeNotifier {
   }
 
   Future<void> setVisibleCurrencies(List<String> currencies) async {
-    visibleCurrencies = _withUsd(currencies);
+    visibleCurrencies = _normalizeCurrencies(currencies);
     final prefs = await SqliteSettings.getInstance();
     await prefs.setStringList('visibleCurrencies', visibleCurrencies);
     if (!visibleCurrencies.contains(displayCurrency)) {

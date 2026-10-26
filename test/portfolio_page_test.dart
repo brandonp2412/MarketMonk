@@ -144,7 +144,7 @@ void main() {
         child: MaterialApp(home: page),
       );
 
-  testWidgets('portfolio exposes a loading state while uncached data loads', (
+  testWidgets('portfolio loads uncached data silently', (
     tester,
   ) async {
     await seedTestSqlite({});
@@ -166,7 +166,7 @@ void main() {
     await tester.pump();
 
     expect(loads, 1);
-    expect(find.bySemanticsLabel('Loading portfolio'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
 
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pump();
@@ -209,22 +209,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('VOO'), findsOneWidget);
-      expect(find.bySemanticsLabel('Loading portfolio'), findsOneWidget);
-      final loadingIndicator = find.byType(CircularProgressIndicator);
-      final positioned = tester.widget<Positioned>(
-        find.ancestor(
-          of: loadingIndicator,
-          matching: find.byType(Positioned),
-        ),
-      );
-      expect(positioned.top, 48);
-      expect(positioned.left, 0);
-      expect(positioned.right, 0);
-      expect(
-        tester.getCenter(loadingIndicator).dx,
-        tester.getCenter(find.byType(Scaffold)).dx,
-      );
-      expect(tester.getCenter(loadingIndicator).dy, 60);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
 
       pending.complete(snapshotFor('*****6552', 'VOO'));
       await tester.pumpAndSettle();
@@ -421,7 +406,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('VOO'), findsNothing);
-      expect(find.bySemanticsLabel('Loading portfolio'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
     },
   );
 

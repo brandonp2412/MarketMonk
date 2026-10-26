@@ -813,7 +813,14 @@ class MyApp extends StatelessWidget {
         theme: ThemeData(
           colorScheme: settings.systemColors
               ? lightDynamic
-              : ColorScheme.fromSeed(seedColor: settings.seedColor),
+              : ColorScheme.fromSeed(seedColor: settings.seedColor).copyWith(
+                  primary: settings.seedColor == defaultSeedColor
+                      ? defaultSeedColor
+                      : null,
+                  onPrimary: settings.seedColor == defaultSeedColor
+                      ? Colors.black
+                      : null,
+                ),
           useMaterial3: true,
           popupMenuTheme: const PopupMenuThemeData(
             menuPadding: EdgeInsets.zero,
@@ -830,7 +837,17 @@ class MyApp extends StatelessWidget {
                       seedColor: settings.seedColor,
                       brightness: Brightness.dark,
                     ))
-              .copyWith(surface: settings.pureBlack ? Colors.black : null),
+              .copyWith(
+            surface: settings.pureBlack ? Colors.black : null,
+            primary:
+                !settings.systemColors && settings.seedColor == defaultSeedColor
+                    ? defaultSeedColor
+                    : null,
+            onPrimary:
+                !settings.systemColors && settings.seedColor == defaultSeedColor
+                    ? Colors.black
+                    : null,
+          ),
           useMaterial3: true,
           popupMenuTheme: const PopupMenuThemeData(
             menuPadding: EdgeInsets.zero,
