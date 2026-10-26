@@ -4,7 +4,7 @@
 
 # MarketMonk
 
-Track stocks on any platform 📈
+Stock charts and portfolio tracking for Android, Windows, and Linux 📈
 
 <p>
   <a href="https://github.com/brandonp2412/MarketMonk/releases/latest"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/brandonp2412/MarketMonk?style=for-the-badge&logoColor=ffffff&labelColor=2B7A78&color=151218"></a>
@@ -19,12 +19,22 @@ Track stocks on any platform 📈
 
 </div>
 
+MarketMonk helps you follow stock prices, track your holdings, and see how your portfolio performs.
+
 # Features
 
-- 💹 Stock charts with daily and intraday Yahoo Finance data
-- 🥧 Build and monitor your portfolio
-- 🏦 Optional read-only Interactive Brokers live portfolio source
-- ⚙️ Customize to your hearts desires
+- 💹 Explore daily and intraday stock charts with Yahoo Finance data
+- 🥧 Track holdings, trades, and portfolio performance
+- 🏦 Connect an optional read-only Interactive Brokers portfolio source
+- ⚙️ Choose your chart settings, currencies, and dashboard layout
+
+# Downloads
+
+MarketMonk supports Android, Windows, and Linux. iOS and macOS are no longer supported.
+
+- Android: [Google Play](https://play.google.com/store/apps/details?id=com.codesail.market_monk), [F-Droid](https://f-droid.org/packages/com.codesail.market_monk), or an APK from [GitHub Releases](https://github.com/brandonp2412/MarketMonk/releases/latest)
+- Windows: [Microsoft Store](https://apps.microsoft.com/detail/9PP4HKV1CMWC?mode=direct) or a ZIP from [GitHub Releases](https://github.com/brandonp2412/MarketMonk/releases/latest)
+- Linux: download the Linux ZIP from [GitHub Releases](https://github.com/brandonp2412/MarketMonk/releases/latest)
 
 <br />
 <p align="center">
@@ -50,7 +60,7 @@ All issues and pull requests are welcome! Bugs will be fixed faster if you inclu
 
 # Developers
 
-Install [flutter](https://docs.flutter.dev/get-started/install) to run this app.
+Use the repository-pinned [Flutter SDK](https://docs.flutter.dev/get-started/install) to build for Android, Windows, or Linux.
 
 Use the pinned SDK: `./flutter/bin/flutter run -d linux`, or
 `./scripts/run_linux.sh`. The VS Code workspace also selects `flutter/`.
