@@ -1,7 +1,10 @@
 import 'package:drafter/drafter.dart';
+import 'package:drafter/painting.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:market_monk/ticker_candlestick.dart';
+import 'package:market_monk/utils.dart';
 
 void main() {
   PriceCandle bar(
@@ -52,7 +55,16 @@ void main() {
     expect(result.single.close, 11);
   });
 
-  testWidgets('uses Drafter OHLC renderer and moving average', (tester) async {
+  testWidgets('uses display-currency prices and shows a tappable OHLC readout',
+      (tester) async {
+    final oldCurrency = currency;
+    final oldRates = Map<String, double>.of(allRatesFromUsd);
+    currency = NumberFormat.simpleCurrency(name: 'NZD');
+    allRatesFromUsd['NZD'] = 1.5;
+    addTearDown(() {
+      currency = oldCurrency;
+      allRatesFromUsd = oldRates;
+    });
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -71,19 +83,74 @@ void main() {
       ),
     );
 
-    final chart =
-        tester.widget<InteractiveChart>(find.byType(InteractiveChart));
-    final renderer = chart.renderer as CandlestickChartRenderer;
+    final canvas = tester.widget<ChartCanvas>(find.byType(ChartCanvas));
+    final renderer = canvas.renderer as CandlestickChartRenderer;
     expect(renderer.candles, hasLength(25));
-    expect(renderer.candles.first.open, 100);
-    expect(renderer.candles.first.low, 95);
+    expect(renderer.candles.first.open, 150);
+    expect(renderer.candles.first.low, 142.5);
     expect(renderer.movingAverages.single.period, 20);
-    expect(
-      chart.interaction.rowLabel!(
-        renderer.buildScene(const Size(320, 240)).marks.first,
-      ),
-      contains('O'),
-    );
+
+    final origin = tester.getTopLeft(find.byType(ChartCanvas));
+    final scene = renderer.buildScene(const Size(320, 240));
+    await tester.tapAt(origin + scene.marks.first.center);
+    await tester.pump();
+    expect(find.byKey(const Key('candle-price-tooltip')), findsOneWidget);
+    expect(find.textContaining('1 Oct 2026'), findsOneWidget);
+    expect(find.textContaining(fmtNativeCurrency(100, 'USD')), findsOneWidget);
+
+    final gesture =
+        await tester.startGesture(origin + scene.marks.first.center);
+    await gesture.moveTo(origin + scene.marks.last.center);
+    await tester.pump();
+    expect(find.textContaining('25 Oct 2026'), findsOneWidget);
+    await gesture.up();
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('long-press scrub keeps the surrounding page in place',
+      (tester) async {
+    final controller = PageController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: PageView(
+            controller: controller,
+            children: [
+              TickerCandlestick(
+                nativeCurrency: 'USD',
+                candles: [
+                  for (var day = 1; day <= 25; day++)
+                    bar(
+                      day,
+                      100 + day.toDouble(),
+                      110 + day.toDouble(),
+                      95,
+                      105 + day.toDouble(),
+                    ),
+                ],
+              ),
+              const Center(child: Text('Other tab')),
+            ],
+          ),
+        ),
+      ),
+    );
+    final finder = find.byType(ChartCanvas);
+    final canvas = tester.widget<ChartCanvas>(finder);
+    final scene = (canvas.renderer as CandlestickChartRenderer)
+        .buildScene(tester.getSize(finder));
+    final center = tester.getTopLeft(finder) + scene.marks[12].center;
+    final gesture = await tester.startGesture(center);
+    await tester.pump(const Duration(milliseconds: 650));
+    await gesture.moveBy(const Offset(-240, 0));
+    await tester.pump();
+    expect(controller.page, closeTo(0, 0.01));
+    expect(find.byKey(const Key('candle-price-tooltip')), findsOneWidget);
+    final index = ChartHitTest.nearestIndexAtX(scene, center.dx - 240);
+    expect(find.textContaining('${index! + 1} Oct 2026'), findsOneWidget);
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(controller.page, closeTo(0, 0.01));
   });
 }

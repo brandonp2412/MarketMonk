@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:drafter/drafter.dart';
+import 'package:drafter/painting.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/utils.dart';
@@ -51,7 +52,7 @@ PriceCandle _aggregateGroup(List<PriceCandle> candles) => PriceCandle(
       close: candles.last.close,
     );
 
-class TickerCandlestick extends StatelessWidget {
+class TickerCandlestick extends StatefulWidget {
   final List<PriceCandle> candles;
   final String nativeCurrency;
   final bool intraday;
@@ -66,10 +67,27 @@ class TickerCandlestick extends StatelessWidget {
   });
 
   @override
+  State<TickerCandlestick> createState() => _TickerCandlestickState();
+}
+
+class _TickerCandlestickState extends State<TickerCandlestick> {
+  final _activeIndex = ValueNotifier<int?>(null);
+
+  @override
+  void dispose() {
+    _activeIndex.dispose();
+    super.dispose();
+  }
+
+  void _select(Offset position, ChartScene scene) {
+    final index = ChartHitTest.nearestIndexAtX(scene, position.dx);
+    if (_activeIndex.value != index) _activeIndex.value = index;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final color = colorScheme.primary;
     final chartTheme = DrafterThemeColors(
       palette: DrafterColors.palette,
       grid: colorScheme.onSurface.withValues(alpha: 0.07),
@@ -77,57 +95,206 @@ class TickerCandlestick extends StatelessWidget {
       surface: colorScheme.surface,
       isDark: dark,
     );
+
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = constraints.maxWidth;
         final plotted = aggregatePriceCandles(
-          candles,
-          max(1, (width / 8).floor()),
+          widget.candles,
+          max(1, (constraints.maxWidth / 8).floor()),
         );
+        if (plotted.isEmpty) {
+          return const Center(child: Text('No OHLC prices available'));
+        }
+
         final dateFormat = DateFormat(
-          intraday
+          widget.intraday
               ? 'HH:mm'
-              : candles.length > 400
+              : widget.candles.length > 400
                   ? 'MMM yy'
                   : 'd/M',
         );
+        final displayRate =
+            exchangeRate / requireUsdRate(widget.nativeCurrency);
         final rows = [
           for (final candle in plotted)
             Candle(
               label: dateFormat.format(candle.date),
-              open: candle.open,
-              high: candle.high,
-              low: candle.low,
-              close: candle.close,
+              open: candle.open * displayRate,
+              high: candle.high * displayRate,
+              low: candle.low * displayRate,
+              close: candle.close * displayRate,
             ),
         ];
-
-        if (rows.isEmpty) {
-          return const Center(child: Text('No OHLC prices available'));
-        }
+        final renderer = CandlestickChartRenderer(
+          candles: rows,
+          movingAverages: [
+            if (widget.showRollingAverage)
+              MovingAverage(period: 20, color: colorScheme.primary),
+          ],
+        );
+        final scene = renderer.buildScene(constraints.biggest);
 
         return DrafterTheme(
           colors: chartTheme,
-          child: InteractiveChart(
-            renderer: CandlestickChartRenderer(
-              candles: rows,
-              movingAverages: [
-                if (showRollingAverage) MovingAverage(period: 20, color: color),
-              ],
-            ),
-            animate: false,
-            interaction: ChartInteraction(
-              rowLabel: (mark) {
-                final candle = plotted[mark.index];
-                String fmt(double value) =>
-                    fmtCompactNativeCurrency(value, nativeCurrency);
-                return 'O ${fmt(candle.open)} · H ${fmt(candle.high)} · '
-                    'L ${fmt(candle.low)} · C ${fmt(candle.close)}';
-              },
+          child: MouseRegion(
+            onHover: (event) => _select(event.localPosition, scene),
+            onExit: (_) => _activeIndex.value = null,
+            child: Listener(
+              behavior: HitTestBehavior.opaque,
+              onPointerDown: (event) => _select(event.localPosition, scene),
+              onPointerMove: (event) => _select(event.localPosition, scene),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onLongPressStart: (details) =>
+                    _select(details.localPosition, scene),
+                onLongPressMoveUpdate: (details) =>
+                    _select(details.localPosition, scene),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ChartCanvas(renderer: renderer, animate: false),
+                    IgnorePointer(
+                      child: RepaintBoundary(
+                        child: CustomPaint(
+                          painter: _CandleCrosshairPainter(
+                            scene: scene,
+                            activeIndex: _activeIndex,
+                            color:
+                                colorScheme.onSurface.withValues(alpha: 0.32),
+                          ),
+                        ),
+                      ),
+                    ),
+                    ValueListenableBuilder<int?>(
+                      valueListenable: _activeIndex,
+                      builder: (context, index, _) {
+                        if (index == null || index >= plotted.length) {
+                          return const SizedBox.shrink();
+                        }
+                        final candle = plotted[index];
+                        final date = DateFormat(
+                          widget.intraday ? 'd MMM HH:mm' : 'd MMM yyyy',
+                        ).format(candle.date);
+                        return Positioned(
+                          top: 4,
+                          left: index > plotted.length ~/ 2 ? 8 : null,
+                          right: index <= plotted.length ~/ 2 ? 8 : null,
+                          child: IgnorePointer(
+                            child: Container(
+                              key: const Key('candle-price-tooltip'),
+                              constraints: const BoxConstraints(maxWidth: 236),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 9,
+                              ),
+                              decoration: BoxDecoration(
+                                color: colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: colorScheme.outlineVariant,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    date,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: colorScheme.onSurface,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 5),
+                                  _valuesRow(candle, colorScheme),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         );
       },
     );
   }
+
+  Widget _valuesRow(PriceCandle candle, ColorScheme scheme) {
+    Widget value(String label, double price) => Padding(
+          padding: const EdgeInsets.only(bottom: 2),
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: '$label ',
+                  style: TextStyle(color: scheme.onSurfaceVariant),
+                ),
+                TextSpan(
+                  text: fmtNativeCurrency(price, widget.nativeCurrency),
+                  style: TextStyle(
+                    color: scheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            style: const TextStyle(fontSize: 11),
+            maxLines: 1,
+          ),
+        );
+
+    return Wrap(
+      spacing: 12,
+      runSpacing: 2,
+      children: [
+        value('O', candle.open),
+        value('H', candle.high),
+        value('L', candle.low),
+        value('C', candle.close),
+      ],
+    );
+  }
+}
+
+class _CandleCrosshairPainter extends CustomPainter {
+  final ChartScene scene;
+  final ValueNotifier<int?> activeIndex;
+  final Color color;
+
+  _CandleCrosshairPainter({
+    required this.scene,
+    required this.activeIndex,
+    required this.color,
+  }) : super(repaint: activeIndex);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final index = activeIndex.value;
+    final bounds = scene.bounds;
+    if (index == null || bounds == null || index >= scene.marks.length) return;
+    final mark = scene.marks[index];
+    final x = mark.center.dx;
+    canvas.drawLine(
+      Offset(x, bounds.top),
+      Offset(x, bounds.bottom),
+      Paint()
+        ..color = color
+        ..strokeWidth = 1,
+    );
+    canvas.drawCircle(
+      mark.center,
+      4.5,
+      Paint()..color = mark.color,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _CandleCrosshairPainter old) =>
+      old.scene != scene || old.color != color;
 }
