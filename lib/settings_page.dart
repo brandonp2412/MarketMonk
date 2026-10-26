@@ -472,7 +472,6 @@ class _SettingsPageState extends State<SettingsPage> {
           labelText: context.l10n.text('Language'),
           prefixIcon: const Icon(Icons.language),
           border: const OutlineInputBorder(),
-          isDense: true,
         ),
         items: [
           DropdownMenuItem(
