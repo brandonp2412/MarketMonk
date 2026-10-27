@@ -98,8 +98,9 @@ class ChartsPageState extends State<ChartsPage>
   final _favoriteIntradayErrors = <String, String>{};
   int _favoriteLoadGeneration = 0;
   bool _networkLoading = false;
-  bool _showRollingAverage = false;
-  bool _showCandlesticks = false;
+  bool get _showRollingAverage =>
+      context.read<SettingsState>().showRollingAverage;
+  bool get _showCandlesticks => context.read<SettingsState>().showCandlesticks;
   final ValueNotifier<int?> _candleSelection = ValueNotifier(null);
   String? _stockError;
   String _nativeCurrency = 'USD';
@@ -224,14 +225,12 @@ class ChartsPageState extends State<ChartsPage>
     final periodYears = prefs.getInt('chartPeriodYears') ?? 1;
     final periodMonths = prefs.getInt('chartPeriodMonths') ?? 0;
     final periodDays = prefs.getInt('chartPeriodDays') ?? 0;
-    final showCandlesticks = prefs.getBool('chartCandlesticks') ?? false;
     if (!mounted) return;
 
     setState(() {
       years = periodYears;
       months = periodMonths;
       days = periodDays;
-      _showCandlesticks = showCandlesticks;
       _chartPeriodLoaded = true;
     });
 
@@ -2188,6 +2187,17 @@ class ChartsPageState extends State<ChartsPage>
                     builder: (_) => const SettingsPage(),
                   ),
                 );
+              } else if (value == '__rolling_average__') {
+                runDetachedTask(
+                  settings.setShowRollingAverage(!settings.showRollingAverage),
+                  'Failed to save rolling average',
+                );
+              } else if (value == '__candles__') {
+                _candleSelection.value = null;
+                runDetachedTask(
+                  settings.setShowCandlesticks(!settings.showCandlesticks),
+                  'Failed to save chart style',
+                );
               } else if (value.startsWith('currency:')) {
                 runDetachedTask(
                   settings.setDisplayCurrency(value.substring(9)),
@@ -2203,6 +2213,47 @@ class ChartsPageState extends State<ChartsPage>
                     checked: currencyCode == settings.displayCurrency,
                     child: Text(currencyCode),
                   ),
+                const PopupMenuDivider(),
+              ],
+              if (!desktop) ...[
+                PopupMenuItem<String>(
+                  key: const Key('chart-menu-rolling-average'),
+                  value: '__rolling_average__',
+                  child: Row(
+                    children: [
+                      Icon(
+                        settings.showRollingAverage
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(context.l10n.text('Rolling average')),
+                      if (settings.showRollingAverage) ...[
+                        const SizedBox(width: 8),
+                        const Icon(Icons.check, size: 18),
+                      ],
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  key: const Key('chart-menu-candles'),
+                  value: '__candles__',
+                  child: Row(
+                    children: [
+                      Icon(
+                        settings.showCandlesticks
+                            ? Icons.candlestick_chart
+                            : Icons.candlestick_chart_outlined,
+                      ),
+                      const SizedBox(width: 12),
+                      const Text('Candles'),
+                      if (settings.showCandlesticks) ...[
+                        const SizedBox(width: 8),
+                        const Icon(Icons.check, size: 18),
+                      ],
+                    ],
+                  ),
+                ),
                 const PopupMenuDivider(),
               ],
               PopupMenuItem<String>(
@@ -2413,12 +2464,9 @@ class ChartsPageState extends State<ChartsPage>
 
   void _toggleCandlesticks() {
     _candleSelection.value = null;
-    setState(() => _showCandlesticks = !_showCandlesticks);
+    final settings = context.read<SettingsState>();
     runDetachedTask(
-      () async {
-        final prefs = await SqliteSettings.getInstance();
-        await prefs.setBool('chartCandlesticks', _showCandlesticks);
-      }(),
+      settings.setShowCandlesticks(!settings.showCandlesticks),
       'Failed to save chart style',
     );
   }
@@ -2735,6 +2783,7 @@ class ChartsPageState extends State<ChartsPage>
           ),
       _buildPortfolioChart(context, settings, accountColors),
       _buildPortfolioSummary(context, accountColors),
+      if (isDesktopLayout(context)) _buildPortfolioChartControls(),
     ];
   }
 
@@ -2747,8 +2796,13 @@ class ChartsPageState extends State<ChartsPage>
               ? Icons.radio_button_checked
               : Icons.radio_button_unchecked,
           label: context.l10n.text('Rolling average'),
-          onTap: () =>
-              setState(() => _showRollingAverage = !_showRollingAverage),
+          onTap: () {
+            final settings = context.read<SettingsState>();
+            runDetachedTask(
+              settings.setShowRollingAverage(!settings.showRollingAverage),
+              'Failed to save rolling average',
+            );
+          },
         ),
       );
 
@@ -2765,8 +2819,24 @@ class ChartsPageState extends State<ChartsPage>
         ),
       );
 
+  Widget _buildPortfolioChartControls() => Padding(
+        key: const Key('desktop-portfolio-chart-controls'),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        child: Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildRollingAverageChip(),
+              const SizedBox(width: 8),
+              _buildPortfolioCandleChip(),
+            ],
+          ),
+        ),
+      );
+
   Widget _buildFavoritesRow() {
     final hasFavorites = _favoriteStocks.isNotEmpty;
+    if (!hasFavorites) return const SizedBox.shrink();
     return Padding(
       padding: EdgeInsets.fromLTRB(
         isDesktopLayout(context) ? 24 : 16,
@@ -2836,19 +2906,6 @@ class ChartsPageState extends State<ChartsPage>
             ),
             const SizedBox(height: 8),
           ],
-          Center(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildRollingAverageChip(),
-                  const SizedBox(width: 8),
-                  _buildPortfolioCandleChip(),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
     );

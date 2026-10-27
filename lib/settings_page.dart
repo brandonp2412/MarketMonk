@@ -1087,6 +1087,28 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           _sectionHeader(context.l10n.text('Charts')),
+          ListTile(
+            key: const Key('settings-rolling-average'),
+            leading: const Icon(Icons.show_chart),
+            title: Text(context.l10n.text('Rolling average')),
+            trailing: Switch(
+              value: settings.showRollingAverage,
+              onChanged: settings.setShowRollingAverage,
+            ),
+            onTap: () =>
+                settings.setShowRollingAverage(!settings.showRollingAverage),
+          ),
+          ListTile(
+            key: const Key('settings-candlestick-chart'),
+            leading: const Icon(Icons.candlestick_chart_outlined),
+            title: const Text('Candles'),
+            trailing: Switch(
+              value: settings.showCandlesticks,
+              onChanged: settings.setShowCandlesticks,
+            ),
+            onTap: () =>
+                settings.setShowCandlesticks(!settings.showCandlesticks),
+          ),
           Tooltip(
             message: context.l10n.text(
               'Show a badge on the chart when the market is closed (weekends)',

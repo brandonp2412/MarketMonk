@@ -15,7 +15,7 @@ void main() {
       'portfolio and favorites share compact candle and average controls',
       (tester) async {
     tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.physicalSize = const Size(430, 940);
     addTearDown(() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
@@ -86,24 +86,28 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final average = find.byKey(const Key('chart-rolling-average'));
-    final candles = find.byKey(const Key('chart-portfolio-candle-toggle'));
-    expect(average, findsOneWidget);
-    expect(candles, findsOneWidget);
-    expect(tester.getSize(average).height, 40);
-    expect(tester.getSize(candles).height, 40);
+    expect(find.byKey(const Key('chart-rolling-average')), findsNothing);
     expect(
-      (tester.getCenter(average).dy - tester.getCenter(candles).dy).abs(),
-      lessThan(1),
+      find.byKey(const Key('chart-portfolio-candle-toggle')),
+      findsNothing,
     );
-
-    await tester.ensureVisible(candles);
-    await tester.tap(candles);
-    await tester.pump();
+    final menu = find.byKey(const Key('chart-menu-button'));
+    await tester.tap(menu);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chart-menu-rolling-average')), findsOneWidget);
+    expect(find.byKey(const Key('chart-menu-candles')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('chart-menu-candles')));
+    await tester.pumpAndSettle();
     var chart = tester.widget<MarketLineChart>(find.byType(MarketLineChart));
     expect(chart.showCandlesticks, true);
     expect(chart.candles, isNotEmpty);
     expect(chart.candles.every((bar) => bar.sampled), true);
+    await tester.tap(menu);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('chart-menu-rolling-average')));
+    await tester.pumpAndSettle();
+    chart = tester.widget<MarketLineChart>(find.byType(MarketLineChart));
+    expect(chart.showRollingAverage, true);
 
     await tester.tap(find.text('SPY'));
     await tester.pumpAndSettle();
@@ -113,5 +117,25 @@ void main() {
     expect(chart.candles.any((bar) => !bar.sampled), true);
     expect(chart.showCandlesticks, true);
     expect(tester.takeException(), isNull);
+
+    tester.view.physicalSize = const Size(1200, 900);
+    await tester.pumpAndSettle();
+    final average = find.byKey(const Key('chart-rolling-average'));
+    final candles = find.byKey(const Key('chart-portfolio-candle-toggle'));
+    final desktopControls =
+        find.byKey(const Key('desktop-portfolio-chart-controls'));
+    expect(desktopControls, findsOneWidget);
+    expect(average, findsOneWidget);
+    expect(candles, findsOneWidget);
+    await tester.ensureVisible(desktopControls);
+    await tester.pumpAndSettle();
+    expect(
+      tester.getTopLeft(desktopControls).dy,
+      greaterThan(
+        tester
+            .getTopLeft(find.byKey(const Key('portfolio-summary-content')))
+            .dy,
+      ),
+    );
   });
 }

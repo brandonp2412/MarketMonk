@@ -67,6 +67,8 @@ class SettingsState extends ChangeNotifier {
   String? languageCode;
   bool systemColors = false;
   bool curveLines = false;
+  bool showRollingAverage = false;
+  bool showCandlesticks = false;
   double curveSmoothness = 0.35;
   String dateFormat = 'd/M/yy';
   Color seedColor = defaultSeedColor;
@@ -169,6 +171,8 @@ class SettingsState extends ChangeNotifier {
 
     systemColors = prefs.getBool('systemColors') ?? false;
     curveLines = prefs.getBool('curveLines') ?? false;
+    showRollingAverage = prefs.getBool('chartRollingAverage') ?? false;
+    showCandlesticks = prefs.getBool('chartCandlesticks') ?? false;
     curveSmoothness = prefs.getDouble('curveSmoothness') ?? 0.35;
     dateFormat = prefs.getString('dateFormat') ?? 'd/M/yy';
     final colorVal = prefs.getInt('seedColor');
@@ -285,6 +289,20 @@ class SettingsState extends ChangeNotifier {
     notifyListeners();
     final prefs = await SqliteSettings.getInstance();
     await prefs.setBool('curveLines', value);
+  }
+
+  Future<void> setShowRollingAverage(bool value) async {
+    showRollingAverage = value;
+    notifyListeners();
+    final prefs = await SqliteSettings.getInstance();
+    await prefs.setBool('chartRollingAverage', value);
+  }
+
+  Future<void> setShowCandlesticks(bool value) async {
+    showCandlesticks = value;
+    notifyListeners();
+    final prefs = await SqliteSettings.getInstance();
+    await prefs.setBool('chartCandlesticks', value);
   }
 
   /// Persists the dark-theme background preference.
