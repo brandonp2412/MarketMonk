@@ -76,22 +76,43 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final position = widget.summary.position;
     final ibkrManaged = context.watch<AccountManager>().ibkrConfigFor().enabled;
 
     return StreamBuilder<List<Trade>>(
       stream: ibkrManaged ? _ibkrTradesStream : _tradesStream,
       builder: (context, snap) {
         final trades = snap.data ?? widget.summary.trades;
-        final totalRealized =
-            trades.fold(0.0, (sum, trade) => sum + trade.realizedPL);
         final symbol = widget.summary.symbol;
         final nativeCurr = symbolCurrency(symbol);
         final centDiv = symbolCentDivisor(symbol);
+        final cachedPosition = widget.summary.position;
+        final position = ibkrManaged
+            ? cachedPosition
+            : computePositions(
+                trades,
+                {
+                  if (cachedPosition != null)
+                    symbol: cachedPosition.currentPrice * centDiv,
+                },
+                nativeCurrencies: {
+                  if (cachedPosition != null)
+                    symbol: cachedPosition.nativeCurrency,
+                },
+              ).firstOrNull;
+        final liveSummary = SymbolSummary(
+          symbol: symbol,
+          name: widget.summary.name,
+          position: position,
+          trades: trades,
+          brokerTradeHistoryAvailable:
+              widget.summary.brokerTradeHistoryAvailable,
+        );
+        final totalRealized =
+            trades.fold(0.0, (sum, trade) => sum + trade.realizedPL);
         final nativeRate = allRatesFromUsd[nativeCurr] ?? 1.0;
         final totalRealizedUsd = totalRealized / centDiv / nativeRate;
         final unrealizedPL = position?.unrealizedPL ?? 0.0;
-        final realizedToday = widget.summary.realizedTodayUsd();
+        final realizedToday = liveSummary.realizedTodayUsd();
         final totalGain = totalRealizedUsd + unrealizedPL;
 
         return Scaffold(

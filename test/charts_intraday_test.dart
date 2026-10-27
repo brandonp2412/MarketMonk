@@ -205,7 +205,8 @@ void main() {
     expect(chart.series.single.points, hasLength(12));
     expect(chart.series.single.points.first.y, 0);
     expect(chart.series.single.points.last.y, closeTo(11, 1e-8));
-    expect(chart.xLabels.first, contains(RegExp(r'\d{2}:\d{2}')));
+    expect(chart.xLabels.first, matches(RegExp(r'^\d{2}:\d{2}$')));
+    expect(chart.candleTooltipTitle?.call(0), contains('/'));
   });
 
   testWidgets('portfolio 5d weights every holding and offers intraday 1d', (
@@ -260,7 +261,8 @@ void main() {
     expect(chart.series.single.points, hasLength(12));
     expect(chart.series.single.points.first.y, 945);
     expect(chart.series.single.points.last.y, 1000);
-    expect(chart.xLabels.first, contains(RegExp(r'\d{2}:\d{2}')));
+    expect(chart.xLabels.first, matches(RegExp(r'^\d{2}:\d{2}$')));
+    expect(chart.candleTooltipTitle?.call(0), contains('/'));
     expect(find.textContaining('TWR'), findsNothing);
     await tester.tap(find.byKey(const Key('chart-period-1d')));
     await tester.pumpAndSettle();

@@ -11,6 +11,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "Dunkel",
     "Light": "Hell",
     "Language": "Sprache",
+    "Hide dollar amounts": "Geldbeträge ausblenden",
     "System default": "Systemstandard",
     "Use the primary color of your device for the app":
         "Primärfarbe des Geräts für die App verwenden",
@@ -238,6 +239,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "มืด",
     "Light": "สว่าง",
     "Language": "ภาษา",
+    "Hide dollar amounts": "ซ่อนจำนวนเงิน",
     "System default": "ค่าเริ่มต้นของระบบ",
     "Use the primary color of your device for the app":
         "ใช้สีหลักของอุปกรณ์กับแอป",
@@ -456,6 +458,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "Tối",
     "Light": "Sáng",
     "Language": "Ngôn ngữ",
+    "Hide dollar amounts": "Ẩn số tiền",
     "System default": "Mặc định hệ thống",
     "Use the primary color of your device for the app":
         "Dùng màu chủ đạo của thiết bị cho ứng dụng",
@@ -676,6 +679,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "Oscuro",
     "Light": "Claro",
     "Language": "Idioma",
+    "Hide dollar amounts": "Ocultar importes",
     "System default": "Predeterminado del sistema",
     "Use the primary color of your device for the app":
         "Usar el color principal del dispositivo en la aplicación",
@@ -902,6 +906,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "Sombre",
     "Light": "Clair",
     "Language": "Langue",
+    "Hide dollar amounts": "Masquer les montants",
     "System default": "Réglage système",
     "Use the primary color of your device for the app":
         "Utiliser la couleur principale de l’appareil pour l’application",
@@ -1129,6 +1134,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "Ciemny",
     "Light": "Jasny",
     "Language": "Język",
+    "Hide dollar amounts": "Ukryj kwoty",
     "System default": "Domyślne ustawienie systemu",
     "Use the primary color of your device for the app":
         "Używaj w aplikacji głównego koloru urządzenia",
@@ -1356,6 +1362,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "Scuro",
     "Light": "Chiaro",
     "Language": "Lingua",
+    "Hide dollar amounts": "Nascondi importi",
     "System default": "Predefinito di sistema",
     "Use the primary color of your device for the app":
         "Usa il colore principale del dispositivo per l'app",
@@ -1582,6 +1589,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "Donker",
     "Light": "Licht",
     "Language": "Taal",
+    "Hide dollar amounts": "Bedragen verbergen",
     "System default": "Systeemstandaard",
     "Use the primary color of your device for the app":
         "Gebruik de primaire kleur van je apparaat voor de app",
@@ -1808,6 +1816,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "Escuro",
     "Light": "Claro",
     "Language": "Idioma",
+    "Hide dollar amounts": "Ocultar valores",
     "System default": "Padrão do sistema",
     "Use the primary color of your device for the app":
         "Usar a cor principal do dispositivo no aplicativo",
@@ -2031,6 +2040,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "Escuro",
     "Light": "Claro",
     "Language": "Idioma",
+    "Hide dollar amounts": "Ocultar montantes",
     "System default": "Predefinição do sistema",
     "Use the primary color of your device for the app":
         "Usar a cor principal do dispositivo no aplicação",
@@ -2256,6 +2266,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "गहरा",
     "Light": "हल्का",
     "Language": "भाषा",
+    "Hide dollar amounts": "राशियाँ छिपाएँ",
     "System default": "सिस्टम डिफ़ॉल्ट",
     "Use the primary color of your device for the app":
         "ऐप में अपने डिवाइस के मुख्य रंग का उपयोग करें",
@@ -2480,6 +2491,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "ダーク",
     "Light": "ライト",
     "Language": "言語",
+    "Hide dollar amounts": "金額を非表示",
     "System default": "システム設定",
     "Use the primary color of your device for the app": "端末のメインカラーをアプリに使用",
     "System color scheme": "システムのカラースキーム",
@@ -2683,6 +2695,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "다크",
     "Light": "라이트",
     "Language": "언어",
+    "Hide dollar amounts": "금액 숨기기",
     "System default": "시스템 기본값",
     "Use the primary color of your device for the app": "기기의 기본 색상을 앱에 사용",
     "System color scheme": "시스템 색상 구성표",
@@ -2887,6 +2900,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "Gelap",
     "Light": "Cerah",
     "Language": "Bahasa",
+    "Hide dollar amounts": "Sembunyikan jumlah wang",
     "System default": "Lalai sistem",
     "Use the primary color of your device for the app":
         "Gunakan warna utama peranti anda untuk aplikasi",
@@ -3112,6 +3126,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "Koyu",
     "Light": "Açık",
     "Language": "Dil",
+    "Hide dollar amounts": "Tutarları gizle",
     "System default": "Sistem varsayılanı",
     "Use the primary color of your device for the app":
         "Uygulamada cihazınızın ana rengini kullan",
@@ -3338,6 +3353,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "深色",
     "Light": "浅色",
     "Language": "语言",
+    "Hide dollar amounts": "隐藏金额",
     "System default": "跟随系统",
     "Use the primary color of your device for the app": "使用设备主色作为应用颜色",
     "System color scheme": "系统配色",
@@ -3537,6 +3553,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "深色",
     "Light": "淺色",
     "Language": "語言",
+    "Hide dollar amounts": "隱藏金額",
     "System default": "跟隨系統",
     "Use the primary color of your device for the app": "使用裝置主色作為應用程式顏色",
     "System color scheme": "系統配色",
@@ -3736,6 +3753,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "داكن",
     "Light": "فاتح",
     "Language": "اللغة",
+    "Hide dollar amounts": "إخفاء المبالغ",
     "System default": "إعداد النظام الافتراضي",
     "Use the primary color of your device for the app":
         "استخدام اللون الأساسي لجهازك في التطبيق",
@@ -3956,6 +3974,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "Тёмная",
     "Light": "Светлая",
     "Language": "Язык",
+    "Hide dollar amounts": "Скрыть суммы",
     "System default": "Системный язык",
     "Use the primary color of your device for the app":
         "Использовать основной цвет устройства в приложении",
@@ -4182,6 +4201,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "Gelap",
     "Light": "Terang",
     "Language": "Bahasa",
+    "Hide dollar amounts": "Sembunyikan jumlah uang",
     "System default": "Default sistem",
     "Use the primary color of your device for the app":
         "Gunakan warna utama perangkat untuk aplikasi",
@@ -4407,6 +4427,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "ডার্ক",
     "Light": "লাইট",
     "Language": "ভাষা",
+    "Hide dollar amounts": "অর্থের পরিমাণ লুকান",
     "System default": "সিস্টেম ডিফল্ট",
     "Use the primary color of your device for the app":
         "অ্যাপে আপনার ডিভাইসের প্রধান রং ব্যবহার করুন",
@@ -4627,6 +4648,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "گہرا",
     "Light": "ہلکا",
     "Language": "زبان",
+    "Hide dollar amounts": "رقوم چھپائیں",
     "System default": "سسٹم ڈیفالٹ",
     "Use the primary color of your device for the app":
         "ایپ کے لیے اپنے آلے کا بنیادی رنگ استعمال کریں",
@@ -4849,6 +4871,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "تیره",
     "Light": "روشن",
     "Language": "زبان",
+    "Hide dollar amounts": "مبالغ را پنهان کنید",
     "System default": "پیش‌فرض سیستم",
     "Use the primary color of your device for the app":
         "استفاده از رنگ اصلی دستگاه برای برنامه",
@@ -5073,6 +5096,7 @@ const appTranslations = <String, Map<String, String>>{
     "Dark": "Темна",
     "Light": "Світла",
     "Language": "Мова",
+    "Hide dollar amounts": "Приховати суми",
     "System default": "Як у системі",
     "Use the primary color of your device for the app":
         "Використовувати основний колір пристрою в застосунку",

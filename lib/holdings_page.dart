@@ -138,7 +138,7 @@ class HoldingsPageState extends State<HoldingsPage>
   @override
   void initState() {
     super.initState();
-    _stream = _buildStream(skipInitial: widget.isActive);
+    _stream = _buildStream();
   }
 
   @override
@@ -146,8 +146,9 @@ class HoldingsPageState extends State<HoldingsPage>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isActive == widget.isActive) return;
 
-    setState(() => _stream = _buildStream(skipInitial: widget.isActive));
-    if (widget.isActive) {
+    setState(() => _stream = _buildStream());
+    if (widget.isActive &&
+        context.read<AccountManager>().ibkrConfigFor().enabled) {
       runDetachedTask(_preload(), 'Failed to preload holdings');
     }
   }
@@ -193,16 +194,21 @@ class HoldingsPageState extends State<HoldingsPage>
     _lastAccount = account;
     _lastIbkrConfig = ibkrConfig;
     _lastIbkrRefreshVersion = refreshVersion;
+    if (accountChanged) {
+      _search.clear();
+      _selectedSymbols.clear();
+      _selecting = false;
+    }
     final cachedPositions = accounts.portfolioCacheFor(account)?.positions;
     setState(() {
-      _stream = _buildStream(skipInitial: widget.isActive);
+      _stream = _buildStream();
       _summaries = ibkrConfig.enabled && cachedPositions != null
           ? _summariesFromPositions(_ibkrTrades, cachedPositions)
           : [];
       _ibkrPreloadCompleted = cachedPositions != null;
       _preloadError = null;
     });
-    if (widget.isActive) {
+    if (widget.isActive && ibkrConfig.enabled) {
       runDetachedTask(
         _preload(
           refreshPortfolio: refreshRequested || configChanged,
@@ -324,7 +330,8 @@ class HoldingsPageState extends State<HoldingsPage>
   }) =>
       hasCache &&
       !refreshPortfolio &&
-      (!ibkrEnabled || cacheFresh || !ibkrConfigured);
+      ibkrEnabled &&
+      (cacheFresh || !ibkrConfigured);
 
   Future<void> _performPreload({
     bool refreshPortfolio = false,
@@ -335,7 +342,7 @@ class HoldingsPageState extends State<HoldingsPage>
     final accountName = accounts.activeAccount;
     try {
       final cachedBefore = accounts.portfolioCacheFor(accountName);
-      if (cachedBefore != null) {
+      if (cachedBefore != null && accounts.ibkrConfigFor(accountName).enabled) {
         setState(() {
           _summaries =
               _summariesFromPositions(_ibkrTrades, cachedBefore.positions);
@@ -369,7 +376,7 @@ class HoldingsPageState extends State<HoldingsPage>
         }
         return;
       }
-      final result = await _computeSummaries(trades);
+      final result = await _computeSummaries(trades, accountName: accountName);
       if (mounted && widget.isActive && accounts.activeAccount == accountName) {
         setState(() {
           _summaries = result;
@@ -388,17 +395,21 @@ class HoldingsPageState extends State<HoldingsPage>
     }
   }
 
-  Future<List<Position>> _loadPositions(List<Trade> trades) async {
+  Future<List<Position>> _loadPositions(
+    List<Trade> trades, {
+    String? forAccount,
+  }) async {
     final accounts = context.read<AccountManager>();
+    final accountName = forAccount ?? accounts.activeAccount;
     if (!widget.isActive) {
-      return accounts.portfolioCacheFor()?.positions ?? const <Position>[];
+      return accounts.portfolioCacheFor(accountName)?.positions ??
+          const <Position>[];
     }
     if (widget._positionsLoader != null) {
       return widget._positionsLoader!(trades);
     }
 
-    final config = accounts.ibkrConfigFor();
-    final accountName = accounts.activeAccount;
+    final config = accounts.ibkrConfigFor(accountName);
     final cached = accounts.portfolioCacheFor(accountName);
     if (!config.enabled) {
       final symbols = trades.map((trade) => trade.symbol).toSet().toList();
@@ -476,8 +487,14 @@ class HoldingsPageState extends State<HoldingsPage>
 
   /// Fires candle syncs for all held symbols in the background without
   /// blocking the UI.
-  Future<List<SymbolSummary>> _computeSummaries(List<Trade> trades) async =>
-      _summariesFromPositions(trades, await _loadPositions(trades));
+  Future<List<SymbolSummary>> _computeSummaries(
+    List<Trade> trades, {
+    String? accountName,
+  }) async =>
+      _summariesFromPositions(
+        trades,
+        await _loadPositions(trades, forAccount: accountName),
+      );
 
   List<SymbolSummary> _summariesFromPositions(
     List<Trade> trades,
@@ -547,7 +564,9 @@ class HoldingsPageState extends State<HoldingsPage>
     Stream<List<Trade>> trades =
         profileDataRepository.watchTradesForAccount(accountName);
     if (skipInitial) trades = trades.skip(1);
-    return trades.asyncMap(_summariesForStream).transform(
+    return trades
+        .asyncMap((rows) => _summariesForStream(accountName, rows))
+        .transform(
       StreamTransformer<List<SymbolSummary>, List<SymbolSummary>>.fromHandlers(
         handleError: (error, stack, sink) {
           _reportError(error, stack, 'loading holdings');
@@ -558,15 +577,20 @@ class HoldingsPageState extends State<HoldingsPage>
   }
 
   Future<List<SymbolSummary>> _summariesForStream(
+    String accountName,
     List<Trade> localTrades,
   ) async {
     final accounts = context.read<AccountManager>();
-    final config = accounts.ibkrConfigFor();
+    if (accounts.activeAccount != accountName) return const [];
+    final config = accounts.ibkrConfigFor(accountName);
     final trades = config.enabled ? _ibkrTrades : localTrades;
-    if (widget.isActive) return _computeSummaries(trades);
+    if (widget.isActive) {
+      return _computeSummaries(trades, accountName: accountName);
+    }
 
     final cachedPositions =
-        accounts.portfolioCacheFor()?.positions ?? const <Position>[];
+        accounts.portfolioCacheFor(accountName)?.positions ??
+            const <Position>[];
     return _summariesFromPositions(trades, cachedPositions);
   }
 
@@ -897,6 +921,9 @@ class HoldingsPageState extends State<HoldingsPage>
                 const SizedBox(height: 16),
                 Expanded(
                   child: StreamBuilder<List<SymbolSummary>>(
+                    key: ValueKey(
+                      'holdings-${accounts.activeAccount}-$ibkrManaged',
+                    ),
                     stream: _stream,
                     builder: _buildList,
                   ),
@@ -957,6 +984,9 @@ class HoldingsPageState extends State<HoldingsPage>
               ),
               Expanded(
                 child: StreamBuilder<List<SymbolSummary>>(
+                  key: ValueKey(
+                    'holdings-${accounts.activeAccount}-$ibkrManaged',
+                  ),
                   stream: _stream,
                   builder: _buildList,
                 ),
@@ -1547,16 +1577,23 @@ class HoldingsPageState extends State<HoldingsPage>
     final ibkrManaged = context.watch<AccountManager>().ibkrConfigFor().enabled;
     final summaries = ibkrManaged ? _summaries : snap.data ?? _summaries;
 
-    if (summaries.isEmpty &&
-        (ibkrManaged ? !_ibkrPreloadCompleted : !snap.hasData)) {
+    if (ibkrManaged &&
+        summaries.isEmpty &&
+        _ibkrTrades.isEmpty &&
+        !_ibkrPreloadCompleted &&
+        !snap.hasData) {
       return _refreshableState(
         const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (!ibkrManaged && snap.hasData && snap.data != _summaries) {
+      final accountName = context.read<AccountManager>().activeAccount;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _summaries = snap.data!);
+        if (mounted &&
+            context.read<AccountManager>().activeAccount == accountName) {
+          setState(() => _summaries = snap.data!);
+        }
       });
     }
 
@@ -1715,7 +1752,7 @@ class HoldingsPageState extends State<HoldingsPage>
   void _retryHoldings() {
     setState(() {
       _preloadError = null;
-      _stream = _buildStream(skipInitial: true);
+      _stream = _buildStream();
     });
     runDetachedTask(_preload(), 'Failed to retry holdings preload');
   }
