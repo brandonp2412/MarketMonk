@@ -2333,84 +2333,6 @@ class ChartsPageState extends State<ChartsPage>
     );
   }
 
-  bool _isMarketClosed() {
-    final weekday = DateTime.now().weekday;
-    return weekday == DateTime.saturday || weekday == DateTime.sunday;
-  }
-
-  Widget _buildMarketClosedBanner(SettingsState settings) {
-    return DesktopContextMenu(
-      actions: [
-        DesktopMenuAction(context.l10n.text('Hide'), () {
-          runDetachedTask(
-            settings.setShowMarketClosed(false),
-            'Failed to hide market-closed indicator',
-          );
-          toast(
-            context,
-            'Market closed indicator hidden',
-            SnackBarAction(
-              label: context.l10n.text('Undo'),
-              onPressed: () => runDetachedTask(
-                settings.setShowMarketClosed(true),
-                'Failed to restore market-closed indicator',
-              ),
-            ),
-          );
-        }),
-      ],
-      child: GestureDetector(
-        onLongPress: () {
-          runDetachedTask(
-            settings.setShowMarketClosed(false),
-            'Failed to hide market-closed indicator',
-          );
-          toast(
-            context,
-            'Market closed indicator hidden',
-            SnackBarAction(
-              label: context.l10n.text('Undo'),
-              onPressed: () => runDetachedTask(
-                settings.setShowMarketClosed(true),
-                'Failed to restore market-closed indicator',
-              ),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.secondaryContainer,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.schedule,
-                    size: 14,
-                    color: Theme.of(context).colorScheme.onSecondaryContainer,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Market closed',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSecondaryContainer,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildChartContent(SettingsState settings, List<Color> accountColors) {
     final desktop = isDesktopLayout(context);
     return NotificationListener<ScrollMetricsNotification>(
@@ -2448,10 +2370,6 @@ class ChartsPageState extends State<ChartsPage>
           ),
           children: [
             _buildTimeChips(),
-            if (settings.showMarketClosed && _isMarketClosed()) ...[
-              const SizedBox(height: 8),
-              _buildMarketClosedBanner(settings),
-            ],
             if (_mode == _ChartMode.stock)
               ..._buildStockContent(settings)
             else

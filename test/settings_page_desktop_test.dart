@@ -14,6 +14,8 @@ void main() {
     tester.view.physicalSize = size;
     await seedTestSqlite({
       'systemColors': true,
+      // Previously enabled on this installation: no retired control should show.
+      'showMarketClosed': true,
     });
     PackageInfo.setMockInitialValues(
       appName: 'Market Monk',
@@ -62,6 +64,7 @@ void main() {
       findsNothing,
     );
     expect(find.text('Charts'), findsOneWidget);
+    expect(find.text('Market closed indicator'), findsNothing);
     expect(find.text('Accounts'), findsOneWidget);
     expect(find.text('Data'), findsOneWidget);
 
@@ -99,6 +102,7 @@ void main() {
     final candles = find.byKey(const Key('settings-candlestick-chart'));
     expect(average, findsOneWidget);
     expect(candles, findsOneWidget);
+    expect(find.text('Market closed indicator'), findsNothing);
     await tester.ensureVisible(average);
     await tester.pumpAndSettle();
     expect(
@@ -144,5 +148,6 @@ void main() {
     await pumpSettings(tester, const Size(1200, 900));
     expect(find.byKey(const Key('settings-rolling-average')), findsNothing);
     expect(find.byKey(const Key('settings-candlestick-chart')), findsNothing);
+    expect(find.text('Market closed indicator'), findsNothing);
   });
 }

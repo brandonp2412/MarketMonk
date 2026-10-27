@@ -74,7 +74,6 @@ class SettingsState extends ChangeNotifier {
   Color seedColor = defaultSeedColor;
   String displayCurrency = 'USD';
   List<String> visibleCurrencies = ['USD'];
-  bool showMarketClosed = false;
   bool pureBlack = false;
   bool hideDollarAmounts = false;
 
@@ -188,7 +187,6 @@ class SettingsState extends ChangeNotifier {
       await prefs.setStringList('visibleCurrencies', visibleCurrencies);
     }
 
-    showMarketClosed = prefs.getBool('showMarketClosed') ?? false;
     pureBlack = prefs.getBool('pureBlack') ?? false;
     hideDollarAmounts = prefs.getBool('hideDollarAmounts') ?? false;
     maskCurrencyAmounts = hideDollarAmounts;
@@ -320,14 +318,6 @@ class SettingsState extends ChangeNotifier {
     notifyListeners();
     final prefs = await SqliteSettings.getInstance();
     await prefs.setBool('hideDollarAmounts', value);
-  }
-
-  /// Persists whether closed-market indicators are shown.
-  Future<void> setShowMarketClosed(bool value) async {
-    showMarketClosed = value;
-    notifyListeners();
-    final prefs = await SqliteSettings.getInstance();
-    await prefs.setBool('showMarketClosed', value);
   }
 
   /// Persists the interpolation strength used by charts.

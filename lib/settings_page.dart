@@ -638,18 +638,6 @@ class _SettingsPageState extends State<SettingsPage> {
       children: [
         ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: settings.showMarketClosed
-              ? const Icon(Icons.schedule)
-              : const Icon(Icons.schedule_outlined),
-          title: Text(context.l10n.text('Market closed indicator')),
-          trailing: Switch(
-            value: settings.showMarketClosed,
-            onChanged: settings.setShowMarketClosed,
-          ),
-          onTap: () => settings.setShowMarketClosed(!settings.showMarketClosed),
-        ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.insights),
           title: Text(context.l10n.text('Curve line graphs')),
           trailing: Switch(
@@ -1108,23 +1096,6 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             onTap: () =>
                 settings.setShowCandlesticks(!settings.showCandlesticks),
-          ),
-          Tooltip(
-            message: context.l10n.text(
-              'Show a badge on the chart when the market is closed (weekends)',
-            ),
-            child: ListTile(
-              title: Text(context.l10n.text('Market closed indicator')),
-              leading: settings.showMarketClosed
-                  ? const Icon(Icons.schedule)
-                  : const Icon(Icons.schedule_outlined),
-              onTap: () =>
-                  settings.setShowMarketClosed(!settings.showMarketClosed),
-              trailing: Switch(
-                value: settings.showMarketClosed,
-                onChanged: (value) => settings.setShowMarketClosed(value),
-              ),
-            ),
           ),
           Tooltip(
             message: context.l10n.text('Use wavy curves in the graphs page'),
