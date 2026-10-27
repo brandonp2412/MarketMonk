@@ -2435,15 +2435,15 @@ class ChartsPageState extends State<ChartsPage>
               Row(
                 children: [
                   Expanded(child: _buildTimeChips()),
-                  IconButton(
+                  TextButton.icon(
                     key: const Key('chart-candlestick-toggle'),
-                    tooltip: _showCandlesticks
-                        ? 'Show line chart'
-                        : 'Show candlesticks',
-                    isSelected: _showCandlesticks,
-                    icon: const Icon(Icons.candlestick_chart_outlined),
-                    selectedIcon: const Icon(Icons.candlestick_chart),
                     onPressed: _toggleCandlesticks,
+                    icon: Icon(
+                      _showCandlesticks
+                          ? Icons.show_chart
+                          : Icons.candlestick_chart_outlined,
+                    ),
+                    label: Text(_showCandlesticks ? 'Line' : 'Candles'),
                   ),
                   const SizedBox(width: 8),
                 ],
