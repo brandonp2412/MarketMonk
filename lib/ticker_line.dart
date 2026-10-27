@@ -11,6 +11,9 @@ import 'package:provider/provider.dart';
 class TickerLine extends StatelessWidget {
   final List<MarketLineChartPoint> spots;
   final Iterable<DateTime> dates;
+  final List<MarketCandlePoint> candles;
+  final bool showCandlesticks;
+  final ValueNotifier<int?>? candleSelection;
 
   /// Overlays a trailing average of up to 20 price observations.
   final bool showRollingAverage;
@@ -31,6 +34,9 @@ class TickerLine extends StatelessWidget {
     super.key,
     required this.spots,
     required this.dates,
+    this.candles = const [],
+    this.showCandlesticks = false,
+    this.candleSelection,
     this.nativeCurrency = 'USD',
     this.intraday = false,
     this.showRollingAverage = false,
@@ -49,11 +55,16 @@ class TickerLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsState>();
-    final formatter = DateFormat(
+    final tooltipFormatter = DateFormat(
       intraday ? "${settings.dateFormat} HH:mm" : settings.dateFormat,
     );
+    final axisFormatter = DateFormat(intraday ? 'HH:mm' : settings.dateFormat);
     final colorScheme = Theme.of(context).colorScheme;
-    final labels = [for (final date in dates) formatter.format(date)];
+    final datesList = dates.toList();
+    final labels = [for (final date in datesList) axisFormatter.format(date)];
+    final candlesByColumn = {
+      for (final candle in candles) candle.column: candle,
+    };
 
     return MarketLineChart(
       range: range,
@@ -70,9 +81,28 @@ class TickerLine extends StatelessWidget {
       ],
       xLabels: labels,
       pointCount: spots.length,
+      candles: candles,
+      showCandlesticks: showCandlesticks,
+      candleSelection: candleSelection,
+      candleTooltipTitle: showCandlesticks
+          ? (index) => index < datesList.length
+              ? tooltipFormatter.format(datesList[index])
+              : ''
+          : null,
+      candleTooltipRows: showCandlesticks
+          ? (index) {
+              final candle = candlesByColumn[index];
+              if (candle == null) return const <String>[];
+              return [
+                'O ${fmtNativeCurrency(candle.open, nativeCurrency)}   H ${fmtNativeCurrency(candle.high, nativeCurrency)}',
+                'L ${fmtNativeCurrency(candle.low, nativeCurrency)}   C ${fmtNativeCurrency(candle.close, nativeCurrency)}',
+              ];
+            }
+          : null,
       yLabelFormatter: (value) =>
           fmtCompactNativeCurrency(value, nativeCurrency),
-      tooltipRowLabel: (PlotMark mark) => tooltipTextAt(mark.index, formatter),
+      tooltipRowLabel: (PlotMark mark) =>
+          tooltipTextAt(mark.index, tooltipFormatter),
       curveLines: settings.curveLines,
       curveSmoothness: settings.curveSmoothness,
       leftInset: 64,

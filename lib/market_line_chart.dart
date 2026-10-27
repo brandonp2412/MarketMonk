@@ -45,6 +45,23 @@ class MarketLineChartSeries {
 }
 
 @immutable
+class MarketCandlePoint {
+  final int column;
+  final double open;
+  final double high;
+  final double low;
+  final double close;
+
+  const MarketCandlePoint({
+    required this.column,
+    required this.open,
+    required this.high,
+    required this.low,
+    required this.close,
+  });
+}
+
+@immutable
 class _LineChartAxisLabel {
   final double x;
   final int? column;
@@ -221,6 +238,11 @@ class MarketLineChart extends StatelessWidget {
   final List<MarketLineChartSeries> series;
   final List<String> xLabels;
   final int pointCount;
+  final List<MarketCandlePoint> candles;
+  final bool showCandlesticks;
+  final ValueNotifier<int?>? candleSelection;
+  final String Function(int index)? candleTooltipTitle;
+  final List<String> Function(int index)? candleTooltipRows;
   final String Function(double value) yLabelFormatter;
   final String Function(PlotMark mark) tooltipRowLabel;
   final bool curveLines;
@@ -243,6 +265,11 @@ class MarketLineChart extends StatelessWidget {
     required this.series,
     required this.xLabels,
     required this.pointCount,
+    this.candles = const [],
+    this.showCandlesticks = false,
+    this.candleSelection,
+    this.candleTooltipTitle,
+    this.candleTooltipRows,
     required this.yLabelFormatter,
     required this.tooltipRowLabel,
     required this.curveLines,
@@ -350,10 +377,19 @@ class MarketLineChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final axisLabelColor = Theme.of(context).colorScheme.onSurface;
     final points = [for (final line in series) ...line.points];
-    final yBounds = _calculateYBounds(points);
+    final candleBoundsPoints = [
+      ...points,
+      for (final candle in candles) ...[
+        MarketLineChartPoint(candle.column.toDouble(), candle.high),
+        MarketLineChartPoint(candle.column.toDouble(), candle.low),
+      ],
+    ];
+    final yBounds = _calculateYBounds(candleBoundsPoints);
     return _MarketLineChartInteraction(
       renderer: _MarketLineChartRenderer(
         series: series,
+        candles: candles,
+        showCandlesticks: showCandlesticks,
         minY: yBounds.$1,
         maxY: yBounds.$2,
         curveLines: curveLines,
@@ -371,6 +407,10 @@ class MarketLineChart extends StatelessWidget {
         accessibilityValue: accessibilityValue,
       ),
       rowLabel: tooltipRowLabel,
+      candleTooltipTitle: candleTooltipTitle,
+      candleTooltipRows: candleTooltipRows,
+      stickyTooltip: showCandlesticks,
+      externalSelection: candleSelection,
       range: range,
       onRangeChanged: onRangeChanged,
     );
@@ -380,11 +420,19 @@ class MarketLineChart extends StatelessWidget {
 class _MarketLineChartInteraction extends StatefulWidget {
   final _MarketLineChartRenderer renderer;
   final String Function(PlotMark mark) rowLabel;
+  final String Function(int index)? candleTooltipTitle;
+  final List<String> Function(int index)? candleTooltipRows;
+  final bool stickyTooltip;
+  final ValueNotifier<int?>? externalSelection;
   final (int, int)? range;
   final ValueChanged<(int, int)?>? onRangeChanged;
   const _MarketLineChartInteraction({
     required this.renderer,
     required this.rowLabel,
+    this.candleTooltipTitle,
+    this.candleTooltipRows,
+    this.stickyTooltip = false,
+    this.externalSelection,
     this.range,
     this.onRangeChanged,
   });
@@ -396,7 +444,9 @@ class _MarketLineChartInteraction extends StatefulWidget {
 
 class _MarketLineChartInteractionState
     extends State<_MarketLineChartInteraction> {
-  final ValueNotifier<int?> _activeIndex = ValueNotifier(null);
+  final ValueNotifier<int?> _ownedSelection = ValueNotifier(null);
+  ValueNotifier<int?> get _activeIndex =>
+      widget.externalSelection ?? _ownedSelection;
 
   (int, int)? _zoom;
   Offset? _dragStart;
@@ -486,6 +536,7 @@ class _MarketLineChartInteractionState
   }
 
   bool get _keepTooltipOnTapUp {
+    if (widget.stickyTooltip) return true;
     if (kIsWeb) return true;
     return switch (defaultTargetPlatform) {
       TargetPlatform.linux ||
@@ -509,6 +560,11 @@ class _MarketLineChartInteractionState
       _dragPointer = null;
       _clear();
     }
+    if (oldWidget.stickyTooltip != widget.stickyTooltip) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _clear();
+      });
+    }
     final index = _activeIndex.value;
     if (index != null && !_renderer.hasIndex(index)) _clear();
   }
@@ -516,7 +572,7 @@ class _MarketLineChartInteractionState
   @override
   void dispose() {
     _pendingScrubIndex = null;
-    _activeIndex.dispose();
+    _ownedSelection.dispose();
     super.dispose();
   }
 
@@ -525,165 +581,191 @@ class _MarketLineChartInteractionState
     final dark = Theme.of(context).brightness == Brightness.dark;
     final theme = dark ? DrafterThemeColors.dark : DrafterThemeColors.light;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final size = constraints.biggest;
-        final renderer = _renderer;
-        final scene = renderer.buildScene(size);
+    return ValueListenableBuilder<int?>(
+      valueListenable: _activeIndex,
+      builder: (context, activeIndex, chart) => PopScope(
+        canPop: widget.externalSelection != null ||
+            !widget.stickyTooltip ||
+            activeIndex == null,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop && widget.externalSelection == null) _clear();
+        },
+        child: chart!,
+      ),
+      child: TapRegion(
+        onTapOutside: (_) {
+          if (widget.stickyTooltip) _clear();
+        },
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final size = constraints.biggest;
+            final renderer = _renderer;
+            final scene = renderer.buildScene(size);
 
-        return MouseRegion(
-          onHover: (event) => _activate(event.localPosition, scene),
-          onExit: (_) {
-            if (_dragPointer == null) _clear();
-          },
-          child: Listener(
-            behavior: HitTestBehavior.opaque,
-            onPointerDown: (event) {
-              _activate(event.localPosition, scene);
-              final bounds = scene.bounds;
-              if (event.kind == PointerDeviceKind.mouse &&
-                  event.buttons == kPrimaryMouseButton &&
-                  bounds != null &&
-                  Rect.fromLTRB(
-                    bounds.left,
-                    bounds.top,
-                    bounds.right,
-                    bounds.bottom,
-                  ).contains(event.localPosition)) {
-                _dragStart = event.localPosition;
-                _dragPointer = event.pointer;
-              }
-            },
-            onPointerMove: (event) {
-              if (event.pointer != _dragPointer || _dragStart == null) return;
-              setState(() {
-                _dragX = event.localPosition.dx;
-              });
-              _activate(event.localPosition, scene);
-            },
-            onPointerUp: (event) {
-              if (event.pointer == _dragPointer) {
-                final start = _dragStart;
-                if (start != null &&
-                    (event.localPosition.dx - start.dx).abs() >= 8) {
-                  final first = ChartHitTest.nearestIndexAtX(scene, start.dx);
-                  final last = ChartHitTest.nearestIndexAtX(
-                    scene,
-                    event.localPosition.dx,
-                  );
-                  if (first != null && last != null && first != last) {
-                    _setRange((min(first, last), max(first, last)));
+            return MouseRegion(
+              onHover: (event) => _activate(event.localPosition, scene),
+              onExit: (_) {
+                if (_dragPointer == null) _clear();
+              },
+              child: Listener(
+                behavior: HitTestBehavior.opaque,
+                onPointerDown: (event) {
+                  _activate(event.localPosition, scene);
+                  final bounds = scene.bounds;
+                  if (event.kind == PointerDeviceKind.mouse &&
+                      event.buttons == kPrimaryMouseButton &&
+                      bounds != null &&
+                      Rect.fromLTRB(
+                        bounds.left,
+                        bounds.top,
+                        bounds.right,
+                        bounds.bottom,
+                      ).contains(event.localPosition)) {
+                    _dragStart = event.localPosition;
+                    _dragPointer = event.pointer;
                   }
-                }
-                setState(() {
+                },
+                onPointerMove: (event) {
+                  if (event.pointer != _dragPointer || _dragStart == null)
+                    return;
+                  setState(() {
+                    _dragX = event.localPosition.dx;
+                  });
+                  _activate(event.localPosition, scene);
+                },
+                onPointerUp: (event) {
+                  if (event.pointer == _dragPointer) {
+                    final start = _dragStart;
+                    if (start != null &&
+                        (event.localPosition.dx - start.dx).abs() >= 8) {
+                      final first =
+                          ChartHitTest.nearestIndexAtX(scene, start.dx);
+                      final last = ChartHitTest.nearestIndexAtX(
+                        scene,
+                        event.localPosition.dx,
+                      );
+                      if (first != null && last != null && first != last) {
+                        _setRange((min(first, last), max(first, last)));
+                      }
+                    }
+                    setState(() {
+                      _dragStart = null;
+                      _dragX = null;
+                      _dragPointer = null;
+                      _clear();
+                    });
+                  } else {
+                    _activate(event.localPosition, scene);
+                  }
+                  if (!_keepTooltipOnTapUp) _clear();
+                },
+                onPointerCancel: (_) => setState(() {
                   _dragStart = null;
                   _dragX = null;
                   _dragPointer = null;
                   _clear();
-                });
-              } else {
-                _activate(event.localPosition, scene);
-              }
-              if (!_keepTooltipOnTapUp) _clear();
-            },
-            onPointerCancel: (_) => setState(() {
-              _dragStart = null;
-              _dragX = null;
-              _dragPointer = null;
-              _clear();
-            }),
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onSecondaryTapUp: (details) {
-                final bounds = scene.bounds;
-                if (bounds == null ||
-                    !Rect.fromLTRB(
-                      bounds.left,
-                      bounds.top,
-                      bounds.right,
-                      bounds.bottom,
-                    ).contains(details.localPosition)) return;
-                final start = ChartHitTest.nearestIndexAtX(
-                  scene,
-                  details.localPosition.dx,
-                );
-                if (start == null || scene.marks.isEmpty) return;
-                final end = scene.marks.map((mark) => mark.index).reduce(max);
-                unawaited(
-                  _showStartDateMenu(details.globalPosition, start, end),
-                );
-              },
-              onLongPressStart: (details) =>
-                  _activate(details.localPosition, scene),
-              onLongPressMoveUpdate: (details) =>
-                  _activateScrub(details.localPosition, scene),
-              onLongPressEnd: (_) {
-                if (_dragPointer == null) _clear();
-              },
-              onLongPressCancel: () {
-                if (_dragPointer == null) _clear();
-              },
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  DrafterTheme(
-                    colors: theme,
-                    child: ChartCanvas(
-                      renderer: renderer,
-                      animate: false,
-                    ),
-                  ),
-                  if (_dragStart != null &&
-                      _dragX != null &&
-                      scene.bounds != null)
-                    Positioned(
-                      left: min(_dragStart!.dx, _dragX!)
-                          .clamp(scene.bounds!.left, scene.bounds!.right),
-                      top: scene.bounds!.top,
-                      width: (max(_dragStart!.dx, _dragX!)
-                              .clamp(scene.bounds!.left, scene.bounds!.right) -
-                          min(_dragStart!.dx, _dragX!)
-                              .clamp(scene.bounds!.left, scene.bounds!.right)),
-                      height: scene.bounds!.height,
-                      child: IgnorePointer(
-                        child: ColoredBox(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primary
-                              .withValues(alpha: 0.2),
+                }),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onSecondaryTapUp: (details) {
+                    final bounds = scene.bounds;
+                    if (bounds == null ||
+                        !Rect.fromLTRB(
+                          bounds.left,
+                          bounds.top,
+                          bounds.right,
+                          bounds.bottom,
+                        ).contains(details.localPosition)) return;
+                    final start = ChartHitTest.nearestIndexAtX(
+                      scene,
+                      details.localPosition.dx,
+                    );
+                    if (start == null || scene.marks.isEmpty) return;
+                    final end =
+                        scene.marks.map((mark) => mark.index).reduce(max);
+                    unawaited(
+                      _showStartDateMenu(details.globalPosition, start, end),
+                    );
+                  },
+                  onLongPressStart: (details) =>
+                      _activate(details.localPosition, scene),
+                  onLongPressMoveUpdate: (details) =>
+                      _activateScrub(details.localPosition, scene),
+                  onLongPressEnd: (_) {
+                    if (_dragPointer == null && !widget.stickyTooltip) _clear();
+                  },
+                  onLongPressCancel: () {
+                    if (_dragPointer == null && !widget.stickyTooltip) _clear();
+                  },
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      DrafterTheme(
+                        colors: theme,
+                        child: ChartCanvas(
+                          renderer: renderer,
+                          animate: false,
                         ),
                       ),
-                    ),
-                  if (_range != null)
-                    Positioned(
-                      top: 0,
-                      right: 0,
-                      child: IconButton(
-                        tooltip: 'Reset zoom',
-                        icon: const Icon(Icons.zoom_out),
-                        onPressed: () => _setRange(null),
-                      ),
-                    ),
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: RepaintBoundary(
-                        child: CustomPaint(
-                          painter: _MarketLineTooltipPainter(
-                            activeIndex: _activeIndex,
-                            scene: scene,
-                            theme: theme,
-                            rowLabel: widget.rowLabel,
+                      if (_dragStart != null &&
+                          _dragX != null &&
+                          scene.bounds != null)
+                        Positioned(
+                          left: min(_dragStart!.dx, _dragX!)
+                              .clamp(scene.bounds!.left, scene.bounds!.right),
+                          top: scene.bounds!.top,
+                          width: (max(_dragStart!.dx, _dragX!).clamp(
+                                scene.bounds!.left,
+                                scene.bounds!.right,
+                              ) -
+                              min(_dragStart!.dx, _dragX!).clamp(
+                                scene.bounds!.left,
+                                scene.bounds!.right,
+                              )),
+                          height: scene.bounds!.height,
+                          child: IgnorePointer(
+                            child: ColoredBox(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primary
+                                  .withValues(alpha: 0.2),
+                            ),
+                          ),
+                        ),
+                      if (_range != null)
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: IconButton(
+                            tooltip: 'Reset zoom',
+                            icon: const Icon(Icons.zoom_out),
+                            onPressed: () => _setRange(null),
+                          ),
+                        ),
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: RepaintBoundary(
+                            child: CustomPaint(
+                              painter: _MarketLineTooltipPainter(
+                                activeIndex: _activeIndex,
+                                scene: scene,
+                                theme: theme,
+                                rowLabel: widget.rowLabel,
+                                candleTooltipTitle: widget.candleTooltipTitle,
+                                candleTooltipRows: widget.candleTooltipRows,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
-        );
-      },
+            );
+          },
+        ),
+      ),
     );
   }
 }
@@ -693,12 +775,16 @@ class _MarketLineTooltipPainter extends CustomPainter {
   final ChartScene scene;
   final DrafterThemeColors theme;
   final String Function(PlotMark mark) rowLabel;
+  final String Function(int index)? candleTooltipTitle;
+  final List<String> Function(int index)? candleTooltipRows;
 
   _MarketLineTooltipPainter({
     required this.activeIndex,
     required this.scene,
     required this.theme,
     required this.rowLabel,
+    this.candleTooltipTitle,
+    this.candleTooltipRows,
   }) : super(repaint: activeIndex);
 
   @override
@@ -727,14 +813,16 @@ class _MarketLineTooltipPainter extends CustomPainter {
         radius: _activeDotRadius,
       );
     }
-    final title = marks.first.label.isEmpty ? null : marks.first.label;
+    final title = candleTooltipTitle?.call(index) ??
+        (marks.first.label.isEmpty ? null : marks.first.label);
+    final candleRows = candleTooltipRows?.call(index);
     _drawMarketTooltip(
       canvas,
       anchor: Offset(
         x,
         MarketLineChart.tooltipTopForMarks(
           [for (final mark in marks) mark.center.dy],
-          rowCount: marks.length,
+          rowCount: candleRows?.length ?? marks.length,
           hasTitle: title != null,
         ),
       ),
@@ -743,10 +831,12 @@ class _MarketLineTooltipPainter extends CustomPainter {
       background: theme.tooltipBackground,
       textColor: theme.tooltipText,
       mutedTextColor: theme.tooltipMutedText,
-      rows: [
-        for (final mark in marks)
-          TooltipRow(rowLabel(mark), swatch: mark.color),
-      ],
+      rows: candleRows == null
+          ? [
+              for (final mark in marks)
+                TooltipRow(rowLabel(mark), swatch: mark.color),
+            ]
+          : [for (final row in candleRows) TooltipRow(row)],
     );
   }
 
@@ -754,7 +844,9 @@ class _MarketLineTooltipPainter extends CustomPainter {
   bool shouldRepaint(covariant _MarketLineTooltipPainter oldDelegate) =>
       oldDelegate.scene != scene ||
       oldDelegate.theme != theme ||
-      oldDelegate.rowLabel != rowLabel;
+      oldDelegate.rowLabel != rowLabel ||
+      oldDelegate.candleTooltipTitle != candleTooltipTitle ||
+      oldDelegate.candleTooltipRows != candleTooltipRows;
 }
 
 class _MarketLineChartScale extends CartesianScale {
@@ -791,6 +883,8 @@ class _MarketLineChartScale extends CartesianScale {
 class _MarketLineChartRenderer extends ChartRenderer
     implements InteractiveRenderer {
   final List<MarketLineChartSeries> series;
+  final List<MarketCandlePoint> candles;
+  final bool showCandlesticks;
   final double minY;
   final double maxY;
   final bool curveLines;
@@ -809,6 +903,8 @@ class _MarketLineChartRenderer extends ChartRenderer
 
   const _MarketLineChartRenderer({
     required this.series,
+    required this.candles,
+    required this.showCandlesticks,
     required this.minY,
     required this.maxY,
     required this.curveLines,
@@ -827,6 +923,8 @@ class _MarketLineChartRenderer extends ChartRenderer
 
   List<Object> get dataSignature => [
         uniformXCount ?? -1,
+        for (final candle in candles)
+          (candle.column, candle.open, candle.high, candle.low, candle.close),
         ...xLabels.map((label) => (label.x, label.column, label.text)),
         for (final line in series) ...[
           line.name,
@@ -873,11 +971,21 @@ class _MarketLineChartRenderer extends ChartRenderer
         ),
       );
     }
+    final visibleCandles = [
+      for (final candle in candles)
+        if (candle.column >= start && candle.column <= end) candle,
+    ];
     final bounds = _calculateYBounds([
       for (final line in visibleSeries) ...line.points,
+      for (final candle in visibleCandles) ...[
+        MarketLineChartPoint(candle.column.toDouble(), candle.high),
+        MarketLineChartPoint(candle.column.toDouble(), candle.low),
+      ],
     ]);
     return _MarketLineChartRenderer(
       series: visibleSeries,
+      candles: visibleCandles,
+      showCandlesticks: showCandlesticks,
       minY: bounds.$1,
       maxY: bounds.$2,
       curveLines: curveLines,
@@ -1126,13 +1234,82 @@ class _MarketLineChartRenderer extends ChartRenderer
     _drawAxes(canvas, bounds);
 
     final displayedSeries = _displaySeries;
-    for (var i = 0; i < displayedSeries.length; i++) {
-      _drawSeries(
-        canvas,
+    if (showCandlesticks && candles.isNotEmpty) {
+      _drawCandles(canvas, bounds);
+      if (showRollingAverage) {
+        for (final line in displayedSeries) {
+          _drawSeries(canvas, bounds, line, fill: false, progress: progress);
+        }
+      }
+    } else {
+      for (final line in displayedSeries) {
+        _drawSeries(
+          canvas,
+          bounds,
+          line,
+          fill: line.fill,
+          progress: progress,
+        );
+      }
+    }
+  }
+
+  void _drawCandles(Canvas canvas, ChartBounds bounds) {
+    if (candles.isEmpty) return;
+    final spacing = uniformXCount == null || uniformXCount! < 2
+        ? bounds.width
+        : bounds.width / (uniformXCount! - 1);
+    final groupSize = max(1, (3.5 / max(spacing, 0.01)).ceil());
+    final barWidth = (spacing * groupSize * 0.65).clamp(1.5, 8.0);
+    for (var start = 0; start < candles.length; start += groupSize) {
+      final group = candles.skip(start).take(groupSize).toList();
+      final first = group.first;
+      final last = group.last;
+      final high = group.map((candle) => candle.high).reduce(max);
+      final low = group.map((candle) => candle.low).reduce(min);
+      final startX = _xForPoint(
+        MarketLineChartPoint(
+          first.column.toDouble(),
+          first.close,
+          column: first.column,
+        ),
+        first.column,
         bounds,
-        displayedSeries[i],
-        fill: displayedSeries[i].fill,
-        progress: progress,
+      );
+      final endX = _xForPoint(
+        MarketLineChartPoint(
+          last.column.toDouble(),
+          last.close,
+          column: last.column,
+        ),
+        last.column,
+        bounds,
+      );
+      final x = (startX + endX) / 2;
+      final positive = last.close >= first.open;
+      final color =
+          positive ? const Color(0xFF26A69A) : const Color(0xFFEF5350);
+      final highY = _yForValue(high, bounds);
+      final lowY = _yForValue(low, bounds);
+      final openY = _yForValue(first.open, bounds);
+      final closeY = _yForValue(last.close, bounds);
+      canvas.drawLine(
+        Offset(x, highY),
+        Offset(x, lowY),
+        Paint()
+          ..color = color
+          ..strokeWidth = 1.2,
+      );
+      final bodyTop = min(openY, closeY);
+      final bodyBottom = max(openY, closeY);
+      canvas.drawRect(
+        Rect.fromLTWH(
+          x - barWidth / 2,
+          bodyTop,
+          barWidth,
+          max(bodyBottom - bodyTop, 1.2),
+        ),
+        Paint()..color = color,
       );
     }
   }

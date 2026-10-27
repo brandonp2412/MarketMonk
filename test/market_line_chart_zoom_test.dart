@@ -81,6 +81,102 @@ void main() {
     await tester.pump();
   }
 
+  testWidgets('candle and line switches preserve every chart coordinate',
+      (tester) async {
+    final closes = <double>[100, 106, 103, 114, 112, 119, 117, 125];
+    final candles = [
+      for (var i = 0; i < closes.length; i++)
+        MarketCandlePoint(
+          column: i,
+          open: closes[i] - 2,
+          high: closes[i] + 3,
+          low: closes[i] - 5,
+          close: closes[i],
+        ),
+    ];
+    Widget build(bool showCandlesticks) => MaterialApp(
+          theme: ThemeData(platform: TargetPlatform.android),
+          home: Scaffold(
+            body: Column(
+              children: [
+                SizedBox(
+                  width: 800,
+                  height: 300,
+                  child: MarketLineChart(
+                    series: [
+                      MarketLineChartSeries(
+                        points: [
+                          for (var i = 0; i < closes.length; i++)
+                            MarketLineChartPoint(i.toDouble(), closes[i]),
+                        ],
+                        color: Colors.amber,
+                      ),
+                    ],
+                    candles: candles,
+                    showCandlesticks: showCandlesticks,
+                    candleTooltipTitle: (_) => '27 Oct 2026',
+                    candleTooltipRows: (_) => ['O 100 H 105', 'L 95 C 101'],
+                    xLabels: [for (var i = 0; i < closes.length; i++) 'D$i'],
+                    pointCount: closes.length,
+                    yLabelFormatter: (value) => value.toStringAsFixed(1),
+                    tooltipRowLabel: (_) => 'Price',
+                    curveLines: false,
+                    curveSmoothness: 0,
+                  ),
+                ),
+                const Text('Outside chart'),
+              ],
+            ),
+          ),
+        );
+
+    PopScope<Object?> popScope() => tester.widget<PopScope<Object?>>(
+          find.byWidgetPredicate((widget) => widget is PopScope<Object?>).first,
+        );
+
+    await tester.pumpWidget(build(false));
+    final line = scene(tester);
+    final lineCanvas = tester.getRect(find.byType(ChartCanvas));
+    await tester.pumpWidget(build(true));
+    final candle = scene(tester);
+    expect(tester.getRect(find.byType(ChartCanvas)), lineCanvas);
+    expect(candle.bounds!.left, line.bounds!.left);
+    expect(candle.bounds!.right, line.bounds!.right);
+    expect(candle.bounds!.top, line.bounds!.top);
+    expect(candle.bounds!.bottom, line.bounds!.bottom);
+    expect(candle.scale!.minValue, line.scale!.minValue);
+    expect(candle.scale!.maxValue, line.scale!.maxValue);
+    expect(
+      [for (final mark in candle.marks) mark.center],
+      [for (final mark in line.marks) mark.center],
+    );
+
+    await tester.tapAt(candle.marks[2].center);
+    await tester.pump();
+    expect(popScope().canPop, false);
+    await tester.tap(find.text('Outside chart'));
+    await tester.pump();
+    expect(popScope().canPop, true);
+
+    await tester.tapAt(candle.marks[3].center);
+    await tester.pump();
+    expect(popScope().canPop, false);
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(popScope().canPop, true);
+    expect(find.byType(ChartCanvas), findsOneWidget);
+
+    await tester.tapAt(candle.marks[4].center);
+    await tester.pump();
+    await tester.pumpWidget(build(false));
+    await tester.pump();
+    expect(popScope().canPop, true);
+    expect(scene(tester).bounds!.left, line.bounds!.left);
+    expect(scene(tester).bounds!.right, line.bounds!.right);
+    expect(scene(tester).bounds!.top, line.bounds!.top);
+    expect(scene(tester).bounds!.bottom, line.bounds!.bottom);
+  });
+
   testWidgets('rolling average replaces plotted values and follows zoom',
       (tester) async {
     await tester.pumpWidget(chart(showRollingAverage: true));
