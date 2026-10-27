@@ -81,6 +81,86 @@ void main() {
     await tester.pump();
   }
 
+  testWidgets('multi-series sampled and OHLC candles share line geometry',
+      (tester) async {
+    final source = [
+      MarketLineChartSeries(
+        color: Colors.orange,
+        name: 'Portfolio',
+        points: [
+          for (var i = 0; i < 12; i++)
+            MarketLineChartPoint(i.toDouble(), i.toDouble(), column: i),
+        ],
+      ),
+      MarketLineChartSeries(
+        color: Colors.blue,
+        name: 'Favorite',
+        points: [
+          for (var i = 0; i < 12; i++)
+            MarketLineChartPoint(i.toDouble(), i * 1.5, column: i),
+        ],
+      ),
+    ];
+    final candles = [
+      for (var i = 0; i < 12; i++) ...[
+        MarketCandlePoint(
+          column: i,
+          seriesIndex: 0,
+          sampled: true,
+          open: (i == 0 ? 0 : i - 1).toDouble(),
+          high: i.toDouble(),
+          low: (i == 0 ? 0 : i - 1).toDouble(),
+          close: i.toDouble(),
+        ),
+        MarketCandlePoint(
+          column: i,
+          seriesIndex: 1,
+          open: i * 1.5 - 0.5,
+          high: i * 1.5 + 0.8,
+          low: i * 1.5 - 1,
+          close: i * 1.5,
+        ),
+      ],
+    ];
+    Widget app(bool show) => MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              height: 300,
+              width: 600,
+              child: MarketLineChart(
+                series: source,
+                candles: candles,
+                showCandlesticks: show,
+                xLabels: [for (var i = 0; i < 12; i++) 'D$i'],
+                pointCount: 12,
+                yLabelFormatter: (value) => '$value',
+                tooltipRowLabel: (mark) => '${mark.seriesName} ${mark.value}',
+                candleTooltipRows: (_) =>
+                    ['Portfolio sampled', 'Favorite OHLC'],
+                curveLines: false,
+                curveSmoothness: 0,
+              ),
+            ),
+          ),
+        );
+    await tester.pumpWidget(app(false));
+    final before = scene(tester);
+    await tester.pumpWidget(app(true));
+    final after = scene(tester);
+    expect(after.marks, hasLength(24));
+    expect(after.bounds!.left, before.bounds!.left);
+    expect(after.bounds!.right, before.bounds!.right);
+    expect(after.bounds!.top, before.bounds!.top);
+    expect(after.bounds!.bottom, before.bounds!.bottom);
+    expect(after.scale!.minValue, before.scale!.minValue);
+    expect(after.scale!.maxValue, before.scale!.maxValue);
+    expect(
+      [for (final mark in after.marks) mark.center],
+      [for (final mark in before.marks) mark.center],
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('candle and line switches preserve every chart coordinate',
       (tester) async {
     final closes = <double>[100, 106, 103, 114, 112, 119, 117, 125];

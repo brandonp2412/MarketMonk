@@ -47,6 +47,8 @@ class MarketLineChartSeries {
 @immutable
 class MarketCandlePoint {
   final int column;
+  final int seriesIndex;
+  final bool sampled;
   final double open;
   final double high;
   final double low;
@@ -54,6 +56,8 @@ class MarketCandlePoint {
 
   const MarketCandlePoint({
     required this.column,
+    this.seriesIndex = 0,
+    this.sampled = false,
     required this.open,
     required this.high,
     required this.low,
@@ -924,7 +928,15 @@ class _MarketLineChartRenderer extends ChartRenderer
   List<Object> get dataSignature => [
         uniformXCount ?? -1,
         for (final candle in candles)
-          (candle.column, candle.open, candle.high, candle.low, candle.close),
+          (
+            candle.column,
+            candle.seriesIndex,
+            candle.sampled,
+            candle.open,
+            candle.high,
+            candle.low,
+            candle.close,
+          ),
         ...xLabels.map((label) => (label.x, label.column, label.text)),
         for (final line in series) ...[
           line.name,
@@ -971,10 +983,39 @@ class _MarketLineChartRenderer extends ChartRenderer
         ),
       );
     }
-    final visibleCandles = [
-      for (final candle in candles)
-        if (candle.column >= start && candle.column <= end) candle,
-    ];
+    final visibleCandles = <MarketCandlePoint>[];
+    final seenSeries = <int>{};
+    for (final candle in candles) {
+      if (candle.column < start || candle.column > end) continue;
+      final line = series[candle.seriesIndex];
+      final selected = [
+        for (var i = 0; i < line.points.length; i++)
+          if ((line.points[i].column ?? i) >= start &&
+              (line.points[i].column ?? i) <= end)
+            line.points[i],
+      ];
+      if (selected.isEmpty) continue;
+      final compare = selected.any((point) => point.comparisonValue != null);
+      final firstY = selected.first.y;
+      final divisor = 1 + firstY / 100;
+      double rebase(double value) =>
+          compare && divisor.abs() > 1e-9 ? (value - firstY) / divisor : value;
+      final close = rebase(candle.close);
+      final open = candle.sampled && seenSeries.add(candle.seriesIndex)
+          ? close
+          : rebase(candle.open);
+      visibleCandles.add(
+        MarketCandlePoint(
+          column: candle.column,
+          seriesIndex: candle.seriesIndex,
+          sampled: candle.sampled,
+          open: open,
+          high: candle.sampled ? max(open, close) : rebase(candle.high),
+          low: candle.sampled ? min(open, close) : rebase(candle.low),
+          close: close,
+        ),
+      );
+    }
     final bounds = _calculateYBounds([
       for (final line in visibleSeries) ...line.points,
       for (final candle in visibleCandles) ...[
@@ -1256,61 +1297,91 @@ class _MarketLineChartRenderer extends ChartRenderer
 
   void _drawCandles(Canvas canvas, ChartBounds bounds) {
     if (candles.isEmpty) return;
+    final seriesCount = series.length;
     final spacing = uniformXCount == null || uniformXCount! < 2
         ? bounds.width
         : bounds.width / (uniformXCount! - 1);
-    final groupSize = max(1, (3.5 / max(spacing, 0.01)).ceil());
-    final barWidth = (spacing * groupSize * 0.65).clamp(1.5, 8.0);
-    for (var start = 0; start < candles.length; start += groupSize) {
-      final group = candles.skip(start).take(groupSize).toList();
-      final first = group.first;
-      final last = group.last;
-      final high = group.map((candle) => candle.high).reduce(max);
-      final low = group.map((candle) => candle.low).reduce(min);
-      final startX = _xForPoint(
-        MarketLineChartPoint(
-          first.column.toDouble(),
-          first.close,
-          column: first.column,
-        ),
-        first.column,
-        bounds,
-      );
-      final endX = _xForPoint(
-        MarketLineChartPoint(
-          last.column.toDouble(),
-          last.close,
-          column: last.column,
-        ),
-        last.column,
-        bounds,
-      );
-      final x = (startX + endX) / 2;
-      final positive = last.close >= first.open;
-      final color =
-          positive ? const Color(0xFF26A69A) : const Color(0xFFEF5350);
-      final highY = _yForValue(high, bounds);
-      final lowY = _yForValue(low, bounds);
-      final openY = _yForValue(first.open, bounds);
-      final closeY = _yForValue(last.close, bounds);
-      canvas.drawLine(
-        Offset(x, highY),
-        Offset(x, lowY),
-        Paint()
-          ..color = color
-          ..strokeWidth = 1.2,
-      );
-      final bodyTop = min(openY, closeY);
-      final bodyBottom = max(openY, closeY);
-      canvas.drawRect(
-        Rect.fromLTWH(
+    final groupSize = max(
+      1,
+      (3.5 * max(1, seriesCount) / max(spacing, 0.01)).ceil(),
+    );
+    final groupedSpacing = spacing * groupSize;
+    final barWidth =
+        (groupedSpacing * 0.65 / max(1, seriesCount)).clamp(1.5, 8.0);
+    for (var seriesIndex = 0; seriesIndex < seriesCount; seriesIndex++) {
+      final source = [
+        for (final candle in candles)
+          if (candle.seriesIndex == seriesIndex) candle,
+      ];
+      final seriesColor = series[seriesIndex].color;
+      for (var start = 0; start < source.length; start += groupSize) {
+        final group = source.skip(start).take(groupSize).toList();
+        final first = group.first;
+        final last = group.last;
+        final high = group.map((candle) => candle.high).reduce(max);
+        final low = group.map((candle) => candle.low).reduce(min);
+        final startX = _xForPoint(
+          MarketLineChartPoint(
+            first.column.toDouble(),
+            first.close,
+            column: first.column,
+          ),
+          first.column,
+          bounds,
+        );
+        final endX = _xForPoint(
+          MarketLineChartPoint(
+            last.column.toDouble(),
+            last.close,
+            column: last.column,
+          ),
+          last.column,
+          bounds,
+        );
+        final x = (startX + endX) / 2 +
+            (seriesIndex - (seriesCount - 1) / 2) * barWidth;
+        final positive = last.close >= first.open;
+        final color = seriesCount == 1
+            ? (positive ? const Color(0xFF26A69A) : const Color(0xFFEF5350))
+            : seriesColor;
+        final highY = _yForValue(high, bounds);
+        final lowY = _yForValue(low, bounds);
+        final openY = _yForValue(first.open, bounds);
+        final closeY = _yForValue(last.close, bounds);
+        if (!group.every((candle) => candle.sampled)) {
+          canvas.drawLine(
+            Offset(x, highY),
+            Offset(x, lowY),
+            Paint()
+              ..color = color
+              ..strokeWidth = 1.2,
+          );
+        }
+        final bodyTop = min(openY, closeY);
+        final bodyBottom = max(openY, closeY);
+        final body = Rect.fromLTWH(
           x - barWidth / 2,
           bodyTop,
           barWidth,
           max(bodyBottom - bodyTop, 1.2),
-        ),
-        Paint()..color = color,
-      );
+        );
+        canvas.drawRect(
+          body,
+          Paint()
+            ..color = positive && seriesCount > 1
+                ? color.withValues(alpha: 0.25)
+                : color,
+        );
+        if (seriesCount > 1) {
+          canvas.drawRect(
+            body,
+            Paint()
+              ..color = color
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 1,
+          );
+        }
+      }
     }
   }
 

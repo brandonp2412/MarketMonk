@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:math';
+import 'dart:math' show max, min;
 
 import 'package:drafter/drafter.dart';
 import 'package:drift/drift.dart' hide Column;
@@ -2069,16 +2071,20 @@ class ChartsPageState extends State<ChartsPage>
           ),
         ),
       ],
-      child: PopScope<void>(
-        canPop: !hasText,
-        onPopInvokedWithResult: (didPop, result) {
-          if (didPop) return;
-          if (_showCandlesticks && _candleSelection.value != null) {
-            _candleSelection.value = null;
-            return;
-          }
-          if (hasText) _clearSearch();
-        },
+      child: ValueListenableBuilder<int?>(
+        valueListenable: _candleSelection,
+        builder: (context, activeIndex, child) => PopScope<void>(
+          canPop: !hasText && (!_showCandlesticks || activeIndex == null),
+          onPopInvokedWithResult: (didPop, result) {
+            if (didPop) return;
+            if (_showCandlesticks && _candleSelection.value != null) {
+              _candleSelection.value = null;
+              return;
+            }
+            if (hasText) _clearSearch();
+          },
+          child: child!,
+        ),
         child: Stack(
           children: [
             if (_mode == _ChartMode.searching)
@@ -2732,150 +2738,118 @@ class ChartsPageState extends State<ChartsPage>
     ];
   }
 
-  Widget _buildRollingAverageChip({bool favoriteCard = false}) {
-    final colors = Theme.of(context).colorScheme;
-    final icon = _showRollingAverage
-        ? Icons.radio_button_checked
-        : Icons.radio_button_unchecked;
-    final label = context.l10n.text('Rolling average');
-    void toggle() => setState(() => _showRollingAverage = !_showRollingAverage);
+  Widget _buildRollingAverageChip() => Semantics(
+        key: const Key('chart-rolling-average'),
+        selected: _showRollingAverage,
+        button: true,
+        child: _ActionChip(
+          icon: _showRollingAverage
+              ? Icons.radio_button_checked
+              : Icons.radio_button_unchecked,
+          label: context.l10n.text('Rolling average'),
+          onTap: () =>
+              setState(() => _showRollingAverage = !_showRollingAverage),
+        ),
+      );
 
-    return Semantics(
-      key: const Key('chart-rolling-average'),
-      selected: _showRollingAverage,
-      button: true,
-      child: favoriteCard
-          ? AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOutCubic,
-              width: 108,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                color: _showRollingAverage
-                    ? colors.primary.withValues(alpha: 0.10)
-                    : null,
-                border: Border.all(
-                  color: _showRollingAverage
-                      ? colors.primary
-                      : colors.outline.withValues(alpha: 0.3),
-                  width: _showRollingAverage ? 2 : 1,
-                ),
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: toggle,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                label,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  height: 1,
-                                  fontWeight: _showRollingAverage
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
-                                ),
-                              ),
-                            ),
-                            Icon(icon, size: 14, color: colors.primary),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        CustomPaint(
-                          size: const Size(32, 14),
-                          painter: _RollingAverageIndicatorPainter(
-                            color: colors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            )
-          : _ActionChip(icon: icon, label: label, onTap: toggle),
-    );
-  }
+  Widget _buildPortfolioCandleChip() => Semantics(
+        key: const Key('chart-portfolio-candle-toggle'),
+        selected: _showCandlesticks,
+        button: true,
+        child: _ActionChip(
+          icon: _showCandlesticks
+              ? Icons.candlestick_chart
+              : Icons.candlestick_chart_outlined,
+          label: 'Candles',
+          onTap: _toggleCandlesticks,
+        ),
+      );
 
   Widget _buildFavoritesRow() {
+    final hasFavorites = _favoriteStocks.isNotEmpty;
     return Padding(
-      // The period selector sits immediately above this row. Give the cards a
-      // clear separation without making the landing page feel oversized.
       padding: EdgeInsets.fromLTRB(
         isDesktopLayout(context) ? 24 : 16,
-        16,
+        12,
         isDesktopLayout(context) ? 24 : 16,
         8,
       ),
-      child: SizedBox(
-        height: 64,
-        child: ListView.builder(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: _favoriteStocks.length + 1,
-          itemBuilder: (context, index) {
-            if (index == _favoriteStocks.length) {
-              return _buildRollingAverageChip(favoriteCard: true);
-            }
-            final symbol = _favoriteStocks[index];
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: DesktopContextMenu(
-                actions: [
-                  DesktopMenuAction(
-                    context.l10n.text('Open chart'),
-                    () => _selectSymbol(symbol),
-                  ),
-                  DesktopMenuAction(
-                    context.l10n.text('Remove favorite'),
-                    () => _toggleFavorite(symbol),
-                  ),
-                  if (!context.read<AccountManager>().ibkrConfigFor().enabled)
-                    DesktopMenuAction(
-                      context.l10n.text('Add trade'),
-                      () => Navigator.push(
-                        context,
-                        adaptivePageRoute(
-                          context,
-                          builder: (_) => EditTickerPage(symbol: symbol),
+      child: Column(
+        children: [
+          if (hasFavorites) ...[
+            SizedBox(
+              height: 64,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: _favoriteStocks.length,
+                itemBuilder: (context, index) {
+                  final symbol = _favoriteStocks[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: DesktopContextMenu(
+                      actions: [
+                        DesktopMenuAction(
+                          context.l10n.text('Open chart'),
+                          () => _selectSymbol(symbol),
                         ),
+                        DesktopMenuAction(
+                          context.l10n.text('Remove favorite'),
+                          () => _toggleFavorite(symbol),
+                        ),
+                        if (!context
+                            .read<AccountManager>()
+                            .ibkrConfigFor()
+                            .enabled)
+                          DesktopMenuAction(
+                            context.l10n.text('Add trade'),
+                            () => Navigator.push(
+                              context,
+                              adaptivePageRoute(
+                                context,
+                                builder: (_) => EditTickerPage(symbol: symbol),
+                              ),
+                            ),
+                          ),
+                      ],
+                      copyText: symbol,
+                      copyLabel: context.l10n.text('Copy symbol'),
+                      child: _FavoriteCard(
+                        symbol: symbol,
+                        periodStart: _requiredCandleStart(),
+                        periodDays: days,
+                        visibleRange: _customChartRange,
+                        intraday: _usesIntraday &&
+                            _selectedFavorites.contains(symbol) &&
+                            (days != 5 ||
+                                _favoriteIntraday.containsKey(symbol)),
+                        intradaySeries: _favoriteIntraday[symbol],
+                        isActive: widget.isActive,
+                        selected: _selectedFavorites.contains(symbol),
+                        selectionColor: _favoriteColor(symbol),
+                        onTap: () => _selectFavorite(symbol),
                       ),
                     ),
-                ],
-                copyText: symbol,
-                copyLabel: context.l10n.text('Copy symbol'),
-                child: _FavoriteCard(
-                  symbol: symbol,
-                  periodStart: _requiredCandleStart(),
-                  periodDays: days,
-                  visibleRange: _customChartRange,
-                  intraday: _usesIntraday &&
-                      _selectedFavorites.contains(symbol) &&
-                      (days != 5 || _favoriteIntraday.containsKey(symbol)),
-                  intradaySeries: _favoriteIntraday[symbol],
-                  isActive: widget.isActive,
-                  selected: _selectedFavorites.contains(symbol),
-                  selectionColor: _favoriteColor(symbol),
-                  onTap: () => _selectFavorite(symbol),
-                ),
+                  );
+                },
               ),
-            );
-          },
-        ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildRollingAverageChip(),
+                  const SizedBox(width: 8),
+                  _buildPortfolioCandleChip(),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2950,6 +2924,9 @@ class ChartsPageState extends State<ChartsPage>
 
     final accountManager = context.read<AccountManager>();
     final accounts = accountManager.accounts;
+    final favoriteOhlcBySymbol = <String,
+        Map<DateTime,
+            ({double open, double high, double low, double close})>>{};
     final visibleSeries = {
       for (final entry in _portfolioSeriesByAccount.entries)
         if (!_hiddenAccounts.contains(entry.key) && entry.value.isNotEmpty)
@@ -2960,6 +2937,16 @@ class ChartsPageState extends State<ChartsPage>
       if (_usesIntraday) {
         final series = _favoriteIntraday[symbol];
         if (series != null) {
+          final divisor = symbolCentDivisor(symbol);
+          favoriteOhlcBySymbol[symbol] = {
+            for (final bar in series.candles)
+              bar.date.toLocal(): (
+                open: bar.open / divisor,
+                high: bar.high / divisor,
+                low: bar.low / divisor,
+                close: bar.close / divisor,
+              ),
+          };
           visibleSeries[symbol] = [
             for (final bar in series.candles)
               _DateValue(
@@ -2978,6 +2965,16 @@ class ChartsPageState extends State<ChartsPage>
         candles = candles.sublist(candles.length - days);
       }
       if (candles.isNotEmpty) {
+        final divisor = symbolCentDivisor(symbol);
+        favoriteOhlcBySymbol[symbol] = {
+          for (final candle in candles)
+            candle.date: (
+              open: candle.open / divisor,
+              high: candle.high / divisor,
+              low: candle.low / divisor,
+              close: candle.close / divisor,
+            ),
+        };
         visibleSeries[symbol] = [
           for (final candle in candles)
             _DateValue(candle.date, candle.close / symbolCentDivisor(symbol)),
@@ -3060,6 +3057,8 @@ class ChartsPageState extends State<ChartsPage>
     final singleLine = visibleSeries.length == 1;
     final scaleForComparison = !singleLine || _selectedFavorites.isNotEmpty;
     final chartSeries = <MarketLineChartSeries>[];
+    final chartCandles = <MarketCandlePoint>[];
+    final candleTooltipRowsByIndex = <int, List<String>>{};
     for (final entry in visibleSeries.entries) {
       final accountIndex = accounts.indexOf(entry.key);
       final color = _selectedFavorites.contains(entry.key)
@@ -3077,6 +3076,60 @@ class ChartsPageState extends State<ChartsPage>
       final displayValues = scaleForComparison
           ? scalePortfolioSeriesForComparison(comparisonValues)
           : entry.value.map((point) => point.value).toList(growable: false);
+      final baseline = comparisonValues.firstWhere(
+        (value) => value.isFinite && value.abs() > 1e-9,
+        orElse: () => 0,
+      );
+      double chartValue(double value) => scaleForComparison
+          ? baseline == 0
+              ? 0
+              : (value / baseline - 1) * 100
+          : value;
+      final seriesIndex = chartSeries.length;
+      final ohlcByDate = favoriteOhlcBySymbol[entry.key];
+      for (var index = 0; index < entry.value.length; index++) {
+        final point = entry.value[index];
+        final column = dateIndex[point.date]!;
+        final rawOhlc = ohlcByDate?[point.date];
+        if (rawOhlc != null) {
+          chartCandles.add(
+            MarketCandlePoint(
+              column: column,
+              seriesIndex: seriesIndex,
+              open: chartValue(rawOhlc.open),
+              high: chartValue(rawOhlc.high),
+              low: chartValue(rawOhlc.low),
+              close: chartValue(rawOhlc.close),
+            ),
+          );
+          candleTooltipRowsByIndex.putIfAbsent(column, () => []).addAll([
+            entry.key,
+            'O ${fmtNativeCurrency(rawOhlc.open, symbolCurrency(entry.key))}  H ${fmtNativeCurrency(rawOhlc.high, symbolCurrency(entry.key))}',
+            'L ${fmtNativeCurrency(rawOhlc.low, symbolCurrency(entry.key))}  C ${fmtNativeCurrency(rawOhlc.close, symbolCurrency(entry.key))}',
+          ]);
+        } else {
+          final previous =
+              index == 0 ? point.value : entry.value[index - 1].value;
+          final open =
+              index == 0 ? displayValues[index] : displayValues[index - 1];
+          final close = displayValues[index];
+          chartCandles.add(
+            MarketCandlePoint(
+              column: column,
+              seriesIndex: seriesIndex,
+              sampled: true,
+              open: open,
+              high: max(open, close),
+              low: min(open, close),
+              close: close,
+            ),
+          );
+          candleTooltipRowsByIndex.putIfAbsent(column, () => []).addAll([
+            '${entry.key} · sampled',
+            'O ${fmtCurrency(previous)}  C ${fmtCurrency(point.value)}',
+          ]);
+        }
+      }
       chartSeries.add(
         MarketLineChartSeries(
           name: entry.key,
@@ -3109,6 +3162,9 @@ class ChartsPageState extends State<ChartsPage>
           ? '${settings.dateFormat} HH:mm'
           : settings.dateFormat,
     );
+    final axisFormatter = DateFormat(
+      _usesIntraday && !dailyOnly ? 'HH:mm' : settings.dateFormat,
+    );
     final visibleKeys = visibleSeries.keys.toList();
 
     return SizedBox(
@@ -3118,8 +3174,17 @@ class ChartsPageState extends State<ChartsPage>
         range: _chartRangeFor(sortedDates),
         onRangeChanged: (range) => _setChartRange(sortedDates, range),
         series: chartSeries,
+        candles: chartCandles,
+        showCandlesticks: _showCandlesticks,
+        candleSelection: _candleSelection,
+        candleTooltipTitle: (index) => index >= 0 && index < sortedDates.length
+            ? formatter.format(sortedDates[index])
+            : '',
+        candleTooltipRows: _showCandlesticks
+            ? (index) => candleTooltipRowsByIndex[index] ?? const []
+            : null,
         showRollingAverage: _showRollingAverage,
-        xLabels: [for (final date in sortedDates) formatter.format(date)],
+        xLabels: [for (final date in sortedDates) axisFormatter.format(date)],
         pointCount: sortedDates.length,
         yLabelFormatter: (value) => scaleForComparison
             ? fmtChartAxisPercent(value)
@@ -3651,37 +3716,4 @@ class _FavoriteCard extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Draws a smooth trend curve for the rolling average control.
-class _RollingAverageIndicatorPainter extends CustomPainter {
-  final Color color;
-
-  const _RollingAverageIndicatorPainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = Path()
-      ..moveTo(1, size.height - 2)
-      ..cubicTo(
-        size.width * 0.35,
-        size.height - 2,
-        size.width * 0.65,
-        2,
-        size.width - 1,
-        2,
-      );
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..strokeCap = StrokeCap.round,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_RollingAverageIndicatorPainter oldDelegate) =>
-      color != oldDelegate.color;
 }
