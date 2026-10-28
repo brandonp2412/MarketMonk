@@ -225,6 +225,50 @@ void main() {
     expect(individualCalls, 1);
   });
 
+  test('batch connection failure pauses broker requests and later recovers',
+      () async {
+    var now = DateTime.utc(2026, 10, 11);
+    var batches = 0;
+    var individualCalls = 0;
+    final loader = IntradayMarketData(
+      now: () => now,
+      ibkrPortfolioFetch: (_, __) async {
+        batches++;
+        if (batches == 1) throw http.ClientException('Failed host lookup');
+        return [_ibkrSeries()];
+      },
+      ibkrFetch: (_, __, ___) async {
+        individualCalls++;
+        return _ibkrSeries();
+      },
+      yahooGet: (_) async => _yahooResponse(),
+    );
+
+    expect(await loader.prefetchPortfolio(_config, days: 1), isFalse);
+    expect((await loader.fetch('AAPL', config: _config)).source, 'Yahoo');
+    expect((await loader.fetch('MSFT', config: _config)).source, 'Yahoo');
+    expect(await loader.prefetchPortfolio(_config, days: 1), isFalse);
+    expect(batches, 1);
+    expect(individualCalls, 0);
+
+    now = now.add(const Duration(minutes: 5));
+    expect(await loader.prefetchPortfolio(_config, days: 1), isTrue);
+    expect((await loader.fetch('AAPL', config: _config)).source, 'IBKR');
+    expect(batches, 2);
+  });
+
+  test('unsupported batch endpoint still tries individual broker requests',
+      () async {
+    final loader = IntradayMarketData(
+      ibkrPortfolioFetch: (_, __) async => throw StateError('HTTP 404'),
+      ibkrFetch: (_, __, ___) async => _ibkrSeries(),
+      yahooGet: (_) async => _yahooResponse(),
+    );
+
+    expect(await loader.prefetchPortfolio(_config, days: 1), isFalse);
+    expect((await loader.fetch('AAPL', config: _config)).source, 'IBKR');
+  });
+
   test('account config changes do not reuse another account cache', () async {
     var calls = 0;
     final loader = IntradayMarketData(

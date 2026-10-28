@@ -59,7 +59,7 @@ class IntradayMarketData {
   final Future<List<IbkrHistoricalSeries>> Function(IbkrAccountConfig, int)?
       _ibkrPortfolioFetch;
   final _portfolioBatchAt = <(IbkrAccountConfig, int), DateTime>{};
-  final _slowPortfolioBatchAt = <(IbkrAccountConfig, int), DateTime>{};
+  final _unavailablePortfolioBatchAt = <(IbkrAccountConfig, int), DateTime>{};
   final DateTime Function() _now;
   final Duration _brokerTimeout;
   final _cache = <(String, int, IbkrAccountConfig),
@@ -117,11 +117,11 @@ class IntradayMarketData {
         final batchAt = _portfolioBatchAt[(config, days)];
         final batchFresh = batchAt != null &&
             _now().difference(batchAt) < const Duration(minutes: 5);
-        final slowAt = _slowPortfolioBatchAt[(config, days)];
-        final batchSlow = slowAt != null &&
-            _now().difference(slowAt) < const Duration(minutes: 5);
+        final unavailableAt = _unavailablePortfolioBatchAt[(config, days)];
+        final batchUnavailable = unavailableAt != null &&
+            _now().difference(unavailableAt) < const Duration(minutes: 5);
         if (config.isConfigured &&
-            !batchSlow &&
+            !batchUnavailable &&
             (!batchFresh || forceRefresh)) {
           try {
             final result = await _ibkrFetch(
@@ -158,6 +158,12 @@ class IntradayMarketData {
   }) async {
     final fetch = _ibkrPortfolioFetch;
     if (!config.isConfigured || fetch == null) return false;
+    final unavailableAt = _unavailablePortfolioBatchAt[(config, days)];
+    if (!forceRefresh &&
+        unavailableAt != null &&
+        _now().difference(unavailableAt) < const Duration(minutes: 5)) {
+      return false;
+    }
     final previous = _portfolioBatchAt[(config, days)];
     if (!forceRefresh &&
         previous != null &&
@@ -169,7 +175,7 @@ class IntradayMarketData {
         () async {
           final series = await fetch(config, days).timeout(_brokerTimeout);
           final fetchedAt = _now();
-          _slowPortfolioBatchAt.remove((config, days));
+          _unavailablePortfolioBatchAt.remove((config, days));
           for (final item in series) {
             final normalized = IntradaySeries(
               currency: item.currency,
@@ -187,8 +193,8 @@ class IntradayMarketData {
         },
       );
     } catch (error, stackTrace) {
-      if (error is TimeoutException) {
-        _slowPortfolioBatchAt[(config, days)] = _now();
+      if (error is TimeoutException || error is http.ClientException) {
+        _unavailablePortfolioBatchAt[(config, days)] = _now();
       }
       talker.handle(
         error,
