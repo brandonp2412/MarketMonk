@@ -3452,7 +3452,9 @@ class ChartsPageState extends State<ChartsPage>
                   pct.toStringAsFixed(2),
                   '%',
                 ].join()
-              : context.l10n.text('History unavailable')),
+              : _portfolioLoading
+                  ? '—'
+                  : context.l10n.text('History unavailable')),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: theme.textTheme.titleMedium!.copyWith(color: returnColor),

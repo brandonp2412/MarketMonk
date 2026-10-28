@@ -883,6 +883,8 @@ void main() {
 
     final successfulPerformanceLoads = performanceLoads;
     await tester.tap(find.text('10y'));
+    await tester.pump();
+    expect(find.text('History unavailable'), findsNothing);
     await tester.pumpAndSettle();
 
     expect(ibkrLoads, refreshedIbkrLoads);
