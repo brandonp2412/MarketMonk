@@ -93,6 +93,21 @@ void main() {
     expect(selected, orderedEquals([0, 3, 5]));
   });
 
+  test('dense x axes measure labels based on width rather than history size', () {
+    final candidates = MarketLineChart.xAxisLabelCandidates(10000, 960);
+    expect(candidates.length, lessThanOrEqualTo(80));
+    expect(candidates.first, 0);
+    expect(candidates.last, 9999);
+    expect(candidates.toSet(), hasLength(candidates.length));
+    expect(
+      MarketLineChart.xAxisLabelCandidates(6, 960),
+      orderedEquals([0, 1, 2, 3, 4, 5]),
+    );
+    expect(MarketLineChart.xAxisLabelCandidates(0, 960), isEmpty);
+    expect(MarketLineChart.xAxisLabelCandidates(1, 0), [0]);
+    expect(MarketLineChart.xAxisLabelCandidates(10000, 0), [0, 9999]);
+  });
+
   test('TickerLine tooltip shows price and date on the same line', () {
     final date = DateTime(2026, 1, 2);
     const spot = MarketLineChartPoint(0, 123.45, column: 0);

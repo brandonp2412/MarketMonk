@@ -287,6 +287,21 @@ class MarketLineChart extends StatelessWidget {
   });
 
   @visibleForTesting
+  static List<int> xAxisLabelCandidates(int count, double width) {
+    if (count <= 0) return const [];
+    final limit = max(
+      2,
+      (width / (_axisLabelFontSize + _xAxisLabelMinGap)).ceil() * 2,
+    );
+    final candidates = min(count, limit);
+    if (candidates == 1) return const [0];
+    return [
+      for (var index = 0; index < candidates; index++)
+        (index * (count - 1) / (candidates - 1)).round(),
+    ];
+  }
+
+  @visibleForTesting
   static List<int> selectXAxisLabelIndices(
     List<double> centers,
     List<double> widths,
@@ -1148,14 +1163,16 @@ class _MarketLineChartRenderer extends ChartRenderer
     if (points.length < 2) return;
 
     final path = _linePath(points);
-    final metrics = path.computeMetrics().toList();
-    final drawn = Path();
     final clamped = progress.clamp(0.0, 1.0);
-    for (final metric in metrics) {
-      drawn.addPath(
-        metric.extractPath(0, metric.length * clamped),
-        Offset.zero,
-      );
+    var drawn = path;
+    if (clamped < 1) {
+      drawn = Path();
+      for (final metric in path.computeMetrics()) {
+        drawn.addPath(
+          metric.extractPath(0, metric.length * clamped),
+          Offset.zero,
+        );
+      }
     }
 
     if (fill) {
@@ -1207,9 +1224,14 @@ class _MarketLineChartRenderer extends ChartRenderer
     if (xLabels.isEmpty) return;
     final centers = <double>[];
     final widths = <double>[];
-    for (final label in xLabels) {
+    final candidates = MarketLineChart.xAxisLabelCandidates(
+      xLabels.length,
+      bounds.width,
+    );
+    for (final index in candidates) {
+      final label = xLabels[index];
       final point = MarketLineChartPoint(label.x, 0, column: label.column);
-      centers.add(_xForPoint(point, label.column ?? centers.length, bounds));
+      centers.add(_xForPoint(point, label.column ?? index, bounds));
       widths.add(
         measureChartText(
           label.text,
@@ -1222,12 +1244,11 @@ class _MarketLineChartRenderer extends ChartRenderer
       centers,
       widths,
       _xAxisLabelMinGap,
-    ).toSet();
-    for (var i = 0; i < xLabels.length; i++) {
-      if (!keep.contains(i)) continue;
+    );
+    for (final i in keep) {
       drawChartText(
         canvas,
-        xLabels[i].text,
+        xLabels[candidates[i]].text,
         Offset(centers[i], bounds.bottom + 15),
         color: axisLabelColor,
         fontSize: _axisLabelFontSize,

@@ -3342,11 +3342,13 @@ class ChartsPageState extends State<ChartsPage>
               close: chartValue(rawOhlc.close),
             ),
           );
-          candleTooltipRowsByIndex.putIfAbsent(column, () => []).addAll([
-            entry.key,
-            'O ${fmtNativeCurrency(rawOhlc.open, symbolCurrency(entry.key))}  H ${fmtNativeCurrency(rawOhlc.high, symbolCurrency(entry.key))}',
-            'L ${fmtNativeCurrency(rawOhlc.low, symbolCurrency(entry.key))}  C ${fmtNativeCurrency(rawOhlc.close, symbolCurrency(entry.key))}',
-          ]);
+          if (_showCandlesticks) {
+            candleTooltipRowsByIndex.putIfAbsent(column, () => []).addAll([
+              entry.key,
+              'O ${fmtNativeCurrency(rawOhlc.open, symbolCurrency(entry.key))}  H ${fmtNativeCurrency(rawOhlc.high, symbolCurrency(entry.key))}',
+              'L ${fmtNativeCurrency(rawOhlc.low, symbolCurrency(entry.key))}  C ${fmtNativeCurrency(rawOhlc.close, symbolCurrency(entry.key))}',
+            ]);
+          }
         } else {
           final previous =
               index == 0 ? point.value : entry.value[index - 1].value;
@@ -3364,10 +3366,12 @@ class ChartsPageState extends State<ChartsPage>
               close: close,
             ),
           );
-          candleTooltipRowsByIndex.putIfAbsent(column, () => []).addAll([
-            '${entry.key} · sampled',
-            'O ${fmtCurrency(previous)}  C ${fmtCurrency(point.value)}',
-          ]);
+          if (_showCandlesticks) {
+            candleTooltipRowsByIndex.putIfAbsent(column, () => []).addAll([
+              '${entry.key} · sampled',
+              'O ${fmtCurrency(previous)}  C ${fmtCurrency(point.value)}',
+            ]);
+          }
         }
       }
       chartSeries.add(
