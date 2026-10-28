@@ -91,6 +91,7 @@ class ChartsPageState extends State<ChartsPage>
   _ChartMode _mode = _ChartMode.portfolio;
   String? _selectedSymbol;
   List<String> _favoriteStocks = [];
+  Map<String, String> _favoriteNames = {};
   final Set<String> _selectedFavorites = {};
   Stream<List<StoredCandle>>? _favoriteChartStream;
   String _favoriteChartStreamKey = '';
@@ -711,7 +712,16 @@ class ChartsPageState extends State<ChartsPage>
       await prefs.setStringList('favoriteStocks', favorites);
       if (legacy != null) await prefs.remove('favoriteStock');
     }
-    if (mounted) setState(() => _favoriteStocks = favorites!);
+    if (mounted) {
+      setState(() {
+        _favoriteStocks = favorites!;
+        _favoriteNames = {
+          for (final symbol in favorites)
+            if (prefs.getString('favoriteName:$symbol') case final String name)
+              symbol: name,
+        };
+      });
+    }
     if (widget.isActive) {
       runDetachedTask(
         _syncFavoriteCandles(),
@@ -2785,7 +2795,31 @@ class ChartsPageState extends State<ChartsPage>
         ),
       );
 
-  void _showFavoriteRemoval(String symbol) {
+  Future<void> _renameFavorite(String symbol) async {
+    final name = await showDialog<String>(
+      context: context,
+      builder: (_) => _RenameFavoriteDialog(
+        currentName: _favoriteNames[symbol] ?? symbol,
+      ),
+    );
+    if (name == null || !mounted) return;
+    final prefs = await SqliteSettings.getInstance();
+    if (name.isEmpty || name == symbol) {
+      await prefs.remove('favoriteName:$symbol');
+    } else {
+      await prefs.setString('favoriteName:$symbol', name);
+    }
+    if (!mounted) return;
+    setState(() {
+      if (name.isEmpty || name == symbol) {
+        _favoriteNames.remove(symbol);
+      } else {
+        _favoriteNames[symbol] = name;
+      }
+    });
+  }
+
+  void _showFavoriteActions(String symbol) {
     runDetachedTask(
       showModalBottomSheet<void>(
         context: context,
@@ -2794,7 +2828,17 @@ class ChartsPageState extends State<ChartsPage>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(title: Text(symbol)),
+              ListTile(
+                leading: const Icon(Icons.edit_outlined),
+                title: Text(context.l10n.text('Rename')),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  runDetachedTask(
+                    _renameFavorite(symbol),
+                    'Failed to rename favorite',
+                  );
+                },
+              ),
               ListTile(
                 leading: const Icon(Icons.favorite_border),
                 title: Text(context.l10n.text('Remove favorite')),
@@ -2809,6 +2853,7 @@ class ChartsPageState extends State<ChartsPage>
                 },
               ),
               ListTile(
+                leading: const Icon(Icons.close),
                 title: Text(context.l10n.text('Cancel')),
                 onTap: () => Navigator.pop(sheetContext),
               ),
@@ -2816,7 +2861,7 @@ class ChartsPageState extends State<ChartsPage>
           ),
         ),
       ),
-      'Failed to show favorite removal',
+      'Failed to show favorite actions',
     );
   }
 
@@ -2846,6 +2891,13 @@ class ChartsPageState extends State<ChartsPage>
                     child: DesktopContextMenu(
                       actions: [
                         DesktopMenuAction(
+                          context.l10n.text('Rename'),
+                          () => runDetachedTask(
+                            _renameFavorite(symbol),
+                            'Failed to rename favorite',
+                          ),
+                        ),
+                        DesktopMenuAction(
                           context.l10n.text('Open chart'),
                           () => _selectSymbol(symbol),
                         ),
@@ -2872,6 +2924,7 @@ class ChartsPageState extends State<ChartsPage>
                       copyLabel: context.l10n.text('Copy symbol'),
                       child: _FavoriteCard(
                         symbol: symbol,
+                        displayName: _favoriteNames[symbol] ?? symbol,
                         periodStart: _requiredCandleStart(),
                         periodDays: days,
                         visibleRange: _customChartRange,
@@ -2884,7 +2937,7 @@ class ChartsPageState extends State<ChartsPage>
                         selected: _selectedFavorites.contains(symbol),
                         selectionColor: _favoriteColor(symbol),
                         onTap: () => _selectFavorite(symbol),
-                        onLongPress: () => _showFavoriteRemoval(symbol),
+                        onLongPress: () => _showFavoriteActions(symbol),
                       ),
                     ),
                   );
@@ -3603,6 +3656,7 @@ class _ActionChip extends StatelessWidget {
 /// used in the favorites row on the portfolio landing view.
 class _FavoriteCard extends StatelessWidget {
   final String symbol;
+  final String displayName;
   final DateTime periodStart;
   final int periodDays;
   final (DateTime, DateTime)? visibleRange;
@@ -3616,6 +3670,7 @@ class _FavoriteCard extends StatelessWidget {
 
   const _FavoriteCard({
     required this.symbol,
+    required this.displayName,
     required this.periodStart,
     required this.periodDays,
     this.visibleRange,
@@ -3681,7 +3736,7 @@ class _FavoriteCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          symbol,
+                          displayName,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 12,
@@ -3773,6 +3828,57 @@ class _FavoriteCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _RenameFavoriteDialog extends StatefulWidget {
+  const _RenameFavoriteDialog({required this.currentName});
+
+  final String currentName;
+
+  @override
+  State<_RenameFavoriteDialog> createState() => _RenameFavoriteDialogState();
+}
+
+class _RenameFavoriteDialogState extends State<_RenameFavoriteDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.currentName);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(context.l10n.text('Rename favorite')),
+      content: TextField(
+        controller: _controller,
+        decoration: InputDecoration(
+          labelText: context.l10n.text('Name'),
+        ),
+        autofocus: true,
+        textCapitalization: TextCapitalization.words,
+        onSubmitted: (value) => Navigator.pop(context, value.trim()),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(context.l10n.text('Cancel')),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _controller.text.trim()),
+          child: Text(context.l10n.text('Rename')),
+        ),
+      ],
     );
   }
 }
