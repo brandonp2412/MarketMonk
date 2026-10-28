@@ -151,7 +151,13 @@ class _EditTickerPageState extends State<EditTickerPage> {
 
     final candles =
         snapshot.data!.map((tickerCandle) => tickerCandle.candle).toList();
-    if (candles.isEmpty) return const SizedBox();
+    if (candles.isEmpty) {
+      return SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.35,
+        child:
+            loading ? const Center(child: CircularProgressIndicator()) : null,
+      );
+    }
     final centDiv = symbolCentDivisor(symbol.text.split(' ').first);
     List<MarketLineChartPoint> spots = [];
     for (var index = 0; index < candles.length; index++) {
@@ -335,14 +341,6 @@ class _EditTickerPageState extends State<EditTickerPage> {
                           padding: EdgeInsets.only(left: 16.0, right: 8.0),
                           child: Icon(Icons.search),
                         );
-                        if (loading)
-                          leading = const Padding(
-                            padding: EdgeInsets.only(
-                              left: 16.0,
-                              right: 8.0,
-                            ),
-                            child: SizedBox(height: 24, width: 24),
-                          );
 
                         return SearchBar(
                           trailing: getTrailing,

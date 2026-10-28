@@ -86,6 +86,17 @@ class PortfolioPageState extends State<PortfolioPage>
   List<Position> _positions = [];
   IbkrAccountValue? _netLiquidation;
   bool _hasCachedPortfolio = false;
+  int _pendingRemoteLoads = 0;
+
+  Future<T> _withRemoteLoading<T>(Future<T> Function() load) async {
+    if (mounted) setState(() => _pendingRemoteLoads++);
+    try {
+      return await load();
+    } finally {
+      if (mounted) setState(() => _pendingRemoteLoads--);
+    }
+  }
+
   Object? _loadError;
   int? touchedIndex;
   List<String> _chartFavorites = [];
@@ -252,8 +263,11 @@ class PortfolioPageState extends State<PortfolioPage>
     final loadKey = (accountName, config);
     final snapshot = await _ibkrSnapshotLoads.putIfAbsent(loadKey, () async {
       try {
-        return await (widget._ibkrLoader?.call(config) ??
-            IbkrApiClient(config).fetchPortfolio());
+        return await _withRemoteLoading(
+          () =>
+              widget._ibkrLoader?.call(config) ??
+              IbkrApiClient(config).fetchPortfolio(),
+        );
       } finally {
         _ibkrSnapshotLoads.removeWhere((key, value) => key == loadKey);
       }
@@ -760,7 +774,11 @@ class PortfolioPageState extends State<PortfolioPage>
     }
 
     if (positions.isEmpty && !snap.hasData && !_hasCachedPortfolio) {
-      return _refreshableState(const SizedBox.shrink());
+      return _refreshableState(
+        _pendingRemoteLoads > 0
+            ? const Center(child: CircularProgressIndicator())
+            : const SizedBox.shrink(),
+      );
     }
 
     if (snap.hasData &&

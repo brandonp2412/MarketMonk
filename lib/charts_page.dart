@@ -98,6 +98,18 @@ class ChartsPageState extends State<ChartsPage>
   final _favoriteIntradayErrors = <String, String>{};
   int _favoriteLoadGeneration = 0;
   bool _networkLoading = false;
+  String? _stockContentKey;
+  int _pendingRemoteLoads = 0;
+
+  Future<T> _withRemoteLoading<T>(Future<T> Function() load) async {
+    if (mounted) setState(() => _pendingRemoteLoads++);
+    try {
+      return await load();
+    } finally {
+      if (mounted) setState(() => _pendingRemoteLoads--);
+    }
+  }
+
   bool get _showRollingAverage =>
       context.read<SettingsState>().showRollingAverage;
   bool get _showCandlesticks => context.read<SettingsState>().showCandlesticks;
@@ -384,8 +396,10 @@ class ChartsPageState extends State<ChartsPage>
       try {
         return await _ibkrLoads.putIfAbsent(loadKey, () async {
           try {
-            final snapshot = await (widget._ibkrLoader?.call(ibkrConfig) ??
-                IbkrApiClient(ibkrConfig).fetchPortfolio());
+            final snapshot = await _withRemoteLoading(
+              () => (widget._ibkrLoader?.call(ibkrConfig) ??
+                  IbkrApiClient(ibkrConfig).fetchPortfolio()),
+            );
             cacheIbkrAccountExchangeRate(snapshot);
             final positions = await computeIbkrPositions(
               snapshot.positions,
@@ -724,11 +738,13 @@ class ChartsPageState extends State<ChartsPage>
     try {
       final accountManager = context.read<AccountManager>();
       if (intraday) {
-        final series = await _intradayData.fetch(
-          symbol,
-          days: selectedDays,
-          config: accountManager.ibkrConfigFor(),
-          forceRefresh: forceRefresh,
+        final series = await _withRemoteLoading(
+          () => _intradayData.fetch(
+            symbol,
+            days: selectedDays,
+            config: accountManager.ibkrConfigFor(),
+            forceRefresh: forceRefresh,
+          ),
         );
         if (!mounted ||
             !widget.isActive ||
@@ -744,12 +760,14 @@ class ChartsPageState extends State<ChartsPage>
         });
         return;
       }
-      await syncCandles(
-        symbol,
-        ibkrConfig: accountManager.ibkrConfigFor(),
-        syncNamespace: accountManager.activeAccount,
-        requiredFrom: _requiredCandleStart(),
-        forceRefresh: forceRefresh,
+      await _withRemoteLoading(
+        () => syncCandles(
+          symbol,
+          ibkrConfig: accountManager.ibkrConfigFor(),
+          syncNamespace: accountManager.activeAccount,
+          requiredFrom: _requiredCandleStart(),
+          forceRefresh: forceRefresh,
+        ),
       );
     } catch (error, stackTrace) {
       talker.handle(error, stackTrace, 'Favorite ticker candle sync failed');
@@ -819,9 +837,10 @@ class ChartsPageState extends State<ChartsPage>
     try {
       return await _ibkrPerformanceLoads.putIfAbsent(loadKey, () async {
         try {
-          final performance =
-              await (widget._ibkrPerformanceLoader?.call(config, period) ??
-                  IbkrApiClient(config).fetchPerformance(period));
+          final performance = await _withRemoteLoading(
+            () => (widget._ibkrPerformanceLoader?.call(config, period) ??
+                IbkrApiClient(config).fetchPerformance(period)),
+          );
           await accountManager.cacheIbkrPerformance(accountName, performance);
           return performance;
         } finally {
@@ -1370,18 +1389,22 @@ class ChartsPageState extends State<ChartsPage>
     final holdings = <IntradayPortfolioHolding>[];
     final failureReasons = <String>[];
     final prefetched = loaded.positions.isNotEmpty &&
-        await _intradayData.prefetchPortfolio(
-          config,
-          days: selectedDays,
-          forceRefresh: forceRefresh,
+        await _withRemoteLoading(
+          () => _intradayData.prefetchPortfolio(
+            config,
+            days: selectedDays,
+            forceRefresh: forceRefresh,
+          ),
         );
     Future<IntradayPortfolioHolding?> loadHolding(Position position) async {
       try {
-        final series = await _intradayData.fetch(
-          position.symbol,
-          days: selectedDays,
-          config: config,
-          forceRefresh: forceRefresh && !prefetched,
+        final series = await _withRemoteLoading(
+          () => _intradayData.fetch(
+            position.symbol,
+            days: selectedDays,
+            config: config,
+            forceRefresh: forceRefresh && !prefetched,
+          ),
         );
         await fetchSymbolCurrencyAndRate(
           position.symbol,
@@ -1804,8 +1827,12 @@ class ChartsPageState extends State<ChartsPage>
     setState(() {
       _networkLoading = true;
       _stockError = null;
-      _intradaySeries = null;
-      _stockDailyPreview = const [];
+      final contentKey = '$namespace|$symbol|$years|$months|$days';
+      if (_stockContentKey != contentKey) {
+        _intradaySeries = null;
+        _stockDailyPreview = const [];
+        _stockContentKey = contentKey;
+      }
       _nativeCurrency = symbolCurrency(symbol);
       _centDivisor = symbolCentDivisor(symbol);
     });
@@ -1825,11 +1852,13 @@ class ChartsPageState extends State<ChartsPage>
             'Failed to load daily stock preview',
           );
         }
-        final series = await _intradayData.fetch(
-          symbol,
-          days: selectedDays,
-          config: config,
-          forceRefresh: forceRefresh,
+        final series = await _withRemoteLoading(
+          () => _intradayData.fetch(
+            symbol,
+            days: selectedDays,
+            config: config,
+            forceRefresh: forceRefresh,
+          ),
         );
         if (!isCurrent()) return;
         await fetchSymbolCurrencyAndRate(symbol, rawCurrency: series.currency);
@@ -2289,13 +2318,15 @@ class ChartsPageState extends State<ChartsPage>
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.only(bottom: bottomNavScrollClearance),
-        itemCount: _searchLoading || _searchResults.isEmpty
-            ? 1
-            : _searchResults.length + 1,
+        itemCount: _searchResults.length + 1 + (_searchLoading ? 1 : 0),
         itemBuilder: (context, index) {
-          if (_searchLoading ||
-              _searchResults.isEmpty ||
-              index == _searchResults.length) {
+          if (_searchLoading && index == _searchResults.length + 1) {
+            return const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (index == _searchResults.length) {
             return useAnywayTile;
           }
           final result = _searchResults[index];
@@ -2505,7 +2536,9 @@ class ChartsPageState extends State<ChartsPage>
       }
       return SizedBox(
         height: height,
-        child: const SizedBox.shrink(),
+        child: _networkLoading && (_usesIntraday || snapshot.hasData)
+            ? const Center(child: CircularProgressIndicator())
+            : null,
       );
     }
 
@@ -2861,6 +2894,9 @@ class ChartsPageState extends State<ChartsPage>
         settings,
         accountColors,
         snapshot.data ?? const [],
+        localPricesReady: _selectedFavorites.isEmpty ||
+            _usesIntraday && days != 5 ||
+            snapshot.hasData,
       ),
     );
   }
@@ -2869,8 +2905,9 @@ class ChartsPageState extends State<ChartsPage>
     BuildContext context,
     SettingsState settings,
     List<Color> accountColors,
-    List<StoredCandle> favoriteCandles,
-  ) {
+    List<StoredCandle> favoriteCandles, {
+    required bool localPricesReady,
+  }) {
     final height = MediaQuery.of(context).size.height * 0.30;
 
     final hasFavoritePrices = _selectedFavorites.any(
@@ -2881,12 +2918,14 @@ class ChartsPageState extends State<ChartsPage>
           ),
     );
     if (!hasFavoritePrices &&
-        (_periodChangePending ||
-            (_portfolioLoading &&
-                _portfolioSeriesByAccount.values.every(
-                  (series) => series.isEmpty,
-                )))) {
-      return SizedBox(height: height);
+        (_periodChangePending || _portfolioLoading) &&
+        _portfolioSeriesByAccount.values.every((series) => series.isEmpty)) {
+      return SizedBox(
+        height: height,
+        child: _pendingRemoteLoads > 0 && localPricesReady
+            ? const Center(child: CircularProgressIndicator())
+            : null,
+      );
     }
     if (_portfolioError != null &&
         _portfolioSeriesByAccount.values.every((series) => series.isEmpty) &&
@@ -2958,6 +2997,12 @@ class ChartsPageState extends State<ChartsPage>
     }
 
     if (visibleSeries.isEmpty) {
+      if (_pendingRemoteLoads > 0 && localPricesReady) {
+        return SizedBox(
+          height: height,
+          child: const Center(child: CircularProgressIndicator()),
+        );
+      }
       final allEmpty = _portfolioSeriesByAccount.values.every(
         (series) => series.isEmpty,
       );

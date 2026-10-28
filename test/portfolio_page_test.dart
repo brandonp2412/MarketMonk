@@ -144,7 +144,7 @@ void main() {
         child: MaterialApp(home: page),
       );
 
-  testWidgets('portfolio loads uncached data silently', (
+  testWidgets('portfolio shows a spinner while uncached remote data loads', (
     tester,
   ) async {
     await seedTestSqlite({});
@@ -166,7 +166,7 @@ void main() {
     await tester.pump();
 
     expect(loads, 1);
-    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pump();

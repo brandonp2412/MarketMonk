@@ -108,16 +108,34 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
   }
 
-  testWidgets('stock navigation never shows a spinner during a fetch',
+  testWidgets('uncached stock shows a spinner only until prices arrive',
       (tester) async {
     final pending = Completer<http.Response>();
     await mountChart(
       tester,
       IntradayMarketData(yahooGet: (_) => pending.future),
     );
-    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.text('1d'), findsWidgets);
     pending.complete(_prices(100));
     await tester.pumpAndSettle();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byType(TickerLine), findsOneWidget);
+  });
+
+  testWidgets('failed stock request replaces the spinner with an error',
+      (tester) async {
+    final pending = Completer<http.Response>();
+    await mountChart(
+      tester,
+      IntradayMarketData(yahooGet: (_) => pending.future),
+    );
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    pending.complete(http.Response('Unavailable', 503));
+    await tester.pumpAndSettle();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byType(TickerLine), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(
@@ -458,7 +476,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Historical prices unavailable'), findsNothing);
-    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
     final recentMonday = DateTime.now().subtract(
       Duration(days: DateTime.now().weekday - DateTime.monday),
