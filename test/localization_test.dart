@@ -26,9 +26,13 @@ void main() {
           .toSet();
 
       expect(appTranslations.keys.toSet(), translatedLanguages);
+      expect(
+        const AppLocalizations(Locale('de')).text('Hide dollar amounts'),
+        'Geldbeträge ausblenden',
+      );
 
       final completeKeys = appTranslations['es']!.keys.toSet();
-      expect(completeKeys, hasLength(182));
+      expect(completeKeys, hasLength(181));
       expect(
         appTranslations['hi']!.keys.toSet(),
         completeKeys,

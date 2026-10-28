@@ -76,6 +76,50 @@ void main() {
     expect(find.textContaining('12 Oct 2026'), findsOneWidget);
   });
 
+  testWidgets('cached empty IBKR history does not spin on navigation',
+      (tester) async {
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.setIbkrConfig(
+      'Default',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'test-token',
+      ),
+    );
+    await accounts.cacheIbkrTradeHistory(
+      'Default',
+      const IbkrTradeHistory(available: true, trades: []),
+    );
+    final pending = Completer<IbkrTradeHistory>();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: TradeHistoryPage(
+            summary: SymbolSummary(
+              symbol: 'VOO',
+              name: 'Vanguard',
+              position: null,
+              trades: const [],
+            ),
+            ibkrTradeHistoryLoader: (_) => pending.future,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('No trade history yet'), findsOneWidget);
+    pending.complete(const IbkrTradeHistory(available: true, trades: []));
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('failed IBKR history can be retried', (tester) async {
     await seedTestSqlite({});
     final accounts = testAccountManager();

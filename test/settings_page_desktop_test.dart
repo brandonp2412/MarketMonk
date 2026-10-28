@@ -14,6 +14,8 @@ void main() {
     tester.view.physicalSize = size;
     await seedTestSqlite({
       'systemColors': true,
+      // Previously enabled on this installation: no retired control should show.
+      'showMarketClosed': true,
     });
     PackageInfo.setMockInitialValues(
       appName: 'Market Monk',
@@ -62,6 +64,7 @@ void main() {
       findsNothing,
     );
     expect(find.text('Charts'), findsOneWidget);
+    expect(find.text('Market closed indicator'), findsNothing);
     expect(find.text('Accounts'), findsOneWidget);
     expect(find.text('Data'), findsOneWidget);
 
@@ -86,5 +89,65 @@ void main() {
     expect(find.text('Appearance'), findsOneWidget);
     expect(find.text('Data'), findsOneWidget);
     expect(tester.takeException(), null);
+  });
+
+  testWidgets('mobile chart settings persist average and candle modes',
+      (tester) async {
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await pumpSettings(tester, const Size(430, 940));
+    final average = find.byKey(const Key('settings-rolling-average'));
+    final candles = find.byKey(const Key('settings-candlestick-chart'));
+    expect(average, findsOneWidget);
+    expect(candles, findsOneWidget);
+    expect(find.text('Market closed indicator'), findsNothing);
+    await tester.ensureVisible(average);
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<Switch>(
+            find.descendant(of: average, matching: find.byType(Switch)),
+          )
+          .value,
+      false,
+    );
+    await tester.tap(average);
+    await tester.pumpAndSettle();
+    expect(
+      (await SqliteSettings.getInstance()).getBool('chartRollingAverage'),
+      true,
+    );
+
+    await tester.ensureVisible(candles);
+    await tester.pumpAndSettle();
+    await tester.tap(candles);
+    await tester.pumpAndSettle();
+    expect(
+      (await SqliteSettings.getInstance()).getBool('chartCandlesticks'),
+      true,
+    );
+    expect(
+      tester
+          .widget<Switch>(
+            find.descendant(of: candles, matching: find.byType(Switch)),
+          )
+          .value,
+      true,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('desktop settings omit the mobile-only chart switches',
+      (tester) async {
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await pumpSettings(tester, const Size(1200, 900));
+    expect(find.byKey(const Key('settings-rolling-average')), findsNothing);
+    expect(find.byKey(const Key('settings-candlestick-chart')), findsNothing);
+    expect(find.text('Market closed indicator'), findsNothing);
   });
 }

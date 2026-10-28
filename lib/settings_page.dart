@@ -358,7 +358,7 @@ class _SettingsPageState extends State<SettingsPage> {
     BuildContext context,
     SettingsState settings,
   ) async {
-    var selected = Set<String>.from(settings.visibleCurrencies)..add('USD');
+    var selected = Set<String>.from(settings.visibleCurrencies);
 
     await showDialog<void>(
       context: context,
@@ -375,7 +375,8 @@ class _SettingsPageState extends State<SettingsPage> {
                       dense: true,
                       title: Text(currencyCode),
                       value: selected.contains(currencyCode),
-                      onChanged: currencyCode == 'USD'
+                      onChanged: selected.length == 1 &&
+                              selected.contains(currencyCode)
                           ? null
                           : (checked) {
                               setState(() {
@@ -471,7 +472,6 @@ class _SettingsPageState extends State<SettingsPage> {
           labelText: context.l10n.text('Language'),
           prefixIcon: const Icon(Icons.language),
           border: const OutlineInputBorder(),
-          isDense: true,
         ),
         items: [
           DropdownMenuItem(
@@ -636,18 +636,6 @@ class _SettingsPageState extends State<SettingsPage> {
       icon: Icons.insights_outlined,
       title: context.l10n.text('Charts'),
       children: [
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: settings.showMarketClosed
-              ? const Icon(Icons.schedule)
-              : const Icon(Icons.schedule_outlined),
-          title: Text(context.l10n.text('Market closed indicator')),
-          trailing: Switch(
-            value: settings.showMarketClosed,
-            onChanged: settings.setShowMarketClosed,
-          ),
-          onTap: () => settings.setShowMarketClosed(!settings.showMarketClosed),
-        ),
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.insights),
@@ -1087,22 +1075,27 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           _sectionHeader(context.l10n.text('Charts')),
-          Tooltip(
-            message: context.l10n.text(
-              'Show a badge on the chart when the market is closed (weekends)',
+          ListTile(
+            key: const Key('settings-rolling-average'),
+            leading: const Icon(Icons.show_chart),
+            title: Text(context.l10n.text('Rolling average')),
+            trailing: Switch(
+              value: settings.showRollingAverage,
+              onChanged: settings.setShowRollingAverage,
             ),
-            child: ListTile(
-              title: Text(context.l10n.text('Market closed indicator')),
-              leading: settings.showMarketClosed
-                  ? const Icon(Icons.schedule)
-                  : const Icon(Icons.schedule_outlined),
-              onTap: () =>
-                  settings.setShowMarketClosed(!settings.showMarketClosed),
-              trailing: Switch(
-                value: settings.showMarketClosed,
-                onChanged: (value) => settings.setShowMarketClosed(value),
-              ),
+            onTap: () =>
+                settings.setShowRollingAverage(!settings.showRollingAverage),
+          ),
+          ListTile(
+            key: const Key('settings-candlestick-chart'),
+            leading: const Icon(Icons.candlestick_chart_outlined),
+            title: const Text('Candles'),
+            trailing: Switch(
+              value: settings.showCandlesticks,
+              onChanged: settings.setShowCandlesticks,
             ),
+            onTap: () =>
+                settings.setShowCandlesticks(!settings.showCandlesticks),
           ),
           Tooltip(
             message: context.l10n.text('Use wavy curves in the graphs page'),
@@ -1546,17 +1539,17 @@ class _IbkrSettingsDialogState extends State<_IbkrSettingsDialog> {
           ),
           TextButton(
             onPressed: _checking ? null : _checkConnection,
-            child: Text(context.l10n.text('Test')),
-          ),
-          FilledButton(
-            onPressed: _checking ? null : _save,
             child: _checking
                 ? const SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : Text(context.l10n.text('Save')),
+                : Text(context.l10n.text('Test')),
+          ),
+          FilledButton(
+            onPressed: _checking ? null : _save,
+            child: Text(context.l10n.text('Save')),
           ),
         ],
       );

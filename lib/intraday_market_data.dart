@@ -59,7 +59,6 @@ class IntradayMarketData {
   final Future<List<IbkrHistoricalSeries>> Function(IbkrAccountConfig, int)?
       _ibkrPortfolioFetch;
   final _portfolioBatchAt = <(IbkrAccountConfig, int), DateTime>{};
-  final _slowPortfolioBatchAt = <(IbkrAccountConfig, int), DateTime>{};
   final DateTime Function() _now;
   final Duration _brokerTimeout;
   final _cache = <(String, int, IbkrAccountConfig),
@@ -117,18 +116,13 @@ class IntradayMarketData {
         final batchAt = _portfolioBatchAt[(config, days)];
         final batchFresh = batchAt != null &&
             _now().difference(batchAt) < const Duration(minutes: 5);
-        final slowAt = _slowPortfolioBatchAt[(config, days)];
-        final batchSlow = slowAt != null &&
-            _now().difference(slowAt) < const Duration(minutes: 5);
-        if (config.isConfigured &&
-            !batchSlow &&
-            (!batchFresh || forceRefresh)) {
+        if (config.isConfigured && (!batchFresh || forceRefresh)) {
           try {
-            final result = await _ibkrFetch(
-              config,
-              canonicalSymbol,
-              days,
-            ).timeout(_brokerTimeout);
+            final result = await backgroundNetworkCoordinator.observe(
+              'ibkr.intradayAttempt',
+              () => _ibkrFetch(config, canonicalSymbol, days)
+                  .timeout(_brokerTimeout),
+            );
             series = IntradaySeries(
               currency: result.currency,
               source: 'IBKR',
@@ -167,9 +161,11 @@ class IntradayMarketData {
         'market.intradayPortfolio',
         (this, config, days),
         () async {
-          final series = await fetch(config, days).timeout(_brokerTimeout);
+          final series = await backgroundNetworkCoordinator.observe(
+            'ibkr.intradayPortfolioAttempt',
+            () => fetch(config, days).timeout(_brokerTimeout),
+          );
           final fetchedAt = _now();
-          _slowPortfolioBatchAt.remove((config, days));
           for (final item in series) {
             final normalized = IntradaySeries(
               currency: item.currency,
@@ -187,9 +183,6 @@ class IntradayMarketData {
         },
       );
     } catch (error, stackTrace) {
-      if (error is TimeoutException) {
-        _slowPortfolioBatchAt[(config, days)] = _now();
-      }
       talker.handle(
         error,
         stackTrace,
@@ -208,7 +201,10 @@ class IntradayMarketData {
       _activeYahooRequests++;
     }
     try {
-      return await _yahooGet(uri).timeout(const Duration(seconds: 15));
+      return await backgroundNetworkCoordinator.observe(
+        'yahoo.intradayRequest',
+        () => _yahooGet(uri).timeout(const Duration(seconds: 15)),
+      );
     } finally {
       if (_yahooWaiters.isNotEmpty) {
         _yahooWaiters.removeFirst().complete();

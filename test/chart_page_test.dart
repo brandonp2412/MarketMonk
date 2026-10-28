@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:drafter/drafter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/empty_state.dart';
@@ -86,6 +87,66 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Appearance'), findsWidgets);
       expect(tester.takeException(), null);
+    });
+  }
+
+  for (final useSystemBack in [false, true]) {
+    testWidgets(
+        'favorite context chart returns to portfolio with ${useSystemBack ? 'system back' : 'back button'}',
+        (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1400, 900);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      await seedTestSqlite({
+        'favoriteStocks': ['VOO'],
+      });
+      final accounts = testAccountManager();
+      await accounts.init();
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(
+              create: (_) => SettingsState(
+                localCurrencyDetector: () async => 'USD',
+              ),
+            ),
+            ChangeNotifierProvider.value(value: accounts),
+          ],
+          child: MaterialApp(
+            theme: ThemeData(platform: TargetPlatform.linux),
+            home: const Scaffold(body: ChartsPage(isActive: false)),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Back'), findsNothing);
+      final favorite = find.text('VOO');
+      expect(favorite, findsOneWidget);
+      await tester.tap(favorite, buttons: kSecondaryMouseButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open chart'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<SearchBar>(find.byType(SearchBar)).controller!.text,
+        'VOO',
+      );
+      expect(find.byTooltip('Back'), findsOneWidget);
+      if (useSystemBack) {
+        await tester.binding.handlePopRoute();
+      } else {
+        await tester.tap(find.byTooltip('Back'));
+      }
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Back'), findsNothing);
+      expect(
+        tester.widget<SearchBar>(find.byType(SearchBar)).controller!.text,
+        isEmpty,
+      );
+      expect(find.text('VOO'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   }
 
@@ -351,7 +412,7 @@ void main() {
       );
 
       expect(find.byType(MarketLineChart), findsNothing);
-      expect(find.bySemanticsLabel('Loading portfolio'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
 
       await tester.pump();
 
@@ -822,6 +883,8 @@ void main() {
 
     final successfulPerformanceLoads = performanceLoads;
     await tester.tap(find.text('10y'));
+    await tester.pump();
+    expect(find.text('History unavailable'), findsNothing);
     await tester.pumpAndSettle();
 
     expect(ibkrLoads, refreshedIbkrLoads);
@@ -935,6 +998,13 @@ void main() {
     expect(find.byIcon(Icons.arrow_downward), findsNothing);
     expect(find.textContaining('value change'), findsNothing);
     expect(tester.takeException(), null);
+
+    await tester.tap(find.text('1y'));
+    await tester.pump();
+    expect(find.text('+5.49%'), findsOneWidget);
+    expect(find.text('History unavailable'), findsNothing);
+    await tester.pumpAndSettle();
+    expect(find.text('+5.49%'), findsOneWidget);
   });
 
   testWidgets('exact ticker fallback is available while search is loading', (
@@ -1081,7 +1151,7 @@ void main() {
     final searchRect =
         tester.getRect(find.byKey(const Key('chart-search-bar')));
     expect(searchRect.width, greaterThan(1000));
-    expect(searchRect.right, closeTo(1376, 1));
+    expect(searchRect.right, closeTo(1368, 1));
     expect(
       find.ancestor(
         of: find.byKey(const Key('chart-period-5d')),

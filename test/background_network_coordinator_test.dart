@@ -1,9 +1,62 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/background_network_coordinator.dart';
 
 void main() {
+  test('background requests start immediately on resume', () async {
+    final coordinator = BackgroundNetworkCoordinator();
+    coordinator.didChangeAppLifecycleState(AppLifecycleState.paused);
+    var calls = 0;
+    final result = coordinator.coalesce('resource', 'key', () async {
+      calls++;
+      return 42;
+    });
+    await Future<void>.delayed(Duration.zero);
+    expect(calls, 0);
+
+    coordinator.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    expect(await result, 42);
+    expect(calls, 1);
+  });
+
+  test('a request interrupted in the background retries on resume', () async {
+    final coordinator = BackgroundNetworkCoordinator();
+    final interrupted = Completer<int>();
+    var calls = 0;
+    final result = coordinator.coalesce('resource', 'key', () {
+      calls++;
+      return calls == 1 ? interrupted.future : Future.value(42);
+    });
+    coordinator.didChangeAppLifecycleState(AppLifecycleState.paused);
+    interrupted.completeError(StateError('network blocked'));
+    await Future<void>.delayed(Duration.zero);
+    expect(calls, 1);
+
+    coordinator.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    expect(await result, 42);
+    expect(calls, 2);
+    expect(coordinator.failedCount('resource'), 0);
+    expect(coordinator.activeRequestCount, 0);
+  });
+
+  test('interrupted requests recover even if resumed before failure arrives',
+      () async {
+    final coordinator = BackgroundNetworkCoordinator();
+    final interrupted = Completer<int>();
+    var calls = 0;
+    final result = coordinator.observe('resource', () {
+      calls++;
+      return calls == 1 ? interrupted.future : Future.value(7);
+    });
+    coordinator.didChangeAppLifecycleState(AppLifecycleState.paused);
+    coordinator.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    interrupted.completeError(StateError('connection aborted'));
+    expect(await result, 7);
+    expect(calls, 2);
+  });
+
   test('duplicate callers share one in-flight request', () async {
     final coordinator = BackgroundNetworkCoordinator();
     final gate = Completer<int>();

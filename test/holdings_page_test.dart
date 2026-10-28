@@ -15,6 +15,27 @@ import 'sqlite_test_support.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  testWidgets('local holdings navigation does not show a spinner',
+      (tester) async {
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: HoldingsPage(positionsLoader: (_) async => []),
+        ),
+      ),
+    );
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
   for (final width in [400.0, 1400.0]) {
     testWidgets('holdings updates privacy after settings at width $width',
         (tester) async {
@@ -68,9 +89,15 @@ void main() {
       final initialLoads = positionLoads;
 
       for (final hidden in [false, true]) {
-        await tester.tap(find.byKey(const Key('holdings-menu-button')));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Settings'));
+        if (width < 1000) {
+          await tester.tap(find.byKey(const Key('holdings-menu-button')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Settings'));
+        } else {
+          Navigator.of(tester.element(find.byType(HoldingsPage))).push(
+            MaterialPageRoute<void>(builder: (_) => const SettingsPage()),
+          );
+        }
         await tester.pumpAndSettle();
         final privacyTile =
             find.widgetWithText(ListTile, 'Hide dollar amounts');
@@ -128,7 +155,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.byType(DataTable), findsOneWidget);
-    expect(find.text('Holdings'), findsOneWidget);
+    expect(find.text('Default · Holdings'), findsOneWidget);
     expect(find.text('VOO'), findsOneWidget);
     final mouse = await tester.createGesture(
       kind: PointerDeviceKind.mouse,
@@ -163,7 +190,7 @@ void main() {
     final desktopPadding = tester.widget<Padding>(
       find.byKey(const Key('desktop-holdings-content')),
     );
-    expect(desktopPadding.padding, const EdgeInsets.fromLTRB(24, 16, 24, 24));
+    expect(desktopPadding.padding, EdgeInsets.zero);
     final scrollbars = tester.widgetList<Scrollbar>(
       find.descendant(
         of: find.byKey(const Key('desktop-holdings-content')),
@@ -479,7 +506,7 @@ void main() {
     expect(find.text(r'+$500.00'), findsOneWidget);
   });
 
-  testWidgets('holdings menu exposes account picker on desktop',
+  testWidgets('desktop holdings profile picker switches accounts',
       (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1400, 900);
@@ -517,11 +544,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.byKey(const Key('desktop-holdings-account-picker')),
+      find.byKey(const Key('holdings-menu-button')),
       findsNothing,
     );
 
-    await tester.tap(find.byKey(const Key('holdings-menu-button')));
+    await tester.tap(find.byKey(const Key('holdings-profile-picker')));
     await tester.pumpAndSettle();
 
     expect(accounts.activeAccount, 'Default');
@@ -533,6 +560,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(accounts.activeAccount, 'Brokerage');
+    expect(find.text('Brokerage · Holdings'), findsOneWidget);
   });
 
   testWidgets('realized profits appear in holding details, not the mobile list',

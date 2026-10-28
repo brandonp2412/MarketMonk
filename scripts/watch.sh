@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euox pipefail
 cd "$(dirname "$0")/.."
 export MARKET_MONK_WATCH_ROOT="$PWD"
 find lib -type f -name '*.dart' | entr -s '

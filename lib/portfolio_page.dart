@@ -20,6 +20,7 @@ import 'package:market_monk/logging.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/market_donut_chart.dart';
 import 'package:market_monk/profile_data_repository.dart';
+import 'package:market_monk/profile_picker.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/sqlite_settings.dart';
@@ -86,7 +87,17 @@ class PortfolioPageState extends State<PortfolioPage>
   List<Position> _positions = [];
   IbkrAccountValue? _netLiquidation;
   bool _hasCachedPortfolio = false;
-  bool _isLoadingPortfolio = false;
+  int _pendingRemoteLoads = 0;
+
+  Future<T> _withRemoteLoading<T>(Future<T> Function() load) async {
+    if (mounted) setState(() => _pendingRemoteLoads++);
+    try {
+      return await load();
+    } finally {
+      if (mounted) setState(() => _pendingRemoteLoads--);
+    }
+  }
+
   Object? _loadError;
   int? touchedIndex;
   List<String> _chartFavorites = [];
@@ -138,15 +149,9 @@ class PortfolioPageState extends State<PortfolioPage>
     final ibkrConfig = accounts.ibkrConfigFor(account);
     final refreshVersion = accounts.ibkrRefreshVersion;
     final cached = accounts.portfolioCacheFor(account);
-    final cacheFresh = accounts.isPortfolioCacheFresh(account);
     final hadAccount = _lastAccount.isNotEmpty;
     final refreshRequested =
         hadAccount && refreshVersion != _lastIbkrRefreshVersion;
-    final willLoadPortfolio = widget.isActive &&
-        (ibkrConfig.enabled
-            ? ibkrConfig.isConfigured &&
-                (refreshRequested || cached == null || !cacheFresh)
-            : true);
 
     if (account == _lastAccount &&
         ibkrConfig == _lastIbkrConfig &&
@@ -162,7 +167,6 @@ class PortfolioPageState extends State<PortfolioPage>
       _positions = cached?.positions ?? [];
       _netLiquidation = cached?.netLiquidation;
       _hasCachedPortfolio = cached != null;
-      _isLoadingPortfolio = willLoadPortfolio;
       touchedIndex = null;
     });
     if (widget.isActive) {
@@ -260,8 +264,11 @@ class PortfolioPageState extends State<PortfolioPage>
     final loadKey = (accountName, config);
     final snapshot = await _ibkrSnapshotLoads.putIfAbsent(loadKey, () async {
       try {
-        return await (widget._ibkrLoader?.call(config) ??
-            IbkrApiClient(config).fetchPortfolio());
+        return await _withRemoteLoading(
+          () =>
+              widget._ibkrLoader?.call(config) ??
+              IbkrApiClient(config).fetchPortfolio(),
+        );
       } finally {
         _ibkrSnapshotLoads.removeWhere((key, value) => key == loadKey);
       }
@@ -350,15 +357,8 @@ class PortfolioPageState extends State<PortfolioPage>
     final willFetchIbkr = config.enabled &&
         config.isConfigured &&
         (forceRefresh || cachedBefore == null || !cacheWasFresh);
-    final willLoadPortfolio = !config.enabled || willFetchIbkr;
     if (_loadError != null && mounted) {
       setState(() => _loadError = null);
-    }
-    if (willLoadPortfolio &&
-        mounted &&
-        accounts.activeAccount == accountName &&
-        !_isLoadingPortfolio) {
-      setState(() => _isLoadingPortfolio = true);
     }
     try {
       final trades =
@@ -408,12 +408,6 @@ class PortfolioPageState extends State<PortfolioPage>
         setState(() => _loadError = error);
       }
       talker.handle(error, stackTrace, 'Failed to preload portfolio positions');
-    } finally {
-      if (mounted &&
-          accounts.activeAccount == accountName &&
-          _isLoadingPortfolio) {
-        setState(() => _isLoadingPortfolio = false);
-      }
     }
   }
 
@@ -617,31 +611,7 @@ class PortfolioPageState extends State<PortfolioPage>
           child: StreamBuilder<_LoadedPortfolio>(
             key: ValueKey(_lastAccount),
             stream: _stream,
-            builder: (context, snapshot) {
-              final body = _buildBody(context, snapshot);
-              if (!_isLoadingPortfolio || !_hasCachedPortfolio) return body;
-              return Stack(
-                fit: StackFit.expand,
-                children: [
-                  body,
-                  Positioned(
-                    top: 48,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: Semantics(
-                        label: context.l10n.text('Loading portfolio'),
-                        child: const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2.5),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
+            builder: (context, snapshot) => _buildBody(context, snapshot),
           ),
         ),
       ),
@@ -806,12 +776,9 @@ class PortfolioPageState extends State<PortfolioPage>
 
     if (positions.isEmpty && !snap.hasData && !_hasCachedPortfolio) {
       return _refreshableState(
-        Center(
-          child: Semantics(
-            label: context.l10n.text('Loading portfolio'),
-            child: const CircularProgressIndicator(),
-          ),
-        ),
+        _pendingRemoteLoads > 0
+            ? const Center(child: CircularProgressIndicator())
+            : const SizedBox.shrink(),
       );
     }
 
@@ -1100,6 +1067,10 @@ class PortfolioPageState extends State<PortfolioPage>
         (firstPosition, secondPosition) =>
             secondPosition.change.compareTo(firstPosition.change),
       );
+    final currencyCount =
+        positions.map((position) => position.nativeCurrency).toSet().length;
+    final positionLabel = positions.length == 1 ? 'position' : 'positions';
+    final currencyLabel = currencyCount == 1 ? 'currency' : 'currencies';
     final accountValue = netLiquidation == null
         ? fmtCurrency(totalValue)
         : fmtNativeCurrency(netLiquidation.value, netLiquidation.currency);
@@ -1112,15 +1083,18 @@ class PortfolioPageState extends State<PortfolioPage>
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _ProfilePicker(
+              ProfilePicker(
+                key: const Key('portfolio-profile-picker'),
                 onExport: () => runDetachedTask(
                   _exportCsv(context, positions),
                   'Failed to export portfolio CSV',
                 ),
-                onShare: () => runDetachedTask(
-                  _shareCsv(context, positions),
-                  'Failed to share portfolio CSV',
-                ),
+                onShare: _supportsFileSharing
+                    ? () => runDetachedTask(
+                          _shareCsv(context, positions),
+                          'Failed to share portfolio CSV',
+                        )
+                    : null,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1128,12 +1102,14 @@ class PortfolioPageState extends State<PortfolioPage>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      context.l10n.text('Portfolio'),
+                      '${accounts.activeAccount} · ${context.l10n.text('Portfolio')}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.headlineMedium,
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      accounts.activeAccount,
+                      '${positions.length} $positionLabel · $currencyCount $currencyLabel',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -1144,47 +1120,49 @@ class PortfolioPageState extends State<PortfolioPage>
               Tooltip(
                 message: context.l10n.text('Refresh'),
                 child: IconButton(
-                  onPressed: _isLoadingPortfolio ? null : _updateCandles,
+                  onPressed: _updateCandles,
                   icon: const Icon(Icons.refresh_rounded),
                 ),
               ),
-              const SizedBox(width: 4),
-              PopupMenuButton<String>(
-                key: const Key('portfolio-currency-menu'),
-                onSelected: (value) => runDetachedTask(
-                  settings.setDisplayCurrency(value),
-                  'Failed to change display currency',
-                ),
-                itemBuilder: (_) => [
-                  for (final currencyCode in settings.visibleCurrencies)
-                    CheckedPopupMenuItem(
-                      value: currencyCode,
-                      checked: currencyCode == settings.displayCurrency,
-                      child: Text(currencyCode),
-                    ),
-                ],
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
+              if (settings.visibleCurrencies.length > 1)
+                const SizedBox(width: 4),
+              if (settings.visibleCurrencies.length > 1)
+                PopupMenuButton<String>(
+                  key: const Key('portfolio-currency-menu'),
+                  onSelected: (value) => runDetachedTask(
+                    settings.setDisplayCurrency(value),
+                    'Failed to change display currency',
                   ),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: colorScheme.outlineVariant),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        settings.displayCurrency,
-                        style: theme.textTheme.labelLarge,
+                  itemBuilder: (_) => [
+                    for (final currencyCode in settings.visibleCurrencies)
+                      CheckedPopupMenuItem(
+                        value: currencyCode,
+                        checked: currencyCode == settings.displayCurrency,
+                        child: Text(currencyCode),
                       ),
-                      const SizedBox(width: 6),
-                      const Icon(Icons.expand_more_rounded, size: 20),
-                    ],
+                  ],
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: colorScheme.outlineVariant),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          settings.displayCurrency,
+                          style: theme.textTheme.labelLarge,
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.expand_more_rounded, size: 20),
+                      ],
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           if (hasRefreshWarning) ...[
@@ -1356,7 +1334,7 @@ class PortfolioPageState extends State<PortfolioPage>
                     margin: EdgeInsets.zero,
                     clipBehavior: Clip.antiAlias,
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+                      padding: const EdgeInsets.fromLTRB(22, 22, 10, 18),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -1378,7 +1356,7 @@ class PortfolioPageState extends State<PortfolioPage>
                               controller: _returnScrollController,
                               child: ListView.separated(
                                 controller: _returnScrollController,
-                                padding: const EdgeInsets.only(right: 12),
+                                padding: const EdgeInsets.only(right: 24),
                                 itemCount: byReturn.length,
                                 separatorBuilder: (_, __) => Divider(
                                   height: 1,
@@ -1709,7 +1687,11 @@ class _SummaryCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Row(
           children: [
-            _ProfilePicker(onExport: onExport, onShare: onShare),
+            ProfilePicker(
+              key: const Key('portfolio-profile-picker'),
+              onExport: onExport,
+              onShare: _supportsFileSharing ? onShare : null,
+            ),
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1731,154 +1713,29 @@ class _SummaryCard extends StatelessWidget {
               ],
             ),
             const Spacer(),
-            PopupMenuButton<String>(
-              key: const Key('portfolio-currency-menu'),
-              onSelected: (value) => runDetachedTask(
-                settings.setDisplayCurrency(value),
-                'Failed to change display currency',
-              ),
-              itemBuilder: (_) => [
-                for (final currencyCode in settings.visibleCurrencies)
-                  CheckedPopupMenuItem(
-                    value: currencyCode,
-                    checked: currencyCode == settings.displayCurrency,
-                    child: Text(currencyCode),
-                  ),
-              ],
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(settings.displayCurrency),
-                  const Icon(Icons.arrow_drop_down),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ProfilePicker extends StatelessWidget {
-  final VoidCallback onExport;
-  final VoidCallback onShare;
-
-  const _ProfilePicker({required this.onExport, required this.onShare});
-
-  @override
-  Widget build(BuildContext context) {
-    final accounts = context.watch<AccountManager>();
-    final theme = Theme.of(context);
-    final activeProfile = accounts.activeAccount;
-    final name = activeProfile.trim();
-    final initial = name.isEmpty
-        ? '?'
-        : String.fromCharCode(name.runes.first).toUpperCase();
-
-    return PopupMenuButton<String>(
-      key: const Key('portfolio-profile-picker'),
-      tooltip: 'Switch profile: $activeProfile',
-      onSelected: (value) {
-        if (value == '__export__') {
-          onExport();
-        } else if (value == '__share__') {
-          onShare();
-        } else if (value != activeProfile) {
-          runDetachedTask(
-            accounts.switchAccount(value),
-            'Failed to switch account',
-          );
-        }
-      },
-      itemBuilder: (_) => [
-        for (final profile in accounts.accounts)
-          CheckedPopupMenuItem<String>(
-            value: profile,
-            checked: profile == activeProfile,
-            child: Text(profile),
-          ),
-        const PopupMenuDivider(),
-        PopupMenuItem<String>(
-          value: '__export__',
-          child: Row(
-            children: [
-              const Icon(Icons.download_rounded, size: 20),
-              const SizedBox(width: 8),
-              Text(context.l10n.text('Export CSV')),
-            ],
-          ),
-        ),
-        if (_supportsFileSharing)
-          PopupMenuItem<String>(
-            value: '__share__',
-            child: Row(
-              children: [
-                const Icon(Icons.share_rounded, size: 20),
-                const SizedBox(width: 8),
-                Text(context.l10n.text('Share CSV')),
-              ],
-            ),
-          ),
-      ],
-      child: SizedBox(
-        width: 48,
-        height: 48,
-        child: Stack(
-          children: [
-            Align(
-              child: Container(
-                width: 42,
-                height: 42,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      theme.colorScheme.primary,
-                      Color.lerp(
-                        theme.colorScheme.primary,
-                        theme.colorScheme.tertiary,
-                        0.25,
-                      )!,
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: [
-                    BoxShadow(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.2),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
+            if (settings.visibleCurrencies.length > 1)
+              PopupMenuButton<String>(
+                key: const Key('portfolio-currency-menu'),
+                onSelected: (value) => runDetachedTask(
+                  settings.setDisplayCurrency(value),
+                  'Failed to change display currency',
+                ),
+                itemBuilder: (_) => [
+                  for (final currencyCode in settings.visibleCurrencies)
+                    CheckedPopupMenuItem(
+                      value: currencyCode,
+                      checked: currencyCode == settings.displayCurrency,
+                      child: Text(currencyCode),
                     ),
+                ],
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(settings.displayCurrency),
+                    const Icon(Icons.arrow_drop_down),
                   ],
                 ),
-                child: Text(
-                  initial,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    color: theme.colorScheme.onPrimary,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.4,
-                  ),
-                ),
               ),
-            ),
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: theme.colorScheme.outlineVariant),
-                ),
-                child: Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  size: 16,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
           ],
         ),
       ),

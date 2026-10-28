@@ -67,12 +67,13 @@ class SettingsState extends ChangeNotifier {
   String? languageCode;
   bool systemColors = false;
   bool curveLines = false;
+  bool showRollingAverage = false;
+  bool showCandlesticks = false;
   double curveSmoothness = 0.35;
   String dateFormat = 'd/M/yy';
   Color seedColor = defaultSeedColor;
   String displayCurrency = 'USD';
   List<String> visibleCurrencies = ['USD'];
-  bool showMarketClosed = false;
   bool pureBlack = false;
   bool hideDollarAmounts = false;
 
@@ -116,21 +117,19 @@ class SettingsState extends ChangeNotifier {
     return currencyForLocale(WidgetsBinding.instance.platformDispatcher.locale);
   }
 
-  static List<String> _withUsd(Iterable<String> currencies) {
+  static List<String> _normalizeCurrencies(Iterable<String> currencies) {
     final normalized = <String>[];
     for (final code in currencies) {
-      if (code != 'USD' &&
-          supportedCurrencies.contains(code) &&
-          !normalized.contains(code)) {
+      if (supportedCurrencies.contains(code) && !normalized.contains(code)) {
         normalized.add(code);
       }
     }
-    normalized.add('USD');
+    if (normalized.isEmpty) normalized.add('USD');
     return normalized;
   }
 
   static List<String> _defaultVisibleCurrencies(String homeCurrency) =>
-      _withUsd([homeCurrency]);
+      _normalizeCurrencies([homeCurrency, 'USD']);
 
   Future<void> init() async {
     final prefs = await SqliteSettings.getInstance();
@@ -171,6 +170,8 @@ class SettingsState extends ChangeNotifier {
 
     systemColors = prefs.getBool('systemColors') ?? false;
     curveLines = prefs.getBool('curveLines') ?? false;
+    showRollingAverage = prefs.getBool('chartRollingAverage') ?? false;
+    showCandlesticks = prefs.getBool('chartCandlesticks') ?? false;
     curveSmoothness = prefs.getDouble('curveSmoothness') ?? 0.35;
     dateFormat = prefs.getString('dateFormat') ?? 'd/M/yy';
     final colorVal = prefs.getInt('seedColor');
@@ -179,14 +180,13 @@ class SettingsState extends ChangeNotifier {
     final homeCurrency = await _detectLocalCurrency();
     final savedCurrencies = prefs.getStringList('visibleCurrencies');
     visibleCurrencies = (savedCurrencies != null && savedCurrencies.isNotEmpty)
-        ? _withUsd(savedCurrencies)
+        ? _normalizeCurrencies(savedCurrencies)
         : _defaultVisibleCurrencies(homeCurrency);
     if (savedCurrencies != null &&
         !listEquals(savedCurrencies, visibleCurrencies)) {
       await prefs.setStringList('visibleCurrencies', visibleCurrencies);
     }
 
-    showMarketClosed = prefs.getBool('showMarketClosed') ?? false;
     pureBlack = prefs.getBool('pureBlack') ?? false;
     hideDollarAmounts = prefs.getBool('hideDollarAmounts') ?? false;
     maskCurrencyAmounts = hideDollarAmounts;
@@ -289,6 +289,20 @@ class SettingsState extends ChangeNotifier {
     await prefs.setBool('curveLines', value);
   }
 
+  Future<void> setShowRollingAverage(bool value) async {
+    showRollingAverage = value;
+    notifyListeners();
+    final prefs = await SqliteSettings.getInstance();
+    await prefs.setBool('chartRollingAverage', value);
+  }
+
+  Future<void> setShowCandlesticks(bool value) async {
+    showCandlesticks = value;
+    notifyListeners();
+    final prefs = await SqliteSettings.getInstance();
+    await prefs.setBool('chartCandlesticks', value);
+  }
+
   /// Persists the dark-theme background preference.
   Future<void> setPureBlack(bool value) async {
     pureBlack = value;
@@ -304,14 +318,6 @@ class SettingsState extends ChangeNotifier {
     notifyListeners();
     final prefs = await SqliteSettings.getInstance();
     await prefs.setBool('hideDollarAmounts', value);
-  }
-
-  /// Persists whether closed-market indicators are shown.
-  Future<void> setShowMarketClosed(bool value) async {
-    showMarketClosed = value;
-    notifyListeners();
-    final prefs = await SqliteSettings.getInstance();
-    await prefs.setBool('showMarketClosed', value);
   }
 
   /// Persists the interpolation strength used by charts.
@@ -364,7 +370,7 @@ class SettingsState extends ChangeNotifier {
   }
 
   Future<void> setVisibleCurrencies(List<String> currencies) async {
-    visibleCurrencies = _withUsd(currencies);
+    visibleCurrencies = _normalizeCurrencies(currencies);
     final prefs = await SqliteSettings.getInstance();
     await prefs.setStringList('visibleCurrencies', visibleCurrencies);
     if (!visibleCurrencies.contains(displayCurrency)) {

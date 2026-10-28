@@ -144,7 +144,7 @@ void main() {
         child: MaterialApp(home: page),
       );
 
-  testWidgets('portfolio exposes a loading state while uncached data loads', (
+  testWidgets('portfolio shows a spinner while uncached remote data loads', (
     tester,
   ) async {
     await seedTestSqlite({});
@@ -166,7 +166,7 @@ void main() {
     await tester.pump();
 
     expect(loads, 1);
-    expect(find.bySemanticsLabel('Loading portfolio'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pump();
@@ -209,22 +209,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('VOO'), findsOneWidget);
-      expect(find.bySemanticsLabel('Loading portfolio'), findsOneWidget);
-      final loadingIndicator = find.byType(CircularProgressIndicator);
-      final positioned = tester.widget<Positioned>(
-        find.ancestor(
-          of: loadingIndicator,
-          matching: find.byType(Positioned),
-        ),
-      );
-      expect(positioned.top, 48);
-      expect(positioned.left, 0);
-      expect(positioned.right, 0);
-      expect(
-        tester.getCenter(loadingIndicator).dx,
-        tester.getCenter(find.byType(Scaffold)).dx,
-      );
-      expect(tester.getCenter(loadingIndicator).dy, 60);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
 
       pending.complete(snapshotFor('*****6552', 'VOO'));
       await tester.pumpAndSettle();
@@ -274,50 +259,59 @@ void main() {
     expect(tester.takeException(), null);
   });
 
-  testWidgets('portfolio initial opens the profile picker and switches', (
-    tester,
-  ) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(700, 900);
-    addTearDown(() {
-      tester.view.resetPhysicalSize();
-      tester.view.resetDevicePixelRatio();
-    });
-    await seedTestSqlite({});
-    final accounts = await configuredTwoAccounts();
-    for (final profile in accounts.accounts) {
-      await accounts.cachePortfolio(
-        profile,
-        [cachedPosition()],
-        const IbkrAccountValue(value: 5500, currency: 'USD'),
+  for (final width in [700.0, 1400.0]) {
+    testWidgets('portfolio profile picker switches at width $width', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = Size(width, 900);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      await seedTestSqlite({});
+      final accounts = await configuredTwoAccounts();
+      for (final profile in accounts.accounts) {
+        await accounts.cachePortfolio(
+          profile,
+          [cachedPosition()],
+          const IbkrAccountValue(value: 5500, currency: 'USD'),
+        );
+      }
+
+      final pending = Completer<IbkrPortfolioSnapshot>();
+      await tester.pumpWidget(
+        app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
       );
-    }
+      await tester.pump();
 
-    final pending = Completer<IbkrPortfolioSnapshot>();
-    await tester.pumpWidget(
-      app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
-    );
-    await tester.pump();
+      if (width == 1400) {
+        expect(find.text('Default · Portfolio'), findsOneWidget);
+        expect(find.text('1 position · 1 currency'), findsOneWidget);
+      }
+      final picker = find.byKey(const Key('portfolio-profile-picker'));
+      expect(
+        find.descendant(of: picker, matching: find.text('D')),
+        findsOneWidget,
+      );
 
-    final picker = find.byKey(const Key('portfolio-profile-picker'));
-    expect(
-      find.descendant(of: picker, matching: find.text('D')),
-      findsOneWidget,
-    );
+      await tester.tap(picker);
+      await tester.pumpAndSettle();
+      expect(find.text('IBKR Bot'), findsOneWidget);
 
-    await tester.tap(picker);
-    await tester.pumpAndSettle();
-    expect(find.text('IBKR Bot'), findsOneWidget);
-
-    await tester.tap(find.text('IBKR Bot'));
-    await tester.pumpAndSettle();
-    expect(accounts.activeAccount, 'IBKR Bot');
-    expect(
-      find.descendant(of: picker, matching: find.text('I')),
-      findsOneWidget,
-    );
-    expect(tester.takeException(), null);
-  });
+      await tester.tap(find.text('IBKR Bot'));
+      await tester.pumpAndSettle();
+      expect(accounts.activeAccount, 'IBKR Bot');
+      if (width == 1400) {
+        expect(find.text('IBKR Bot · Portfolio'), findsOneWidget);
+      }
+      expect(
+        find.descendant(of: picker, matching: find.text('I')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), null);
+    });
+  }
 
   testWidgets(
     'slow IBKR performance refresh does not keep portfolio loading',
@@ -421,7 +415,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('VOO'), findsNothing);
-      expect(find.bySemanticsLabel('Loading portfolio'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
     },
   );
 
@@ -558,7 +552,7 @@ void main() {
         matching: find.byType(ListView),
       ),
     );
-    expect(returnList.padding, allocationList.padding);
+    expect(returnList.padding, const EdgeInsets.only(right: 24));
     final pieFinder = find.byType(MarketDonutChart).first;
     final pie = tester.widget<MarketDonutChart>(pieFinder);
     expect(pie.radius, 75);

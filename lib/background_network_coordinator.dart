@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:flutter/widgets.dart';
+
 abstract final class RequestCategory {
   static const ibkrHealth = 'ibkr.health';
   static const ibkrPortfolio = 'ibkr.portfolio';
@@ -9,7 +13,44 @@ abstract final class RequestCategory {
   static const marketCandles = 'market.candles';
 }
 
-class BackgroundNetworkCoordinator {
+class BackgroundNetworkCoordinator with WidgetsBindingObserver {
+  Completer<void>? _foreground;
+  int _suspensionVersion = 0;
+
+  void observeAppLifecycle() {
+    final binding = WidgetsBinding.instance;
+    binding.addObserver(this);
+    didChangeAppLifecycleState(
+      binding.lifecycleState ?? AppLifecycleState.resumed,
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final pending = _foreground;
+      _foreground = null;
+      pending?.complete();
+    } else if (_foreground == null) {
+      _suspensionVersion++;
+      _foreground = Completer<void>();
+    }
+  }
+
+  Future<T> _requestInForeground<T>(Future<T> Function() request) async {
+    while (true) {
+      while (_foreground != null) {
+        await _foreground!.future;
+      }
+      final version = _suspensionVersion;
+      try {
+        return await Future<T>.sync(request);
+      } catch (_) {
+        if (_foreground == null && version == _suspensionVersion) rethrow;
+      }
+    }
+  }
+
   static const ibkrPortfolioFreshness = Duration(minutes: 5);
   static const ibkrPerformanceFreshness = Duration(minutes: 30);
 
@@ -87,7 +128,7 @@ class BackgroundNetworkCoordinator {
       ifAbsent: () => 1,
     );
     try {
-      final result = await Future<T>.sync(request);
+      final result = await _requestInForeground(request);
       _completedByNamespace.update(
         namespace,
         (count) => count + 1,

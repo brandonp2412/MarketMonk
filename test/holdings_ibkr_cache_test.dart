@@ -41,7 +41,7 @@ void main() {
     );
   });
 
-  test('local holdings retain existing cache behavior', () {
+  test('local holdings recompute after trades change', () {
     expect(
       HoldingsPageState.shouldUsePortfolioCache(
         hasCache: true,
@@ -50,7 +50,7 @@ void main() {
         ibkrConfigured: false,
         cacheFresh: false,
       ),
-      isTrue,
+      isFalse,
     );
   });
 }

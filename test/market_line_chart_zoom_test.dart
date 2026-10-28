@@ -81,6 +81,243 @@ void main() {
     await tester.pump();
   }
 
+  testWidgets('only candlestick tooltips paint a date heading', (tester) async {
+    final selected = ValueNotifier<int?>(0);
+    addTearDown(selected.dispose);
+    var titleCalls = 0;
+    Widget chart(bool showCandlesticks) => MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 300,
+              child: MarketLineChart(
+                series: [
+                  MarketLineChartSeries(
+                    color: Colors.blue,
+                    points: const [
+                      MarketLineChartPoint(0, 100, column: 0),
+                      MarketLineChartPoint(1, 101, column: 1),
+                    ],
+                  ),
+                ],
+                xLabels: const ['27 Oct', '28 Oct'],
+                pointCount: 2,
+                candles: const [
+                  MarketCandlePoint(
+                    column: 0,
+                    open: 99,
+                    high: 102,
+                    low: 98,
+                    close: 100,
+                  ),
+                  MarketCandlePoint(
+                    column: 1,
+                    open: 100,
+                    high: 103,
+                    low: 99,
+                    close: 101,
+                  ),
+                ],
+                showCandlesticks: showCandlesticks,
+                candleSelection: selected,
+                candleTooltipTitle: (_) {
+                  titleCalls++;
+                  return '28 Oct 2026';
+                },
+                candleTooltipRows: (_) => const ['O 100 H 103'],
+                yLabelFormatter: (value) => '$value',
+                tooltipRowLabel: (_) => r'$101 · 28 Oct',
+                curveLines: false,
+                curveSmoothness: 0,
+              ),
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(chart(false));
+    await tester.pump();
+    expect(titleCalls, 0);
+    await tester.pumpWidget(chart(true));
+    await tester.pump();
+    expect(titleCalls, greaterThan(0));
+  });
+
+  testWidgets('multi-series sampled and OHLC candles share line geometry',
+      (tester) async {
+    final source = [
+      MarketLineChartSeries(
+        color: Colors.orange,
+        name: 'Portfolio',
+        points: [
+          for (var i = 0; i < 12; i++)
+            MarketLineChartPoint(i.toDouble(), i.toDouble(), column: i),
+        ],
+      ),
+      MarketLineChartSeries(
+        color: Colors.blue,
+        name: 'Favorite',
+        points: [
+          for (var i = 0; i < 12; i++)
+            MarketLineChartPoint(i.toDouble(), i * 1.5, column: i),
+        ],
+      ),
+    ];
+    final candles = [
+      for (var i = 0; i < 12; i++) ...[
+        MarketCandlePoint(
+          column: i,
+          seriesIndex: 0,
+          sampled: true,
+          open: (i == 0 ? 0 : i - 1).toDouble(),
+          high: i.toDouble(),
+          low: (i == 0 ? 0 : i - 1).toDouble(),
+          close: i.toDouble(),
+        ),
+        MarketCandlePoint(
+          column: i,
+          seriesIndex: 1,
+          open: i * 1.5 - 0.5,
+          high: i * 1.5 + 0.8,
+          low: i * 1.5 - 1,
+          close: i * 1.5,
+        ),
+      ],
+    ];
+    Widget app(bool show) => MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              height: 300,
+              width: 600,
+              child: MarketLineChart(
+                series: source,
+                candles: candles,
+                showCandlesticks: show,
+                xLabels: [for (var i = 0; i < 12; i++) 'D$i'],
+                pointCount: 12,
+                yLabelFormatter: (value) => '$value',
+                tooltipRowLabel: (mark) => '${mark.seriesName} ${mark.value}',
+                candleTooltipRows: (_) =>
+                    ['Portfolio sampled', 'Favorite OHLC'],
+                curveLines: false,
+                curveSmoothness: 0,
+              ),
+            ),
+          ),
+        );
+    await tester.pumpWidget(app(false));
+    final before = scene(tester);
+    await tester.pumpWidget(app(true));
+    final after = scene(tester);
+    expect(after.marks, hasLength(24));
+    expect(after.bounds!.left, before.bounds!.left);
+    expect(after.bounds!.right, before.bounds!.right);
+    expect(after.bounds!.top, before.bounds!.top);
+    expect(after.bounds!.bottom, before.bounds!.bottom);
+    expect(after.scale!.minValue, before.scale!.minValue);
+    expect(after.scale!.maxValue, before.scale!.maxValue);
+    expect(
+      [for (final mark in after.marks) mark.center],
+      [for (final mark in before.marks) mark.center],
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('candle and line switches preserve every chart coordinate',
+      (tester) async {
+    final closes = <double>[100, 106, 103, 114, 112, 119, 117, 125];
+    final candles = [
+      for (var i = 0; i < closes.length; i++)
+        MarketCandlePoint(
+          column: i,
+          open: closes[i] - 2,
+          high: closes[i] + 3,
+          low: closes[i] - 5,
+          close: closes[i],
+        ),
+    ];
+    Widget build(bool showCandlesticks) => MaterialApp(
+          theme: ThemeData(platform: TargetPlatform.android),
+          home: Scaffold(
+            body: Column(
+              children: [
+                SizedBox(
+                  width: 800,
+                  height: 300,
+                  child: MarketLineChart(
+                    series: [
+                      MarketLineChartSeries(
+                        points: [
+                          for (var i = 0; i < closes.length; i++)
+                            MarketLineChartPoint(i.toDouble(), closes[i]),
+                        ],
+                        color: Colors.amber,
+                      ),
+                    ],
+                    candles: candles,
+                    showCandlesticks: showCandlesticks,
+                    candleTooltipTitle: (_) => '27 Oct 2026',
+                    candleTooltipRows: (_) => ['O 100 H 105', 'L 95 C 101'],
+                    xLabels: [for (var i = 0; i < closes.length; i++) 'D$i'],
+                    pointCount: closes.length,
+                    yLabelFormatter: (value) => value.toStringAsFixed(1),
+                    tooltipRowLabel: (_) => 'Price',
+                    curveLines: false,
+                    curveSmoothness: 0,
+                  ),
+                ),
+                const Text('Outside chart'),
+              ],
+            ),
+          ),
+        );
+
+    PopScope<Object?> popScope() => tester.widget<PopScope<Object?>>(
+          find.byWidgetPredicate((widget) => widget is PopScope<Object?>).first,
+        );
+
+    await tester.pumpWidget(build(false));
+    final line = scene(tester);
+    final lineCanvas = tester.getRect(find.byType(ChartCanvas));
+    await tester.pumpWidget(build(true));
+    final candle = scene(tester);
+    expect(tester.getRect(find.byType(ChartCanvas)), lineCanvas);
+    expect(candle.bounds!.left, line.bounds!.left);
+    expect(candle.bounds!.right, line.bounds!.right);
+    expect(candle.bounds!.top, line.bounds!.top);
+    expect(candle.bounds!.bottom, line.bounds!.bottom);
+    expect(candle.scale!.minValue, line.scale!.minValue);
+    expect(candle.scale!.maxValue, line.scale!.maxValue);
+    expect(
+      [for (final mark in candle.marks) mark.center],
+      [for (final mark in line.marks) mark.center],
+    );
+
+    await tester.tapAt(candle.marks[2].center);
+    await tester.pump();
+    expect(popScope().canPop, false);
+    await tester.tap(find.text('Outside chart'));
+    await tester.pump();
+    expect(popScope().canPop, true);
+
+    await tester.tapAt(candle.marks[3].center);
+    await tester.pump();
+    expect(popScope().canPop, false);
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(popScope().canPop, true);
+    expect(find.byType(ChartCanvas), findsOneWidget);
+
+    await tester.tapAt(candle.marks[4].center);
+    await tester.pump();
+    await tester.pumpWidget(build(false));
+    await tester.pump();
+    expect(popScope().canPop, true);
+    expect(scene(tester).bounds!.left, line.bounds!.left);
+    expect(scene(tester).bounds!.right, line.bounds!.right);
+    expect(scene(tester).bounds!.top, line.bounds!.top);
+    expect(scene(tester).bounds!.bottom, line.bounds!.bottom);
+  });
+
   testWidgets('rolling average replaces plotted values and follows zoom',
       (tester) async {
     await tester.pumpWidget(chart(showRollingAverage: true));

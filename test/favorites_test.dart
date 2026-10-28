@@ -21,6 +21,78 @@ Future<void> _pumpApp(WidgetTester tester, AccountManager accounts) async {
 }
 
 void main() {
+  testWidgets('long press confirms favorite removal in a bottom sheet', (
+    tester,
+  ) async {
+    await seedTestSqlite({
+      'favoriteStocks': ['AAPL'],
+    });
+    cacheSymbolMeta('AAPL', 'USD');
+    await seedTestCandle('AAPL', DateTime.now(), 190);
+    await _pumpApp(tester, testAccountManager());
+    final prefs = await SqliteSettings.getInstance();
+
+    await tester.longPress(find.text('AAPL'));
+    await tester.pumpAndSettle();
+    final sheet = find.byType(BottomSheet);
+    expect(
+      find.descendant(of: sheet, matching: find.text('AAPL')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: sheet, matching: find.byIcon(Icons.close)),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Rename'));
+    await tester.pumpAndSettle();
+    final nameField = find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(nameField, 'Apple');
+    await tester.tap(find.widgetWithText(FilledButton, 'Rename'));
+    await tester.pumpAndSettle();
+    expect(find.text('Apple'), findsOneWidget);
+    expect(prefs.getString('favoriteName:AAPL'), 'Apple');
+    expect(prefs.getStringList('favoriteStocks'), ['AAPL']);
+
+    await tester.longPress(find.text('Apple'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Rename'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(nameField).controller!.text, 'Apple');
+    await tester.enterText(nameField, '');
+    await tester.tap(find.widgetWithText(FilledButton, 'Rename'));
+    await tester.pumpAndSettle();
+    expect(find.text('AAPL'), findsOneWidget);
+    expect(prefs.getString('favoriteName:AAPL'), isNull);
+
+    await tester.longPress(find.text('AAPL'));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(prefs.getStringList('favoriteStocks'), ['AAPL']);
+    expect(find.byIcon(Icons.check_circle_rounded), findsNothing);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.text('AAPL'), findsOneWidget);
+    expect(prefs.getStringList('favoriteStocks'), ['AAPL']);
+
+    await tester.tap(find.text('AAPL'));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
+    await tester.longPress(find.text('AAPL'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remove favorite'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.text('AAPL'), findsNothing);
+    expect(find.byType(MarketLineChart), findsNothing);
+    expect(prefs.getStringList('favoriteStocks'), isEmpty);
+  });
+
   testWidgets(
     'favorites toggle graph lines and selection without opening search',
     (WidgetTester tester) async {
@@ -95,7 +167,10 @@ void main() {
   testWidgets(
     'legacy single favoriteStock is migrated into favoriteStocks on load',
     (WidgetTester tester) async {
-      await seedTestSqlite({'favoriteStock': 'MSFT'});
+      await seedTestSqlite({
+        'favoriteStock': 'MSFT',
+        'favoriteName:MSFT': 'Microsoft',
+      });
       cacheSymbolMeta('MSFT', 'USD');
       final accounts = testAccountManager();
 
@@ -116,7 +191,7 @@ void main() {
 
       await _pumpApp(tester, accounts);
 
-      expect(find.text('MSFT'), findsOneWidget);
+      expect(find.text('Microsoft'), findsOneWidget);
 
       final prefs = await SqliteSettings.getInstance();
       expect(prefs.getStringList('favoriteStocks'), ['MSFT']);

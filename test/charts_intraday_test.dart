@@ -108,6 +108,38 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
   }
 
+  testWidgets('uncached stock shows a spinner only until prices arrive', (
+    tester,
+  ) async {
+    final pending = Completer<http.Response>();
+    await mountChart(
+      tester,
+      IntradayMarketData(yahooGet: (_) => pending.future),
+    );
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.text('1d'), findsWidgets);
+    pending.complete(_prices(100));
+    await tester.pumpAndSettle();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byType(TickerLine), findsOneWidget);
+  });
+
+  testWidgets('failed stock request replaces the spinner with an error', (
+    tester,
+  ) async {
+    final pending = Completer<http.Response>();
+    await mountChart(
+      tester,
+      IntradayMarketData(yahooGet: (_) => pending.future),
+    );
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    pending.complete(http.Response('Unavailable', 503));
+    await tester.pumpAndSettle();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byType(TickerLine), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     '1d renders all minute prices and local times without daily writes',
     (tester) async {
@@ -170,6 +202,7 @@ void main() {
         calls++;
         return calls <= 3 ? http.Response('rate limited', 429) : _prices(100);
       },
+      retryDelay: (_) async {},
     );
     await mountChart(tester, loader);
     await tester.pumpAndSettle();
@@ -181,6 +214,84 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(TickerLine), findsOneWidget);
     expect(calls, 4);
+  });
+
+  testWidgets('period changes replace favorite lines together', (tester) async {
+    final first = Completer<http.Response>();
+    final second = Completer<http.Response>();
+    var requests = 0;
+    final loader = IntradayMarketData(
+      yahooGet: (uri) async {
+        requests++;
+        if (uri.queryParameters['range'] == '5d') {
+          return uri.path.endsWith('AAPL') ? first.future : second.future;
+        }
+        return _prices(100, currency: 'USD');
+      },
+    );
+    await mountChart(
+      tester,
+      loader,
+      initialSymbol: null,
+      favorites: ['AAPL', 'MSFT'],
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('AAPL'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('MSFT'));
+    await tester.pumpAndSettle();
+    final previous = tester.widget<MarketLineChart>(
+      find.byType(MarketLineChart),
+    );
+    expect(previous.series, hasLength(2));
+
+    await tester.tap(find.byKey(const Key('chart-period-5d')));
+    await tester.pump();
+    expect(
+      tester.widget<MarketLineChart>(find.byType(MarketLineChart)),
+      same(previous),
+    );
+
+    first.complete(_prices(200, currency: 'USD', count: 6));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(
+      tester.widget<MarketLineChart>(find.byType(MarketLineChart)),
+      same(previous),
+    );
+
+    second.complete(_prices(300, currency: 'USD', count: 6));
+    await tester.pumpAndSettle();
+    final updated = tester.widget<MarketLineChart>(
+      find.byType(MarketLineChart),
+    );
+    expect(updated.series, hasLength(2));
+    expect(updated.series.every((series) => series.points.length == 6), isTrue);
+    expect(tester.takeException(), isNull);
+
+    final loadedRequests = requests;
+    await tester.tap(find.byKey(const Key('chart-period-1d')));
+    await tester.pump();
+    final restoredDay = tester.widget<MarketLineChart>(
+      find.byType(MarketLineChart),
+    );
+    expect(restoredDay.series, hasLength(2));
+    expect(
+      restoredDay.series.every((series) => series.points.length == 3),
+      isTrue,
+    );
+
+    await tester.tap(find.byKey(const Key('chart-period-5d')));
+    await tester.pump();
+    final restoredWeek = tester.widget<MarketLineChart>(
+      find.byType(MarketLineChart),
+    );
+    expect(restoredWeek.series, hasLength(2));
+    expect(
+      restoredWeek.series.every((series) => series.points.length == 6),
+      isTrue,
+    );
+    expect(requests, loadedRequests);
   });
 
   testWidgets('favorite 5d chart preserves all intraday observations', (
@@ -205,7 +316,8 @@ void main() {
     expect(chart.series.single.points, hasLength(12));
     expect(chart.series.single.points.first.y, 0);
     expect(chart.series.single.points.last.y, closeTo(11, 1e-8));
-    expect(chart.xLabels.first, contains(RegExp(r'\d{2}:\d{2}')));
+    expect(chart.xLabels.first, matches(RegExp(r'^\d{2}:\d{2}$')));
+    expect(chart.candleTooltipTitle?.call(0), contains('/'));
   });
 
   testWidgets('portfolio 5d weights every holding and offers intraday 1d', (
@@ -260,7 +372,8 @@ void main() {
     expect(chart.series.single.points, hasLength(12));
     expect(chart.series.single.points.first.y, 945);
     expect(chart.series.single.points.last.y, 1000);
-    expect(chart.xLabels.first, contains(RegExp(r'\d{2}:\d{2}')));
+    expect(chart.xLabels.first, matches(RegExp(r'^\d{2}:\d{2}$')));
+    expect(chart.candleTooltipTitle?.call(0), contains('/'));
     expect(find.textContaining('TWR'), findsNothing);
     await tester.tap(find.byKey(const Key('chart-period-1d')));
     await tester.pumpAndSettle();
@@ -443,7 +556,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Historical prices unavailable'), findsNothing);
-    expect(find.bySemanticsLabel('Loading portfolio'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
     final recentMonday = DateTime.now().subtract(
       Duration(days: DateTime.now().weekday - DateTime.monday),
@@ -519,9 +632,7 @@ void main() {
     expect(find.byType(MarketLineChart), findsOneWidget);
   });
 
-  testWidgets('5d favorite uses daily line until intraday data arrives', (
-    tester,
-  ) async {
+  testWidgets('5d favorite waits for intraday before plotting', (tester) async {
     final pending = Completer<http.Response>();
     final loader = IntradayMarketData(yahooGet: (_) => pending.future);
     await mountChart(
@@ -543,22 +654,18 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('AAPL').first);
-    await tester.pumpAndSettle();
-    var series = tester
-        .widget<MarketLineChart>(
-          find.byType(MarketLineChart),
-        )
-        .series;
+    await tester.pump();
+    expect(find.byType(MarketLineChart), findsNothing);
     expect(
-      series.where((line) => line.name == 'AAPL').single.points,
-      hasLength(5),
+      find.byKey(const Key('chart-account-selector-Default')),
+      findsOneWidget,
     );
 
     pending.complete(
       _prices(200, currency: 'USD', count: 12, intervalSeconds: 900),
     );
     await tester.pumpAndSettle();
-    series =
+    final series =
         tester.widget<MarketLineChart>(find.byType(MarketLineChart)).series;
     expect(
       series.where((line) => line.name == 'AAPL').single.points,
@@ -566,7 +673,7 @@ void main() {
     );
   });
 
-  testWidgets('5d stock shows cached daily prices before 15-minute data', (
+  testWidgets('5d stock waits for 15-minute data before plotting', (
     tester,
   ) async {
     final pending = Completer<http.Response>();
@@ -587,15 +694,8 @@ void main() {
       },
     );
     await tester.pump();
-    expect(find.textContaining('Daily preview'), findsNothing);
-    expect(
-      tester.widget<TickerLine>(find.byType(TickerLine)).spots,
-      hasLength(5),
-    );
-    expect(
-      tester.widget<TickerLine>(find.byType(TickerLine)).intraday,
-      isFalse,
-    );
+    expect(find.byType(TickerLine), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
     pending.complete(
       _prices(200, currency: 'GBp', count: 12, intervalSeconds: 900),
@@ -639,110 +739,104 @@ void main() {
     );
   });
 
-  testWidgets(
-    '5d portfolio shows five broker daily NAV points before intraday',
-    (tester) async {
-      final pending = Completer<IbkrHistoricalSeries>();
-      final loader = IntradayMarketData(
-        ibkrFetch: (_, __, ___) => pending.future,
-        yahooGet: (_) async => throw StateError('Yahoo should not be needed'),
-      );
-      await mountChart(
-        tester,
-        loader,
-        initialSymbol: null,
-        days: 5,
-        configureAccounts: (accounts) async {
-          await accounts.setIbkrConfig(
-            'Default',
-            const IbkrAccountConfig(
-              enabled: true,
-              baseUrl: 'https://test.example',
-              token: 'secret',
+  testWidgets('5d portfolio shows account details while intraday loads', (
+    tester,
+  ) async {
+    final pending = Completer<IbkrHistoricalSeries>();
+    final loader = IntradayMarketData(
+      ibkrFetch: (_, __, ___) => pending.future,
+      yahooGet: (_) async => throw StateError('Yahoo should not be needed'),
+    );
+    await mountChart(
+      tester,
+      loader,
+      initialSymbol: null,
+      days: 5,
+      configureAccounts: (accounts) async {
+        await accounts.setIbkrConfig(
+          'Default',
+          const IbkrAccountConfig(
+            enabled: true,
+            baseUrl: 'https://test.example',
+            token: 'secret',
+          ),
+        );
+        await accounts.cachePortfolio(
+          'Default',
+          [
+            Position(
+              symbol: 'AAPL',
+              name: 'Apple',
+              nativeCurrency: 'USD',
+              netShares: 2,
+              avgCost: 50,
+              currentPrice: 100,
+              firstBuyDate: DateTime(2026),
+              lastBuyDate: DateTime(2026),
             ),
-          );
-          await accounts.cachePortfolio(
-            'Default',
-            [
-              Position(
-                symbol: 'AAPL',
-                name: 'Apple',
-                nativeCurrency: 'USD',
-                netShares: 2,
-                avgCost: 50,
-                currentPrice: 100,
-                firstBuyDate: DateTime(2026),
-                lastBuyDate: DateTime(2026),
-              ),
-            ],
-            const IbkrAccountValue(value: 1000, currency: 'USD'),
-            netLiquidationUsd: 1000,
-          );
-          await accounts.cacheIbkrPerformance(
-            'Default',
-            IbkrPerformanceSeries(
-              period: '1Y',
-              measure: 'TWR',
-              currency: 'USD',
-              startDate: null,
-              startNav: null,
-              dates: [
-                DateTime(2026, 10, 5),
-                DateTime(2026, 10, 6),
-                DateTime(2026, 10, 7),
-                DateTime(2026, 10, 8),
-                DateTime(2026, 10, 9),
-              ],
-              nav: const [960, 970, 980, 990, 1000],
-              returnDates: const [],
-              returns: const [],
-            ),
-          );
-        },
-      );
-      await tester.pump();
-      expect(
-        find.textContaining('Daily preview'),
-        findsNothing,
-      );
-      expect(
-        tester
-            .widget<MarketLineChart>(find.byType(MarketLineChart))
-            .series
-            .single
-            .points,
-        hasLength(5),
-      );
-
-      pending.complete(
-        IbkrHistoricalSeries(
-          symbol: 'AAPL',
-          currency: 'USD',
-          candles: [
-            for (var index = 0; index < 12; index++)
-              IbkrHistoricalCandle(
-                date: DateTime.utc(2026, 10, 9, 14, index * 15),
-                open: 100 + index.toDouble(),
-                high: 100 + index.toDouble(),
-                low: 100 + index.toDouble(),
-                close: 100 + index.toDouble(),
-                volume: 10,
-              ),
           ],
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.textContaining('Daily preview'), findsNothing);
-      expect(
-        tester
-            .widget<MarketLineChart>(find.byType(MarketLineChart))
-            .series
-            .single
-            .points,
-        hasLength(12),
-      );
-    },
-  );
+          const IbkrAccountValue(value: 1000, currency: 'USD'),
+          netLiquidationUsd: 1000,
+        );
+        await accounts.cacheIbkrPerformance(
+          'Default',
+          IbkrPerformanceSeries(
+            period: '1Y',
+            measure: 'TWR',
+            currency: 'USD',
+            startDate: null,
+            startNav: null,
+            dates: [
+              DateTime(2026, 10, 5),
+              DateTime(2026, 10, 6),
+              DateTime(2026, 10, 7),
+              DateTime(2026, 10, 8),
+              DateTime(2026, 10, 9),
+            ],
+            nav: const [960, 970, 980, 990, 1000],
+            returnDates: const [],
+            returns: const [],
+          ),
+        );
+      },
+    );
+    await tester.pump();
+    expect(find.textContaining('Daily preview'), findsNothing);
+    expect(find.byType(MarketLineChart), findsNothing);
+    expect(
+      find.byKey(const Key('chart-account-selector-Default')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('1,000'), findsWidgets);
+
+    pending.complete(
+      IbkrHistoricalSeries(
+        symbol: 'AAPL',
+        currency: 'USD',
+        candles: [
+          for (var index = 0; index < 12; index++)
+            IbkrHistoricalCandle(
+              date: DateTime.utc(2026, 10, 9, 14, index * 15),
+              open: 100 + index.toDouble(),
+              high: 100 + index.toDouble(),
+              low: 100 + index.toDouble(),
+              close: 100 + index.toDouble(),
+              volume: 10,
+            ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Daily preview'), findsNothing);
+    expect(
+      tester
+          .widget<MarketLineChart>(find.byType(MarketLineChart))
+          .series
+          .single
+          .points,
+      hasLength(12),
+    );
+  });
 
   testWidgets('inactive charts do not request intraday bars', (tester) async {
     var calls = 0;

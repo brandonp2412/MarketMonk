@@ -343,8 +343,9 @@ double _averageCostForOpenPosition(List<Trade> trades) {
 /// Only returns positions with net shares > 0 (i.e. not fully closed).
 List<Position> computePositions(
   List<Trade> trades,
-  Map<String, double> latestPrices,
-) {
+  Map<String, double> latestPrices, {
+  Map<String, String> nativeCurrencies = const {},
+}) {
   final Map<String, List<Trade>> bySymbol = {};
   for (final trade in trades) {
     bySymbol.putIfAbsent(trade.symbol, () => []).add(trade);
@@ -387,7 +388,8 @@ List<Position> computePositions(
       Position(
         symbol: symbol,
         name: name,
-        nativeCurrency: _symbolCurrencies[symbol] ?? 'UNKNOWN',
+        nativeCurrency:
+            nativeCurrencies[symbol] ?? _symbolCurrencies[symbol] ?? 'UNKNOWN',
         netShares: netShares,
         avgCost: avgCost / centDiv,
         currentPrice: currentPrice / centDiv,
