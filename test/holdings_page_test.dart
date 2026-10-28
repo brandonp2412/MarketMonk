@@ -89,9 +89,15 @@ void main() {
       final initialLoads = positionLoads;
 
       for (final hidden in [false, true]) {
-        await tester.tap(find.byKey(const Key('holdings-menu-button')));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Settings'));
+        if (width < 1000) {
+          await tester.tap(find.byKey(const Key('holdings-menu-button')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Settings'));
+        } else {
+          Navigator.of(tester.element(find.byType(HoldingsPage))).push(
+            MaterialPageRoute<void>(builder: (_) => const SettingsPage()),
+          );
+        }
         await tester.pumpAndSettle();
         final privacyTile =
             find.widgetWithText(ListTile, 'Hide dollar amounts');
@@ -500,7 +506,7 @@ void main() {
     expect(find.text(r'+$500.00'), findsOneWidget);
   });
 
-  testWidgets('holdings menu exposes account picker on desktop',
+  testWidgets('desktop holdings profile picker switches accounts',
       (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1400, 900);
@@ -538,11 +544,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.byKey(const Key('desktop-holdings-account-picker')),
+      find.byKey(const Key('holdings-menu-button')),
       findsNothing,
     );
 
-    await tester.tap(find.byKey(const Key('holdings-menu-button')));
+    await tester.tap(find.byKey(const Key('holdings-profile-picker')));
     await tester.pumpAndSettle();
 
     expect(accounts.activeAccount, 'Default');

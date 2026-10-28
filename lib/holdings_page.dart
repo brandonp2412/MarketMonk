@@ -14,6 +14,7 @@ import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/profile_data_repository.dart';
+import 'package:market_monk/profile_picker.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/trade_history_page.dart';
@@ -802,6 +803,8 @@ class HoldingsPageState extends State<HoldingsPage>
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
+                    const ProfilePicker(key: Key('holdings-profile-picker')),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -873,10 +876,6 @@ class HoldingsPageState extends State<HoldingsPage>
                         icon: const Icon(Icons.add),
                         label: Text(context.l10n.text('Add trade')),
                       ),
-                    ],
-                    if (!_selecting) ...[
-                      const SizedBox(width: 8),
-                      menuButton,
                     ],
                   ],
                 ),

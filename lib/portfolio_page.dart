@@ -20,6 +20,7 @@ import 'package:market_monk/logging.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/market_donut_chart.dart';
 import 'package:market_monk/profile_data_repository.dart';
+import 'package:market_monk/profile_picker.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/sqlite_settings.dart';
@@ -1078,15 +1079,18 @@ class PortfolioPageState extends State<PortfolioPage>
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _ProfilePicker(
+              ProfilePicker(
+                key: const Key('portfolio-profile-picker'),
                 onExport: () => runDetachedTask(
                   _exportCsv(context, positions),
                   'Failed to export portfolio CSV',
                 ),
-                onShare: () => runDetachedTask(
-                  _shareCsv(context, positions),
-                  'Failed to share portfolio CSV',
-                ),
+                onShare: _supportsFileSharing
+                    ? () => runDetachedTask(
+                          _shareCsv(context, positions),
+                          'Failed to share portfolio CSV',
+                        )
+                    : null,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1677,7 +1681,11 @@ class _SummaryCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Row(
           children: [
-            _ProfilePicker(onExport: onExport, onShare: onShare),
+            ProfilePicker(
+              key: const Key('portfolio-profile-picker'),
+              onExport: onExport,
+              onShare: _supportsFileSharing ? onShare : null,
+            ),
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1722,132 +1730,6 @@ class _SummaryCard extends StatelessWidget {
                   ],
                 ),
               ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ProfilePicker extends StatelessWidget {
-  final VoidCallback onExport;
-  final VoidCallback onShare;
-
-  const _ProfilePicker({required this.onExport, required this.onShare});
-
-  @override
-  Widget build(BuildContext context) {
-    final accounts = context.watch<AccountManager>();
-    final theme = Theme.of(context);
-    final activeProfile = accounts.activeAccount;
-    final name = activeProfile.trim();
-    final initial = name.isEmpty
-        ? '?'
-        : String.fromCharCode(name.runes.first).toUpperCase();
-
-    return PopupMenuButton<String>(
-      key: const Key('portfolio-profile-picker'),
-      tooltip: 'Switch profile: $activeProfile',
-      onSelected: (value) {
-        if (value == '__export__') {
-          onExport();
-        } else if (value == '__share__') {
-          onShare();
-        } else if (value != activeProfile) {
-          runDetachedTask(
-            accounts.switchAccount(value),
-            'Failed to switch account',
-          );
-        }
-      },
-      itemBuilder: (_) => [
-        for (final profile in accounts.accounts)
-          CheckedPopupMenuItem<String>(
-            value: profile,
-            checked: profile == activeProfile,
-            child: Text(profile),
-          ),
-        const PopupMenuDivider(),
-        PopupMenuItem<String>(
-          value: '__export__',
-          child: Row(
-            children: [
-              const Icon(Icons.download_rounded, size: 20),
-              const SizedBox(width: 8),
-              Text(context.l10n.text('Export CSV')),
-            ],
-          ),
-        ),
-        if (_supportsFileSharing)
-          PopupMenuItem<String>(
-            value: '__share__',
-            child: Row(
-              children: [
-                const Icon(Icons.share_rounded, size: 20),
-                const SizedBox(width: 8),
-                Text(context.l10n.text('Share CSV')),
-              ],
-            ),
-          ),
-      ],
-      child: SizedBox(
-        width: 48,
-        height: 48,
-        child: Stack(
-          children: [
-            Align(
-              child: Container(
-                width: 42,
-                height: 42,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      theme.colorScheme.primary,
-                      Color.lerp(
-                        theme.colorScheme.primary,
-                        theme.colorScheme.tertiary,
-                        0.25,
-                      )!,
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: [
-                    BoxShadow(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.2),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  initial,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    color: theme.colorScheme.onPrimary,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.4,
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: theme.colorScheme.outlineVariant),
-                ),
-                child: Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  size: 16,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
           ],
         ),
       ),
