@@ -263,8 +263,13 @@ void main() {
           .buildScene(tester.getSize(find.byType(ChartCanvas)));
     }
 
+    final orderedChart =
+        tester.widget<MarketLineChart>(find.byType(MarketLineChart));
+    expect(
+        orderedChart.series.map((series) => series.name), ['SPY', 'Default']);
+
     final accountBefore =
-        scene().marks.where((mark) => mark.seriesIndex == 0).toList();
+        scene().marks.where((mark) => mark.seriesIndex == 1).toList();
     expect(accountBefore.last.value, closeTo(4, 1e-9));
 
     final origin = tester.getTopLeft(find.byType(ChartCanvas));
@@ -288,9 +293,9 @@ void main() {
     expect(find.text('+4.00%'), findsNothing);
     expect(find.text('+20.00%'), findsNothing);
     final account =
-        scene().marks.where((mark) => mark.seriesIndex == 0).toList();
-    final benchmark =
         scene().marks.where((mark) => mark.seriesIndex == 1).toList();
+    final benchmark =
+        scene().marks.where((mark) => mark.seriesIndex == 0).toList();
     expect(account.first.value, closeTo(0, 1e-9));
     expect(account.last.value, closeTo((1.04 / 1.02 - 1) * 100, 1e-9));
     expect(benchmark.first.value, closeTo(0, 1e-9));

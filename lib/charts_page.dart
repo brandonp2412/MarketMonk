@@ -3029,13 +3029,9 @@ class ChartsPageState extends State<ChartsPage>
     final favoriteOhlcBySymbol = <String,
         Map<DateTime,
             ({double open, double high, double low, double close})>>{};
-    final visibleSeries = {
-      for (final entry in _portfolioSeriesByAccount.entries)
-        if (!_hiddenAccounts.contains(entry.key) && entry.value.isNotEmpty)
-          entry.key: entry.value,
-    };
+    final visibleSeries = <String, List<_DateValue>>{};
 
-    for (final symbol in _selectedFavorites) {
+    for (final symbol in _favoriteStocks.where(_selectedFavorites.contains)) {
       if (_usesIntraday) {
         final series = _favoriteIntraday[symbol];
         if (series != null) {
@@ -3081,6 +3077,15 @@ class ChartsPageState extends State<ChartsPage>
           for (final candle in candles)
             _DateValue(candle.date, candle.close / symbolCentDivisor(symbol)),
         ];
+      }
+    }
+
+    for (final account in accounts) {
+      final series = _portfolioSeriesByAccount[account];
+      if (!_hiddenAccounts.contains(account) &&
+          series != null &&
+          series.isNotEmpty) {
+        visibleSeries[account] = series;
       }
     }
 
