@@ -2785,6 +2785,41 @@ class ChartsPageState extends State<ChartsPage>
         ),
       );
 
+  void _showFavoriteRemoval(String symbol) {
+    runDetachedTask(
+      showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        builder: (sheetContext) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(title: Text(symbol)),
+              ListTile(
+                leading: const Icon(Icons.favorite_border),
+                title: Text(context.l10n.text('Remove favorite')),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  if (_favoriteStocks.contains(symbol)) {
+                    runDetachedTask(
+                      _toggleFavorite(symbol),
+                      'Failed to remove favorite',
+                    );
+                  }
+                },
+              ),
+              ListTile(
+                title: Text(context.l10n.text('Cancel')),
+                onTap: () => Navigator.pop(sheetContext),
+              ),
+            ],
+          ),
+        ),
+      ),
+      'Failed to show favorite removal',
+    );
+  }
+
   Widget _buildFavoritesRow() {
     final hasFavorites = _favoriteStocks.isNotEmpty;
     if (!hasFavorites) return const SizedBox.shrink();
@@ -2849,6 +2884,7 @@ class ChartsPageState extends State<ChartsPage>
                         selected: _selectedFavorites.contains(symbol),
                         selectionColor: _favoriteColor(symbol),
                         onTap: () => _selectFavorite(symbol),
+                        onLongPress: () => _showFavoriteRemoval(symbol),
                       ),
                     ),
                   );
@@ -3576,6 +3612,7 @@ class _FavoriteCard extends StatelessWidget {
   final bool selected;
   final Color selectionColor;
   final VoidCallback onTap;
+  final VoidCallback onLongPress;
 
   const _FavoriteCard({
     required this.symbol,
@@ -3588,6 +3625,7 @@ class _FavoriteCard extends StatelessWidget {
     required this.selected,
     required this.selectionColor,
     required this.onTap,
+    required this.onLongPress,
   });
 
   @override
@@ -3632,6 +3670,7 @@ class _FavoriteCard extends StatelessWidget {
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
             onTap: onTap,
+            onLongPress: onLongPress,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Column(

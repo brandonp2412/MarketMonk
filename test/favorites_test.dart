@@ -21,6 +21,43 @@ Future<void> _pumpApp(WidgetTester tester, AccountManager accounts) async {
 }
 
 void main() {
+  testWidgets('long press confirms favorite removal in a bottom sheet', (
+    tester,
+  ) async {
+    await seedTestSqlite({
+      'favoriteStocks': ['AAPL'],
+    });
+    cacheSymbolMeta('AAPL', 'USD');
+    await seedTestCandle('AAPL', DateTime.now(), 190);
+    await _pumpApp(tester, testAccountManager());
+    final prefs = await SqliteSettings.getInstance();
+
+    await tester.longPress(find.text('AAPL'));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(prefs.getStringList('favoriteStocks'), ['AAPL']);
+    expect(find.byIcon(Icons.check_circle_rounded), findsNothing);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.text('AAPL'), findsOneWidget);
+    expect(prefs.getStringList('favoriteStocks'), ['AAPL']);
+
+    await tester.tap(find.text('AAPL'));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
+    await tester.longPress(find.text('AAPL'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remove favorite'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.text('AAPL'), findsNothing);
+    expect(find.byType(MarketLineChart), findsNothing);
+    expect(prefs.getStringList('favoriteStocks'), isEmpty);
+  });
+
   testWidgets(
     'favorites toggle graph lines and selection without opening search',
     (WidgetTester tester) async {
