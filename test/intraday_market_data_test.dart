@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/intraday_market_data.dart';
 
@@ -195,78 +197,62 @@ void main() {
     },
   );
 
-  test('slow broker portfolio does not delay each Yahoo fallback', () async {
-    var now = DateTime.utc(2026, 10, 11);
-    var individualCalls = 0;
-    var batches = 0;
-    final neverCompletes = Completer<List<IbkrHistoricalSeries>>();
+  test('broker timeout while paused retries on resume before fallback',
+      () async {
+    addTearDown(() {
+      backgroundNetworkCoordinator.didChangeAppLifecycleState(
+        AppLifecycleState.resumed,
+      );
+    });
+    final started = Completer<void>();
+    final interrupted = Completer<IbkrHistoricalSeries>();
+    var brokerCalls = 0;
+    var yahooCalls = 0;
     final loader = IntradayMarketData(
-      now: () => now,
       brokerTimeout: const Duration(milliseconds: 5),
-      ibkrPortfolioFetch: (_, __) {
-        batches++;
-        return neverCompletes.future;
+      ibkrFetch: (_, __, ___) {
+        brokerCalls++;
+        if (brokerCalls == 1) {
+          started.complete();
+          return interrupted.future;
+        }
+        return Future.value(_ibkrSeries());
       },
-      ibkrFetch: (_, __, ___) async {
-        individualCalls++;
-        return _ibkrSeries();
+      yahooGet: (_) async {
+        yahooCalls++;
+        return _yahooResponse();
       },
-      yahooGet: (_) async => _yahooResponse(),
     );
+    final result = loader.fetch('AAPL', config: _config);
+    await started.future;
+    backgroundNetworkCoordinator
+        .didChangeAppLifecycleState(AppLifecycleState.paused);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(brokerCalls, 1);
+    expect(yahooCalls, 0);
 
-    expect(await loader.prefetchPortfolio(_config, days: 1), isFalse);
-    expect((await loader.fetch('AAPL', config: _config)).source, 'Yahoo');
-    expect((await loader.fetch('MSFT', config: _config)).source, 'Yahoo');
-    expect(individualCalls, 0);
-    expect(batches, 1);
-
-    now = now.add(const Duration(minutes: 5));
-    expect((await loader.fetch('GOOG', config: _config)).source, 'IBKR');
-    expect(individualCalls, 1);
+    backgroundNetworkCoordinator
+        .didChangeAppLifecycleState(AppLifecycleState.resumed);
+    expect((await result).source, 'IBKR');
+    expect(brokerCalls, 2);
+    expect(yahooCalls, 0);
   });
 
-  test('batch connection failure pauses broker requests and later recovers',
-      () async {
-    var now = DateTime.utc(2026, 10, 11);
+  test('batch failure does not prevent an immediate broker retry', () async {
     var batches = 0;
-    var individualCalls = 0;
     final loader = IntradayMarketData(
-      now: () => now,
       ibkrPortfolioFetch: (_, __) async {
         batches++;
-        if (batches == 1) throw http.ClientException('Failed host lookup');
+        if (batches == 1) throw http.ClientException('connection interrupted');
         return [_ibkrSeries()];
       },
-      ibkrFetch: (_, __, ___) async {
-        individualCalls++;
-        return _ibkrSeries();
-      },
-      yahooGet: (_) async => _yahooResponse(),
-    );
-
-    expect(await loader.prefetchPortfolio(_config, days: 1), isFalse);
-    expect((await loader.fetch('AAPL', config: _config)).source, 'Yahoo');
-    expect((await loader.fetch('MSFT', config: _config)).source, 'Yahoo');
-    expect(await loader.prefetchPortfolio(_config, days: 1), isFalse);
-    expect(batches, 1);
-    expect(individualCalls, 0);
-
-    now = now.add(const Duration(minutes: 5));
-    expect(await loader.prefetchPortfolio(_config, days: 1), isTrue);
-    expect((await loader.fetch('AAPL', config: _config)).source, 'IBKR');
-    expect(batches, 2);
-  });
-
-  test('unsupported batch endpoint still tries individual broker requests',
-      () async {
-    final loader = IntradayMarketData(
-      ibkrPortfolioFetch: (_, __) async => throw StateError('HTTP 404'),
       ibkrFetch: (_, __, ___) async => _ibkrSeries(),
-      yahooGet: (_) async => _yahooResponse(),
     );
 
     expect(await loader.prefetchPortfolio(_config, days: 1), isFalse);
-    expect((await loader.fetch('AAPL', config: _config)).source, 'IBKR');
+    expect((await loader.fetch('MSFT', config: _config)).source, 'IBKR');
+    expect(await loader.prefetchPortfolio(_config, days: 1), isTrue);
+    expect(batches, 2);
   });
 
   test('account config changes do not reuse another account cache', () async {

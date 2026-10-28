@@ -38,6 +38,7 @@ Future<void> main() async {
   await runZonedGuarded<Future<void>>(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+      backgroundNetworkCoordinator.observeAppLifecycle();
       await CrashLogger.install(fileName: 'marketmonk-crash.log');
       installTalkerErrorHandlers();
       talker.info('Starting Market Monk');
