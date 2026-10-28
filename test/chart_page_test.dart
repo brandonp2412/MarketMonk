@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:drafter/drafter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/empty_state.dart';
@@ -86,6 +87,62 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Appearance'), findsWidgets);
       expect(tester.takeException(), null);
+    });
+  }
+
+  for (final useSystemBack in [false, true]) {
+    testWidgets(
+        'favorite context chart returns to portfolio with ${useSystemBack ? 'system back' : 'back button'}',
+        (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1400, 900);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      await seedTestSqlite({
+        'favoriteStocks': ['VOO'],
+      });
+      final accounts = testAccountManager();
+      await accounts.init();
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(
+              create: (_) => SettingsState(
+                localCurrencyDetector: () async => 'USD',
+              ),
+            ),
+            ChangeNotifierProvider.value(value: accounts),
+          ],
+          child: MaterialApp(
+            theme: ThemeData(platform: TargetPlatform.linux),
+            home: const Scaffold(body: ChartsPage(isActive: false)),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Back'), findsNothing);
+      final favorite = find.text('VOO');
+      expect(favorite, findsOneWidget);
+      await tester.tap(favorite, buttons: kSecondaryMouseButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open chart'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<SearchBar>(find.byType(SearchBar)).controller!.text,
+        isEmpty,
+      );
+      expect(find.byTooltip('Back'), findsOneWidget);
+      if (useSystemBack) {
+        await tester.binding.handlePopRoute();
+      } else {
+        await tester.tap(find.byTooltip('Back'));
+      }
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Back'), findsNothing);
+      expect(find.text('VOO'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   }
 

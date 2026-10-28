@@ -2088,7 +2088,8 @@ class ChartsPageState extends State<ChartsPage>
       context.watch<AccountManager>().accounts.length + 1,
       (index) => chartSeriesColor(Theme.of(context).colorScheme, index),
     );
-    final hasText = _searchController.text.isNotEmpty;
+    final canReturnToPortfolio =
+        _mode != _ChartMode.portfolio || _searchController.text.isNotEmpty;
 
     // The chart fills the available height so the Drafter tooltip overlay can
     // render above its data points without being obscured by the search bar.
@@ -2105,14 +2106,15 @@ class ChartsPageState extends State<ChartsPage>
       child: ValueListenableBuilder<int?>(
         valueListenable: _candleSelection,
         builder: (context, activeIndex, child) => PopScope<void>(
-          canPop: !hasText && (!_showCandlesticks || activeIndex == null),
+          canPop: !canReturnToPortfolio &&
+              (!_showCandlesticks || activeIndex == null),
           onPopInvokedWithResult: (didPop, result) {
             if (didPop) return;
             if (_showCandlesticks && _candleSelection.value != null) {
               _candleSelection.value = null;
               return;
             }
-            if (hasText) _clearSearch();
+            if (canReturnToPortfolio) _clearSearch();
           },
           child: child!,
         ),
@@ -2164,10 +2166,11 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   Widget _buildSearchBar() {
-    final hasText = _searchController.text.isNotEmpty;
+    final canReturnToPortfolio =
+        _mode != _ChartMode.portfolio || _searchController.text.isNotEmpty;
     final desktop = isDesktopLayout(context);
     final settings = context.watch<SettingsState>();
-    final leading = hasText
+    final leading = canReturnToPortfolio
         ? IconButton(
             icon: const Icon(Icons.arrow_back),
             tooltip: context.l10n.text('Back'),
