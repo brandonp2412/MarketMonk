@@ -57,6 +57,30 @@ class _CachedIntradayPortfolio {
   const _CachedIntradayPortfolio(this.series, this.error);
 }
 
+class _CachedChartPeriod {
+  final Map<String, List<_DateValue>> series;
+  final Map<String, List<_DateValue>> returns;
+  final Map<String, Map<DateTime, double>> flows;
+  final Map<String, IntradaySeries> favorites;
+  final Map<String, String> favoriteErrors;
+  final Set<String> dailyPreviews;
+  final Map<String, DateTime> provisionalStarts;
+  final List<StoredCandle> candles;
+  final String? error;
+
+  const _CachedChartPeriod({
+    required this.series,
+    required this.returns,
+    required this.flows,
+    required this.favorites,
+    required this.favoriteErrors,
+    required this.dailyPreviews,
+    required this.provisionalStarts,
+    required this.candles,
+    required this.error,
+  });
+}
+
 class ChartsPage extends StatefulWidget {
   final bool isActive;
 
@@ -155,6 +179,8 @@ class ChartsPageState extends State<ChartsPage>
   bool _periodTransition = false;
   int _periodTransitionGeneration = 0;
   Widget? _lastPortfolioChart;
+  final _chartPeriodCache = <String, _CachedChartPeriod>{};
+  List<StoredCandle>? _restoredFavoriteCandles;
   bool _chartPeriodLoaded = false;
   final Set<String> _hiddenAccounts = {};
   final Map<String, Future<_LoadedChartPortfolio>> _ibkrLoads = {};
@@ -280,10 +306,13 @@ class ChartsPageState extends State<ChartsPage>
     await prefs.setInt('chartPeriodDays', days);
   }
 
-  void _hydratePortfolioSeriesFromCache(AccountManager accountManager) {
+  void _hydratePortfolioSeriesFromCache(
+    AccountManager accountManager, {
+    bool replaceExisting = false,
+  }) {
     if (!_chartPeriodLoaded ||
         _usesIntraday ||
-        _portfolioSeriesByAccount.isNotEmpty) return;
+        !replaceExisting && _portfolioSeriesByAccount.isNotEmpty) return;
 
     // The persisted IBKR performance cache is one year of history. It can
     // faithfully satisfy any selected period up to one year, but must never be
@@ -336,6 +365,11 @@ class ChartsPageState extends State<ChartsPage>
     _portfolioSeriesByAccount = cachedSeries;
     _portfolioReturnSeriesByAccount = cachedReturns;
     _portfolioCashFlowsByAccount = cachedFlows;
+    if (replaceExisting) {
+      _portfolioDailyPreviewAccounts.clear();
+      _provisionalStartByAccount.clear();
+      _portfolioError = null;
+    }
     _portfolioLoading = false;
   }
 
@@ -677,6 +711,8 @@ class ChartsPageState extends State<ChartsPage>
     try {
       clearAllSyncCache();
       _intradayPortfolioCache.clear();
+      _chartPeriodCache.clear();
+      _restoredFavoriteCandles = null;
       await _refreshAllPortfolioCandles();
       await _loadAllPortfolios(
         refreshIbkrPortfolio: true,
@@ -732,9 +768,13 @@ class ChartsPageState extends State<ChartsPage>
     }
   }
 
-  Future<void> _syncFavoriteCandles({bool forceRefresh = false}) async {
+  Future<void> _syncFavoriteCandles({
+    bool forceRefresh = false,
+    bool selectedOnly = false,
+  }) async {
     final generation = _favoriteLoadGeneration;
     for (final symbol in _favoriteStocks) {
+      if (selectedOnly && !_selectedFavorites.contains(symbol)) continue;
       if (!mounted ||
           !widget.isActive ||
           generation != _favoriteLoadGeneration) return;
@@ -2016,6 +2056,14 @@ class ChartsPageState extends State<ChartsPage>
     });
   }
 
+  String get _chartPeriodCacheKey {
+    final manager = context.read<AccountManager>();
+    final now = DateTime.now();
+    return '$years|$months|$_intradayPortfolioCacheKey|'
+        '$_selectedFavorites|$_favoriteStocks|${now.year}-${now.month}-${now.day}|'
+        '${manager.accounts.map((name) => '$name:${manager.portfolioCacheFor(name)?.cachedAt}:${identityHashCode(manager.ibkrPerformanceCacheFor(name, '1Y'))}').join(',')}';
+  }
+
   void _onPeriodSelected({
     int selectedYears = 0,
     int selectedMonths = 0,
@@ -2035,13 +2083,42 @@ class ChartsPageState extends State<ChartsPage>
       _favoriteLoadGeneration++;
       _favoriteIntraday.clear();
       _favoriteIntradayErrors.clear();
+      _restoredFavoriteCandles = null;
+      if (_mode != _ChartMode.stock) {
+        final cached = _chartPeriodCache[_chartPeriodCacheKey];
+        if (cached != null) {
+          _portfolioSeriesByAccount = Map.of(cached.series);
+          _portfolioReturnSeriesByAccount = Map.of(cached.returns);
+          _portfolioCashFlowsByAccount = Map.of(cached.flows);
+          _favoriteIntraday.addAll(cached.favorites);
+          _favoriteIntradayErrors.addAll(cached.favoriteErrors);
+          _portfolioDailyPreviewAccounts
+            ..clear()
+            ..addAll(cached.dailyPreviews);
+          _provisionalStartByAccount
+            ..clear()
+            ..addAll(cached.provisionalStarts);
+          _portfolioError = cached.error;
+          _restoredFavoriteCandles = cached.candles;
+          _portfolioLoading = false;
+          _periodTransition = false;
+        } else if (_selectedFavorites.isEmpty) {
+          _hydratePortfolioSeriesFromCache(
+            context.read<AccountManager>(),
+            replaceExisting: true,
+          );
+          if (!_portfolioLoading) _periodTransition = false;
+        }
+      }
     });
     runDetachedTask(_savePeriod(), 'Failed to save chart period');
+    if (!_periodTransition) return;
     runDetachedTask(
       () async {
         try {
           await Future.wait([
-            if (_favoriteStocks.isNotEmpty) _syncFavoriteCandles(),
+            if (_selectedFavorites.isNotEmpty)
+              _syncFavoriteCandles(selectedOnly: true),
             if (_mode == _ChartMode.stock && _selectedSymbol != null)
               _loadSelectedStock()
             else if (!_restoreIntradayPortfolio())
@@ -2981,11 +3058,14 @@ class ChartsPageState extends State<ChartsPage>
         context,
         settings,
         accountColors,
-        snapshot.data ?? const [],
+        snapshot.connectionState == ConnectionState.active
+            ? snapshot.data ?? const []
+            : _restoredFavoriteCandles ?? const [],
         localPricesReady: _selectedFavorites.isEmpty ||
             _usesIntraday && days != 5 ||
             snapshot.connectionState == ConnectionState.active &&
-                snapshot.hasData,
+                snapshot.hasData ||
+            _restoredFavoriteCandles != null,
       ),
     );
   }
@@ -3008,6 +3088,30 @@ class ChartsPageState extends State<ChartsPage>
       favoriteCandles,
       localPricesReady: localPricesReady,
     );
+    if (!_portfolioLoading &&
+        !_networkLoading &&
+        (!_usesIntraday ||
+            _selectedFavorites.every(
+              (symbol) =>
+                  _favoriteIntraday.containsKey(symbol) ||
+                  _favoriteIntradayErrors.containsKey(symbol),
+            ))) {
+      if (_chartPeriodCache.length >= 16 &&
+          !_chartPeriodCache.containsKey(_chartPeriodCacheKey)) {
+        _chartPeriodCache.remove(_chartPeriodCache.keys.first);
+      }
+      _chartPeriodCache[_chartPeriodCacheKey] = _CachedChartPeriod(
+        series: Map.of(_portfolioSeriesByAccount),
+        returns: Map.of(_portfolioReturnSeriesByAccount),
+        flows: Map.of(_portfolioCashFlowsByAccount),
+        favorites: Map.of(_favoriteIntraday),
+        favoriteErrors: Map.of(_favoriteIntradayErrors),
+        dailyPreviews: Set.of(_portfolioDailyPreviewAccounts),
+        provisionalStarts: Map.of(_provisionalStartByAccount),
+        candles: favoriteCandles,
+        error: _portfolioError,
+      );
+    }
     _lastPortfolioChart = chart;
     return chart;
   }

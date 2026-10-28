@@ -217,8 +217,10 @@ void main() {
   testWidgets('period changes replace favorite lines together', (tester) async {
     final first = Completer<http.Response>();
     final second = Completer<http.Response>();
+    var requests = 0;
     final loader = IntradayMarketData(
       yahooGet: (uri) async {
+        requests++;
         if (uri.queryParameters['range'] == '5d') {
           return uri.path.endsWith('AAPL') ? first.future : second.future;
         }
@@ -260,6 +262,28 @@ void main() {
     expect(updated.series, hasLength(2));
     expect(updated.series.every((series) => series.points.length == 6), isTrue);
     expect(tester.takeException(), isNull);
+
+    final loadedRequests = requests;
+    await tester.tap(find.byKey(const Key('chart-period-1d')));
+    await tester.pump();
+    final restoredDay =
+        tester.widget<MarketLineChart>(find.byType(MarketLineChart));
+    expect(restoredDay.series, hasLength(2));
+    expect(
+      restoredDay.series.every((series) => series.points.length == 3),
+      isTrue,
+    );
+
+    await tester.tap(find.byKey(const Key('chart-period-5d')));
+    await tester.pump();
+    final restoredWeek =
+        tester.widget<MarketLineChart>(find.byType(MarketLineChart));
+    expect(restoredWeek.series, hasLength(2));
+    expect(
+      restoredWeek.series.every((series) => series.points.length == 6),
+      isTrue,
+    );
+    expect(requests, loadedRequests);
   });
 
   testWidgets('favorite 5d chart preserves all intraday observations', (
