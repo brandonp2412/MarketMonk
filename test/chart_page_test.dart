@@ -1142,7 +1142,7 @@ void main() {
     final searchRect =
         tester.getRect(find.byKey(const Key('chart-search-bar')));
     expect(searchRect.width, greaterThan(1000));
-    expect(searchRect.right, closeTo(1376, 1));
+    expect(searchRect.right, closeTo(1368, 1));
     expect(
       find.ancestor(
         of: find.byKey(const Key('chart-period-5d')),

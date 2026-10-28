@@ -2184,7 +2184,12 @@ class ChartsPageState extends State<ChartsPage>
           );
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(desktop ? 24 : 8, 8, desktop ? 24 : 8, 4),
+      padding: EdgeInsets.fromLTRB(
+        desktop ? 32 : 8,
+        desktop ? 28 : 8,
+        desktop ? 32 : 8,
+        4,
+      ),
       child: SearchBar(
         key: const Key('chart-search-bar'),
         constraints: const BoxConstraints(
@@ -2869,9 +2874,9 @@ class ChartsPageState extends State<ChartsPage>
     if (!hasFavorites) return const SizedBox.shrink();
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        isDesktopLayout(context) ? 24 : 16,
+        isDesktopLayout(context) ? 32 : 16,
         12,
-        isDesktopLayout(context) ? 24 : 16,
+        isDesktopLayout(context) ? 32 : 16,
         8,
       ),
       child: Column(
