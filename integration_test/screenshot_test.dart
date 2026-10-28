@@ -4,22 +4,25 @@ import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/main.dart' as app;
-import 'package:market_monk/main.dart';
 import 'package:market_monk/market_line_chart.dart';
+import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/trade_history_page.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
+
 import '../test/sqlite_test_support.dart';
 
-final DateTime _mockToday = DateTime.now();
+final DateTime _mockToday = canonicalMarketDay(DateTime.now());
 
 List<TradesCompanion> mockTrades = [
   TradesCompanion.insert(
@@ -73,17 +76,29 @@ List<CandlesCompanion> _mockCandlesFor(
   String symbol,
   double basePrice,
   List<double> movement,
-) =>
-    [
-      for (var index = 0; index < movement.length; index++)
-        CandlesCompanion.insert(
-          symbol: symbol,
-          date: _mockToday.subtract(
-            Duration(days: (movement.length - 1 - index) * 14),
+) {
+  final start = DateTime(
+    _mockToday.year - 1,
+    _mockToday.month,
+    _mockToday.day - 7,
+  );
+  final historyDays = _mockToday.difference(start).inDays;
+  return [
+    for (var index = 0; index < movement.length; index++)
+      CandlesCompanion.insert(
+        symbol: symbol,
+        date: _mockToday.subtract(
+          Duration(
+            days: (historyDays *
+                    (movement.length - 1 - index) /
+                    (movement.length - 1))
+                .round(),
           ),
-          close: Value(basePrice + movement[index]),
         ),
-    ];
+        close: Value(basePrice + movement[index]),
+      ),
+  ];
+}
 
 List<CandlesCompanion> mockCandles = [
   ..._mockCandlesFor('GME', 30.0, [
@@ -165,24 +180,32 @@ List<CandlesCompanion> mockCandles = [
 
 enum TabBarState { chart, portfolio, holdings }
 
-Future<void> appWrapper() async {
+Future<void> appWrapper(WidgetTester tester) async {
   WidgetsFlutterBinding.ensureInitialized();
   await seedTestSqlite({
     'theme': 'ThemeMode.dark',
     'systemColors': false,
     'curveLines': true,
+    'displayCurrency': 'USD',
+    'visibleCurrencies': ['USD'],
   });
   for (final symbol in ['GME', 'AAPL', 'TSLA', 'MSFT', 'AMZN']) {
-    cacheSymbolMeta(symbol, 'USD');
+    await upsertSymbolCurrencyMetadata(symbol, 'USD');
   }
   allRatesFromUsd['USD'] = 1.0;
   await testDatabase.candles.insertAll(mockCandles);
   await testDatabase.trades.insertAll(mockTrades);
 
-  final settings = SettingsState();
-  final accounts = AccountManager();
+  final settings = SettingsState(localCurrencyDetector: () async => 'USD');
+  await settings.initialized;
+  final accounts = testAccountManager();
   await accounts.init();
-  runApp(
+  addTearDown(() async {
+    await tester.pumpWidget(const SizedBox.shrink());
+    accounts.dispose();
+    settings.dispose();
+  });
+  await tester.pumpWidget(
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: settings),
@@ -198,12 +221,16 @@ BuildContext getBuildContext(WidgetTester tester, TabBarState? tabBarState) {
     case TabBarState.chart:
       return (tester.state(find.byType(ChartsPage)) as ChartsPageState).context;
     case TabBarState.portfolio:
-      return (tester.state(find.byType(PortfolioPage)) as PortfolioPageState)
+      return (tester.state(
+        find.byType(PortfolioPage),
+      ) as PortfolioPageState)
           .context;
     case null:
       break;
     case TabBarState.holdings:
-      return (tester.state(find.byType(HoldingsPage)) as HoldingsPageState)
+      return (tester.state(
+        find.byType(HoldingsPage),
+      ) as HoldingsPageState)
           .context;
   }
 
@@ -212,9 +239,7 @@ BuildContext getBuildContext(WidgetTester tester, TabBarState? tabBarState) {
 
 void navigateTo({required BuildContext context, required Widget page}) {
   unawaited(
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => page),
-    ),
+    Navigator.of(context).push(MaterialPageRoute(builder: (context) => page)),
   );
 }
 
@@ -225,59 +250,76 @@ Future<void> generateScreenshot({
   required TabBarState tabBarState,
   Future<void> Function(BuildContext context)? navigateToPage,
 }) async {
-  await appWrapper();
-  await tester.pumpAndSettle();
+  final requests = <Uri>[];
+  final client = MockClient((request) async {
+    requests.add(request.url);
+    return http.Response('Screenshot fixtures must not need the network', 500);
+  });
+  addTearDown(() {
+    client.close();
+    expect(requests, isEmpty, reason: 'Screenshots must use only seeded data.');
+  });
+  await http.runWithClient(
+    () async {
+      await appWrapper(tester);
+      final chartFinder = find.byType(MarketLineChart);
+      final deadline = DateTime.now().add(const Duration(seconds: 20));
+      while (!chartFinder.evaluate().any(
+            (element) => (element.widget as MarketLineChart).series.any(
+                  (line) => line.points.length > 1,
+                ),
+          )) {
+        if (DateTime.now().isAfter(deadline)) {
+          fail('The seeded portfolio chart did not finish loading.');
+        }
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      await tester.pumpAndSettle();
 
-  final tabKey = switch (tabBarState) {
-    TabBarState.chart => 'ChartPage',
-    TabBarState.portfolio => 'PortfolioPage',
-    TabBarState.holdings => 'HoldingsPage',
-  };
-  final desktopTab = find.byKey(Key('desktop-$tabKey'));
-  final tab =
-      desktopTab.evaluate().isNotEmpty ? desktopTab : find.byKey(Key(tabKey));
-  expect(tab, findsOneWidget);
-  await tester.tap(tab);
-  await tester.pumpAndSettle();
+      final tabKey = switch (tabBarState) {
+        TabBarState.chart => 'ChartPage',
+        TabBarState.portfolio => 'PortfolioPage',
+        TabBarState.holdings => 'HoldingsPage',
+      };
+      final desktopTab = find.byKey(Key('desktop-$tabKey'));
+      final tab = desktopTab.evaluate().isNotEmpty
+          ? desktopTab
+          : find.byKey(Key(tabKey));
+      expect(tab, findsOneWidget);
+      await tester.tap(tab);
+      await tester.pumpAndSettle();
 
-  if (navigateToPage != null) {
-    final navState = getBuildContext(tester, tabBarState);
-    if (!navState.mounted) return;
-    await navigateToPage(navState);
-  }
+      if (navigateToPage != null) {
+        final navState = getBuildContext(tester, tabBarState);
+        if (!navState.mounted) return;
+        await navigateToPage(navState);
+      }
 
-  await tester.pumpAndSettle();
+      await tester.pumpAndSettle();
 
-  if (tabBarState == TabBarState.chart && navigateToPage == null) {
-    final chartFinder = find.byType(MarketLineChart);
-    expect(chartFinder, findsWidgets);
-    final chart = tester.widget<MarketLineChart>(chartFinder.first);
-    expect(
-      chart.series.any((line) => line.points.length > 1),
-      isTrue,
-      reason: 'The README chart screenshot must contain a visible data series.',
-    );
-  }
+      if (tabBarState == TabBarState.chart && navigateToPage == null) {
+        final chartFinder = find.byType(MarketLineChart);
+        expect(chartFinder, findsWidgets);
+        final chart = tester.widget<MarketLineChart>(chartFinder.first);
+        expect(
+          chart.series.any((line) => line.points.length > 1),
+          isTrue,
+          reason:
+              'The README chart screenshot must contain a visible data series.',
+        );
+      }
 
-  await binding.convertFlutterSurfaceToImage();
-  await tester.pumpAndSettle();
-  await binding.takeScreenshot(screenshotName);
+      await binding.convertFlutterSurfaceToImage();
+      await tester.pumpAndSettle();
+      await binding.takeScreenshot(screenshotName);
+    },
+    () => client,
+  );
 }
 
 void main() {
   IntegrationTestWidgetsFlutterBinding binding =
       IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-
-  setUpAll(() async {
-    await seedTestSqlite({
-      'accounts': ['Default'],
-      'activeAccount': 'Default',
-    });
-    for (final symbol in ['GME', 'AAPL', 'TSLA', 'MSFT', 'AMZN']) {
-      cacheSymbolMeta(symbol, 'USD');
-    }
-    allRatesFromUsd['USD'] = 1.0;
-  });
 
   group("Generate default screenshots ", () {
     testWidgets(
