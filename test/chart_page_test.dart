@@ -351,7 +351,7 @@ void main() {
       );
 
       expect(find.byType(MarketLineChart), findsNothing);
-      expect(find.bySemanticsLabel('Loading portfolio'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
 
       await tester.pump();
 

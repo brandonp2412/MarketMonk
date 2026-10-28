@@ -15,6 +15,27 @@ import 'sqlite_test_support.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  testWidgets('local holdings navigation does not show a spinner',
+      (tester) async {
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: HoldingsPage(positionsLoader: (_) async => []),
+        ),
+      ),
+    );
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
   for (final width in [400.0, 1400.0]) {
     testWidgets('holdings updates privacy after settings at width $width',
         (tester) async {

@@ -108,6 +108,18 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
   }
 
+  testWidgets('stock navigation never shows a spinner during a fetch',
+      (tester) async {
+    final pending = Completer<http.Response>();
+    await mountChart(
+      tester,
+      IntradayMarketData(yahooGet: (_) => pending.future),
+    );
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    pending.complete(_prices(100));
+    await tester.pumpAndSettle();
+  });
+
   testWidgets(
     '1d renders all minute prices and local times without daily writes',
     (tester) async {
@@ -170,6 +182,7 @@ void main() {
         calls++;
         return calls <= 3 ? http.Response('rate limited', 429) : _prices(100);
       },
+      retryDelay: (_) async {},
     );
     await mountChart(tester, loader);
     await tester.pumpAndSettle();
@@ -445,7 +458,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Historical prices unavailable'), findsNothing);
-    expect(find.bySemanticsLabel('Loading portfolio'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
 
     final recentMonday = DateTime.now().subtract(
       Duration(days: DateTime.now().weekday - DateTime.monday),

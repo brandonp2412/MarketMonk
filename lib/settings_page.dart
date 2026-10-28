@@ -1543,13 +1543,7 @@ class _IbkrSettingsDialogState extends State<_IbkrSettingsDialog> {
           ),
           FilledButton(
             onPressed: _checking ? null : _save,
-            child: _checking
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(context.l10n.text('Save')),
+            child: Text(context.l10n.text('Save')),
           ),
         ],
       );

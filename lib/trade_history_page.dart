@@ -76,12 +76,20 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final ibkrManaged = context.watch<AccountManager>().ibkrConfigFor().enabled;
+    final accounts = context.watch<AccountManager>();
+    final ibkrManaged = accounts.ibkrConfigFor(_accountName).enabled;
+    final cachedHistory = accounts.ibkrTradeHistoryCacheFor(_accountName);
+    final cachedTrades = cachedHistory == null
+        ? widget.summary.trades
+        : (tradesFromIbkr(cachedHistory.trades)
+            .where((trade) => trade.symbol == widget.summary.symbol)
+            .toList()
+          ..sort((a, b) => b.tradeDate.compareTo(a.tradeDate)));
 
     return StreamBuilder<List<Trade>>(
       stream: ibkrManaged ? _ibkrTradesStream : _tradesStream,
       builder: (context, snap) {
-        final trades = snap.data ?? widget.summary.trades;
+        final trades = snap.data ?? cachedTrades;
         final symbol = widget.summary.symbol;
         final nativeCurr = symbolCurrency(symbol);
         final centDiv = symbolCentDivisor(symbol);
@@ -259,6 +267,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                   SizedBox(
                     height: 300,
                     child: ibkrManaged &&
+                            cachedHistory == null &&
                             snap.connectionState == ConnectionState.waiting
                         ? const Center(child: CircularProgressIndicator())
                         : AppEmptyState(

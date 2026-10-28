@@ -26,6 +26,7 @@ class _WhatsNewState extends State<WhatsNew> {
   List<_Changelog> _changelogs = [];
   List<String> _changelogFiles = [];
   int _page = 0;
+  int _pageLoadGeneration = 0;
   bool _isLoading = true;
   bool _loadFailed = false;
   bool _showUpdateNotices = true;
@@ -90,14 +91,16 @@ class _WhatsNewState extends State<WhatsNew> {
   }
 
   Future<void> _loadPage(int page) async {
+    final generation = ++_pageLoadGeneration;
     final pageFiles = _changelogFiles.skip(page * _pageSize).take(_pageSize);
     final result = <_Changelog>[];
     for (final path in pageFiles) {
       final changelog = await _loadChangelogFile(path);
       if (changelog != null) result.add(changelog);
     }
-    if (!mounted || _page != page) return;
+    if (!mounted || generation != _pageLoadGeneration) return;
     setState(() {
+      _page = page;
       _changelogs = result;
       _isLoading = false;
     });
@@ -106,10 +109,6 @@ class _WhatsNewState extends State<WhatsNew> {
   Future<void> _setPage(int page) async {
     final pageCount = (_changelogFiles.length / _pageSize).ceil();
     if (page < 0 || page >= pageCount) return;
-    setState(() {
-      _page = page;
-      _isLoading = true;
-    });
     await _loadPage(page);
   }
 
@@ -135,7 +134,7 @@ class _WhatsNewState extends State<WhatsNew> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const SizedBox.expand();
     }
     if (_loadFailed) {
       return Center(
