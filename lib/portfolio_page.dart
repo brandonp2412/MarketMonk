@@ -1067,6 +1067,10 @@ class PortfolioPageState extends State<PortfolioPage>
         (firstPosition, secondPosition) =>
             secondPosition.change.compareTo(firstPosition.change),
       );
+    final currencyCount =
+        positions.map((position) => position.nativeCurrency).toSet().length;
+    final positionLabel = positions.length == 1 ? 'position' : 'positions';
+    final currencyLabel = currencyCount == 1 ? 'currency' : 'currencies';
     final accountValue = netLiquidation == null
         ? fmtCurrency(totalValue)
         : fmtNativeCurrency(netLiquidation.value, netLiquidation.currency);
@@ -1094,11 +1098,23 @@ class PortfolioPageState extends State<PortfolioPage>
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  '${accounts.activeAccount} · ${context.l10n.text('Portfolio')}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.headlineMedium,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${accounts.activeAccount} · ${context.l10n.text('Portfolio')}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.headlineMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${positions.length} $positionLabel · $currencyCount $currencyLabel',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Tooltip(

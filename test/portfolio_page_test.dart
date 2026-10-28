@@ -287,6 +287,7 @@ void main() {
 
       if (width == 1400) {
         expect(find.text('Default · Portfolio'), findsOneWidget);
+        expect(find.text('1 position · 1 currency'), findsOneWidget);
       }
       final picker = find.byKey(const Key('portfolio-profile-picker'));
       expect(
