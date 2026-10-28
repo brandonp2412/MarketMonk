@@ -131,7 +131,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         tester.widget<SearchBar>(find.byType(SearchBar)).controller!.text,
-        isEmpty,
+        'VOO',
       );
       expect(find.byTooltip('Back'), findsOneWidget);
       if (useSystemBack) {
@@ -141,6 +141,10 @@ void main() {
       }
       await tester.pumpAndSettle();
       expect(find.byTooltip('Back'), findsNothing);
+      expect(
+        tester.widget<SearchBar>(find.byType(SearchBar)).controller!.text,
+        isEmpty,
+      );
       expect(find.text('VOO'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });

@@ -1805,6 +1805,7 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   void _selectSymbol(String symbol) {
+    _searchController.text = symbol;
     _candleSelection.value = null;
     _searchFocus.unfocus();
     setState(() {
