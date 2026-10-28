@@ -818,7 +818,7 @@ class MyApp extends StatelessWidget {
             if (child != null) child,
             if (kDebugMode)
               PositionedDirectional(
-                top: 0,
+                bottom: 0,
                 end: 0,
                 child: SafeArea(
                   child: IgnorePointer(
