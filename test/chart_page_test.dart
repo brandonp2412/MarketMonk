@@ -998,6 +998,13 @@ void main() {
     expect(find.byIcon(Icons.arrow_downward), findsNothing);
     expect(find.textContaining('value change'), findsNothing);
     expect(tester.takeException(), null);
+
+    await tester.tap(find.text('1y'));
+    await tester.pump();
+    expect(find.text('+5.49%'), findsOneWidget);
+    expect(find.text('History unavailable'), findsNothing);
+    await tester.pumpAndSettle();
+    expect(find.text('+5.49%'), findsOneWidget);
   });
 
   testWidgets('exact ticker fallback is available while search is loading', (

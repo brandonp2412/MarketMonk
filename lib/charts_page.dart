@@ -993,15 +993,12 @@ class ChartsPageState extends State<ChartsPage>
     final cachedPreviews = _cachedFiveDayPortfolioPreviews(accountManager);
 
     final newSeries = <String, List<_DateValue>>{
-      for (final name in accounts)
-        name: _portfolioSeriesByAccount[name] ?? <_DateValue>[],
+      for (final name in accounts) name: <_DateValue>[],
     };
     final dailyFallbacks = Map<String, List<_DateValue>>.of(cachedPreviews);
     setState(() {
       _portfolioError = null;
-      _portfolioLoading = _portfolioSeriesByAccount.values.every(
-        (series) => series.isEmpty,
-      );
+      _portfolioLoading = true;
     });
 
     bool isCurrent() =>
@@ -1059,10 +1056,6 @@ class ChartsPageState extends State<ChartsPage>
           if (!isCurrent()) return;
           if (series.isNotEmpty) {
             newSeries[accountName] = series;
-            setState(() {
-              _portfolioDailyPreviewAccounts.remove(accountName);
-              _portfolioSeriesByAccount = Map.of(newSeries);
-            });
           }
           return;
         }
@@ -1128,6 +1121,7 @@ class ChartsPageState extends State<ChartsPage>
       return;
     }
     setState(() {
+      _portfolioDailyPreviewAccounts.clear();
       if (fiveDayPreview) {
         for (final name in accounts) {
           if (newSeries[name]!.isEmpty &&
@@ -2026,11 +2020,6 @@ class ChartsPageState extends State<ChartsPage>
       _portfolioLoadGeneration++;
       _portfolioLoads.clear();
       _backgroundSyncs.clear();
-      _portfolioSeriesByAccount.clear();
-      _portfolioDailyPreviewAccounts.clear();
-      _provisionalStartByAccount.clear();
-      _portfolioReturnSeriesByAccount.clear();
-      _portfolioCashFlowsByAccount.clear();
       _portfolioLoading = true;
       years = selectedYears;
       months = selectedMonths;
