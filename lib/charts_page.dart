@@ -152,6 +152,9 @@ class ChartsPageState extends State<ChartsPage>
   bool _provisionalRefreshInFlight = false;
   String? _portfolioError;
   bool _portfolioLoading = true;
+  bool _periodTransition = false;
+  int _periodTransitionGeneration = 0;
+  Widget? _lastPortfolioChart;
   bool _chartPeriodLoaded = false;
   final Set<String> _hiddenAccounts = {};
   final Map<String, Future<_LoadedChartPortfolio>> _ibkrLoads = {};
@@ -730,8 +733,11 @@ class ChartsPageState extends State<ChartsPage>
   }
 
   Future<void> _syncFavoriteCandles({bool forceRefresh = false}) async {
+    final generation = _favoriteLoadGeneration;
     for (final symbol in _favoriteStocks) {
-      if (!mounted || !widget.isActive) return;
+      if (!mounted ||
+          !widget.isActive ||
+          generation != _favoriteLoadGeneration) return;
       await _syncFavoriteCandle(symbol, forceRefresh: forceRefresh);
     }
   }
@@ -2015,7 +2021,9 @@ class ChartsPageState extends State<ChartsPage>
     int selectedMonths = 0,
     int selectedDays = 0,
   }) {
+    final transitionGeneration = ++_periodTransitionGeneration;
     setState(() {
+      _periodTransition = true;
       _customChartRange = null;
       _portfolioLoadGeneration++;
       _portfolioLoads.clear();
@@ -2029,26 +2037,24 @@ class ChartsPageState extends State<ChartsPage>
       _favoriteIntradayErrors.clear();
     });
     runDetachedTask(_savePeriod(), 'Failed to save chart period');
-    if (_favoriteStocks.isNotEmpty) {
-      runDetachedTask(
-        _syncFavoriteCandles(),
-        'Failed to backfill favorite period',
-      );
-    }
-    final restored = _mode != _ChartMode.stock && _restoreIntradayPortfolio();
-    if (_mode == _ChartMode.stock && _selectedSymbol != null) {
-      runDetachedTask(
-        _loadSelectedStock(),
-        'Failed to load selected chart period',
-      );
-    } else if (!restored) {
-      runDetachedTask(
-        () async {
-          await _syncCandlesInBackground();
-        }(),
-        'Failed to reload portfolios for chart period',
-      );
-    }
+    runDetachedTask(
+      () async {
+        try {
+          await Future.wait([
+            if (_favoriteStocks.isNotEmpty) _syncFavoriteCandles(),
+            if (_mode == _ChartMode.stock && _selectedSymbol != null)
+              _loadSelectedStock()
+            else if (!_restoreIntradayPortfolio())
+              _syncCandlesInBackground(),
+          ]);
+        } finally {
+          if (mounted && transitionGeneration == _periodTransitionGeneration) {
+            setState(() => _periodTransition = false);
+          }
+        }
+      }(),
+      'Failed to load selected chart period',
+    );
   }
 
   void _clearSearch() {
@@ -2969,7 +2975,7 @@ class ChartsPageState extends State<ChartsPage>
           : null;
     }
     return StreamBuilder<List<StoredCandle>>(
-      key: ValueKey(streamKey),
+      key: const Key('portfolio-price-stream'),
       stream: _favoriteChartStream,
       builder: (context, snapshot) => _buildCombinedPortfolioChart(
         context,
@@ -2978,12 +2984,35 @@ class ChartsPageState extends State<ChartsPage>
         snapshot.data ?? const [],
         localPricesReady: _selectedFavorites.isEmpty ||
             _usesIntraday && days != 5 ||
-            snapshot.hasData,
+            snapshot.connectionState == ConnectionState.active &&
+                snapshot.hasData,
       ),
     );
   }
 
   Widget _buildCombinedPortfolioChart(
+    BuildContext context,
+    SettingsState settings,
+    List<Color> accountColors,
+    List<StoredCandle> favoriteCandles, {
+    required bool localPricesReady,
+  }) {
+    if (_periodTransition || !localPricesReady) {
+      return _lastPortfolioChart ??
+          SizedBox(height: MediaQuery.of(context).size.height * 0.30);
+    }
+    final chart = _buildReadyPortfolioChart(
+      context,
+      settings,
+      accountColors,
+      favoriteCandles,
+      localPricesReady: localPricesReady,
+    );
+    _lastPortfolioChart = chart;
+    return chart;
+  }
+
+  Widget _buildReadyPortfolioChart(
     BuildContext context,
     SettingsState settings,
     List<Color> accountColors,

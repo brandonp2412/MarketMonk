@@ -214,6 +214,54 @@ void main() {
     expect(calls, 4);
   });
 
+  testWidgets('period changes replace favorite lines together', (tester) async {
+    final first = Completer<http.Response>();
+    final second = Completer<http.Response>();
+    final loader = IntradayMarketData(
+      yahooGet: (uri) async {
+        if (uri.queryParameters['range'] == '5d') {
+          return uri.path.endsWith('AAPL') ? first.future : second.future;
+        }
+        return _prices(100, currency: 'USD');
+      },
+    );
+    await mountChart(
+      tester,
+      loader,
+      initialSymbol: null,
+      favorites: ['AAPL', 'MSFT'],
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('AAPL'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('MSFT'));
+    await tester.pumpAndSettle();
+    final previous = tester.widget<MarketLineChart>(find.byType(MarketLineChart));
+    expect(previous.series, hasLength(2));
+
+    await tester.tap(find.byKey(const Key('chart-period-5d')));
+    await tester.pump();
+    expect(
+      tester.widget<MarketLineChart>(find.byType(MarketLineChart)),
+      same(previous),
+    );
+
+    first.complete(_prices(200, currency: 'USD', count: 6));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(
+      tester.widget<MarketLineChart>(find.byType(MarketLineChart)),
+      same(previous),
+    );
+
+    second.complete(_prices(300, currency: 'USD', count: 6));
+    await tester.pumpAndSettle();
+    final updated = tester.widget<MarketLineChart>(find.byType(MarketLineChart));
+    expect(updated.series, hasLength(2));
+    expect(updated.series.every((series) => series.points.length == 6), isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('favorite 5d chart preserves all intraday observations', (
     tester,
   ) async {
