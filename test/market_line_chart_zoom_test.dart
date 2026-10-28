@@ -81,6 +81,67 @@ void main() {
     await tester.pump();
   }
 
+  testWidgets('only candlestick tooltips paint a date heading', (tester) async {
+    final selected = ValueNotifier<int?>(0);
+    addTearDown(selected.dispose);
+    var titleCalls = 0;
+    Widget chart(bool showCandlesticks) => MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 300,
+              child: MarketLineChart(
+                series: [
+                  MarketLineChartSeries(
+                    color: Colors.blue,
+                    points: const [
+                      MarketLineChartPoint(0, 100, column: 0),
+                      MarketLineChartPoint(1, 101, column: 1),
+                    ],
+                  ),
+                ],
+                xLabels: const ['27 Oct', '28 Oct'],
+                pointCount: 2,
+                candles: const [
+                  MarketCandlePoint(
+                    column: 0,
+                    open: 99,
+                    high: 102,
+                    low: 98,
+                    close: 100,
+                  ),
+                  MarketCandlePoint(
+                    column: 1,
+                    open: 100,
+                    high: 103,
+                    low: 99,
+                    close: 101,
+                  ),
+                ],
+                showCandlesticks: showCandlesticks,
+                candleSelection: selected,
+                candleTooltipTitle: (_) {
+                  titleCalls++;
+                  return '28 Oct 2026';
+                },
+                candleTooltipRows: (_) => const ['O 100 H 103'],
+                yLabelFormatter: (value) => '$value',
+                tooltipRowLabel: (_) => r'$101 · 28 Oct',
+                curveLines: false,
+                curveSmoothness: 0,
+              ),
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(chart(false));
+    await tester.pump();
+    expect(titleCalls, 0);
+    await tester.pumpWidget(chart(true));
+    await tester.pump();
+    expect(titleCalls, greaterThan(0));
+  });
+
   testWidgets('multi-series sampled and OHLC candles share line geometry',
       (tester) async {
     final source = [

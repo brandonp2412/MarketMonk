@@ -552,7 +552,7 @@ void main() {
     expect(find.byType(MarketLineChart), findsOneWidget);
   });
 
-  testWidgets('5d favorite uses daily line until intraday data arrives', (
+  testWidgets('5d favorite waits for intraday before plotting', (
     tester,
   ) async {
     final pending = Completer<http.Response>();
@@ -576,22 +576,18 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('AAPL').first);
-    await tester.pumpAndSettle();
-    var series = tester
-        .widget<MarketLineChart>(
-          find.byType(MarketLineChart),
-        )
-        .series;
+    await tester.pump();
+    expect(find.byType(MarketLineChart), findsNothing);
     expect(
-      series.where((line) => line.name == 'AAPL').single.points,
-      hasLength(5),
+      find.byKey(const Key('chart-account-selector-Default')),
+      findsOneWidget,
     );
 
     pending.complete(
       _prices(200, currency: 'USD', count: 12, intervalSeconds: 900),
     );
     await tester.pumpAndSettle();
-    series =
+    final series =
         tester.widget<MarketLineChart>(find.byType(MarketLineChart)).series;
     expect(
       series.where((line) => line.name == 'AAPL').single.points,
@@ -599,7 +595,7 @@ void main() {
     );
   });
 
-  testWidgets('5d stock shows cached daily prices before 15-minute data', (
+  testWidgets('5d stock waits for 15-minute data before plotting', (
     tester,
   ) async {
     final pending = Completer<http.Response>();
@@ -620,15 +616,8 @@ void main() {
       },
     );
     await tester.pump();
-    expect(find.textContaining('Daily preview'), findsNothing);
-    expect(
-      tester.widget<TickerLine>(find.byType(TickerLine)).spots,
-      hasLength(5),
-    );
-    expect(
-      tester.widget<TickerLine>(find.byType(TickerLine)).intraday,
-      isFalse,
-    );
+    expect(find.byType(TickerLine), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
     pending.complete(
       _prices(200, currency: 'GBp', count: 12, intervalSeconds: 900),
@@ -673,7 +662,7 @@ void main() {
   });
 
   testWidgets(
-    '5d portfolio shows five broker daily NAV points before intraday',
+    '5d portfolio shows account details while intraday loads',
     (tester) async {
       final pending = Completer<IbkrHistoricalSeries>();
       final loader = IntradayMarketData(
@@ -738,14 +727,12 @@ void main() {
         find.textContaining('Daily preview'),
         findsNothing,
       );
+      expect(find.byType(MarketLineChart), findsNothing);
       expect(
-        tester
-            .widget<MarketLineChart>(find.byType(MarketLineChart))
-            .series
-            .single
-            .points,
-        hasLength(5),
+        find.byKey(const Key('chart-account-selector-Default')),
+        findsOneWidget,
       );
+      expect(find.textContaining('1,000'), findsWidgets);
 
       pending.complete(
         IbkrHistoricalSeries(

@@ -152,7 +152,6 @@ class ChartsPageState extends State<ChartsPage>
   bool _provisionalRefreshInFlight = false;
   String? _portfolioError;
   bool _portfolioLoading = true;
-  bool _periodChangePending = false;
   bool _chartPeriodLoaded = false;
   final Set<String> _hiddenAccounts = {};
   final Map<String, Future<_LoadedChartPortfolio>> _ibkrLoads = {};
@@ -918,7 +917,6 @@ class ChartsPageState extends State<ChartsPage>
       _portfolioCashFlowsByAccount.clear();
       _portfolioError = cached.error;
       _portfolioLoading = false;
-      _periodChangePending = false;
     });
     return true;
   }
@@ -995,32 +993,19 @@ class ChartsPageState extends State<ChartsPage>
     final cachedPreviews = _cachedFiveDayPortfolioPreviews(accountManager);
 
     final newSeries = <String, List<_DateValue>>{
-      for (final name in accounts) name: cachedPreviews[name] ?? [],
+      for (final name in accounts)
+        name: _portfolioSeriesByAccount[name] ?? <_DateValue>[],
     };
+    final dailyFallbacks = Map<String, List<_DateValue>>.of(cachedPreviews);
     setState(() {
       _portfolioError = null;
-      _portfolioDailyPreviewAccounts
-        ..clear()
-        ..addAll(cachedPreviews.keys);
-      if (cachedPreviews.isNotEmpty) {
-        _portfolioSeriesByAccount = Map.of(newSeries);
-      }
-      _portfolioLoading = cachedPreviews.isEmpty &&
-          _portfolioSeriesByAccount.values.every((series) => series.isEmpty);
+      _portfolioLoading = _portfolioSeriesByAccount.values.every(
+        (series) => series.isEmpty,
+      );
     });
 
     bool isCurrent() =>
         mounted && widget.isActive && generation == _portfolioLoadGeneration;
-
-    void publishPreview(String accountName, List<_DateValue> preview) {
-      if (!isCurrent() || preview.isEmpty) return;
-      newSeries[accountName] = preview;
-      setState(() {
-        _portfolioDailyPreviewAccounts.add(accountName);
-        _portfolioSeriesByAccount = Map.of(newSeries);
-        _portfolioLoading = false;
-      });
-    }
 
     final newReturns = <String, List<_DateValue>>{};
     final newFlows = <String, Map<DateTime, double>>{};
@@ -1049,14 +1034,16 @@ class ChartsPageState extends State<ChartsPage>
         }
         loadedAccounts[accountName] = loaded;
         if (_usesIntraday) {
-          if (fiveDayPreview && newSeries[accountName]!.isEmpty) {
+          if (fiveDayPreview && !dailyFallbacks.containsKey(accountName)) {
             try {
               final preview = await _buildPortfolioSeries(
                 accountName,
                 loaded.positions,
                 currentPortfolioValueUsd: loaded.currentValueUsd,
               );
-              publishPreview(accountName, preview.series);
+              if (preview.series.isNotEmpty) {
+                dailyFallbacks[accountName] = preview.series;
+              }
             } catch (error, stackTrace) {
               talker.handle(error, stackTrace, 'Daily preview unavailable');
             }
@@ -1075,7 +1062,6 @@ class ChartsPageState extends State<ChartsPage>
             setState(() {
               _portfolioDailyPreviewAccounts.remove(accountName);
               _portfolioSeriesByAccount = Map.of(newSeries);
-              _portfolioLoading = false;
             });
           }
           return;
@@ -1142,12 +1128,20 @@ class ChartsPageState extends State<ChartsPage>
       return;
     }
     setState(() {
+      if (fiveDayPreview) {
+        for (final name in accounts) {
+          if (newSeries[name]!.isEmpty &&
+              dailyFallbacks[name]?.isNotEmpty == true) {
+            newSeries[name] = dailyFallbacks[name]!;
+            _portfolioDailyPreviewAccounts.add(name);
+          }
+        }
+      }
       _portfolioSeriesByAccount = newSeries;
       _portfolioReturnSeriesByAccount = newReturns;
       _portfolioCashFlowsByAccount = newFlows;
       _portfolioError = firstError;
       _portfolioLoading = false;
-      _periodChangePending = false;
       _provisionalStartByAccount.clear();
       if (_usesIntraday &&
           _portfolioDailyPreviewAccounts.isEmpty &&
@@ -2037,7 +2031,6 @@ class ChartsPageState extends State<ChartsPage>
       _portfolioReturnSeriesByAccount.clear();
       _portfolioCashFlowsByAccount.clear();
       _portfolioLoading = true;
-      _periodChangePending = _mode != _ChartMode.stock;
       years = selectedYears;
       months = selectedMonths;
       days = selectedDays;
@@ -2481,7 +2474,9 @@ class ChartsPageState extends State<ChartsPage>
     final intradaySnapshot = AsyncSnapshot.withData(
       ConnectionState.done,
       _intradaySeries == null
-          ? _stockDailyPreview
+          ? _networkLoading || _stockError == null
+              ? const <CandleTicker>[]
+              : _stockDailyPreview
           : [
               for (final bar in _intradaySeries!.candles)
                 CandleTicker(
@@ -3007,7 +3002,7 @@ class ChartsPageState extends State<ChartsPage>
           ),
     );
     if (!hasFavoritePrices &&
-        (_periodChangePending || _portfolioLoading) &&
+        _portfolioLoading &&
         _portfolioSeriesByAccount.values.every((series) => series.isEmpty)) {
       return SizedBox(
         height: height,
@@ -3059,7 +3054,7 @@ class ChartsPageState extends State<ChartsPage>
           ];
           continue;
         }
-        if (days != 5) continue;
+        if (days != 5 || !_favoriteIntradayErrors.containsKey(symbol)) continue;
       }
       var candles = favoriteCandles
           .where((candle) => candle.symbol == canonicalMarketSymbol(symbol))
@@ -3343,13 +3338,8 @@ class ChartsPageState extends State<ChartsPage>
     BuildContext context,
     List<Color> accountColors,
   ) {
-    if (_periodChangePending) return const SizedBox.shrink();
     final accounts = context.read<AccountManager>().accounts;
-    final allSeries = {
-      for (final entry in _portfolioSeriesByAccount.entries)
-        if (entry.value.isNotEmpty) entry.key: entry.value,
-    };
-    if (allSeries.isEmpty) return const SizedBox();
+    if (accounts.isEmpty) return const SizedBox.shrink();
 
     return Padding(
       key: const Key('portfolio-summary-content'),
@@ -3359,12 +3349,12 @@ class ChartsPageState extends State<ChartsPage>
       ),
       child: Column(
         children: [
-          for (final entry in allSeries.entries)
+          for (final accountName in accounts)
             _buildAccountSummaryRow(
               context,
               accounts,
-              entry.key,
-              entry.value,
+              accountName,
+              _portfolioSeriesByAccount[accountName] ?? const [],
               accountColors,
             ),
         ],
@@ -3429,13 +3419,16 @@ class ChartsPageState extends State<ChartsPage>
         }
       }
     }
-    final estimated = _provisionalStartByAccount[accountName] != null &&
+    final estimated = series.isNotEmpty &&
+        _provisionalStartByAccount[accountName] != null &&
         !series.last.date.isBefore(_provisionalStartByAccount[accountName]!);
     final summaryValue = estimated
         ? series.last.value
         : currentValueUsd != null && currentValueUsd.isFinite
             ? currentValueUsd
-            : series.last.value;
+            : series.isNotEmpty
+                ? series.last.value
+                : null;
     final theme = Theme.of(context);
 
     Widget returnLabel() => Text(
@@ -3452,7 +3445,7 @@ class ChartsPageState extends State<ChartsPage>
         );
 
     final valueText = Text(
-      fmtCurrency(summaryValue),
+      summaryValue == null ? '—' : fmtCurrency(summaryValue),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       textAlign: TextAlign.right,
@@ -3461,7 +3454,9 @@ class ChartsPageState extends State<ChartsPage>
     final changeText = Text(
       hasHistory
           ? (change >= 0 ? '+' : '') + fmtCurrency(change)
-          : context.l10n.text('Historical prices unavailable'),
+          : _portfolioLoading
+              ? '—'
+              : context.l10n.text('Historical prices unavailable'),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(color: returnColor, fontSize: 13, height: 1.1),

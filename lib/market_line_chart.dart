@@ -411,8 +411,8 @@ class MarketLineChart extends StatelessWidget {
         accessibilityValue: accessibilityValue,
       ),
       rowLabel: tooltipRowLabel,
-      candleTooltipTitle: candleTooltipTitle,
-      candleTooltipRows: candleTooltipRows,
+      candleTooltipTitle: showCandlesticks ? candleTooltipTitle : null,
+      candleTooltipRows: showCandlesticks ? candleTooltipRows : null,
       stickyTooltip: showCandlesticks,
       externalSelection: candleSelection,
       range: range,
@@ -817,9 +817,11 @@ class _MarketLineTooltipPainter extends CustomPainter {
         radius: _activeDotRadius,
       );
     }
-    final title = candleTooltipTitle?.call(index) ??
-        (marks.first.label.isEmpty ? null : marks.first.label);
     final candleRows = candleTooltipRows?.call(index);
+    final title = candleRows == null
+        ? null
+        : candleTooltipTitle?.call(index) ??
+            (marks.first.label.isEmpty ? null : marks.first.label);
     _drawMarketTooltip(
       canvas,
       anchor: Offset(
