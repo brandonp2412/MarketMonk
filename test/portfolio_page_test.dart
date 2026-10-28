@@ -259,50 +259,58 @@ void main() {
     expect(tester.takeException(), null);
   });
 
-  testWidgets('portfolio initial opens the profile picker and switches', (
-    tester,
-  ) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(700, 900);
-    addTearDown(() {
-      tester.view.resetPhysicalSize();
-      tester.view.resetDevicePixelRatio();
-    });
-    await seedTestSqlite({});
-    final accounts = await configuredTwoAccounts();
-    for (final profile in accounts.accounts) {
-      await accounts.cachePortfolio(
-        profile,
-        [cachedPosition()],
-        const IbkrAccountValue(value: 5500, currency: 'USD'),
+  for (final width in [700.0, 1400.0]) {
+    testWidgets('portfolio profile picker switches at width $width', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = Size(width, 900);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      await seedTestSqlite({});
+      final accounts = await configuredTwoAccounts();
+      for (final profile in accounts.accounts) {
+        await accounts.cachePortfolio(
+          profile,
+          [cachedPosition()],
+          const IbkrAccountValue(value: 5500, currency: 'USD'),
+        );
+      }
+
+      final pending = Completer<IbkrPortfolioSnapshot>();
+      await tester.pumpWidget(
+        app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
       );
-    }
+      await tester.pump();
 
-    final pending = Completer<IbkrPortfolioSnapshot>();
-    await tester.pumpWidget(
-      app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
-    );
-    await tester.pump();
+      if (width == 1400) {
+        expect(find.text('Default · Portfolio'), findsOneWidget);
+      }
+      final picker = find.byKey(const Key('portfolio-profile-picker'));
+      expect(
+        find.descendant(of: picker, matching: find.text('D')),
+        findsOneWidget,
+      );
 
-    final picker = find.byKey(const Key('portfolio-profile-picker'));
-    expect(
-      find.descendant(of: picker, matching: find.text('D')),
-      findsOneWidget,
-    );
+      await tester.tap(picker);
+      await tester.pumpAndSettle();
+      expect(find.text('IBKR Bot'), findsOneWidget);
 
-    await tester.tap(picker);
-    await tester.pumpAndSettle();
-    expect(find.text('IBKR Bot'), findsOneWidget);
-
-    await tester.tap(find.text('IBKR Bot'));
-    await tester.pumpAndSettle();
-    expect(accounts.activeAccount, 'IBKR Bot');
-    expect(
-      find.descendant(of: picker, matching: find.text('I')),
-      findsOneWidget,
-    );
-    expect(tester.takeException(), null);
-  });
+      await tester.tap(find.text('IBKR Bot'));
+      await tester.pumpAndSettle();
+      expect(accounts.activeAccount, 'IBKR Bot');
+      if (width == 1400) {
+        expect(find.text('IBKR Bot · Portfolio'), findsOneWidget);
+      }
+      expect(
+        find.descendant(of: picker, matching: find.text('I')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), null);
+    });
+  }
 
   testWidgets(
     'slow IBKR performance refresh does not keep portfolio loading',
