@@ -810,7 +810,9 @@ class HoldingsPageState extends State<HoldingsPage>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            context.l10n.text('Holdings'),
+                            '${accounts.activeAccount} · ${context.l10n.text('Holdings')}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.headlineMedium,
                           ),
                           const SizedBox(height: 4),

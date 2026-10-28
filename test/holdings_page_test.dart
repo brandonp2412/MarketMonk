@@ -155,7 +155,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.byType(DataTable), findsOneWidget);
-    expect(find.text('Holdings'), findsOneWidget);
+    expect(find.text('Default · Holdings'), findsOneWidget);
     expect(find.text('VOO'), findsOneWidget);
     final mouse = await tester.createGesture(
       kind: PointerDeviceKind.mouse,
@@ -560,6 +560,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(accounts.activeAccount, 'Brokerage');
+    expect(find.text('Brokerage · Holdings'), findsOneWidget);
   });
 
   testWidgets('realized profits appear in holding details, not the mobile list',
