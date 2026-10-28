@@ -543,7 +543,7 @@ void main() {
         matching: find.byType(ListView),
       ),
     );
-    expect(returnList.padding, allocationList.padding);
+    expect(returnList.padding, const EdgeInsets.only(right: 24));
     final pieFinder = find.byType(MarketDonutChart).first;
     final pie = tester.widget<MarketDonutChart>(pieFinder);
     expect(pie.radius, 75);

@@ -1324,7 +1324,7 @@ class PortfolioPageState extends State<PortfolioPage>
                     margin: EdgeInsets.zero,
                     clipBehavior: Clip.antiAlias,
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+                      padding: const EdgeInsets.fromLTRB(22, 22, 10, 18),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -1346,7 +1346,7 @@ class PortfolioPageState extends State<PortfolioPage>
                               controller: _returnScrollController,
                               child: ListView.separated(
                                 controller: _returnScrollController,
-                                padding: const EdgeInsets.only(right: 12),
+                                padding: const EdgeInsets.only(right: 24),
                                 itemCount: byReturn.length,
                                 separatorBuilder: (_, __) => Divider(
                                   height: 1,
