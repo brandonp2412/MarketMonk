@@ -775,9 +775,8 @@ class ChartsPageState extends State<ChartsPage>
     final generation = _favoriteLoadGeneration;
     for (final symbol in _favoriteStocks) {
       if (selectedOnly && !_selectedFavorites.contains(symbol)) continue;
-      if (!mounted ||
-          !widget.isActive ||
-          generation != _favoriteLoadGeneration) return;
+      if (!mounted || !widget.isActive || generation != _favoriteLoadGeneration)
+        return;
       await _syncFavoriteCandle(symbol, forceRefresh: forceRefresh);
     }
   }
@@ -2677,7 +2676,9 @@ class ChartsPageState extends State<ChartsPage>
             for (final candle in candles) candle.date.value,
           ]),
           onRangeChanged: (range) => _setChartRange(
-            [for (final candle in candles) candle.date.value],
+            [
+              for (final candle in candles) candle.date.value,
+            ],
             range,
           ),
           dates: candles.map((candle) => candle.date.value),
@@ -2874,9 +2875,8 @@ class ChartsPageState extends State<ChartsPage>
   Future<void> _renameFavorite(String symbol) async {
     final name = await showDialog<String>(
       context: context,
-      builder: (_) => _RenameFavoriteDialog(
-        currentName: _favoriteNames[symbol] ?? symbol,
-      ),
+      builder: (_) =>
+          _RenameFavoriteDialog(currentName: _favoriteNames[symbol] ?? symbol),
     );
     if (name == null || !mounted) return;
     final prefs = await SqliteSettings.getInstance();
@@ -3573,11 +3573,7 @@ class ChartsPageState extends State<ChartsPage>
 
     Widget returnLabel() => Text(
           (hasHistory
-              ? <String>[
-                  if (pct >= 0) '+',
-                  pct.toStringAsFixed(2),
-                  '%',
-                ].join()
+              ? <String>[if (pct >= 0) '+', pct.toStringAsFixed(2), '%'].join()
               : _portfolioLoading
                   ? '—'
                   : context.l10n.text('History unavailable')),
@@ -3999,9 +3995,7 @@ class _RenameFavoriteDialogState extends State<_RenameFavoriteDialog> {
       title: Text(context.l10n.text('Rename favorite')),
       content: TextField(
         controller: _controller,
-        decoration: InputDecoration(
-          labelText: context.l10n.text('Name'),
-        ),
+        decoration: InputDecoration(labelText: context.l10n.text('Name')),
         autofocus: true,
         textCapitalization: TextCapitalization.words,
         onSubmitted: (value) => Navigator.pop(context, value.trim()),
