@@ -1209,7 +1209,7 @@ class HoldingsPageState extends State<HoldingsPage>
 
     return Padding(
       key: const Key('desktop-holdings-content'),
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      padding: EdgeInsets.zero,
       child: Column(
         children: [
           desktopMetricGrid(

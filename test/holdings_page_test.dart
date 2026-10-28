@@ -190,7 +190,7 @@ void main() {
     final desktopPadding = tester.widget<Padding>(
       find.byKey(const Key('desktop-holdings-content')),
     );
-    expect(desktopPadding.padding, const EdgeInsets.fromLTRB(24, 16, 24, 24));
+    expect(desktopPadding.padding, EdgeInsets.zero);
     final scrollbars = tester.widgetList<Scrollbar>(
       find.descendant(
         of: find.byKey(const Key('desktop-holdings-content')),
