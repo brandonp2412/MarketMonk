@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:dynamic_color/dynamic_color.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:market_monk/adaptive_layout.dart';
@@ -811,6 +812,67 @@ class MyApp extends StatelessWidget {
     return DynamicColorBuilder(
       builder: (lightDynamic, darkDynamic) => MaterialApp(
         title: 'Market Monk',
+        debugShowCheckedModeBanner: false,
+        builder: (context, child) => Stack(
+          children: [
+            if (child != null) child,
+            if (kDebugMode)
+              PositionedDirectional(
+                top: 0,
+                end: 0,
+                child: SafeArea(
+                  child: IgnorePointer(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color:
+                              Theme.of(context).colorScheme.secondaryContainer,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 4,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.code_rounded,
+                                size: 13,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSecondaryContainer,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'DEBUG',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSecondaryContainer,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 1,
+                                      decoration: TextDecoration.none,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
         theme: ThemeData(
           colorScheme: settings.systemColors
               ? lightDynamic

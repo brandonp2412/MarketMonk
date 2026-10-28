@@ -266,7 +266,9 @@ void main() {
     final orderedChart =
         tester.widget<MarketLineChart>(find.byType(MarketLineChart));
     expect(
-        orderedChart.series.map((series) => series.name), ['SPY', 'Default']);
+      orderedChart.series.map((series) => series.name),
+      ['SPY', 'Default'],
+    );
 
     final accountBefore =
         scene().marks.where((mark) => mark.seriesIndex == 1).toList();
