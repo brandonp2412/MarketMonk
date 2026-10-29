@@ -2584,7 +2584,7 @@ class ChartsPageState extends State<ChartsPage>
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            '${_intradaySeries!.source} · ${days == 1 ? "1 min" : "15 min"} · ${context.l10n.text('Local time')}',
+            '${_intradaySeries!.source} · ${_intradaySeries!.isDaily ? "1 day" : (days == 1 ? "1 min" : "15 min")} · ${context.l10n.text('Local time')}',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall,
           ),

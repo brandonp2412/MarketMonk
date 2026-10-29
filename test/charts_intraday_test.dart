@@ -167,6 +167,103 @@ void main() {
     },
   );
 
+  testWidgets('1d renders a fund daily valuation instead of an error',
+      (tester) async {
+    final loader = IntradayMarketData(
+      yahooGet: (uri) async {
+        if (uri.queryParameters['interval'] == '1m') {
+          return http.Response(
+            jsonEncode({
+              'chart': {
+                'result': null,
+                'error': {'description': 'This is a fixed-price asset'},
+              },
+            }),
+            422,
+          );
+        }
+        return _prices(123, count: 1);
+      },
+    );
+    await mountChart(tester, loader, initialSymbol: 'FUND.L');
+    await tester.pumpAndSettle();
+    final ticker = tester.widget<TickerLine>(find.byType(TickerLine));
+    expect(ticker.spots.single.y, 1.23);
+    expect(find.text('Yahoo · 1 day · Local time'), findsOneWidget);
+    expect(ticker.nativeCurrency, 'GBP');
+    expect(find.byType(MarketLineChart), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.textContaining('fixed-price asset'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('1d portfolio includes a daily fund alongside minute stocks',
+      (tester) async {
+    final requests = <Uri>[];
+    final loader = IntradayMarketData(
+      yahooGet: (uri) async {
+        requests.add(uri);
+        if (uri.path.endsWith('FUND') &&
+            uri.queryParameters['interval'] == '1m') {
+          return http.Response(
+            jsonEncode({
+              'chart': {
+                'result': null,
+                'error': {'description': 'This is a fixed price asset'},
+              },
+            }),
+            422,
+          );
+        }
+        return _prices(
+          uri.path.endsWith('FUND') ? 50 : 100,
+          currency: 'USD',
+          count: uri.path.endsWith('FUND') ? 1 : 3,
+        );
+      },
+    );
+    await mountChart(
+      tester,
+      loader,
+      initialSymbol: null,
+      configureAccounts: (accounts) async {
+        await accounts.setIbkrConfig(
+          'Default',
+          const IbkrAccountConfig(enabled: true),
+        );
+        await accounts.cachePortfolio(
+          'Default',
+          [
+            for (final symbol in ['AAPL', 'FUND'])
+              Position(
+                symbol: symbol,
+                name: symbol,
+                nativeCurrency: 'USD',
+                netShares: 2,
+                avgCost: 50,
+                currentPrice: 100,
+                firstBuyDate: DateTime(2026),
+                lastBuyDate: DateTime(2026),
+              ),
+          ],
+          const IbkrAccountValue(value: 1000, currency: 'USD'),
+        );
+      },
+    );
+    await tester.pumpAndSettle();
+    final chart = tester.widget<MarketLineChart>(find.byType(MarketLineChart));
+    expect(
+      chart.series.single.points.map((point) => point.y),
+      [996, 998, 1000],
+    );
+    expect(
+      requests.where((uri) => uri.queryParameters['interval'] == '1d'),
+      hasLength(1),
+    );
+    expect(find.textContaining('fixed price asset'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('late 1d response cannot replace the selected 5d chart', (
     tester,
   ) async {

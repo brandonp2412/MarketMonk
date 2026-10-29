@@ -54,6 +54,41 @@ void main() {
     expect(result.map((point) => point.valueUsd), [490, 500]);
   });
 
+  test('a late daily fund valuation preserves earlier stock observations', () {
+    final fund = IntradayPortfolioHolding.fromSeries(
+      IntradaySeries(
+        currency: 'USD',
+        source: 'Yahoo',
+        isDaily: true,
+        candles: [
+          IbkrHistoricalCandle(
+            date: end,
+            open: 50,
+            high: 50,
+            low: 50,
+            close: 50,
+            volume: 0,
+          ),
+        ],
+      ),
+      quantity: 3,
+      currencyPerUsd: 1,
+      centDivisor: 1,
+    );
+    final result = buildIntradayPortfolio(
+      holdings: [
+        IntradayPortfolioHolding(
+          quantity: 2,
+          pricesUsd: {start: 100, middle: 110, end: 120},
+        ),
+        fund,
+      ],
+      currentValueUsd: 1000,
+    );
+    expect(result.map((point) => point.date), [start, middle, end]);
+    expect(result.map((point) => point.valueUsd), [960, 980, 1000]);
+  });
+
   test('converts cent-denominated quotes and FX before weighting shares', () {
     final holding = IntradayPortfolioHolding.fromSeries(
       IntradaySeries(

@@ -96,6 +96,118 @@ void main() {
     },
   );
 
+  test('one day fixed-price funds use their single daily valuation', () async {
+    final requests = <Uri>[];
+    final loader = IntradayMarketData(
+      yahooGet: (uri) async {
+        requests.add(uri);
+        if (uri.queryParameters['interval'] == '1m') {
+          return http.Response(
+            jsonEncode({
+              'chart': {
+                'result': null,
+                'error': {
+                  'code': 'Bad Request',
+                  'description': 'This asset is a fixed price asset',
+                },
+              },
+            }),
+            422,
+          );
+        }
+        return http.Response(
+          jsonEncode({
+            'chart': {
+              'error': null,
+              'result': [
+                {
+                  'meta': {'currency': 'GBp'},
+                  'timestamp': [1791552600],
+                  'indicators': {
+                    'quote': [
+                      {
+                        'close': [123.5],
+                      }
+                    ],
+                  },
+                }
+              ],
+            },
+          }),
+          200,
+        );
+      },
+    );
+    final series = await loader.fetch('FUND.L');
+    expect(
+      requests.map((uri) => uri.queryParameters['interval']),
+      ['1m', '1d'],
+    );
+    expect(requests.last.queryParameters['range'], '1d');
+    expect(series.currency, 'GBp');
+    final candle = series.candles.single;
+    expect(candle.date.millisecondsSinceEpoch, 1791552600000);
+    expect(
+      [candle.open, candle.high, candle.low, candle.close],
+      everyElement(123.5),
+    );
+    expect(await loader.fetch('FUND.L'), same(series));
+    expect(requests, hasLength(2));
+  });
+
+  test('daily-only fund metadata supplies its dated valuation', () async {
+    final loader = IntradayMarketData(
+      yahooGet: (_) async => http.Response(
+        jsonEncode({
+          'chart': {
+            'error': null,
+            'result': [
+              {
+                'meta': {
+                  'currency': 'USD',
+                  'instrumentType': 'MUTUALFUND',
+                  'dataGranularity': '1d',
+                  'regularMarketPrice': 714.95,
+                  'regularMarketTime': 1793275826,
+                },
+                'indicators': {
+                  'quote': [{}],
+                },
+              }
+            ],
+          },
+        }),
+        200,
+      ),
+    );
+    final series = await loader.fetch('VFIAX');
+    expect(series.candles.single.close, 714.95);
+    expect(
+      series.candles.single.date,
+      DateTime.fromMillisecondsSinceEpoch(1793275826000, isUtc: true),
+    );
+  });
+
+  test('unrelated Yahoo errors do not request daily prices', () async {
+    var calls = 0;
+    final loader = IntradayMarketData(
+      yahooGet: (_) async {
+        calls++;
+        return http.Response(
+          jsonEncode({
+            'chart': {
+              'result': null,
+              'error': {'description': 'No data found'},
+            },
+          }),
+          422,
+        );
+      },
+    );
+    await expectLater(loader.fetch('MISSING'), throwsStateError);
+    expect(calls, 1);
+  });
+
   test('five days uses 15-minute Yahoo bars', () async {
     late Uri request;
     final loader = IntradayMarketData(

@@ -5,12 +5,15 @@ class IntradayPortfolioHolding {
   /// Signed current share count, including short positions.
   final double quantity;
 
+  final bool constantPrice;
+
   /// Observed prices by UTC timestamp, after currency and cent conversion.
   final Map<DateTime, double> pricesUsd;
 
   /// Retains current quantities when reconstructing the selected period.
   const IntradayPortfolioHolding({
     required this.quantity,
+    this.constantPrice = false,
     required this.pricesUsd,
   });
 
@@ -23,6 +26,7 @@ class IntradayPortfolioHolding {
   }) =>
       IntradayPortfolioHolding(
         quantity: quantity,
+        constantPrice: series.isDaily && series.candles.length == 1,
         pricesUsd: {
           for (final candle in series.candles)
             candle.date: candle.close / centDivisor / currencyPerUsd,
@@ -56,7 +60,11 @@ List<IntradayPortfolioValue> buildIntradayPortfolio({
   final dates = holdings.expand((holding) => holding.pricesUsd.keys).toSet()
     ..removeWhere((date) => !date.isUtc);
   final sortedDates = dates.toList()..sort();
-  final prices = <int, double>{};
+  final prices = <int, double>{
+    for (final (index, holding) in holdings.indexed)
+      if (holding.constantPrice && holding.pricesUsd.length == 1)
+        index: holding.pricesUsd.values.single,
+  };
   final values = <IntradayPortfolioValue>[];
   for (final date in sortedDates) {
     for (var i = 0; i < holdings.length; i++) {

@@ -15,6 +15,8 @@ class IntradaySeries {
   /// Provider that supplied these bars, which may be Yahoo after IBKR fails.
   final String source;
 
+  final bool isDaily;
+
   /// UTC observations in ascending order, without duplicate timestamps.
   final List<IbkrHistoricalCandle> candles;
 
@@ -22,6 +24,7 @@ class IntradaySeries {
   IntradaySeries({
     required this.currency,
     required this.source,
+    this.isDaily = false,
     required List<IbkrHistoricalCandle> candles,
   }) : candles = _normalize(candles);
 
@@ -235,8 +238,9 @@ class IntradayMarketData {
 
   Future<IntradaySeries> _fetchYahoo(
     String symbol,
-    int days,
-  ) =>
+    int days, {
+    bool daily = false,
+  }) =>
       backgroundNetworkCoordinator.observe('yahoo.intraday', () async {
         // Yahoo's chart endpoint accepts range and intraday interval parameters.
         // https://github.com/ranaroussi/yfinance/blob/main/yfinance/scrapers/history.py
@@ -245,11 +249,27 @@ class IntradayMarketData {
           '/v8/finance/chart/$symbol',
           {
             'range': '${days}d',
-            'interval': days == 1 ? '1m' : '15m',
+            'interval': daily ? '1d' : (days == 1 ? '1m' : '15m'),
             'includePrePost': 'false',
           },
         );
         final response = await _requestYahooWithRetry(uri);
+        if (!daily && days == 1) {
+          dynamic payload;
+          try {
+            payload = jsonDecode(response.body);
+          } on FormatException {
+            payload = null;
+          }
+          final chart = payload is Map ? payload['chart'] : null;
+          final error = chart is Map ? chart['error'] : null;
+          final description = error is Map ? error['description'] : null;
+          if (description is String &&
+              RegExp(r'fixed[ -]price', caseSensitive: false)
+                  .hasMatch(description)) {
+            return _fetchYahoo(symbol, days, daily: true);
+          }
+        }
         if (response.statusCode != 200) {
           throw StateError(
             'Yahoo intraday returned HTTP ${response.statusCode}',
@@ -266,13 +286,17 @@ class IntradayMarketData {
         }
         final result = results.first as Map<String, dynamic>;
         final meta = result['meta'] as Map<String, dynamic>?;
+        final dailyValuation =
+            daily || (days == 1 && meta?['instrumentType'] == 'MUTUALFUND');
         final timestamps = result['timestamp'] as List? ?? [];
         final quotes =
             (result['indicators'] as Map<String, dynamic>?)?['quote'] as List?;
-        if (quotes == null || quotes.isEmpty) {
+        if ((quotes == null || quotes.isEmpty) && !dailyValuation) {
           throw StateError('No Yahoo intraday prices available for $symbol');
         }
-        final quote = quotes.first as Map<String, dynamic>;
+        final quote = quotes == null || quotes.isEmpty
+            ? <String, dynamic>{}
+            : quotes.first as Map<String, dynamic>;
         num? numberAt(String field, int index) {
           final values = quote[field] as List?;
           final value =
@@ -283,10 +307,10 @@ class IntradayMarketData {
         final candles = <IbkrHistoricalCandle>[];
         for (var i = 0; i < timestamps.length; i++) {
           final timestamp = timestamps[i];
-          final open = numberAt('open', i);
-          final high = numberAt('high', i);
-          final low = numberAt('low', i);
           final close = numberAt('close', i);
+          final open = numberAt('open', i) ?? (dailyValuation ? close : null);
+          final high = numberAt('high', i) ?? (dailyValuation ? close : null);
+          final low = numberAt('low', i) ?? (dailyValuation ? close : null);
           if (timestamp is! num ||
               !timestamp.isFinite ||
               timestamp <= 0 ||
@@ -311,9 +335,34 @@ class IntradayMarketData {
             ),
           );
         }
+        if (candles.isEmpty && dailyValuation) {
+          final price = meta?['regularMarketPrice'];
+          final timestamp = meta?['regularMarketTime'];
+          if (price is num &&
+              price.isFinite &&
+              price > 0 &&
+              timestamp is num &&
+              timestamp.isFinite &&
+              timestamp > 0) {
+            candles.add(
+              IbkrHistoricalCandle(
+                date: DateTime.fromMillisecondsSinceEpoch(
+                  (timestamp * 1000).round(),
+                  isUtc: true,
+                ),
+                open: price.toDouble(),
+                high: price.toDouble(),
+                low: price.toDouble(),
+                close: price.toDouble(),
+                volume: 0,
+              ),
+            );
+          }
+        }
         return IntradaySeries(
           currency: meta?['currency'] as String? ?? 'USD',
           source: 'Yahoo',
+          isDaily: dailyValuation,
           candles: candles,
         );
       });
