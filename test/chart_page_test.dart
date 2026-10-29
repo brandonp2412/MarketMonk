@@ -883,9 +883,9 @@ void main() {
 
     final successfulPerformanceLoads = performanceLoads;
     await tester.tap(find.text('10y'));
-    await tester.pump();
-    expect(find.text('History unavailable'), findsNothing);
     await tester.pumpAndSettle();
+    expect(find.text('History unavailable'), findsOneWidget);
+    expect(find.textContaining('10,100'), findsWidgets);
 
     expect(ibkrLoads, refreshedIbkrLoads);
     expect(performanceLoads, successfulPerformanceLoads);

@@ -649,11 +649,17 @@ void main() {
       },
     );
     await tester.pumpAndSettle();
+    final previousChart = tester.widget<MarketLineChart>(
+      find.byType(MarketLineChart),
+    );
     await tester.tap(find.byKey(const Key('chart-period-1m')));
     await tester.pump();
 
     expect(find.text('Historical prices unavailable'), findsNothing);
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(
+      tester.widget<MarketLineChart>(find.byType(MarketLineChart)),
+      same(previousChart),
+    );
 
     final recentMonday = DateTime.now().subtract(
       Duration(days: DateTime.now().weekday - DateTime.monday),
