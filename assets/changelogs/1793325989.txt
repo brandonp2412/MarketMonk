@@ -1,0 +1,10 @@
+• Center first few things of README
+• Fix external link buttons on Android
+• Preserve recovered Glass changes for reconciliation
+• Reduce spinners
+• Shorten AGENTS.md
+• Show upgrade changelog snackbar no more than every 14 days
+• Update README
+• chore(android): drop unreachable pre-21 splash resource (#54)
+• chore(android): remove dead splash bitmap template markup (#55)
+• chore(android): remove unreachable pre-N currency fallback (#53)
