@@ -1,11 +1,6 @@
 name: Privacy policy Pages
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - docs/privacy-policy.html
-      - .github/workflows/privacy-pages.yml
   workflow_dispatch:
 
 permissions:
