@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +9,16 @@ import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
 import 'sqlite_test_support.dart';
 import 'test_log_support.dart';
+
+http.Response frankfurterResponse(String code, double rate) => http.Response(
+      jsonEncode({
+        'date': DateTime.now().toUtc().toIso8601String().substring(0, 10),
+        'base': 'USD',
+        'quote': code,
+        'rate': rate,
+      }),
+      200,
+    );
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -43,7 +54,7 @@ void main() {
 
     final settings = SettingsState(
       localCurrencyDetector: () async => 'NZD',
-      rateFetcher: (_) async => http.Response('{"rates":{"NZD":1.6}}', 200),
+      rateFetcher: (_) async => frankfurterResponse('NZD', 1.6),
     );
     await settings.initialized;
 
@@ -59,7 +70,7 @@ void main() {
     addTearDown(tester.binding.platformDispatcher.clearLocaleTestValue);
 
     final settings = SettingsState(
-      rateFetcher: (_) async => http.Response('{"rates":{"NZD":1.6}}', 200),
+      rateFetcher: (_) async => frankfurterResponse('NZD', 1.6),
     );
     await settings.initialized;
 
@@ -159,7 +170,7 @@ void main() {
     final nzdResponse = Completer<http.Response>();
     final settings = SettingsState(
       rateFetcher: (uri) {
-        final target = uri.queryParameters['to'];
+        final target = uri.pathSegments.last;
         if (target == 'GBP') return gbpResponse.future;
         if (target == 'NZD') return nzdResponse.future;
         return Future.value(http.Response('{"rates":{}}', 200));
@@ -168,10 +179,10 @@ void main() {
     await settings.initialized;
 
     await settings.setDisplayCurrency('NZD');
-    nzdResponse.complete(http.Response('{"rates":{"NZD":1.7}}', 200));
+    nzdResponse.complete(frankfurterResponse('NZD', 1.7));
     await Future<void>.delayed(Duration.zero);
 
-    gbpResponse.complete(http.Response('{"rates":{"GBP":0.8}}', 200));
+    gbpResponse.complete(frankfurterResponse('GBP', 0.8));
     await Future<void>.delayed(Duration.zero);
 
     expect(settings.displayCurrency, 'NZD');
@@ -189,7 +200,7 @@ void main() {
     var calls = 0;
     final settings = SettingsState(
       rateFetcher: (uri) {
-        if (uri.queryParameters['to'] != 'NZD') {
+        if (uri.pathSegments.last != 'NZD') {
           return Future.value(http.Response('{"rates":{}}', 200));
         }
         calls++;
@@ -204,7 +215,7 @@ void main() {
     ]);
 
     expect(calls, 1);
-    response.complete(http.Response('{"rates":{"NZD":1.7}}', 200));
+    response.complete(frankfurterResponse('NZD', 1.7));
     await Future<void>.delayed(Duration.zero);
     await Future<void>.delayed(Duration.zero);
 
@@ -221,12 +232,12 @@ void main() {
     var calls = 0;
     final settings = SettingsState(
       rateFetcher: (uri) async {
-        if (uri.queryParameters['to'] != 'NZD') {
+        if (uri.pathSegments.last != 'NZD') {
           return http.Response('{"rates":{}}', 200);
         }
         calls++;
         if (calls == 1) throw StateError('temporary failure');
-        return http.Response('{"rates":{"NZD":1.8}}', 200);
+        return frankfurterResponse('NZD', 1.8);
       },
     );
     await settings.initialized;

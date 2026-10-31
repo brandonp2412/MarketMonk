@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:market_monk/background_network_coordinator.dart';
+import 'package:market_monk/exchange_rate_service.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/logging.dart';
@@ -127,8 +128,12 @@ Future<void> fetchSymbolCurrencyAndRate(
 }
 
 /// Formats [v] (assumed to be in USD) in the user's display currency.
-String fmtCurrency(double usdValue) =>
-    maskCurrencyAmounts ? '••••' : currency.format(usdValue * exchangeRate);
+String fmtCurrency(double usdValue) {
+  if (maskCurrencyAmounts) return '••••';
+  final rate = allRatesFromUsd[currency.currencyName ?? 'USD'];
+  if (rate == null || !rate.isFinite || rate <= 0) return '—';
+  return currency.format(usdValue * rate);
+}
 
 /// Formats [v] which is denominated in [nativeCurrency], converting it to the
 /// user's chosen display currency via the cached cross-rates.
@@ -141,10 +146,13 @@ String fmtNativeCurrency(double nativeValue, String nativeCurrency) {
 }
 
 /// Compact display-currency label for chart axes (e.g. $1.2K).
-String fmtCompactCurrency(double usdValue) => maskCurrencyAmounts
-    ? '••••'
-    : NumberFormat.compactCurrency(symbol: currency.currencySymbol)
-        .format(usdValue * exchangeRate);
+String fmtCompactCurrency(double usdValue) {
+  if (maskCurrencyAmounts) return '••••';
+  final rate = allRatesFromUsd[currency.currencyName ?? 'USD'];
+  if (rate == null || !rate.isFinite || rate <= 0) return '—';
+  return NumberFormat.compactCurrency(symbol: currency.currencySymbol)
+      .format(usdValue * rate);
+}
 
 /// Compact axis label for [v] denominated in [nativeCurrency].
 String fmtCompactNativeCurrency(double nativeValue, String nativeCurrency) {
@@ -917,7 +925,7 @@ Future<void> syncCandles(
 
 /// Fetches the native currency for [symbol] from the Yahoo Finance chart API,
 /// then — only if that currency differs from USD — lazily fetches its USD-based
-/// exchange rate from Frankfurter and stores it in [allRatesFromUsd].
+/// exchange rate and stores it in [allRatesFromUsd].
 ///
 /// Results are cached in-memory and in the unified symbol metadata table, so repeat calls are
 /// free and cent-quoted stocks (GBp/ZAc) keep the right scale offline.
@@ -928,7 +936,7 @@ Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
     if (cachedCurrency != 'USD' &&
         !allRatesFromUsd.containsKey(cachedCurrency)) {
       final prefs = await SqliteSettings.getInstance();
-      final savedRate = prefs.getDouble('exchangeRate_$cachedCurrency');
+      final savedRate = readCachedUsdRate(cachedCurrency, prefs)?.rate;
       if (savedRate != null && savedRate.isFinite && savedRate > 0) {
         allRatesFromUsd[cachedCurrency] = savedRate;
       } else {
@@ -944,7 +952,7 @@ Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
   if (savedRaw != null && savedRaw.isNotEmpty) {
     final normalized = cacheSymbolMeta(canonicalSymbol, savedRaw);
     if (normalized != 'USD' && !allRatesFromUsd.containsKey(normalized)) {
-      final savedRate = prefs.getDouble('exchangeRate_$normalized');
+      final savedRate = readCachedUsdRate(normalized, prefs)?.rate;
       if (savedRate != null) {
         allRatesFromUsd[normalized] = savedRate;
         runDetachedTask(
@@ -990,32 +998,11 @@ Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
   }
 }
 
-/// Fetches the USD → [currencyCode] rate from Frankfurter and stores it in
-/// [allRatesFromUsd]. Called lazily, only for currencies we haven't seen yet.
 Future<void> _fetchAndCacheRate(String currencyCode) async {
   try {
-    final rate = await backgroundNetworkCoordinator.coalesce<double?>(
-      'fx.rate',
-      currencyCode,
-      () async {
-        final uri = Uri.parse(
-          'https://api.frankfurter.app/latest?from=USD&to=$currencyCode',
-        );
-        final response = await http.get(uri);
-        if (response.statusCode != 200) return null;
-
-        final data = json.decode(response.body) as Map<String, dynamic>;
-        return ((data['rates'] as Map<String, dynamic>)[currencyCode] as num?)
-            ?.toDouble();
-      },
-    );
-    if (rate != null) {
-      allRatesFromUsd[currencyCode] = rate;
-      final prefs = await SqliteSettings.getInstance();
-      await prefs.setDouble('exchangeRate_$currencyCode', rate);
-    }
+    final quote = await refreshUsdRate(currencyCode);
+    allRatesFromUsd[currencyCode] = quote.rate;
   } catch (error, stackTrace) {
-    // The position falls back to treating native as USD.
     talker.handle(error, stackTrace, 'Failed to fetch exchange rate');
   }
 }

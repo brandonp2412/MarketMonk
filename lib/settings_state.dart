@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
@@ -7,7 +6,7 @@ import 'device_region_currency_stub.dart'
     if (dart.library.io) 'device_region_currency_io.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:market_monk/background_network_coordinator.dart';
+import 'package:market_monk/exchange_rate_service.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/utils.dart';
 import 'package:market_monk/logging.dart';
@@ -22,7 +21,7 @@ int _colorToInt(Color color) =>
     ((color.g * 255).round() << 8) |
     (color.b * 255).round();
 
-/// Currencies supported by the Frankfurter API (ECB data).
+/// Display currencies supported by MarketMonk.
 const supportedCurrencies = [
   'AUD',
   'BGN',
@@ -58,7 +57,7 @@ const supportedCurrencies = [
 ];
 
 class SettingsState extends ChangeNotifier {
-  final Future<http.Response> Function(Uri) _rateFetcher;
+  final Future<http.Response> Function(Uri)? _rateFetcher;
   final Future<String?> Function()? _localCurrencyDetector;
   final Map<String, Future<void>> _rateRefreshes = {};
   late final Future<void> initialized;
@@ -80,7 +79,7 @@ class SettingsState extends ChangeNotifier {
   SettingsState({
     Future<http.Response> Function(Uri)? rateFetcher,
     Future<String?> Function()? localCurrencyDetector,
-  })  : _rateFetcher = rateFetcher ?? http.get,
+  })  : _rateFetcher = rateFetcher,
         _localCurrencyDetector = localCurrencyDetector {
     initialized = init();
   }
@@ -195,8 +194,8 @@ class SettingsState extends ChangeNotifier {
     if (!visibleCurrencies.contains(displayCurrency)) {
       displayCurrency = visibleCurrencies.first;
     }
-    final cachedRate = prefs.getDouble('exchangeRate_$displayCurrency');
-    _applyRate(displayCurrency, cachedRate ?? 1.0);
+    final cachedRate = readCachedUsdRate(displayCurrency, prefs)?.rate;
+    _applyRate(displayCurrency, cachedRate);
 
     notifyListeners();
     talker.debug('Loaded application settings');
@@ -207,9 +206,15 @@ class SettingsState extends ChangeNotifier {
     );
   }
 
-  void _applyRate(String currencyCode, double rate) {
+  void _applyRate(String currencyCode, double? rate) {
     currency = NumberFormat.simpleCurrency(name: currencyCode);
-    allRatesFromUsd[currencyCode] = rate;
+    if (currencyCode == 'USD') {
+      allRatesFromUsd['USD'] = 1.0;
+    } else if (rate != null && rate.isFinite && rate > 0) {
+      allRatesFromUsd[currencyCode] = rate;
+    } else {
+      allRatesFromUsd.remove(currencyCode);
+    }
   }
 
   Future<void> _fetchAndApplyRate(String currencyCode) {
@@ -240,30 +245,13 @@ class SettingsState extends ChangeNotifier {
       return;
     }
     try {
-      final rate = await backgroundNetworkCoordinator.coalesce<double?>(
-        RequestCategory.fxRate,
-        currencyCode,
-        () async {
-          final uri = Uri.parse(
-            'https://api.frankfurter.app/latest?from=USD&to=$currencyCode',
-          );
-          final response = await _rateFetcher(uri);
-          if (response.statusCode != 200) return null;
-          final data = json.decode(response.body) as Map<String, dynamic>;
-          final rates = data['rates'] as Map<String, dynamic>;
-          return (rates[currencyCode] as num).toDouble();
-        },
-      );
-      if (rate != null) {
-        allRatesFromUsd[currencyCode] = rate;
-        final prefs = await SqliteSettings.getInstance();
-        await prefs.setDouble('exchangeRate_$currencyCode', rate);
-        if (displayCurrency == currencyCode) {
-          _applyRate(currencyCode, rate);
-          notifyListeners();
-        }
-        talker.info('Refreshed display exchange rate');
+      final quote = await refreshUsdRate(currencyCode, fetcher: _rateFetcher);
+      allRatesFromUsd[currencyCode] = quote.rate;
+      if (displayCurrency == currencyCode) {
+        _applyRate(currencyCode, quote.rate);
+        notifyListeners();
       }
+      talker.info('Refreshed display exchange rate via ${quote.provider}');
     } catch (error, stackTrace) {
       talker.handle(
         error,
@@ -390,8 +378,14 @@ class SettingsState extends ChangeNotifier {
     SqliteSettings prefs,
   ) async {
     displayCurrency = code;
-    final cachedRate = prefs.getDouble('exchangeRate_$code');
-    _applyRate(code, cachedRate ?? allRatesFromUsd[code] ?? 1.0);
+    final cachedRate = readCachedUsdRate(code, prefs)?.rate;
+    _applyRate(
+      code,
+      cachedRate ??
+          (prefs.getString('exchangeRateQuote_$code') == null
+              ? allRatesFromUsd[code]
+              : null),
+    );
     notifyListeners();
     await prefs.setString('displayCurrency', code);
     runDetachedTask(
