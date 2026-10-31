@@ -20,8 +20,8 @@ void main() {
       () async {
     var contactedNetwork = false;
     for (final insecureUrl in [
-      'http://192.168.1.243:8091',
-      'http://pi.presley.nz:8091',
+      'http://192.168.100.200:8091',
+      'http://intranet.example.test:8091',
       'http://example.com',
     ]) {
       final client = IbkrApiClient(
