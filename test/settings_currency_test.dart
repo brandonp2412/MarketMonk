@@ -224,6 +224,9 @@ void main() {
         if (uri.queryParameters['to'] != 'NZD') {
           return http.Response('{"rates":{}}', 200);
         }
+        if (uri.host != 'api.frankfurter.app') {
+          throw StateError('fallback unavailable');
+        }
         calls++;
         if (calls == 1) throw StateError('temporary failure');
         return http.Response('{"rates":{"NZD":1.8}}', 200);
@@ -242,6 +245,36 @@ void main() {
 
     expect(calls, 2);
     expect(allRatesFromUsd['NZD'], 1.8);
+  });
+
+  test('display rate falls back when Frankfurter fails', () async {
+    silenceTalkerForTest();
+    await seedTestSqlite({
+      'visibleCurrencies': ['NZD', 'USD'],
+      'displayCurrency': 'USD',
+      'exchangeRate_USD': 1.0,
+    });
+    final hosts = <String>[];
+    final settings = SettingsState(
+      rateFetcher: (uri) async {
+        if (uri.queryParameters['to'] != 'NZD') {
+          return http.Response('{"rates":{}}', 200);
+        }
+        hosts.add(uri.host);
+        if (uri.host == 'api.frankfurter.app') {
+          return http.Response('unavailable', 503);
+        }
+        return http.Response('{"rates":{"NZD":1.9}}', 200);
+      },
+    );
+    await settings.initialized;
+
+    await settings.setDisplayCurrency('NZD');
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(hosts, ['api.frankfurter.app', 'allratestoday.com']);
+    expect(allRatesFromUsd['NZD'], 1.9);
   });
 
   test('ticker sync reports progress and refreshes portfolio data', () async {

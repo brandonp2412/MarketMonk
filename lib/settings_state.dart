@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
@@ -243,16 +242,7 @@ class SettingsState extends ChangeNotifier {
       final rate = await backgroundNetworkCoordinator.coalesce<double?>(
         RequestCategory.fxRate,
         currencyCode,
-        () async {
-          final uri = Uri.parse(
-            'https://api.frankfurter.app/latest?from=USD&to=$currencyCode',
-          );
-          final response = await _rateFetcher(uri);
-          if (response.statusCode != 200) return null;
-          final data = json.decode(response.body) as Map<String, dynamic>;
-          final rates = data['rates'] as Map<String, dynamic>;
-          return (rates[currencyCode] as num).toDouble();
-        },
+        () => fetchUsdRate(currencyCode, _rateFetcher),
       );
       if (rate != null) {
         allRatesFromUsd[currencyCode] = rate;

@@ -990,6 +990,40 @@ Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
   }
 }
 
+/// Frankfurter-compatible endpoints, tried in order. AllRatesToday serves the
+/// same ECB reference rates in the same shape and is only asked when
+/// Frankfurter fails or has no rate.
+const fxRateEndpoints = [
+  'https://api.frankfurter.app/latest',
+  'https://allratestoday.com/api/compat/frankfurter/latest',
+];
+
+Future<double?> fetchUsdRate(
+  String currencyCode,
+  Future<http.Response> Function(Uri) fetch,
+) async {
+  Object? lastError;
+  StackTrace? lastStackTrace;
+  for (final endpoint in fxRateEndpoints) {
+    try {
+      final response =
+          await fetch(Uri.parse('$endpoint?from=USD&to=$currencyCode'));
+      if (response.statusCode != 200) continue;
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      final rates = data['rates'] as Map<String, dynamic>?;
+      final rate = rates?[currencyCode] as num?;
+      if (rate != null) return rate.toDouble();
+    } catch (error, stackTrace) {
+      lastError = error;
+      lastStackTrace = stackTrace;
+    }
+  }
+  if (lastError != null) {
+    Error.throwWithStackTrace(lastError, lastStackTrace!);
+  }
+  return null;
+}
+
 /// Fetches the USD → [currencyCode] rate from Frankfurter and stores it in
 /// [allRatesFromUsd]. Called lazily, only for currencies we haven't seen yet.
 Future<void> _fetchAndCacheRate(String currencyCode) async {
@@ -997,17 +1031,7 @@ Future<void> _fetchAndCacheRate(String currencyCode) async {
     final rate = await backgroundNetworkCoordinator.coalesce<double?>(
       'fx.rate',
       currencyCode,
-      () async {
-        final uri = Uri.parse(
-          'https://api.frankfurter.app/latest?from=USD&to=$currencyCode',
-        );
-        final response = await http.get(uri);
-        if (response.statusCode != 200) return null;
-
-        final data = json.decode(response.body) as Map<String, dynamic>;
-        return ((data['rates'] as Map<String, dynamic>)[currencyCode] as num?)
-            ?.toDouble();
-      },
+      () => fetchUsdRate(currencyCode, http.get),
     );
     if (rate != null) {
       allRatesFromUsd[currencyCode] = rate;

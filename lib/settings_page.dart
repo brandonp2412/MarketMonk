@@ -879,6 +879,18 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         ListTile(
           contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.currency_exchange),
+          title: Text(context.l10n.text('Currencies')),
+          subtitle: const Text(
+            'Exchange rates by Frankfurter, with AllRatesToday as fallback',
+          ),
+          onTap: () async {
+            const url = 'https://allratestoday.com';
+            await launchUrlString(url);
+          },
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.code),
           title: Text(context.l10n.text('Source code')),
           subtitle: Text(context.l10n.text('Check it out on GitHub')),
