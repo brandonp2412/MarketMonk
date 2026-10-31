@@ -1,6 +1,6 @@
 • Center first few things of README
 • Fix external link buttons on Android
-• Preserve recovered Glass changes for reconciliation
+• Preserve recovered changes for reconciliation
 • Reduce spinners
 • Shorten AGENTS.md
 • Show upgrade changelog snackbar no more than every 14 days
