@@ -116,6 +116,36 @@ void main() {
     expect(result.last.valueUsd, 10);
   });
 
+  test('mid-window buy changes shares and cash at the trade timestamp', () {
+    final result = buildIntradayPortfolio(
+      holdings: [
+        IntradayPortfolioHolding(
+          quantity: 100,
+          trades: [IntradayPortfolioTrade(middle, 99, 50)],
+          pricesUsd: {start: 100, middle: 110, end: 120},
+        ),
+      ],
+      currentValueUsd: 10000,
+    );
+    expect(result.map((point) => point.date), [start, middle, end]);
+    // The purchase costs 4,950; it must not be valued before it occurred.
+    expect(result.map((point) => point.valueUsd), [3050, 9000, 10000]);
+  });
+
+  test('mid-window sale removes shares and adds proceeds', () {
+    final result = buildIntradayPortfolio(
+      holdings: [
+        IntradayPortfolioHolding(
+          quantity: 1,
+          trades: [IntradayPortfolioTrade(middle, -99, 110)],
+          pricesUsd: {start: 100, middle: 110, end: 120},
+        ),
+      ],
+      currentValueUsd: 1000,
+    );
+    expect(result.map((point) => point.valueUsd), [-10, 990, 1000]);
+  });
+
   test('does not manufacture timestamps or values without usable prices', () {
     expect(buildIntradayPortfolio(holdings: [], currentValueUsd: 100), isEmpty);
     expect(

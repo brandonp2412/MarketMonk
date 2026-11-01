@@ -1429,6 +1429,8 @@ class ChartsPageState extends State<ChartsPage>
     required bool forceRefresh,
   }) async {
     final selectedDays = days;
+    final accountTrades =
+        await profileDataRepository.readTradesForAccount(accountName);
     final holdings = <IntradayPortfolioHolding>[];
     final failureReasons = <String>[];
     final prefetched = loaded.positions.isNotEmpty &&
@@ -1458,6 +1460,17 @@ class ChartsPageState extends State<ChartsPage>
           quantity: position.netShares,
           currencyPerUsd: requireUsdRate(symbolCurrency(position.symbol)),
           centDivisor: symbolCentDivisor(position.symbol),
+          trades: [
+            for (final trade in accountTrades)
+              if (trade.symbol == position.symbol)
+                IntradayPortfolioTrade(
+                  trade.tradeDate.toUtc(),
+                  trade.quantity,
+                  trade.price /
+                      symbolCentDivisor(position.symbol) /
+                      requireUsdRate(symbolCurrency(position.symbol)),
+                ),
+          ],
         );
       } catch (error, stackTrace) {
         failureReasons.add(error.toString().replaceFirst('Bad state: ', ''));
