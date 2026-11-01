@@ -44,17 +44,32 @@ const _yahooCentCurrencies = <String, (String, double)>{
   'GBp': ('GBP', 100.0),
 };
 
+String normalizedQuoteCurrency(String rawCurrency) =>
+    _yahooCentCurrencies[rawCurrency]?.$1 ?? rawCurrency;
+
+double quoteUnitDivisor(String rawCurrency) =>
+    _yahooCentCurrencies[rawCurrency]?.$2 ?? 1.0;
+
+bool hasKnownQuoteCurrencyChange(String symbol) =>
+    _symbolsWithCurrencyChanges.contains(canonicalMarketSymbol(symbol));
+
+final Set<String> _symbolsWithCurrencyChanges = {};
+
 /// In-memory cache: symbol → native ISO currency code (e.g. "INR" for .NS stocks).
 final Map<String, String> _symbolCurrencies = {};
 
 /// In-memory cache: symbol → cent divisor (100.0 for ZAc/GBp, else 1.0).
 final Map<String, double> _symbolCentDivisors = {};
+final Map<String, DateTime> _observedSymbolAt = {};
 
 /// Returns the cached native currency for [symbol], defaulting to 'USD'.
 String symbolCurrency(String symbol) => _symbolCurrencies[symbol] ?? 'USD';
 
 /// Returns the cent divisor for [symbol] (100.0 for ZAc/GBp stocks, else 1.0).
 double symbolCentDivisor(String symbol) => _symbolCentDivisors[symbol] ?? 1.0;
+
+bool symbolHasQuoteCurrencyChange(String symbol) =>
+    _symbolsWithCurrencyChanges.contains(canonicalMarketSymbol(symbol));
 
 void runDetachedTask<T>(Future<T> future, String label) {
   unawaited(
@@ -68,10 +83,119 @@ void runDetachedTask<T>(Future<T> future, String label) {
 /// normalizing cent codes to their parent ISO currency (GBp → GBP ÷ 100).
 /// Returns the normalized ISO code.
 String cacheSymbolMeta(String symbol, String rawCurrency) {
-  final centInfo = _yahooCentCurrencies[rawCurrency];
-  _symbolCurrencies[symbol] = centInfo?.$1 ?? rawCurrency;
-  _symbolCentDivisors[symbol] = centInfo?.$2 ?? 1.0;
-  return centInfo?.$1 ?? rawCurrency;
+  final normalized = normalizedQuoteCurrency(rawCurrency);
+  _symbolCurrencies[symbol] = normalized;
+  _symbolCentDivisors[symbol] = quoteUnitDivisor(rawCurrency);
+  _observedSymbolAt[symbol] = DateTime.now().toUtc();
+  return normalized;
+}
+
+Future<double> historicalTradeUsdRate(String rawCurrency, DateTime date) async {
+  final code = normalizedQuoteCurrency(rawCurrency).toUpperCase();
+  if (code == 'USD') return 1.0;
+  final day = DateTime.utc(date.year, date.month, date.day);
+  final dateKey = day.toIso8601String().substring(0, 10);
+  final settingKey = 'historicalUsdRate_${code}_$dateKey';
+  final prefs = await SqliteSettings.getInstance();
+  final cached = prefs.getDouble(settingKey);
+  if (cached != null && cached.isFinite && cached > 0) return cached;
+  return backgroundNetworkCoordinator.coalesce<double>(
+    'fx.historical',
+    settingKey,
+    () async {
+      final quote = await fetchHistoricalUsdRate(code, day);
+      await prefs.setDouble(settingKey, quote.rate);
+      return quote.rate;
+    },
+  );
+}
+
+Future<List<Trade>> enrichHistoricalTradeRates(List<Trade> trades) async {
+  final verified = List<Trade>.of(trades);
+  for (var offset = 0; offset < verified.length; offset += 4) {
+    final end = (offset + 4).clamp(0, verified.length);
+    final batch = await Future.wait([
+      for (var index = offset; index < end; index++)
+        () async {
+          final trade = verified[index];
+          final raw = trade.rawCurrency;
+          if (raw == null || trade.usdRateAtTrade != null) return trade;
+          try {
+            return trade.withUsdRate(
+              await historicalTradeUsdRate(raw, trade.tradeDate),
+            );
+          } catch (error) {
+            talker.warning(
+              'Historical FX unavailable for ${trade.symbol} '
+              '${trade.tradeDate}: $error',
+            );
+            return trade;
+          }
+        }(),
+    ]);
+    for (var index = offset; index < end; index++) {
+      verified[index] = batch[index - offset];
+    }
+  }
+  return verified;
+}
+
+double tradeAmountUsd(Trade trade, double rawAmount) {
+  final rawCurrency = trade.rawCurrency;
+  if (rawCurrency == null &&
+      _symbolsWithCurrencyChanges.contains(trade.symbol)) {
+    throw StateError('${trade.symbol} has an unverified historical quote unit');
+  }
+  final currencyCode = rawCurrency == null
+      ? symbolCurrency(trade.symbol)
+      : normalizedQuoteCurrency(rawCurrency);
+  final divisor = rawCurrency == null
+      ? symbolCentDivisor(trade.symbol)
+      : quoteUnitDivisor(rawCurrency);
+  if (rawCurrency != null &&
+      currencyCode != 'USD' &&
+      trade.usdRateAtTrade == null) {
+    throw StateError('Historical FX rate unavailable for ${trade.symbol}');
+  }
+  final rate = trade.usdRateAtTrade ?? requireUsdRate(currencyCode);
+  if (!rate.isFinite || rate <= 0) {
+    throw StateError('Invalid trade FX rate for ${trade.symbol}');
+  }
+  return rawAmount / divisor / rate;
+}
+
+double? verifiedTradeAmountUsd(Trade trade, double rawAmount) {
+  if (rawAmount == 0) return 0;
+  final raw = trade.rawCurrency;
+  if (raw != null &&
+      normalizedQuoteCurrency(raw) != 'USD' &&
+      trade.usdRateAtTrade == null) {
+    return null;
+  }
+  try {
+    return tradeAmountUsd(trade, rawAmount);
+  } on StateError {
+    return null;
+  }
+}
+
+String fmtTradeNative(Trade trade, double amount) {
+  final raw = trade.rawCurrency;
+  if (raw == null) {
+    return '${amount.toStringAsFixed(2)} (unit unverified)';
+  }
+  final code = normalizedQuoteCurrency(raw);
+  return NumberFormat.simpleCurrency(name: code)
+      .format(amount / quoteUnitDivisor(raw));
+}
+
+double candleCentDivisor(StoredCandle candle) {
+  final raw = candle.rawCurrency;
+  if (raw != null) return quoteUnitDivisor(raw);
+  if (_symbolsWithCurrencyChanges.contains(candle.symbol)) {
+    throw StateError('${candle.symbol} has unverified historical candle units');
+  }
+  return symbolCentDivisor(candle.symbol);
 }
 
 /// Uses IBKR's own base-currency conversion when the snapshot exposes the same
@@ -106,7 +230,23 @@ Future<void> fetchSymbolCurrencyAndRate(
 }) async {
   final canonicalSymbol = canonicalMarketSymbol(symbol);
   if (canonicalSymbol.isEmpty) return;
-  if (rawCurrency != null) cacheSymbolMeta(canonicalSymbol, rawCurrency);
+  final seenAt = _observedSymbolAt[canonicalSymbol];
+  final cachedCurrency = _symbolCurrencies[canonicalSymbol];
+  if (rawCurrency == null &&
+      seenAt != null &&
+      DateTime.now().toUtc().difference(seenAt) < const Duration(hours: 24) &&
+      cachedCurrency != null &&
+      allRatesFromUsd.containsKey(cachedCurrency)) {
+    return;
+  }
+  if (rawCurrency != null && rawCurrency.isNotEmpty) {
+    await upsertSymbolCurrencyMetadata(
+      canonicalSymbol,
+      rawCurrency,
+      source: 'live-quote',
+    );
+    cacheSymbolMeta(canonicalSymbol, rawCurrency);
+  }
   try {
     await backgroundNetworkCoordinator.coalesce<void>(
       'yahoo.symbolMetadata',
@@ -114,16 +254,14 @@ Future<void> fetchSymbolCurrencyAndRate(
       () => _fetchSymbolCurrencyAndRate(canonicalSymbol)
           .timeout(const Duration(seconds: 2)),
     );
+    if ((await marketDataDatabase.readQuoteCurrencyChanges(canonicalSymbol))
+        .isNotEmpty) {
+      _symbolsWithCurrencyChanges.add(canonicalSymbol);
+    }
   } on TimeoutException {
-    talker.warning(
-      'Symbol currency metadata timed out; using cached/default currency',
-    );
+    talker.warning('Symbol currency metadata timed out for $canonicalSymbol');
   } catch (error, stackTrace) {
-    talker.handle(
-      error,
-      stackTrace,
-      'Failed to resolve symbol currency metadata',
-    );
+    talker.handle(error, stackTrace, 'Failed to resolve symbol currency');
   }
 }
 
@@ -218,6 +356,7 @@ class Position {
   final double? brokerMarketValue;
   final double? brokerUnrealizedPL;
   final double? brokerRealizedPL;
+  final double? historicalCostBasisUsd;
 
   Position({
     required this.symbol,
@@ -231,6 +370,7 @@ class Position {
     this.brokerMarketValue,
     this.brokerUnrealizedPL,
     this.brokerRealizedPL,
+    this.historicalCostBasisUsd,
   });
 
   /// Conversion factor from [nativeCurrency] to USD.
@@ -239,19 +379,23 @@ class Position {
   double get _nativeToUsd => 1.0 / requireUsdRate(nativeCurrency);
 
   /// Percentage gain/loss relative to average cost. Currency-agnostic.
-  double get change => safePercentChange(avgCost, currentPrice);
+  double get change => historicalCostBasisUsd == null
+      ? safePercentChange(avgCost, currentPrice)
+      : safePercentChange(costBasis, currentValue);
 
   /// Current market value in USD.
   double get currentValue =>
       (brokerMarketValue ?? netShares * currentPrice) * _nativeToUsd;
 
   /// Total cost basis in USD.
-  double get costBasis => netShares * avgCost * _nativeToUsd;
+  double get costBasis =>
+      historicalCostBasisUsd ?? netShares * avgCost * _nativeToUsd;
 
   /// Unrealised profit/loss in USD.
   double get unrealizedPL =>
-      (brokerUnrealizedPL ?? netShares * (currentPrice - avgCost)) *
-      _nativeToUsd;
+      historicalCostBasisUsd != null || brokerUnrealizedPL == null
+          ? currentValue - costBasis
+          : brokerUnrealizedPL! * _nativeToUsd;
 
   /// IBKR realized P/L for the current day, converted to USD when available.
   double? get realizedToday =>
@@ -298,6 +442,24 @@ Future<List<Position>> computeIbkrPositions(
             );
     final currentPrice = broker.marketPrice ?? broker.averageCost ?? 0.0;
     final avgCost = broker.averageCost ?? currentPrice;
+    final historyVerified = trades.isNotEmpty &&
+        trades.every(
+          (trade) =>
+              trade.rawCurrency != null &&
+              (trade.usdRateAtTrade != null ||
+                  normalizedQuoteCurrency(trade.rawCurrency!) == 'USD'),
+        ) &&
+        ((trades.fold<double>(0, (sum, trade) => sum + trade.quantity)) -
+                    broker.quantity)
+                .abs() <
+            0.00001;
+    final historicalCostBasisUsd = historyVerified
+        ? _averageCostForOpenPosition(
+              trades,
+              priceForTrade: (trade) => tradeAmountUsd(trade, trade.price),
+            ) *
+            broker.quantity
+        : null;
     return Position(
       symbol: broker.symbol,
       name: trades.isEmpty ? broker.symbol : trades.first.name,
@@ -310,11 +472,15 @@ Future<List<Position>> computeIbkrPositions(
       brokerMarketValue: broker.marketValue,
       brokerUnrealizedPL: broker.unrealizedPnl,
       brokerRealizedPL: broker.realizedPnl,
+      historicalCostBasisUsd: historicalCostBasisUsd,
     );
   }).toList();
 }
 
-double _averageCostForOpenPosition(List<Trade> trades) {
+double _averageCostForOpenPosition(
+  List<Trade> trades, {
+  double Function(Trade)? priceForTrade,
+}) {
   final ordered = List<Trade>.from(trades)
     ..sort((firstTrade, secondTrade) {
       final byDate = firstTrade.tradeDate.compareTo(secondTrade.tradeDate);
@@ -333,9 +499,11 @@ double _averageCostForOpenPosition(List<Trade> trades) {
       openShares += quantity;
       if (openShares > 0) {
         averageCost = previousLongShares > 0
-            ? (previousLongShares * averageCost + openingShares * trade.price) /
+            ? (previousLongShares * averageCost +
+                    openingShares *
+                        (priceForTrade?.call(trade) ?? trade.price)) /
                 openShares
-            : trade.price;
+            : (priceForTrade?.call(trade) ?? trade.price);
       } else {
         averageCost = 0.0;
       }
@@ -354,7 +522,7 @@ List<Position> computePositions(
   Map<String, double> latestPrices, {
   Map<String, String> nativeCurrencies = const {},
 }) {
-  final Map<String, List<Trade>> bySymbol = {};
+  final bySymbol = <String, List<Trade>>{};
   for (final trade in trades) {
     bySymbol.putIfAbsent(trade.symbol, () => []).add(trade);
   }
@@ -363,50 +531,59 @@ List<Position> computePositions(
   for (final entry in bySymbol.entries) {
     final symbol = entry.key;
     final symbolTrades = entry.value;
-
     final netShares = symbolTrades.fold(
       0.0,
       (sum, trade) => sum + trade.quantity,
     );
     if (netShares <= 0) continue;
 
-    final buyTrades =
-        symbolTrades.where((trade) => trade.quantity > 0).toList();
-    final avgCost = _averageCostForOpenPosition(symbolTrades);
-    final currentPrice = latestPrices[symbol] ?? avgCost;
-
-    final name = symbolTrades.first.name;
-    final dates = buyTrades.map((trade) => trade.tradeDate);
-    final firstBuyDate = buyTrades.isNotEmpty
-        ? dates.reduce(
-            (firstDate, candidateDate) =>
-                firstDate.isBefore(candidateDate) ? firstDate : candidateDate,
-          )
+    final nativeCurrency =
+        nativeCurrencies[symbol] ?? _symbolCurrencies[symbol] ?? 'UNKNOWN';
+    if (_symbolsWithCurrencyChanges.contains(symbol) &&
+        symbolTrades.any((trade) => trade.rawCurrency == null)) {
+      throw StateError(
+        '$symbol changed quotation currency. Confirm the original currency '
+        'and unit of legacy trades before calculating its cost basis.',
+      );
+    }
+    final legacyUnits =
+        symbolTrades.every((trade) => trade.rawCurrency == null);
+    final avgCostUsd = legacyUnits
+        ? null
+        : _averageCostForOpenPosition(
+            symbolTrades,
+            priceForTrade: (trade) => tradeAmountUsd(trade, trade.price),
+          );
+    final buyTrades = symbolTrades.where((trade) => trade.quantity > 0);
+    final dates = buyTrades.map((trade) => trade.tradeDate).toList();
+    final firstBuyDate = dates.isNotEmpty
+        ? dates.reduce((a, b) => a.isBefore(b) ? a : b)
         : DateTime.now();
-    final lastBuyDate = buyTrades.isNotEmpty
-        ? dates.reduce(
-            (lastDate, candidateDate) =>
-                lastDate.isAfter(candidateDate) ? lastDate : candidateDate,
-          )
+    final lastBuyDate = dates.isNotEmpty
+        ? dates.reduce((a, b) => a.isAfter(b) ? a : b)
         : DateTime.now();
 
-    final centDiv = symbolCentDivisor(symbol);
-
+    final nativeAvgCost = avgCostUsd == null
+        ? _averageCostForOpenPosition(symbolTrades) / symbolCentDivisor(symbol)
+        : avgCostUsd * requireUsdRate(nativeCurrency);
+    final currentPrice = latestPrices.containsKey(symbol)
+        ? latestPrices[symbol]! / symbolCentDivisor(symbol)
+        : nativeAvgCost;
     positions.add(
       Position(
         symbol: symbol,
-        name: name,
-        nativeCurrency:
-            nativeCurrencies[symbol] ?? _symbolCurrencies[symbol] ?? 'UNKNOWN',
+        name: symbolTrades.first.name,
+        nativeCurrency: nativeCurrency,
         netShares: netShares,
-        avgCost: avgCost / centDiv,
-        currentPrice: currentPrice / centDiv,
+        avgCost: nativeAvgCost,
+        currentPrice: currentPrice,
+        historicalCostBasisUsd:
+            avgCostUsd == null ? null : netShares * avgCostUsd,
         firstBuyDate: firstBuyDate,
         lastBuyDate: lastBuyDate,
       ),
     );
   }
-
   return positions;
 }
 
@@ -422,8 +599,7 @@ Future<Map<String, double>> fetchLatestPrices(
   final canonicalSymbols = symbols
       .map(canonicalMarketSymbol)
       .where((symbol) => symbol.isNotEmpty)
-      .toSet()
-      .toList();
+      .toSet();
   if (canonicalSymbols.isEmpty) return {};
 
   await Future.wait(
@@ -437,52 +613,34 @@ Future<Map<String, double>> fetchLatestPrices(
     }),
   );
 
-  final placeholders = List.filled(canonicalSymbols.length, '?').join(', ');
-  try {
-    final rows = await targetDatabase.customSelect(
-      'SELECT candle.symbol, candle.close '
-      'FROM candles candle '
-      'INNER JOIN ('
-      '  SELECT symbol, MAX(date) AS max_date FROM candles '
-      '  WHERE symbol IN ($placeholders) GROUP BY symbol'
-      ') latest ON candle.symbol = latest.symbol '
-      'AND candle.date = latest.max_date '
-      'WHERE candle.close > 0',
-      variables: [
-        for (final symbol in canonicalSymbols) Variable(symbol),
-      ],
-      readsFrom: {targetDatabase.candles},
-    ).get();
-
-    return {
-      for (final row in rows)
-        row.readNullable<String>('symbol') ?? '':
-            row.readNullable<double>('close') ?? 0.0,
-    }..removeWhere((symbol, price) => symbol.isEmpty || price <= 0);
-  } catch (error, stackTrace) {
-    talker.handle(
-      error,
-      stackTrace,
-      'Latest-price query failed; using fallback',
-    );
-    final prices = <String, double>{};
-    for (final symbol in canonicalSymbols) {
-      final candle = await (targetDatabase.candles.select()
-            ..where((row) => row.symbol.equals(symbol))
-            ..orderBy([
-              (row) => OrderingTerm(
-                    expression: row.date,
-                    mode: OrderingMode.desc,
-                  ),
-            ])
+  final prices = <String, double>{};
+  await Future.wait(
+    canonicalSymbols.map((symbol) async {
+      final latest = await (targetDatabase.candles.select()
+            ..where(
+              (row) =>
+                  row.symbol.equals(symbol) & row.close.isBiggerThanValue(0),
+            )
+            ..orderBy([(row) => OrderingTerm.desc(row.date)])
             ..limit(1))
           .getSingleOrNull();
-      if (candle != null && candle.close > 0) {
-        prices[symbol] = candle.close;
+      if (latest == null) return;
+      final storedRaw = latest.rawCurrency;
+      final currentRaw = rawCurrencyFromMetadata(
+        await targetDatabase.readSymbolMetadata(symbol),
+      );
+      if ((storedRaw == null && _symbolsWithCurrencyChanges.contains(symbol)) ||
+          (storedRaw != null &&
+              currentRaw != null &&
+              storedRaw != currentRaw)) {
+        throw StateError(
+          'Cannot value $symbol until historical candle units are reconciled',
+        );
       }
-    }
-    return prices;
-  }
+      prices[symbol] = latest.close;
+    }),
+  );
+  return prices;
 }
 
 typedef YahooCandleFetcher = Future<List<YahooFinanceCandleData>> Function(
@@ -522,6 +680,8 @@ Future<int> insertCandles(
   List<YahooFinanceCandleData> dataList,
   String symbol, {
   Database? database,
+  String? rawCurrency,
+  bool preserveExisting = false,
 }) async {
   const batchSize = 1000;
   final targetDatabase = database ?? marketDataDatabase;
@@ -548,6 +708,7 @@ Future<int> insertCandles(
         close: Value(data.close),
         adjClose: Value(data.adjClose),
         volume: Value(data.volume),
+        rawCurrency: Value(rawCurrency),
       );
     }).toList();
 
@@ -555,7 +716,9 @@ Future<int> insertCandles(
       batchBuilder.insertAll(
         targetDatabase.candles,
         candleBatch,
-        mode: InsertMode.insertOrReplace,
+        mode: preserveExisting
+            ? InsertMode.insertOrIgnore
+            : InsertMode.insertOrReplace,
       );
     });
   }
@@ -574,6 +737,8 @@ Future<int> insertIbkrCandles(
   List<IbkrHistoricalCandle> dataList,
   String symbol, {
   Database? database,
+  String? rawCurrency,
+  bool preserveExisting = false,
 }) async {
   const batchSize = 1000;
   final targetDatabase = database ?? marketDataDatabase;
@@ -627,6 +792,7 @@ Future<int> insertIbkrCandles(
         close: Value(data.close),
         adjClose: Value(data.close),
         volume: Value(data.volume),
+        rawCurrency: Value(rawCurrency),
       );
     }).toList();
 
@@ -634,7 +800,9 @@ Future<int> insertIbkrCandles(
       batchBuilder.insertAll(
         targetDatabase.candles,
         candleBatch,
-        mode: InsertMode.insertOrReplace,
+        mode: preserveExisting
+            ? InsertMode.insertOrIgnore
+            : InsertMode.insertOrReplace,
       );
     });
   }
@@ -710,6 +878,20 @@ DateTime _latestExpectedMarketDay(DateTime today) {
   return expectedDay;
 }
 
+/// Provider currency metadata does not prove that pre-change bars were
+/// retroactively redenominated. Only observations strictly after the most
+/// recent detected transition can be labelled with its current quote unit.
+Future<DateTime?> _firstVerifiedCurrentQuoteDay(
+  Database database,
+  String symbol,
+) async {
+  final changes = await database.readQuoteCurrencyChanges(symbol);
+  if (changes.isEmpty) return null;
+  _symbolsWithCurrencyChanges.add(symbol);
+  final observed = changes.last.observedAt;
+  return DateTime(observed.year, observed.month, observed.day + 1);
+}
+
 Future<bool> _syncIbkrCandlesIfAvailable(
   String symbol, {
   required Database targetDatabase,
@@ -751,10 +933,36 @@ Future<bool> _syncIbkrCandlesIfAvailable(
       throw StateError('IBKR returned no candles in the requested range');
     }
 
-    final stored = await insertIbkrCandles(
-      requestedCandles,
+    final verifiedFrom =
+        await _firstVerifiedCurrentQuoteDay(targetDatabase, symbol);
+    var stored = 0;
+    if (verifiedFrom != null) {
+      // Do not overwrite known older units, or assign today's quote unit to
+      // older bars that the broker may still express in their original unit.
+      stored += await insertIbkrCandles(
+        requestedCandles
+            .where(
+              (candle) =>
+                  canonicalMarketDay(candle.date).isBefore(verifiedFrom),
+            )
+            .toList(),
+        symbol,
+        database: targetDatabase,
+        preserveExisting: true,
+      );
+    }
+    stored += await insertIbkrCandles(
+      verifiedFrom == null
+          ? requestedCandles
+          : requestedCandles
+              .where(
+                (candle) =>
+                    !canonicalMarketDay(candle.date).isBefore(verifiedFrom),
+              )
+              .toList(),
       symbol,
       database: targetDatabase,
+      rawCurrency: history.currency,
     );
     talker.info(
       'Completed IBKR candle sync for $symbol: $stored rows from '
@@ -789,6 +997,9 @@ Future<void> syncCandles(
 }) async {
   final targetDatabase = database ?? marketDataDatabase;
   final canonicalSymbol = canonicalMarketSymbol(symbol);
+  if (database == null && ibkrConfig?.isConfigured != true) {
+    await fetchSymbolCurrencyAndRate(canonicalSymbol);
+  }
   final now = DateTime.now();
   final today = canonicalMarketDay(now);
   final expectedMarketDay = _latestExpectedMarketDay(today);
@@ -798,8 +1009,13 @@ Future<void> syncCandles(
     expectedMarketDay,
   );
 
-  Future<({bool covered, DateTime? oldestDay, DateTime? latestDay})>
-      readCoverage() async {
+  Future<
+      ({
+        bool covered,
+        DateTime? oldestDay,
+        DateTime? latestDay,
+        bool needsReconciliation
+      })> readCoverage() async {
     final oldest = await (targetDatabase.candles.select()
           ..where((row) => row.symbol.equals(canonicalSymbol))
           ..orderBy([
@@ -818,11 +1034,39 @@ Future<void> syncCandles(
 
     final oldestDay = oldest == null ? null : canonicalMarketDay(oldest.date);
     final latestDay = latest == null ? null : canonicalMarketDay(latest.date);
+    final currentRaw = rawCurrencyFromMetadata(
+      await targetDatabase.readSymbolMetadata(canonicalSymbol),
+    );
+    final transitioned =
+        (await targetDatabase.readQuoteCurrencyChanges(canonicalSymbol))
+            .isNotEmpty;
+    final unresolved = transitioned &&
+        (await (targetDatabase.candles.select()
+                  ..where(
+                    (row) =>
+                        row.symbol.equals(canonicalSymbol) &
+                        row.date.isBiggerOrEqualValue(requiredStart) &
+                        row.rawCurrency.isNull(),
+                  )
+                  ..limit(1))
+                .getSingleOrNull()) !=
+            null;
+    final staleLatest = currentRaw != null &&
+        latest != null &&
+        latest.rawCurrency != null &&
+        latest.rawCurrency != currentRaw;
+    final needsReconciliation = unresolved || staleLatest;
     final covered = oldestDay != null &&
         !oldestDay.isAfter(requiredStart) &&
         latestDay != null &&
-        !expectedMarketDay.isAfter(latestDay);
-    return (covered: covered, oldestDay: oldestDay, latestDay: latestDay);
+        !expectedMarketDay.isAfter(latestDay) &&
+        !needsReconciliation;
+    return (
+      covered: covered,
+      oldestDay: oldestDay,
+      latestDay: latestDay,
+      needsReconciliation: needsReconciliation,
+    );
   }
 
   Future<({bool requested, bool progressed})> performSync() async {
@@ -839,7 +1083,7 @@ Future<void> syncCandles(
             coverage.oldestDay!.isAfter(requiredStart))) {
       requestFrom = requiredStart;
     }
-    if (requestFrom.isBefore(requiredStart)) {
+    if (coverage.needsReconciliation || requestFrom.isBefore(requiredStart)) {
       requestFrom = requiredStart;
     }
 
@@ -854,13 +1098,14 @@ Future<void> syncCandles(
     if (ibkrHandled) {
       final after = await readCoverage();
       final progressed = coverage.oldestDay != after.oldestDay ||
-          coverage.latestDay != after.latestDay;
+          coverage.latestDay != after.latestDay ||
+          coverage.needsReconciliation != after.needsReconciliation;
       return (requested: true, progressed: progressed);
     }
 
-    runDetachedTask(
-      fetchSymbolCurrencyAndRate(canonicalSymbol),
-      'Failed to refresh candle currency metadata',
+    await fetchSymbolCurrencyAndRate(canonicalSymbol);
+    final seriesRawCurrency = rawCurrencyFromMetadata(
+      await targetDatabase.readSymbolMetadata(canonicalSymbol),
     );
 
     final fetch = yahooFetcher ??
@@ -880,10 +1125,34 @@ Future<void> syncCandles(
       final day = canonicalMarketDay(candle.date);
       return !day.isBefore(requestFrom) && !day.isAfter(expectedMarketDay);
     }).toList();
-    final stored = await insertCandles(
-      requestedCandles,
+    final verifiedFrom =
+        await _firstVerifiedCurrentQuoteDay(targetDatabase, canonicalSymbol);
+    var stored = 0;
+    if (verifiedFrom != null) {
+      stored += await insertCandles(
+        requestedCandles
+            .where(
+              (candle) =>
+                  canonicalMarketDay(candle.date).isBefore(verifiedFrom),
+            )
+            .toList(),
+        canonicalSymbol,
+        database: targetDatabase,
+        preserveExisting: true,
+      );
+    }
+    stored += await insertCandles(
+      verifiedFrom == null
+          ? requestedCandles
+          : requestedCandles
+              .where(
+                (candle) =>
+                    !canonicalMarketDay(candle.date).isBefore(verifiedFrom),
+              )
+              .toList(),
       canonicalSymbol,
       database: targetDatabase,
+      rawCurrency: seriesRawCurrency,
     );
     backgroundNetworkCoordinator.recordRows(
       RequestCategory.yahooCandles,
@@ -931,21 +1200,6 @@ Future<void> syncCandles(
 /// free and cent-quoted stocks (GBp/ZAc) keep the right scale offline.
 Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
   final canonicalSymbol = canonicalMarketSymbol(symbol);
-  final cachedCurrency = _symbolCurrencies[canonicalSymbol];
-  if (cachedCurrency != null) {
-    if (cachedCurrency != 'USD' &&
-        !allRatesFromUsd.containsKey(cachedCurrency)) {
-      final prefs = await SqliteSettings.getInstance();
-      final savedRate = readCachedUsdRate(cachedCurrency, prefs)?.rate;
-      if (savedRate != null && savedRate.isFinite && savedRate > 0) {
-        allRatesFromUsd[cachedCurrency] = savedRate;
-      } else {
-        await _fetchAndCacheRate(cachedCurrency);
-      }
-    }
-    return;
-  }
-
   final metadata = await marketDataDatabase.readSymbolMetadata(canonicalSymbol);
   final savedRaw = rawCurrencyFromMetadata(metadata);
   final prefs = await SqliteSettings.getInstance();
@@ -953,17 +1207,16 @@ Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
     final normalized = cacheSymbolMeta(canonicalSymbol, savedRaw);
     if (normalized != 'USD' && !allRatesFromUsd.containsKey(normalized)) {
       final savedRate = readCachedUsdRate(normalized, prefs)?.rate;
-      if (savedRate != null) {
+      if (savedRate != null && savedRate.isFinite && savedRate > 0) {
         allRatesFromUsd[normalized] = savedRate;
-        runDetachedTask(
-          _fetchAndCacheRate(normalized),
-          'Failed to refresh cached exchange rate',
-        );
       } else {
         await _fetchAndCacheRate(normalized);
       }
     }
-    return;
+    if (DateTime.now().toUtc().difference(metadata!.cachedAt.toUtc()) <
+        const Duration(hours: 24)) {
+      return;
+    }
   }
 
   try {
@@ -973,28 +1226,25 @@ Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
     );
     final response = await http.get(uri);
     if (response.statusCode != 200) return;
-
     final data = json.decode(response.body) as Map<String, dynamic>;
     final result =
         ((data['chart'] as Map<String, dynamic>?)?['result'] as List?)?.first
             as Map<String, dynamic>?;
-    final rawCurr =
+    final rawCurrency =
         (result?['meta'] as Map<String, dynamic>?)?['currency'] as String?;
-    if (rawCurr == null || rawCurr.isEmpty) return;
+    if (rawCurrency == null || rawCurrency.isEmpty) return;
 
-    final normalizedCurr = cacheSymbolMeta(canonicalSymbol, rawCurr);
-    await upsertSymbolCurrencyMetadata(canonicalSymbol, rawCurr);
-
-    if (!allRatesFromUsd.containsKey(normalizedCurr) &&
-        normalizedCurr != 'USD') {
-      await _fetchAndCacheRate(normalizedCurr);
+    await upsertSymbolCurrencyMetadata(
+      canonicalSymbol,
+      rawCurrency,
+      source: 'yahoo-chart',
+    );
+    final normalized = cacheSymbolMeta(canonicalSymbol, rawCurrency);
+    if (normalized != 'USD' && !allRatesFromUsd.containsKey(normalized)) {
+      await _fetchAndCacheRate(normalized);
     }
   } catch (error, stackTrace) {
-    talker.handle(
-      error,
-      stackTrace,
-      'Failed to fetch symbol currency metadata',
-    );
+    talker.handle(error, stackTrace, 'Failed to fetch symbol currency');
   }
 }
 

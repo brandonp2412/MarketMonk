@@ -15,6 +15,7 @@ import 'package:market_monk/database.dart';
 import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/empty_state.dart';
+import 'package:market_monk/exchange_rate_service.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/intraday_market_data.dart';
 import 'package:market_monk/intraday_portfolio.dart';
@@ -1303,15 +1304,18 @@ class ChartsPageState extends State<ChartsPage>
             ..orderBy([(c) => OrderingTerm.asc(c.date)]))
           .get();
       if (rows.isEmpty) return;
-      final rate = requireUsdRate(position.nativeCurrency);
-      final divisor = symbolCentDivisor(position.symbol);
       holdings.add(
         ProvisionalHolding(
           shares: position.netShares,
           closesUsd: {
             for (final row in rows)
-              DateTime(row.date.year, row.date.month, row.date.day):
-                  row.close / divisor / rate,
+              DateTime(row.date.year, row.date.month, row.date.day): row.close /
+                  candleCentDivisor(row) /
+                  requireUsdRate(
+                    normalizedQuoteCurrency(
+                      row.rawCurrency ?? position.nativeCurrency,
+                    ),
+                  ),
           },
         ),
       );
@@ -1466,9 +1470,7 @@ class ChartsPageState extends State<ChartsPage>
                 IntradayPortfolioTrade(
                   trade.tradeDate.toUtc(),
                   trade.quantity,
-                  trade.price /
-                      symbolCentDivisor(position.symbol) /
-                      requireUsdRate(symbolCurrency(position.symbol)),
+                  tradeAmountUsd(trade, trade.price),
                 ),
           ],
         );
@@ -1568,12 +1570,16 @@ class ChartsPageState extends State<ChartsPage>
                   ),
             ]))
           .get();
-      final centDiv = symbolCentDivisor(symbol);
-      final nativeRate = allRatesFromUsd[symbolCurrency(symbol)] ?? 1.0;
       pricesBySymbol[symbol] = {
         for (final candle in rows)
           DateTime(candle.date.year, candle.date.month, candle.date.day):
-              candle.close / centDiv / nativeRate,
+              candle.close /
+                  candleCentDivisor(candle) /
+                  requireUsdRate(
+                    normalizedQuoteCurrency(
+                      candle.rawCurrency ?? symbolCurrency(symbol),
+                    ),
+                  ),
       };
     }
 
@@ -1959,9 +1965,28 @@ class ChartsPageState extends State<ChartsPage>
           ..limit(5))
         .get();
     if (rows.isEmpty) return;
-    await fetchSymbolCurrencyAndRate(symbol);
+    // A daily preview must remain available while the live provider is down.
+    // Use locally verified metadata and cached FX without waiting for a network
+    // refresh, and never show unidentified old units after a transition.
+    final metadata = await marketDataDatabase.readSymbolMetadata(symbol);
+    final savedRaw = rawCurrencyFromMetadata(metadata);
+    if (savedRaw != null) cacheSymbolMeta(symbol, savedRaw);
+    if ((await marketDataDatabase.readQuoteCurrencyChanges(symbol))
+            .isNotEmpty &&
+        rows.any((row) => row.rawCurrency == null)) {
+      return;
+    }
+    final nativeCurrency = symbolCurrency(symbol);
+    if (nativeCurrency != 'USD' &&
+        !allRatesFromUsd.containsKey(nativeCurrency)) {
+      final prefs = await SqliteSettings.getInstance();
+      final savedRate = readCachedUsdRate(nativeCurrency, prefs)?.rate;
+      if (savedRate != null && savedRate.isFinite && savedRate > 0) {
+        allRatesFromUsd[nativeCurrency] = savedRate;
+      }
+    }
     try {
-      requireUsdRate(symbolCurrency(symbol));
+      requireUsdRate(nativeCurrency);
     } on StateError {
       return;
     }
@@ -1986,6 +2011,7 @@ class ChartsPageState extends State<ChartsPage>
               high: Value(row.high),
               low: Value(row.low),
               close: Value(row.close),
+              rawCurrency: Value(row.rawCurrency),
             ),
           ),
       ];
@@ -2034,6 +2060,7 @@ class ChartsPageState extends State<ChartsPage>
               high: Value(row.high),
               low: Value(row.low),
               close: Value(row.close),
+              rawCurrency: Value(row.rawCurrency),
             ),
           ),
       ];
@@ -2641,11 +2668,45 @@ class ChartsPageState extends State<ChartsPage>
     }
 
     final candles = snapshot.data!.map((tc) => tc.candle).toList();
+    String? observedUnit(CandlesCompanion candle) =>
+        candle.rawCurrency.present ? candle.rawCurrency.value : null;
+    if ((!_usesIntraday || _intradaySeries == null) &&
+        _selectedSymbol != null &&
+        symbolHasQuoteCurrencyChange(_selectedSymbol!) &&
+        candles.any((candle) => observedUnit(candle) == null)) {
+      return SizedBox(
+        height: height,
+        child: const Center(
+          child: Text(
+            'Historical candle quotation units are unverified following a '
+            'currency change. Refresh or reconcile the history before charting.',
+          ),
+        ),
+      );
+    }
+    if (candles.any(
+      (candle) =>
+          observedUnit(candle) != null &&
+          normalizedQuoteCurrency(observedUnit(candle)!) != _nativeCurrency,
+    )) {
+      return SizedBox(
+        height: height,
+        child: const Center(
+          child: Text(
+            'Historical prices use different currencies; verify the source '
+            'before displaying a combined chart.',
+          ),
+        ),
+      );
+    }
+    double scale(CandlesCompanion candle) => observedUnit(candle) == null
+        ? _centDivisor
+        : quoteUnitDivisor(observedUnit(candle)!);
     final spots = <MarketLineChartPoint>[
       for (var index = 0; index < candles.length; index++)
         MarketLineChartPoint(
           index.toDouble(),
-          candles[index].close.value / _centDivisor,
+          candles[index].close.value / scale(candles[index]),
           column: index,
         ),
     ];
@@ -2700,10 +2761,10 @@ class ChartsPageState extends State<ChartsPage>
             for (var i = 0; i < candles.length; i++)
               MarketCandlePoint(
                 column: i,
-                open: candles[i].open.value / _centDivisor,
-                high: candles[i].high.value / _centDivisor,
-                low: candles[i].low.value / _centDivisor,
-                close: candles[i].close.value / _centDivisor,
+                open: candles[i].open.value / scale(candles[i]),
+                high: candles[i].high.value / scale(candles[i]),
+                low: candles[i].low.value / scale(candles[i]),
+                close: candles[i].close.value / scale(candles[i]),
               ),
           ],
           showCandlesticks: _showCandlesticks,
@@ -3203,19 +3264,18 @@ class ChartsPageState extends State<ChartsPage>
         candles = candles.sublist(candles.length - days);
       }
       if (candles.isNotEmpty) {
-        final divisor = symbolCentDivisor(symbol);
         favoriteOhlcBySymbol[symbol] = {
           for (final candle in candles)
             candle.date: (
-              open: candle.open / divisor,
-              high: candle.high / divisor,
-              low: candle.low / divisor,
-              close: candle.close / divisor,
+              open: candle.open / candleCentDivisor(candle),
+              high: candle.high / candleCentDivisor(candle),
+              low: candle.low / candleCentDivisor(candle),
+              close: candle.close / candleCentDivisor(candle),
             ),
         };
         visibleSeries[symbol] = [
           for (final candle in candles)
-            _DateValue(candle.date, candle.close / symbolCentDivisor(symbol)),
+            _DateValue(candle.date, candle.close / candleCentDivisor(candle)),
         ];
       }
     }
@@ -3937,8 +3997,8 @@ class _FavoriteCard extends StatelessWidget {
                       if (visibleCandles.isEmpty) {
                         return const SizedBox(height: 14, width: 14);
                       }
-                      final centDivisor = symbolCentDivisor(symbol);
-                      final price = visibleCandles.first.close / centDivisor;
+                      final price = visibleCandles.first.close /
+                          candleCentDivisor(visibleCandles.first);
                       final pct = visibleCandles.length > 1
                           ? safePercentChange(
                               visibleCandles.last.close,

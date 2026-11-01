@@ -4,6 +4,6 @@ targets:
       drift_dev:
         options:
           databases:
-            database: lib/database.dart
-            legacy_app_state: lib/legacy_app_state_database.dart
-            legacy_profile: lib/legacy_profile_database.dart
+            unified_database: lib/database.dart
+            app_state: lib/legacy_app_state_database.dart
+            database: lib/legacy_profile_database.dart

@@ -1,6 +1,7 @@
 import 'package:csv/csv.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/logging.dart';
+import 'package:market_monk/utils.dart';
 
 class ImportedTrade {
   final String symbol;
@@ -11,6 +12,8 @@ class ImportedTrade {
   final DateTime tradeDate;
   final double realizedPL;
   final double commission;
+  final String? rawCurrency;
+  final int? brokerConid;
 
   ImportedTrade({
     required this.symbol,
@@ -21,6 +24,8 @@ class ImportedTrade {
     required this.tradeDate,
     required this.realizedPL,
     required this.commission,
+    this.rawCurrency,
+    this.brokerConid,
   });
 }
 
@@ -96,6 +101,9 @@ class TigerBrokersParser extends BrokerCsvParser {
           tradeDate: tradeDate,
           realizedPL: activityType == 'Close' ? realizedPL : 0.0,
           commission: commission,
+          rawCurrency: RegExp(r'^[A-Z]{3}$').hasMatch(row.last.trim())
+              ? row.last.trim()
+              : null,
         ),
       );
     }
@@ -134,6 +142,8 @@ class InteractiveBrokersParser extends BrokerCsvParser {
     final commissionIdx = col['IBCommission'] ?? col['Commission'];
     final tradeDateIdx = col['TradeDate'];
     final levelIdx = col['LevelOfDetail'];
+    final currencyIdx = col['CurrencyPrimary'] ?? col['Currency'];
+    final conidIdx = col['Conid'] ?? col['ConID'];
 
     if ([
       symbolIdx,
@@ -199,6 +209,14 @@ class InteractiveBrokersParser extends BrokerCsvParser {
           tradeDate: tradeDate,
           realizedPL: 0.0,
           commission: commission,
+          rawCurrency: currencyIdx != null &&
+                  row.length > currencyIdx &&
+                  row[currencyIdx].trim().isNotEmpty
+              ? row[currencyIdx].trim()
+              : null,
+          brokerConid: conidIdx != null && row.length > conidIdx
+              ? int.tryParse(row[conidIdx].trim())
+              : null,
         ),
       );
     }
@@ -250,23 +268,33 @@ Future<int> importTrades(
   List<ImportedTrade> trades, {
   required String profileId,
   ProfileDataRepository? repository,
+  Future<double> Function(String, DateTime)? fxRateLoader,
 }) async {
   final target = repository ?? profileDataRepository;
-  final count = await target.addTrades(
-    profileId,
-    trades.map(
-      (trade) => ProfileTradeWrite(
-        symbol: trade.symbol,
-        name: trade.name,
-        quantity: trade.quantity,
-        price: trade.price,
-        tradeType: trade.tradeType,
-        tradeDate: trade.tradeDate,
-        realizedPL: trade.realizedPL,
-        commission: trade.commission,
-      ),
-    ),
-  );
+  final resolveRate = fxRateLoader ?? historicalTradeUsdRate;
+  final writes = await Future.wait([
+    for (final trade in trades)
+      () async {
+        final rawCurrency = trade.rawCurrency;
+        final rate = rawCurrency == null
+            ? null
+            : await resolveRate(rawCurrency, trade.tradeDate);
+        return ProfileTradeWrite(
+          symbol: trade.symbol,
+          name: trade.name,
+          quantity: trade.quantity,
+          price: trade.price,
+          tradeType: trade.tradeType,
+          tradeDate: trade.tradeDate,
+          realizedPL: trade.realizedPL,
+          commission: trade.commission,
+          rawCurrency: rawCurrency,
+          usdRateAtTrade: rate,
+          brokerConid: trade.brokerConid,
+        );
+      }(),
+  ]);
+  final count = await target.addTrades(profileId, writes);
   talker.info('Imported $count trades');
   return count;
 }

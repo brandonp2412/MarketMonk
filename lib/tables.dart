@@ -61,6 +61,9 @@ class Trades extends Table {
   DateTimeColumn get tradeDate => dateTime()();
   RealColumn get realizedPL => real().withDefault(const Constant(0.0))();
   RealColumn get commission => real().withDefault(const Constant(0.0))();
+  TextColumn get rawCurrency => text().nullable()();
+  RealColumn get usdRateAtTrade => real().nullable()();
+  IntColumn get brokerConid => integer().nullable()();
 }
 
 @DataClassName('StoredIbkrSetting')
@@ -104,6 +107,7 @@ class Candles extends Table {
   RealColumn get close => real().withDefault(const Constant(-1.0))();
   IntColumn get volume => integer().withDefault(const Constant(0))();
   RealColumn get adjClose => real().withDefault(const Constant(-1.0))();
+  TextColumn get rawCurrency => text().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {symbol, date};
@@ -123,4 +127,19 @@ class SymbolMetadata extends Table {
 
   @override
   Set<Column<Object>> get primaryKey => {symbol};
+}
+
+@TableIndex(
+  name: 'idx_quote_currency_changes_symbol_date',
+  columns: {#symbol, #observedAt},
+)
+@DataClassName('StoredQuoteCurrencyChange')
+class QuoteCurrencyChanges extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get symbol => text()();
+  TextColumn get previousRawCurrency => text()();
+  TextColumn get nextRawCurrency => text()();
+  DateTimeColumn get observedAt => dateTime()();
+  TextColumn get source => text()();
+  DateTimeColumn get effectiveDate => dateTime().nullable()();
 }

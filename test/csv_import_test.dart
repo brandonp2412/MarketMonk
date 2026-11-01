@@ -215,6 +215,11 @@ void main() {
       expect(sell.price, closeTo(175.0, 0.001));
     });
 
+    test('preserves execution currency and contract ID', () {
+      expect(result.trades.first.rawCurrency, 'USD');
+      expect(result.trades.first.brokerConid, 12345);
+    });
+
     test('commission stored as positive absolute value', () {
       final buy = result.trades.firstWhere(
         (t) => t.symbol == 'AAPL' && t.tradeType == 'open' && t.quantity > 9,
@@ -392,6 +397,26 @@ void main() {
       expect(sell.price, closeTo(180.0, 0.001));
       expect(sell.realizedPL, closeTo(150.0, 0.01));
       expect(sell.commission, closeTo(2.0, 0.001));
+      expect(sell.rawCurrency, 'USD');
+      expect(sell.usdRateAtTrade, 1);
+    });
+
+    test('IBKR execution ID, currency and dated FX survive import', () async {
+      final parsed = InteractiveBrokersParser().parse(_ibkrCsvMinimal);
+      await importTrades(
+        parsed.trades,
+        profileId: 'profile-default',
+        repository: repository,
+        fxRateLoader: (code, date) async {
+          expect(code, 'USD');
+          return 1;
+        },
+      );
+      final stored = await repository.readTrades('profile-default');
+      expect(stored, hasLength(3));
+      expect(stored.first.rawCurrency, 'USD');
+      expect(stored.first.usdRateAtTrade, 1);
+      expect(stored.first.brokerConid, 12345);
     });
 
     test(

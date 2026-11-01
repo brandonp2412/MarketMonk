@@ -770,6 +770,24 @@ class $TradesTable extends Trades with TableInfo<$TradesTable, StoredTrade> {
       type: DriftSqlType.double,
       requiredDuringInsert: false,
       defaultValue: const Constant(0.0));
+  static const VerificationMeta _rawCurrencyMeta =
+      const VerificationMeta('rawCurrency');
+  @override
+  late final GeneratedColumn<String> rawCurrency = GeneratedColumn<String>(
+      'raw_currency', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _usdRateAtTradeMeta =
+      const VerificationMeta('usdRateAtTrade');
+  @override
+  late final GeneratedColumn<double> usdRateAtTrade = GeneratedColumn<double>(
+      'usd_rate_at_trade', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _brokerConidMeta =
+      const VerificationMeta('brokerConid');
+  @override
+  late final GeneratedColumn<int> brokerConid = GeneratedColumn<int>(
+      'broker_conid', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -781,7 +799,10 @@ class $TradesTable extends Trades with TableInfo<$TradesTable, StoredTrade> {
         tradeType,
         tradeDate,
         realizedPL,
-        commission
+        commission,
+        rawCurrency,
+        usdRateAtTrade,
+        brokerConid
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -850,6 +871,24 @@ class $TradesTable extends Trades with TableInfo<$TradesTable, StoredTrade> {
           commission.isAcceptableOrUnknown(
               data['commission']!, _commissionMeta));
     }
+    if (data.containsKey('raw_currency')) {
+      context.handle(
+          _rawCurrencyMeta,
+          rawCurrency.isAcceptableOrUnknown(
+              data['raw_currency']!, _rawCurrencyMeta));
+    }
+    if (data.containsKey('usd_rate_at_trade')) {
+      context.handle(
+          _usdRateAtTradeMeta,
+          usdRateAtTrade.isAcceptableOrUnknown(
+              data['usd_rate_at_trade']!, _usdRateAtTradeMeta));
+    }
+    if (data.containsKey('broker_conid')) {
+      context.handle(
+          _brokerConidMeta,
+          brokerConid.isAcceptableOrUnknown(
+              data['broker_conid']!, _brokerConidMeta));
+    }
     return context;
   }
 
@@ -879,6 +918,12 @@ class $TradesTable extends Trades with TableInfo<$TradesTable, StoredTrade> {
           .read(DriftSqlType.double, data['${effectivePrefix}realized_p_l'])!,
       commission: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}commission'])!,
+      rawCurrency: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}raw_currency']),
+      usdRateAtTrade: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}usd_rate_at_trade']),
+      brokerConid: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}broker_conid']),
     );
   }
 
@@ -899,6 +944,9 @@ class StoredTrade extends DataClass implements Insertable<StoredTrade> {
   final DateTime tradeDate;
   final double realizedPL;
   final double commission;
+  final String? rawCurrency;
+  final double? usdRateAtTrade;
+  final int? brokerConid;
   const StoredTrade(
       {required this.id,
       required this.profileId,
@@ -909,7 +957,10 @@ class StoredTrade extends DataClass implements Insertable<StoredTrade> {
       required this.tradeType,
       required this.tradeDate,
       required this.realizedPL,
-      required this.commission});
+      required this.commission,
+      this.rawCurrency,
+      this.usdRateAtTrade,
+      this.brokerConid});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -923,6 +974,15 @@ class StoredTrade extends DataClass implements Insertable<StoredTrade> {
     map['trade_date'] = Variable<DateTime>(tradeDate);
     map['realized_p_l'] = Variable<double>(realizedPL);
     map['commission'] = Variable<double>(commission);
+    if (!nullToAbsent || rawCurrency != null) {
+      map['raw_currency'] = Variable<String>(rawCurrency);
+    }
+    if (!nullToAbsent || usdRateAtTrade != null) {
+      map['usd_rate_at_trade'] = Variable<double>(usdRateAtTrade);
+    }
+    if (!nullToAbsent || brokerConid != null) {
+      map['broker_conid'] = Variable<int>(brokerConid);
+    }
     return map;
   }
 
@@ -938,6 +998,15 @@ class StoredTrade extends DataClass implements Insertable<StoredTrade> {
       tradeDate: Value(tradeDate),
       realizedPL: Value(realizedPL),
       commission: Value(commission),
+      rawCurrency: rawCurrency == null && nullToAbsent
+          ? const Value.absent()
+          : Value(rawCurrency),
+      usdRateAtTrade: usdRateAtTrade == null && nullToAbsent
+          ? const Value.absent()
+          : Value(usdRateAtTrade),
+      brokerConid: brokerConid == null && nullToAbsent
+          ? const Value.absent()
+          : Value(brokerConid),
     );
   }
 
@@ -955,6 +1024,9 @@ class StoredTrade extends DataClass implements Insertable<StoredTrade> {
       tradeDate: serializer.fromJson<DateTime>(json['tradeDate']),
       realizedPL: serializer.fromJson<double>(json['realizedPL']),
       commission: serializer.fromJson<double>(json['commission']),
+      rawCurrency: serializer.fromJson<String?>(json['rawCurrency']),
+      usdRateAtTrade: serializer.fromJson<double?>(json['usdRateAtTrade']),
+      brokerConid: serializer.fromJson<int?>(json['brokerConid']),
     );
   }
   @override
@@ -971,6 +1043,9 @@ class StoredTrade extends DataClass implements Insertable<StoredTrade> {
       'tradeDate': serializer.toJson<DateTime>(tradeDate),
       'realizedPL': serializer.toJson<double>(realizedPL),
       'commission': serializer.toJson<double>(commission),
+      'rawCurrency': serializer.toJson<String?>(rawCurrency),
+      'usdRateAtTrade': serializer.toJson<double?>(usdRateAtTrade),
+      'brokerConid': serializer.toJson<int?>(brokerConid),
     };
   }
 
@@ -984,7 +1059,10 @@ class StoredTrade extends DataClass implements Insertable<StoredTrade> {
           String? tradeType,
           DateTime? tradeDate,
           double? realizedPL,
-          double? commission}) =>
+          double? commission,
+          Value<String?> rawCurrency = const Value.absent(),
+          Value<double?> usdRateAtTrade = const Value.absent(),
+          Value<int?> brokerConid = const Value.absent()}) =>
       StoredTrade(
         id: id ?? this.id,
         profileId: profileId ?? this.profileId,
@@ -996,6 +1074,10 @@ class StoredTrade extends DataClass implements Insertable<StoredTrade> {
         tradeDate: tradeDate ?? this.tradeDate,
         realizedPL: realizedPL ?? this.realizedPL,
         commission: commission ?? this.commission,
+        rawCurrency: rawCurrency.present ? rawCurrency.value : this.rawCurrency,
+        usdRateAtTrade:
+            usdRateAtTrade.present ? usdRateAtTrade.value : this.usdRateAtTrade,
+        brokerConid: brokerConid.present ? brokerConid.value : this.brokerConid,
       );
   StoredTrade copyWithCompanion(TradesCompanion data) {
     return StoredTrade(
@@ -1011,6 +1093,13 @@ class StoredTrade extends DataClass implements Insertable<StoredTrade> {
           data.realizedPL.present ? data.realizedPL.value : this.realizedPL,
       commission:
           data.commission.present ? data.commission.value : this.commission,
+      rawCurrency:
+          data.rawCurrency.present ? data.rawCurrency.value : this.rawCurrency,
+      usdRateAtTrade: data.usdRateAtTrade.present
+          ? data.usdRateAtTrade.value
+          : this.usdRateAtTrade,
+      brokerConid:
+          data.brokerConid.present ? data.brokerConid.value : this.brokerConid,
     );
   }
 
@@ -1026,14 +1115,29 @@ class StoredTrade extends DataClass implements Insertable<StoredTrade> {
           ..write('tradeType: $tradeType, ')
           ..write('tradeDate: $tradeDate, ')
           ..write('realizedPL: $realizedPL, ')
-          ..write('commission: $commission')
+          ..write('commission: $commission, ')
+          ..write('rawCurrency: $rawCurrency, ')
+          ..write('usdRateAtTrade: $usdRateAtTrade, ')
+          ..write('brokerConid: $brokerConid')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, profileId, symbol, name, quantity, price,
-      tradeType, tradeDate, realizedPL, commission);
+  int get hashCode => Object.hash(
+      id,
+      profileId,
+      symbol,
+      name,
+      quantity,
+      price,
+      tradeType,
+      tradeDate,
+      realizedPL,
+      commission,
+      rawCurrency,
+      usdRateAtTrade,
+      brokerConid);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1047,7 +1151,10 @@ class StoredTrade extends DataClass implements Insertable<StoredTrade> {
           other.tradeType == this.tradeType &&
           other.tradeDate == this.tradeDate &&
           other.realizedPL == this.realizedPL &&
-          other.commission == this.commission);
+          other.commission == this.commission &&
+          other.rawCurrency == this.rawCurrency &&
+          other.usdRateAtTrade == this.usdRateAtTrade &&
+          other.brokerConid == this.brokerConid);
 }
 
 class TradesCompanion extends UpdateCompanion<StoredTrade> {
@@ -1061,6 +1168,9 @@ class TradesCompanion extends UpdateCompanion<StoredTrade> {
   final Value<DateTime> tradeDate;
   final Value<double> realizedPL;
   final Value<double> commission;
+  final Value<String?> rawCurrency;
+  final Value<double?> usdRateAtTrade;
+  final Value<int?> brokerConid;
   const TradesCompanion({
     this.id = const Value.absent(),
     this.profileId = const Value.absent(),
@@ -1072,6 +1182,9 @@ class TradesCompanion extends UpdateCompanion<StoredTrade> {
     this.tradeDate = const Value.absent(),
     this.realizedPL = const Value.absent(),
     this.commission = const Value.absent(),
+    this.rawCurrency = const Value.absent(),
+    this.usdRateAtTrade = const Value.absent(),
+    this.brokerConid = const Value.absent(),
   });
   TradesCompanion.insert({
     this.id = const Value.absent(),
@@ -1084,6 +1197,9 @@ class TradesCompanion extends UpdateCompanion<StoredTrade> {
     required DateTime tradeDate,
     this.realizedPL = const Value.absent(),
     this.commission = const Value.absent(),
+    this.rawCurrency = const Value.absent(),
+    this.usdRateAtTrade = const Value.absent(),
+    this.brokerConid = const Value.absent(),
   })  : profileId = Value(profileId),
         symbol = Value(symbol),
         name = Value(name),
@@ -1102,6 +1218,9 @@ class TradesCompanion extends UpdateCompanion<StoredTrade> {
     Expression<DateTime>? tradeDate,
     Expression<double>? realizedPL,
     Expression<double>? commission,
+    Expression<String>? rawCurrency,
+    Expression<double>? usdRateAtTrade,
+    Expression<int>? brokerConid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1114,6 +1233,9 @@ class TradesCompanion extends UpdateCompanion<StoredTrade> {
       if (tradeDate != null) 'trade_date': tradeDate,
       if (realizedPL != null) 'realized_p_l': realizedPL,
       if (commission != null) 'commission': commission,
+      if (rawCurrency != null) 'raw_currency': rawCurrency,
+      if (usdRateAtTrade != null) 'usd_rate_at_trade': usdRateAtTrade,
+      if (brokerConid != null) 'broker_conid': brokerConid,
     });
   }
 
@@ -1127,7 +1249,10 @@ class TradesCompanion extends UpdateCompanion<StoredTrade> {
       Value<String>? tradeType,
       Value<DateTime>? tradeDate,
       Value<double>? realizedPL,
-      Value<double>? commission}) {
+      Value<double>? commission,
+      Value<String?>? rawCurrency,
+      Value<double?>? usdRateAtTrade,
+      Value<int?>? brokerConid}) {
     return TradesCompanion(
       id: id ?? this.id,
       profileId: profileId ?? this.profileId,
@@ -1139,6 +1264,9 @@ class TradesCompanion extends UpdateCompanion<StoredTrade> {
       tradeDate: tradeDate ?? this.tradeDate,
       realizedPL: realizedPL ?? this.realizedPL,
       commission: commission ?? this.commission,
+      rawCurrency: rawCurrency ?? this.rawCurrency,
+      usdRateAtTrade: usdRateAtTrade ?? this.usdRateAtTrade,
+      brokerConid: brokerConid ?? this.brokerConid,
     );
   }
 
@@ -1175,6 +1303,15 @@ class TradesCompanion extends UpdateCompanion<StoredTrade> {
     if (commission.present) {
       map['commission'] = Variable<double>(commission.value);
     }
+    if (rawCurrency.present) {
+      map['raw_currency'] = Variable<String>(rawCurrency.value);
+    }
+    if (usdRateAtTrade.present) {
+      map['usd_rate_at_trade'] = Variable<double>(usdRateAtTrade.value);
+    }
+    if (brokerConid.present) {
+      map['broker_conid'] = Variable<int>(brokerConid.value);
+    }
     return map;
   }
 
@@ -1190,7 +1327,10 @@ class TradesCompanion extends UpdateCompanion<StoredTrade> {
           ..write('tradeType: $tradeType, ')
           ..write('tradeDate: $tradeDate, ')
           ..write('realizedPL: $realizedPL, ')
-          ..write('commission: $commission')
+          ..write('commission: $commission, ')
+          ..write('rawCurrency: $rawCurrency, ')
+          ..write('usdRateAtTrade: $usdRateAtTrade, ')
+          ..write('brokerConid: $brokerConid')
           ..write(')'))
         .toString();
   }
@@ -1846,9 +1986,15 @@ class $CandlesTable extends Candles
       type: DriftSqlType.double,
       requiredDuringInsert: false,
       defaultValue: const Constant(-1.0));
+  static const VerificationMeta _rawCurrencyMeta =
+      const VerificationMeta('rawCurrency');
+  @override
+  late final GeneratedColumn<String> rawCurrency = GeneratedColumn<String>(
+      'raw_currency', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns =>
-      [symbol, date, open, high, low, close, volume, adjClose];
+      [symbol, date, open, high, low, close, volume, adjClose, rawCurrency];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1895,6 +2041,12 @@ class $CandlesTable extends Candles
       context.handle(_adjCloseMeta,
           adjClose.isAcceptableOrUnknown(data['adj_close']!, _adjCloseMeta));
     }
+    if (data.containsKey('raw_currency')) {
+      context.handle(
+          _rawCurrencyMeta,
+          rawCurrency.isAcceptableOrUnknown(
+              data['raw_currency']!, _rawCurrencyMeta));
+    }
     return context;
   }
 
@@ -1920,6 +2072,8 @@ class $CandlesTable extends Candles
           .read(DriftSqlType.int, data['${effectivePrefix}volume'])!,
       adjClose: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}adj_close'])!,
+      rawCurrency: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}raw_currency']),
     );
   }
 
@@ -1938,6 +2092,7 @@ class StoredCandle extends DataClass implements Insertable<StoredCandle> {
   final double close;
   final int volume;
   final double adjClose;
+  final String? rawCurrency;
   const StoredCandle(
       {required this.symbol,
       required this.date,
@@ -1946,7 +2101,8 @@ class StoredCandle extends DataClass implements Insertable<StoredCandle> {
       required this.low,
       required this.close,
       required this.volume,
-      required this.adjClose});
+      required this.adjClose,
+      this.rawCurrency});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1958,6 +2114,9 @@ class StoredCandle extends DataClass implements Insertable<StoredCandle> {
     map['close'] = Variable<double>(close);
     map['volume'] = Variable<int>(volume);
     map['adj_close'] = Variable<double>(adjClose);
+    if (!nullToAbsent || rawCurrency != null) {
+      map['raw_currency'] = Variable<String>(rawCurrency);
+    }
     return map;
   }
 
@@ -1971,6 +2130,9 @@ class StoredCandle extends DataClass implements Insertable<StoredCandle> {
       close: Value(close),
       volume: Value(volume),
       adjClose: Value(adjClose),
+      rawCurrency: rawCurrency == null && nullToAbsent
+          ? const Value.absent()
+          : Value(rawCurrency),
     );
   }
 
@@ -1986,6 +2148,7 @@ class StoredCandle extends DataClass implements Insertable<StoredCandle> {
       close: serializer.fromJson<double>(json['close']),
       volume: serializer.fromJson<int>(json['volume']),
       adjClose: serializer.fromJson<double>(json['adjClose']),
+      rawCurrency: serializer.fromJson<String?>(json['rawCurrency']),
     );
   }
   @override
@@ -2000,6 +2163,7 @@ class StoredCandle extends DataClass implements Insertable<StoredCandle> {
       'close': serializer.toJson<double>(close),
       'volume': serializer.toJson<int>(volume),
       'adjClose': serializer.toJson<double>(adjClose),
+      'rawCurrency': serializer.toJson<String?>(rawCurrency),
     };
   }
 
@@ -2011,7 +2175,8 @@ class StoredCandle extends DataClass implements Insertable<StoredCandle> {
           double? low,
           double? close,
           int? volume,
-          double? adjClose}) =>
+          double? adjClose,
+          Value<String?> rawCurrency = const Value.absent()}) =>
       StoredCandle(
         symbol: symbol ?? this.symbol,
         date: date ?? this.date,
@@ -2021,6 +2186,7 @@ class StoredCandle extends DataClass implements Insertable<StoredCandle> {
         close: close ?? this.close,
         volume: volume ?? this.volume,
         adjClose: adjClose ?? this.adjClose,
+        rawCurrency: rawCurrency.present ? rawCurrency.value : this.rawCurrency,
       );
   StoredCandle copyWithCompanion(CandlesCompanion data) {
     return StoredCandle(
@@ -2032,6 +2198,8 @@ class StoredCandle extends DataClass implements Insertable<StoredCandle> {
       close: data.close.present ? data.close.value : this.close,
       volume: data.volume.present ? data.volume.value : this.volume,
       adjClose: data.adjClose.present ? data.adjClose.value : this.adjClose,
+      rawCurrency:
+          data.rawCurrency.present ? data.rawCurrency.value : this.rawCurrency,
     );
   }
 
@@ -2045,14 +2213,15 @@ class StoredCandle extends DataClass implements Insertable<StoredCandle> {
           ..write('low: $low, ')
           ..write('close: $close, ')
           ..write('volume: $volume, ')
-          ..write('adjClose: $adjClose')
+          ..write('adjClose: $adjClose, ')
+          ..write('rawCurrency: $rawCurrency')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(symbol, date, open, high, low, close, volume, adjClose);
+  int get hashCode => Object.hash(
+      symbol, date, open, high, low, close, volume, adjClose, rawCurrency);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2064,7 +2233,8 @@ class StoredCandle extends DataClass implements Insertable<StoredCandle> {
           other.low == this.low &&
           other.close == this.close &&
           other.volume == this.volume &&
-          other.adjClose == this.adjClose);
+          other.adjClose == this.adjClose &&
+          other.rawCurrency == this.rawCurrency);
 }
 
 class CandlesCompanion extends UpdateCompanion<StoredCandle> {
@@ -2076,6 +2246,7 @@ class CandlesCompanion extends UpdateCompanion<StoredCandle> {
   final Value<double> close;
   final Value<int> volume;
   final Value<double> adjClose;
+  final Value<String?> rawCurrency;
   final Value<int> rowid;
   const CandlesCompanion({
     this.symbol = const Value.absent(),
@@ -2086,6 +2257,7 @@ class CandlesCompanion extends UpdateCompanion<StoredCandle> {
     this.close = const Value.absent(),
     this.volume = const Value.absent(),
     this.adjClose = const Value.absent(),
+    this.rawCurrency = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CandlesCompanion.insert({
@@ -2097,6 +2269,7 @@ class CandlesCompanion extends UpdateCompanion<StoredCandle> {
     this.close = const Value.absent(),
     this.volume = const Value.absent(),
     this.adjClose = const Value.absent(),
+    this.rawCurrency = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : symbol = Value(symbol),
         date = Value(date);
@@ -2109,6 +2282,7 @@ class CandlesCompanion extends UpdateCompanion<StoredCandle> {
     Expression<double>? close,
     Expression<int>? volume,
     Expression<double>? adjClose,
+    Expression<String>? rawCurrency,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2120,6 +2294,7 @@ class CandlesCompanion extends UpdateCompanion<StoredCandle> {
       if (close != null) 'close': close,
       if (volume != null) 'volume': volume,
       if (adjClose != null) 'adj_close': adjClose,
+      if (rawCurrency != null) 'raw_currency': rawCurrency,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2133,6 +2308,7 @@ class CandlesCompanion extends UpdateCompanion<StoredCandle> {
       Value<double>? close,
       Value<int>? volume,
       Value<double>? adjClose,
+      Value<String?>? rawCurrency,
       Value<int>? rowid}) {
     return CandlesCompanion(
       symbol: symbol ?? this.symbol,
@@ -2143,6 +2319,7 @@ class CandlesCompanion extends UpdateCompanion<StoredCandle> {
       close: close ?? this.close,
       volume: volume ?? this.volume,
       adjClose: adjClose ?? this.adjClose,
+      rawCurrency: rawCurrency ?? this.rawCurrency,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2174,6 +2351,9 @@ class CandlesCompanion extends UpdateCompanion<StoredCandle> {
     if (adjClose.present) {
       map['adj_close'] = Variable<double>(adjClose.value);
     }
+    if (rawCurrency.present) {
+      map['raw_currency'] = Variable<String>(rawCurrency.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2191,6 +2371,7 @@ class CandlesCompanion extends UpdateCompanion<StoredCandle> {
           ..write('close: $close, ')
           ..write('volume: $volume, ')
           ..write('adjClose: $adjClose, ')
+          ..write('rawCurrency: $rawCurrency, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2602,6 +2783,411 @@ class SymbolMetadataCompanion extends UpdateCompanion<StoredSymbolMetadata> {
   }
 }
 
+class $QuoteCurrencyChangesTable extends QuoteCurrencyChanges
+    with TableInfo<$QuoteCurrencyChangesTable, StoredQuoteCurrencyChange> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $QuoteCurrencyChangesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _symbolMeta = const VerificationMeta('symbol');
+  @override
+  late final GeneratedColumn<String> symbol = GeneratedColumn<String>(
+      'symbol', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _previousRawCurrencyMeta =
+      const VerificationMeta('previousRawCurrency');
+  @override
+  late final GeneratedColumn<String> previousRawCurrency =
+      GeneratedColumn<String>('previous_raw_currency', aliasedName, false,
+          type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _nextRawCurrencyMeta =
+      const VerificationMeta('nextRawCurrency');
+  @override
+  late final GeneratedColumn<String> nextRawCurrency = GeneratedColumn<String>(
+      'next_raw_currency', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _observedAtMeta =
+      const VerificationMeta('observedAt');
+  @override
+  late final GeneratedColumn<DateTime> observedAt = GeneratedColumn<DateTime>(
+      'observed_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _sourceMeta = const VerificationMeta('source');
+  @override
+  late final GeneratedColumn<String> source = GeneratedColumn<String>(
+      'source', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _effectiveDateMeta =
+      const VerificationMeta('effectiveDate');
+  @override
+  late final GeneratedColumn<DateTime> effectiveDate =
+      GeneratedColumn<DateTime>('effective_date', aliasedName, true,
+          type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        symbol,
+        previousRawCurrency,
+        nextRawCurrency,
+        observedAt,
+        source,
+        effectiveDate
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'quote_currency_changes';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<StoredQuoteCurrencyChange> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('symbol')) {
+      context.handle(_symbolMeta,
+          symbol.isAcceptableOrUnknown(data['symbol']!, _symbolMeta));
+    } else if (isInserting) {
+      context.missing(_symbolMeta);
+    }
+    if (data.containsKey('previous_raw_currency')) {
+      context.handle(
+          _previousRawCurrencyMeta,
+          previousRawCurrency.isAcceptableOrUnknown(
+              data['previous_raw_currency']!, _previousRawCurrencyMeta));
+    } else if (isInserting) {
+      context.missing(_previousRawCurrencyMeta);
+    }
+    if (data.containsKey('next_raw_currency')) {
+      context.handle(
+          _nextRawCurrencyMeta,
+          nextRawCurrency.isAcceptableOrUnknown(
+              data['next_raw_currency']!, _nextRawCurrencyMeta));
+    } else if (isInserting) {
+      context.missing(_nextRawCurrencyMeta);
+    }
+    if (data.containsKey('observed_at')) {
+      context.handle(
+          _observedAtMeta,
+          observedAt.isAcceptableOrUnknown(
+              data['observed_at']!, _observedAtMeta));
+    } else if (isInserting) {
+      context.missing(_observedAtMeta);
+    }
+    if (data.containsKey('source')) {
+      context.handle(_sourceMeta,
+          source.isAcceptableOrUnknown(data['source']!, _sourceMeta));
+    } else if (isInserting) {
+      context.missing(_sourceMeta);
+    }
+    if (data.containsKey('effective_date')) {
+      context.handle(
+          _effectiveDateMeta,
+          effectiveDate.isAcceptableOrUnknown(
+              data['effective_date']!, _effectiveDateMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  StoredQuoteCurrencyChange map(Map<String, dynamic> data,
+      {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return StoredQuoteCurrencyChange(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      symbol: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}symbol'])!,
+      previousRawCurrency: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}previous_raw_currency'])!,
+      nextRawCurrency: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}next_raw_currency'])!,
+      observedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}observed_at'])!,
+      source: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}source'])!,
+      effectiveDate: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}effective_date']),
+    );
+  }
+
+  @override
+  $QuoteCurrencyChangesTable createAlias(String alias) {
+    return $QuoteCurrencyChangesTable(attachedDatabase, alias);
+  }
+}
+
+class StoredQuoteCurrencyChange extends DataClass
+    implements Insertable<StoredQuoteCurrencyChange> {
+  final int id;
+  final String symbol;
+  final String previousRawCurrency;
+  final String nextRawCurrency;
+  final DateTime observedAt;
+  final String source;
+  final DateTime? effectiveDate;
+  const StoredQuoteCurrencyChange(
+      {required this.id,
+      required this.symbol,
+      required this.previousRawCurrency,
+      required this.nextRawCurrency,
+      required this.observedAt,
+      required this.source,
+      this.effectiveDate});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['symbol'] = Variable<String>(symbol);
+    map['previous_raw_currency'] = Variable<String>(previousRawCurrency);
+    map['next_raw_currency'] = Variable<String>(nextRawCurrency);
+    map['observed_at'] = Variable<DateTime>(observedAt);
+    map['source'] = Variable<String>(source);
+    if (!nullToAbsent || effectiveDate != null) {
+      map['effective_date'] = Variable<DateTime>(effectiveDate);
+    }
+    return map;
+  }
+
+  QuoteCurrencyChangesCompanion toCompanion(bool nullToAbsent) {
+    return QuoteCurrencyChangesCompanion(
+      id: Value(id),
+      symbol: Value(symbol),
+      previousRawCurrency: Value(previousRawCurrency),
+      nextRawCurrency: Value(nextRawCurrency),
+      observedAt: Value(observedAt),
+      source: Value(source),
+      effectiveDate: effectiveDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(effectiveDate),
+    );
+  }
+
+  factory StoredQuoteCurrencyChange.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return StoredQuoteCurrencyChange(
+      id: serializer.fromJson<int>(json['id']),
+      symbol: serializer.fromJson<String>(json['symbol']),
+      previousRawCurrency:
+          serializer.fromJson<String>(json['previousRawCurrency']),
+      nextRawCurrency: serializer.fromJson<String>(json['nextRawCurrency']),
+      observedAt: serializer.fromJson<DateTime>(json['observedAt']),
+      source: serializer.fromJson<String>(json['source']),
+      effectiveDate: serializer.fromJson<DateTime?>(json['effectiveDate']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'symbol': serializer.toJson<String>(symbol),
+      'previousRawCurrency': serializer.toJson<String>(previousRawCurrency),
+      'nextRawCurrency': serializer.toJson<String>(nextRawCurrency),
+      'observedAt': serializer.toJson<DateTime>(observedAt),
+      'source': serializer.toJson<String>(source),
+      'effectiveDate': serializer.toJson<DateTime?>(effectiveDate),
+    };
+  }
+
+  StoredQuoteCurrencyChange copyWith(
+          {int? id,
+          String? symbol,
+          String? previousRawCurrency,
+          String? nextRawCurrency,
+          DateTime? observedAt,
+          String? source,
+          Value<DateTime?> effectiveDate = const Value.absent()}) =>
+      StoredQuoteCurrencyChange(
+        id: id ?? this.id,
+        symbol: symbol ?? this.symbol,
+        previousRawCurrency: previousRawCurrency ?? this.previousRawCurrency,
+        nextRawCurrency: nextRawCurrency ?? this.nextRawCurrency,
+        observedAt: observedAt ?? this.observedAt,
+        source: source ?? this.source,
+        effectiveDate:
+            effectiveDate.present ? effectiveDate.value : this.effectiveDate,
+      );
+  StoredQuoteCurrencyChange copyWithCompanion(
+      QuoteCurrencyChangesCompanion data) {
+    return StoredQuoteCurrencyChange(
+      id: data.id.present ? data.id.value : this.id,
+      symbol: data.symbol.present ? data.symbol.value : this.symbol,
+      previousRawCurrency: data.previousRawCurrency.present
+          ? data.previousRawCurrency.value
+          : this.previousRawCurrency,
+      nextRawCurrency: data.nextRawCurrency.present
+          ? data.nextRawCurrency.value
+          : this.nextRawCurrency,
+      observedAt:
+          data.observedAt.present ? data.observedAt.value : this.observedAt,
+      source: data.source.present ? data.source.value : this.source,
+      effectiveDate: data.effectiveDate.present
+          ? data.effectiveDate.value
+          : this.effectiveDate,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StoredQuoteCurrencyChange(')
+          ..write('id: $id, ')
+          ..write('symbol: $symbol, ')
+          ..write('previousRawCurrency: $previousRawCurrency, ')
+          ..write('nextRawCurrency: $nextRawCurrency, ')
+          ..write('observedAt: $observedAt, ')
+          ..write('source: $source, ')
+          ..write('effectiveDate: $effectiveDate')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, symbol, previousRawCurrency,
+      nextRawCurrency, observedAt, source, effectiveDate);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is StoredQuoteCurrencyChange &&
+          other.id == this.id &&
+          other.symbol == this.symbol &&
+          other.previousRawCurrency == this.previousRawCurrency &&
+          other.nextRawCurrency == this.nextRawCurrency &&
+          other.observedAt == this.observedAt &&
+          other.source == this.source &&
+          other.effectiveDate == this.effectiveDate);
+}
+
+class QuoteCurrencyChangesCompanion
+    extends UpdateCompanion<StoredQuoteCurrencyChange> {
+  final Value<int> id;
+  final Value<String> symbol;
+  final Value<String> previousRawCurrency;
+  final Value<String> nextRawCurrency;
+  final Value<DateTime> observedAt;
+  final Value<String> source;
+  final Value<DateTime?> effectiveDate;
+  const QuoteCurrencyChangesCompanion({
+    this.id = const Value.absent(),
+    this.symbol = const Value.absent(),
+    this.previousRawCurrency = const Value.absent(),
+    this.nextRawCurrency = const Value.absent(),
+    this.observedAt = const Value.absent(),
+    this.source = const Value.absent(),
+    this.effectiveDate = const Value.absent(),
+  });
+  QuoteCurrencyChangesCompanion.insert({
+    this.id = const Value.absent(),
+    required String symbol,
+    required String previousRawCurrency,
+    required String nextRawCurrency,
+    required DateTime observedAt,
+    required String source,
+    this.effectiveDate = const Value.absent(),
+  })  : symbol = Value(symbol),
+        previousRawCurrency = Value(previousRawCurrency),
+        nextRawCurrency = Value(nextRawCurrency),
+        observedAt = Value(observedAt),
+        source = Value(source);
+  static Insertable<StoredQuoteCurrencyChange> custom({
+    Expression<int>? id,
+    Expression<String>? symbol,
+    Expression<String>? previousRawCurrency,
+    Expression<String>? nextRawCurrency,
+    Expression<DateTime>? observedAt,
+    Expression<String>? source,
+    Expression<DateTime>? effectiveDate,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (symbol != null) 'symbol': symbol,
+      if (previousRawCurrency != null)
+        'previous_raw_currency': previousRawCurrency,
+      if (nextRawCurrency != null) 'next_raw_currency': nextRawCurrency,
+      if (observedAt != null) 'observed_at': observedAt,
+      if (source != null) 'source': source,
+      if (effectiveDate != null) 'effective_date': effectiveDate,
+    });
+  }
+
+  QuoteCurrencyChangesCompanion copyWith(
+      {Value<int>? id,
+      Value<String>? symbol,
+      Value<String>? previousRawCurrency,
+      Value<String>? nextRawCurrency,
+      Value<DateTime>? observedAt,
+      Value<String>? source,
+      Value<DateTime?>? effectiveDate}) {
+    return QuoteCurrencyChangesCompanion(
+      id: id ?? this.id,
+      symbol: symbol ?? this.symbol,
+      previousRawCurrency: previousRawCurrency ?? this.previousRawCurrency,
+      nextRawCurrency: nextRawCurrency ?? this.nextRawCurrency,
+      observedAt: observedAt ?? this.observedAt,
+      source: source ?? this.source,
+      effectiveDate: effectiveDate ?? this.effectiveDate,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (symbol.present) {
+      map['symbol'] = Variable<String>(symbol.value);
+    }
+    if (previousRawCurrency.present) {
+      map['previous_raw_currency'] =
+          Variable<String>(previousRawCurrency.value);
+    }
+    if (nextRawCurrency.present) {
+      map['next_raw_currency'] = Variable<String>(nextRawCurrency.value);
+    }
+    if (observedAt.present) {
+      map['observed_at'] = Variable<DateTime>(observedAt.value);
+    }
+    if (source.present) {
+      map['source'] = Variable<String>(source.value);
+    }
+    if (effectiveDate.present) {
+      map['effective_date'] = Variable<DateTime>(effectiveDate.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('QuoteCurrencyChangesCompanion(')
+          ..write('id: $id, ')
+          ..write('symbol: $symbol, ')
+          ..write('previousRawCurrency: $previousRawCurrency, ')
+          ..write('nextRawCurrency: $nextRawCurrency, ')
+          ..write('observedAt: $observedAt, ')
+          ..write('source: $source, ')
+          ..write('effectiveDate: $effectiveDate')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$Database extends GeneratedDatabase {
   _$Database(QueryExecutor e) : super(e);
   $DatabaseManager get managers => $DatabaseManager(this);
@@ -2614,12 +3200,17 @@ abstract class _$Database extends GeneratedDatabase {
       $IbkrCacheEntriesTable(this);
   late final $CandlesTable candles = $CandlesTable(this);
   late final $SymbolMetadataTable symbolMetadata = $SymbolMetadataTable(this);
+  late final $QuoteCurrencyChangesTable quoteCurrencyChanges =
+      $QuoteCurrencyChangesTable(this);
   late final Index idxUnifiedProfilesSortOrder = Index(
       'idx_unified_profiles_sort_order',
       'CREATE INDEX idx_unified_profiles_sort_order ON profiles (sort_order)');
   late final Index idxUnifiedTradesProfileSymbolDate = Index(
       'idx_unified_trades_profile_symbol_date',
       'CREATE INDEX idx_unified_trades_profile_symbol_date ON trades (profile_id, symbol, trade_date)');
+  late final Index idxQuoteCurrencyChangesSymbolDate = Index(
+      'idx_quote_currency_changes_symbol_date',
+      'CREATE INDEX idx_quote_currency_changes_symbol_date ON quote_currency_changes (symbol, observed_at)');
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2633,8 +3224,10 @@ abstract class _$Database extends GeneratedDatabase {
         ibkrCacheEntries,
         candles,
         symbolMetadata,
+        quoteCurrencyChanges,
         idxUnifiedProfilesSortOrder,
-        idxUnifiedTradesProfileSymbolDate
+        idxUnifiedTradesProfileSymbolDate,
+        idxQuoteCurrencyChangesSymbolDate
       ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules(
@@ -3038,8 +3631,10 @@ class $$ProfilesTableTableManager extends RootTableManager<
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) =>
-                  (e.readTable(table), $$ProfilesTableReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$ProfilesTable, StoredProfile>(table),
+                    $$ProfilesTableReferences(db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: (
               {appStateRefs = false,
@@ -3297,8 +3892,10 @@ class $$AppStateTableTableManager extends RootTableManager<
             activeProfileId: activeProfileId,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) =>
-                  (e.readTable(table), $$AppStateTableReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$AppStateTable, StoredAppState>(table),
+                    $$AppStateTableReferences(db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: ({activeProfileId = false}) {
             return PrefetchHooks(
@@ -3472,7 +4069,11 @@ class $$AppSettingsTableTableManager extends RootTableManager<
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$AppSettingsTable, StoredAppSetting>(table),
+                    BaseReferences<_$Database, $AppSettingsTable,
+                        StoredAppSetting>(db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: null,
         ));
@@ -3504,6 +4105,9 @@ typedef $$TradesTableCreateCompanionBuilder = TradesCompanion Function({
   required DateTime tradeDate,
   Value<double> realizedPL,
   Value<double> commission,
+  Value<String?> rawCurrency,
+  Value<double?> usdRateAtTrade,
+  Value<int?> brokerConid,
 });
 typedef $$TradesTableUpdateCompanionBuilder = TradesCompanion Function({
   Value<int> id,
@@ -3516,6 +4120,9 @@ typedef $$TradesTableUpdateCompanionBuilder = TradesCompanion Function({
   Value<DateTime> tradeDate,
   Value<double> realizedPL,
   Value<double> commission,
+  Value<String?> rawCurrency,
+  Value<double?> usdRateAtTrade,
+  Value<int?> brokerConid,
 });
 
 final class $$TradesTableReferences
@@ -3572,6 +4179,16 @@ class $$TradesTableFilterComposer extends Composer<_$Database, $TradesTable> {
   ColumnFilters<double> get commission => $composableBuilder(
       column: $table.commission, builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<String> get rawCurrency => $composableBuilder(
+      column: $table.rawCurrency, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get usdRateAtTrade => $composableBuilder(
+      column: $table.usdRateAtTrade,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get brokerConid => $composableBuilder(
+      column: $table.brokerConid, builder: (column) => ColumnFilters(column));
+
   $$ProfilesTableFilterComposer get profileId {
     final $$ProfilesTableFilterComposer composer = $composerBuilder(
         composer: this,
@@ -3627,6 +4244,16 @@ class $$TradesTableOrderingComposer extends Composer<_$Database, $TradesTable> {
 
   ColumnOrderings<double> get commission => $composableBuilder(
       column: $table.commission, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get rawCurrency => $composableBuilder(
+      column: $table.rawCurrency, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get usdRateAtTrade => $composableBuilder(
+      column: $table.usdRateAtTrade,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get brokerConid => $composableBuilder(
+      column: $table.brokerConid, builder: (column) => ColumnOrderings(column));
 
   $$ProfilesTableOrderingComposer get profileId {
     final $$ProfilesTableOrderingComposer composer = $composerBuilder(
@@ -3685,6 +4312,15 @@ class $$TradesTableAnnotationComposer
   GeneratedColumn<double> get commission => $composableBuilder(
       column: $table.commission, builder: (column) => column);
 
+  GeneratedColumn<String> get rawCurrency => $composableBuilder(
+      column: $table.rawCurrency, builder: (column) => column);
+
+  GeneratedColumn<double> get usdRateAtTrade => $composableBuilder(
+      column: $table.usdRateAtTrade, builder: (column) => column);
+
+  GeneratedColumn<int> get brokerConid => $composableBuilder(
+      column: $table.brokerConid, builder: (column) => column);
+
   $$ProfilesTableAnnotationComposer get profileId {
     final $$ProfilesTableAnnotationComposer composer = $composerBuilder(
         composer: this,
@@ -3739,6 +4375,9 @@ class $$TradesTableTableManager extends RootTableManager<
             Value<DateTime> tradeDate = const Value.absent(),
             Value<double> realizedPL = const Value.absent(),
             Value<double> commission = const Value.absent(),
+            Value<String?> rawCurrency = const Value.absent(),
+            Value<double?> usdRateAtTrade = const Value.absent(),
+            Value<int?> brokerConid = const Value.absent(),
           }) =>
               TradesCompanion(
             id: id,
@@ -3751,6 +4390,9 @@ class $$TradesTableTableManager extends RootTableManager<
             tradeDate: tradeDate,
             realizedPL: realizedPL,
             commission: commission,
+            rawCurrency: rawCurrency,
+            usdRateAtTrade: usdRateAtTrade,
+            brokerConid: brokerConid,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -3763,6 +4405,9 @@ class $$TradesTableTableManager extends RootTableManager<
             required DateTime tradeDate,
             Value<double> realizedPL = const Value.absent(),
             Value<double> commission = const Value.absent(),
+            Value<String?> rawCurrency = const Value.absent(),
+            Value<double?> usdRateAtTrade = const Value.absent(),
+            Value<int?> brokerConid = const Value.absent(),
           }) =>
               TradesCompanion.insert(
             id: id,
@@ -3775,10 +4420,15 @@ class $$TradesTableTableManager extends RootTableManager<
             tradeDate: tradeDate,
             realizedPL: realizedPL,
             commission: commission,
+            rawCurrency: rawCurrency,
+            usdRateAtTrade: usdRateAtTrade,
+            brokerConid: brokerConid,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) =>
-                  (e.readTable(table), $$TradesTableReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$TradesTable, StoredTrade>(table),
+                    $$TradesTableReferences(db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: ({profileId = false}) {
             return PrefetchHooks(
@@ -4035,7 +4685,7 @@ class $$IbkrSettingsTableTableManager extends RootTableManager<
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (
-                    e.readTable(table),
+                    e.readTable<$IbkrSettingsTable, StoredIbkrSetting>(table),
                     $$IbkrSettingsTableReferences(db, table, e)
                   ))
               .toList(),
@@ -4311,7 +4961,8 @@ class $$IbkrCacheEntriesTableTableManager extends RootTableManager<
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (
-                    e.readTable(table),
+                    e.readTable<$IbkrCacheEntriesTable, StoredIbkrCacheEntry>(
+                        table),
                     $$IbkrCacheEntriesTableReferences(db, table, e)
                   ))
               .toList(),
@@ -4375,6 +5026,7 @@ typedef $$CandlesTableCreateCompanionBuilder = CandlesCompanion Function({
   Value<double> close,
   Value<int> volume,
   Value<double> adjClose,
+  Value<String?> rawCurrency,
   Value<int> rowid,
 });
 typedef $$CandlesTableUpdateCompanionBuilder = CandlesCompanion Function({
@@ -4386,6 +5038,7 @@ typedef $$CandlesTableUpdateCompanionBuilder = CandlesCompanion Function({
   Value<double> close,
   Value<int> volume,
   Value<double> adjClose,
+  Value<String?> rawCurrency,
   Value<int> rowid,
 });
 
@@ -4420,6 +5073,9 @@ class $$CandlesTableFilterComposer extends Composer<_$Database, $CandlesTable> {
 
   ColumnFilters<double> get adjClose => $composableBuilder(
       column: $table.adjClose, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get rawCurrency => $composableBuilder(
+      column: $table.rawCurrency, builder: (column) => ColumnFilters(column));
 }
 
 class $$CandlesTableOrderingComposer
@@ -4454,6 +5110,9 @@ class $$CandlesTableOrderingComposer
 
   ColumnOrderings<double> get adjClose => $composableBuilder(
       column: $table.adjClose, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get rawCurrency => $composableBuilder(
+      column: $table.rawCurrency, builder: (column) => ColumnOrderings(column));
 }
 
 class $$CandlesTableAnnotationComposer
@@ -4488,6 +5147,9 @@ class $$CandlesTableAnnotationComposer
 
   GeneratedColumn<double> get adjClose =>
       $composableBuilder(column: $table.adjClose, builder: (column) => column);
+
+  GeneratedColumn<String> get rawCurrency => $composableBuilder(
+      column: $table.rawCurrency, builder: (column) => column);
 }
 
 class $$CandlesTableTableManager extends RootTableManager<
@@ -4521,6 +5183,7 @@ class $$CandlesTableTableManager extends RootTableManager<
             Value<double> close = const Value.absent(),
             Value<int> volume = const Value.absent(),
             Value<double> adjClose = const Value.absent(),
+            Value<String?> rawCurrency = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               CandlesCompanion(
@@ -4532,6 +5195,7 @@ class $$CandlesTableTableManager extends RootTableManager<
             close: close,
             volume: volume,
             adjClose: adjClose,
+            rawCurrency: rawCurrency,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -4543,6 +5207,7 @@ class $$CandlesTableTableManager extends RootTableManager<
             Value<double> close = const Value.absent(),
             Value<int> volume = const Value.absent(),
             Value<double> adjClose = const Value.absent(),
+            Value<String?> rawCurrency = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               CandlesCompanion.insert(
@@ -4554,10 +5219,15 @@ class $$CandlesTableTableManager extends RootTableManager<
             close: close,
             volume: volume,
             adjClose: adjClose,
+            rawCurrency: rawCurrency,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$CandlesTable, StoredCandle>(table),
+                    BaseReferences<_$Database, $CandlesTable, StoredCandle>(
+                        db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: null,
         ));
@@ -4757,7 +5427,12 @@ class $$SymbolMetadataTableTableManager extends RootTableManager<
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$SymbolMetadataTable, StoredSymbolMetadata>(
+                        table),
+                    BaseReferences<_$Database, $SymbolMetadataTable,
+                        StoredSymbolMetadata>(db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: null,
         ));
@@ -4778,6 +5453,219 @@ typedef $$SymbolMetadataTableProcessedTableManager = ProcessedTableManager<
     ),
     StoredSymbolMetadata,
     PrefetchHooks Function()>;
+typedef $$QuoteCurrencyChangesTableCreateCompanionBuilder
+    = QuoteCurrencyChangesCompanion Function({
+  Value<int> id,
+  required String symbol,
+  required String previousRawCurrency,
+  required String nextRawCurrency,
+  required DateTime observedAt,
+  required String source,
+  Value<DateTime?> effectiveDate,
+});
+typedef $$QuoteCurrencyChangesTableUpdateCompanionBuilder
+    = QuoteCurrencyChangesCompanion Function({
+  Value<int> id,
+  Value<String> symbol,
+  Value<String> previousRawCurrency,
+  Value<String> nextRawCurrency,
+  Value<DateTime> observedAt,
+  Value<String> source,
+  Value<DateTime?> effectiveDate,
+});
+
+class $$QuoteCurrencyChangesTableFilterComposer
+    extends Composer<_$Database, $QuoteCurrencyChangesTable> {
+  $$QuoteCurrencyChangesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get symbol => $composableBuilder(
+      column: $table.symbol, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get previousRawCurrency => $composableBuilder(
+      column: $table.previousRawCurrency,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get nextRawCurrency => $composableBuilder(
+      column: $table.nextRawCurrency,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get observedAt => $composableBuilder(
+      column: $table.observedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get source => $composableBuilder(
+      column: $table.source, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get effectiveDate => $composableBuilder(
+      column: $table.effectiveDate, builder: (column) => ColumnFilters(column));
+}
+
+class $$QuoteCurrencyChangesTableOrderingComposer
+    extends Composer<_$Database, $QuoteCurrencyChangesTable> {
+  $$QuoteCurrencyChangesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get symbol => $composableBuilder(
+      column: $table.symbol, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get previousRawCurrency => $composableBuilder(
+      column: $table.previousRawCurrency,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get nextRawCurrency => $composableBuilder(
+      column: $table.nextRawCurrency,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get observedAt => $composableBuilder(
+      column: $table.observedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get source => $composableBuilder(
+      column: $table.source, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get effectiveDate => $composableBuilder(
+      column: $table.effectiveDate,
+      builder: (column) => ColumnOrderings(column));
+}
+
+class $$QuoteCurrencyChangesTableAnnotationComposer
+    extends Composer<_$Database, $QuoteCurrencyChangesTable> {
+  $$QuoteCurrencyChangesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get symbol =>
+      $composableBuilder(column: $table.symbol, builder: (column) => column);
+
+  GeneratedColumn<String> get previousRawCurrency => $composableBuilder(
+      column: $table.previousRawCurrency, builder: (column) => column);
+
+  GeneratedColumn<String> get nextRawCurrency => $composableBuilder(
+      column: $table.nextRawCurrency, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get observedAt => $composableBuilder(
+      column: $table.observedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get source =>
+      $composableBuilder(column: $table.source, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get effectiveDate => $composableBuilder(
+      column: $table.effectiveDate, builder: (column) => column);
+}
+
+class $$QuoteCurrencyChangesTableTableManager extends RootTableManager<
+    _$Database,
+    $QuoteCurrencyChangesTable,
+    StoredQuoteCurrencyChange,
+    $$QuoteCurrencyChangesTableFilterComposer,
+    $$QuoteCurrencyChangesTableOrderingComposer,
+    $$QuoteCurrencyChangesTableAnnotationComposer,
+    $$QuoteCurrencyChangesTableCreateCompanionBuilder,
+    $$QuoteCurrencyChangesTableUpdateCompanionBuilder,
+    (
+      StoredQuoteCurrencyChange,
+      BaseReferences<_$Database, $QuoteCurrencyChangesTable,
+          StoredQuoteCurrencyChange>
+    ),
+    StoredQuoteCurrencyChange,
+    PrefetchHooks Function()> {
+  $$QuoteCurrencyChangesTableTableManager(
+      _$Database db, $QuoteCurrencyChangesTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$QuoteCurrencyChangesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$QuoteCurrencyChangesTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$QuoteCurrencyChangesTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<String> symbol = const Value.absent(),
+            Value<String> previousRawCurrency = const Value.absent(),
+            Value<String> nextRawCurrency = const Value.absent(),
+            Value<DateTime> observedAt = const Value.absent(),
+            Value<String> source = const Value.absent(),
+            Value<DateTime?> effectiveDate = const Value.absent(),
+          }) =>
+              QuoteCurrencyChangesCompanion(
+            id: id,
+            symbol: symbol,
+            previousRawCurrency: previousRawCurrency,
+            nextRawCurrency: nextRawCurrency,
+            observedAt: observedAt,
+            source: source,
+            effectiveDate: effectiveDate,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required String symbol,
+            required String previousRawCurrency,
+            required String nextRawCurrency,
+            required DateTime observedAt,
+            required String source,
+            Value<DateTime?> effectiveDate = const Value.absent(),
+          }) =>
+              QuoteCurrencyChangesCompanion.insert(
+            id: id,
+            symbol: symbol,
+            previousRawCurrency: previousRawCurrency,
+            nextRawCurrency: nextRawCurrency,
+            observedAt: observedAt,
+            source: source,
+            effectiveDate: effectiveDate,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (
+                    e.readTable<$QuoteCurrencyChangesTable,
+                        StoredQuoteCurrencyChange>(table),
+                    BaseReferences<_$Database, $QuoteCurrencyChangesTable,
+                        StoredQuoteCurrencyChange>(db, table, e)
+                  ))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$QuoteCurrencyChangesTableProcessedTableManager
+    = ProcessedTableManager<
+        _$Database,
+        $QuoteCurrencyChangesTable,
+        StoredQuoteCurrencyChange,
+        $$QuoteCurrencyChangesTableFilterComposer,
+        $$QuoteCurrencyChangesTableOrderingComposer,
+        $$QuoteCurrencyChangesTableAnnotationComposer,
+        $$QuoteCurrencyChangesTableCreateCompanionBuilder,
+        $$QuoteCurrencyChangesTableUpdateCompanionBuilder,
+        (
+          StoredQuoteCurrencyChange,
+          BaseReferences<_$Database, $QuoteCurrencyChangesTable,
+              StoredQuoteCurrencyChange>
+        ),
+        StoredQuoteCurrencyChange,
+        PrefetchHooks Function()>;
 
 class $DatabaseManager {
   final _$Database _db;
@@ -4798,4 +5686,6 @@ class $DatabaseManager {
       $$CandlesTableTableManager(_db, _db.candles);
   $$SymbolMetadataTableTableManager get symbolMetadata =>
       $$SymbolMetadataTableTableManager(_db, _db.symbolMetadata);
+  $$QuoteCurrencyChangesTableTableManager get quoteCurrencyChanges =>
+      $$QuoteCurrencyChangesTableTableManager(_db, _db.quoteCurrencyChanges);
 }

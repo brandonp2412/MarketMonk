@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:market_monk/database.dart';
 
 Database? _profileDataDatabase;
@@ -20,6 +21,9 @@ class ProfileTradeWrite {
   final DateTime tradeDate;
   final double realizedPL;
   final double commission;
+  final String? rawCurrency;
+  final double? usdRateAtTrade;
+  final int? brokerConid;
 
   const ProfileTradeWrite({
     required this.symbol,
@@ -30,6 +34,9 @@ class ProfileTradeWrite {
     required this.tradeDate,
     this.realizedPL = 0,
     this.commission = 0,
+    this.rawCurrency,
+    this.usdRateAtTrade,
+    this.brokerConid,
   });
 }
 
@@ -77,6 +84,9 @@ class ProfileDataRepository {
         tradeDate: trade.tradeDate,
         realizedPL: trade.realizedPL,
         commission: trade.commission,
+        rawCurrency: trade.rawCurrency,
+        usdRateAtTrade: trade.usdRateAtTrade,
+        brokerConid: trade.brokerConid,
       );
 
   Future<int> addTrades(
@@ -113,6 +123,9 @@ class ProfileDataRepository {
     DateTime? tradeDate,
     double? realizedPL,
     double? commission,
+    String? rawCurrency,
+    double? usdRateAtTrade,
+    bool resetCurrencyMetadata = false,
   }) =>
       database.updateTrade(
         profileId: profileId,
@@ -123,6 +136,16 @@ class ProfileDataRepository {
         tradeDate: tradeDate,
         realizedPL: realizedPL,
         commission: commission,
+        rawCurrency: resetCurrencyMetadata
+            ? const Value(null)
+            : rawCurrency == null
+                ? const Value.absent()
+                : Value(rawCurrency),
+        usdRateAtTrade: resetCurrencyMetadata
+            ? const Value(null)
+            : usdRateAtTrade == null
+                ? const Value.absent()
+                : Value(usdRateAtTrade),
       );
 }
 
@@ -136,4 +159,7 @@ Trade _toTrade(StoredTrade row) => Trade(
       tradeDate: row.tradeDate,
       realizedPL: row.realizedPL,
       commission: row.commission,
+      rawCurrency: row.rawCurrency,
+      usdRateAtTrade: row.usdRateAtTrade,
+      brokerConid: row.brokerConid,
     );

@@ -50,20 +50,19 @@ class SymbolSummary {
   /// Uses dated executions instead of the frequently zero broker position P/L.
   double? realizedTodayUsd({DateTime? tradingDate}) {
     final today = tradingDate ?? DateTime.now();
-    final realized = trades
-        .where(
-          (trade) =>
-              trade.tradeDate.year == today.year &&
-              trade.tradeDate.month == today.month &&
-              trade.tradeDate.day == today.day,
-        )
-        .fold(0.0, (sum, trade) => sum + trade.realizedPL);
-    if (realized != 0) {
-      final nativeCurrency = position?.nativeCurrency ?? symbolCurrency(symbol);
-      return realized /
-          symbolCentDivisor(symbol) /
-          requireUsdRate(nativeCurrency);
+    final datedTrades = trades.where(
+      (trade) =>
+          trade.tradeDate.year == today.year &&
+          trade.tradeDate.month == today.month &&
+          trade.tradeDate.day == today.day,
+    );
+    var realized = 0.0;
+    for (final trade in datedTrades) {
+      final amount = verifiedTradeAmountUsd(trade, trade.realizedPL);
+      if (amount == null) return null;
+      realized += amount;
     }
+    if (realized != 0) return realized;
     if (brokerTradeHistoryAvailable) return null;
     final snapshot = position?.realizedToday;
     return snapshot == 0 ? null : snapshot;
@@ -85,6 +84,8 @@ List<Trade> tradesFromIbkr(List<IbkrTrade> brokerTrades) => [
           tradeDate: brokerTrades[index].tradeDate,
           realizedPL: brokerTrades[index].realizedPnl,
           commission: brokerTrades[index].commission,
+          rawCurrency: brokerTrades[index].currency,
+          brokerConid: brokerTrades[index].conid,
         ),
     ];
 
@@ -240,6 +241,7 @@ class HoldingsPageState extends State<HoldingsPage>
     }
 
     if (!forceRefresh && _ibkrTradesAccount == accountName) {
+      _ibkrTrades = await enrichHistoricalTradeRates(_ibkrTrades);
       return _ibkrTrades;
     }
 
@@ -256,7 +258,9 @@ class HoldingsPageState extends State<HoldingsPage>
         final tradeHistory =
             await (widget._ibkrTradeHistoryLoader?.call(config) ??
                 IbkrApiClient(config).fetchTradeHistory());
-        final trades = tradesFromIbkr(tradeHistory.trades);
+        final trades = await enrichHistoricalTradeRates(
+          tradesFromIbkr(tradeHistory.trades),
+        );
         if (mounted &&
             accounts.activeAccount == accountName &&
             accounts.ibkrConfigFor(accountName) == config) {

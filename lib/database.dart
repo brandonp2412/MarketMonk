@@ -22,6 +22,9 @@ class Trade {
   final DateTime tradeDate;
   final double realizedPL;
   final double commission;
+  final String? rawCurrency;
+  final double? usdRateAtTrade;
+  final int? brokerConid;
 
   const Trade({
     required this.id,
@@ -33,7 +36,25 @@ class Trade {
     required this.tradeDate,
     required this.realizedPL,
     required this.commission,
+    this.rawCurrency,
+    this.usdRateAtTrade,
+    this.brokerConid,
   });
+
+  Trade withUsdRate(double rate) => Trade(
+        id: id,
+        symbol: symbol,
+        name: name,
+        quantity: quantity,
+        price: price,
+        tradeType: tradeType,
+        tradeDate: tradeDate,
+        realizedPL: realizedPL,
+        commission: commission,
+        rawCurrency: rawCurrency,
+        usdRateAtTrade: rate,
+        brokerConid: brokerConid,
+      );
 }
 
 @DriftDatabase(
@@ -46,6 +67,7 @@ class Trade {
     IbkrCacheEntries,
     Candles,
     SymbolMetadata,
+    QuoteCurrencyChanges,
   ],
 )
 class Database extends _$Database {
@@ -65,7 +87,7 @@ class Database extends _$Database {
   }) : _legacySnapshotLoader = legacySnapshotLoader;
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   Future<void> validateSchema() => validateDatabaseSchema();
 
@@ -86,7 +108,20 @@ class Database extends _$Database {
           await customStatement(
             'DROP INDEX IF EXISTS idx_unified_trades_profile_symbol_date',
           );
+          await customStatement(
+            'DROP INDEX IF EXISTS idx_quote_currency_changes_symbol_date',
+          );
           await migrator.createAll();
+        },
+        onUpgrade: (migrator, from, to) async {
+          if (from < 2) {
+            await migrator.addColumn(trades, trades.rawCurrency);
+            await migrator.addColumn(trades, trades.usdRateAtTrade);
+            await migrator.addColumn(trades, trades.brokerConid);
+            await migrator.addColumn(candles, candles.rawCurrency);
+            await migrator.createTable(quoteCurrencyChanges);
+            await migrator.createIndex(idxQuoteCurrencyChangesSymbolDate);
+          }
         },
         beforeOpen: (_) async {
           await customStatement('PRAGMA foreign_keys = ON');
@@ -470,6 +505,9 @@ class Database extends _$Database {
     required DateTime tradeDate,
     double realizedPL = 0,
     double commission = 0,
+    String? rawCurrency,
+    double? usdRateAtTrade,
+    int? brokerConid,
   }) {
     return into(trades).insert(
       TradesCompanion.insert(
@@ -482,6 +520,9 @@ class Database extends _$Database {
         tradeDate: tradeDate,
         realizedPL: Value(realizedPL),
         commission: Value(commission),
+        rawCurrency: Value(rawCurrency),
+        usdRateAtTrade: Value(usdRateAtTrade),
+        brokerConid: Value(brokerConid),
       ),
     );
   }
@@ -530,6 +571,8 @@ class Database extends _$Database {
     DateTime? tradeDate,
     double? realizedPL,
     double? commission,
+    Value<String?> rawCurrency = const Value.absent(),
+    Value<double?> usdRateAtTrade = const Value.absent(),
   }) {
     return (update(trades)
           ..where(
@@ -545,6 +588,8 @@ class Database extends _$Database {
             realizedPL == null ? const Value.absent() : Value(realizedPL),
         commission:
             commission == null ? const Value.absent() : Value(commission),
+        rawCurrency: rawCurrency,
+        usdRateAtTrade: usdRateAtTrade,
       ),
     );
   }
@@ -629,6 +674,7 @@ class Database extends _$Database {
     required double close,
     required int volume,
     required double adjClose,
+    String? rawCurrency,
   }) {
     return into(candles).insertOnConflictUpdate(
       CandlesCompanion.insert(
@@ -640,6 +686,7 @@ class Database extends _$Database {
         close: Value(close),
         volume: Value(volume),
         adjClose: Value(adjClose),
+        rawCurrency: Value(rawCurrency),
       ),
     );
   }
@@ -687,6 +734,41 @@ class Database extends _$Database {
       ),
     );
   }
+
+  Future<void> recordQuoteCurrencyChange({
+    required String symbol,
+    required String previousRawCurrency,
+    required String nextRawCurrency,
+    required String source,
+    required DateTime observedAt,
+  }) async {
+    final last = await (select(quoteCurrencyChanges)
+          ..where((row) => row.symbol.equals(symbol))
+          ..orderBy([(row) => OrderingTerm.desc(row.observedAt)])
+          ..limit(1))
+        .getSingleOrNull();
+    if (last?.previousRawCurrency == previousRawCurrency &&
+        last?.nextRawCurrency == nextRawCurrency) {
+      return;
+    }
+    await into(quoteCurrencyChanges).insert(
+      QuoteCurrencyChangesCompanion.insert(
+        symbol: symbol,
+        previousRawCurrency: previousRawCurrency,
+        nextRawCurrency: nextRawCurrency,
+        source: source,
+        observedAt: observedAt,
+      ),
+    );
+  }
+
+  Future<List<StoredQuoteCurrencyChange>> readQuoteCurrencyChanges(
+    String symbol,
+  ) =>
+      (select(quoteCurrencyChanges)
+            ..where((row) => row.symbol.equals(symbol))
+            ..orderBy([(row) => OrderingTerm.asc(row.observedAt)]))
+          .get();
 
   (String, String) _encodeSetting(Object value) => switch (value) {
         bool value => ('bool', value ? '1' : '0'),

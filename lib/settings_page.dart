@@ -220,7 +220,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         trade.tradeDate.toIso8601String().substring(0, 10),
                       ),
                       trailing: Text(
-                        '${trade.quantity.abs().toStringAsFixed(2)} @ ${nativeCurrencySymbol(symbolCurrency(trade.symbol))}${trade.price.toStringAsFixed(2)}',
+                        '${trade.quantity.abs().toStringAsFixed(2)} @ ${trade.price.toStringAsFixed(2)} ${trade.rawCurrency ?? 'unit unknown'}',
                       ),
                     ),
                   ),

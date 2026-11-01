@@ -32,6 +32,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
   final purchasedAt = TextEditingController();
   DateTime _purchasedDate = DateTime.now();
   final price = TextEditingController(text: '0');
+  final quoteUnit = TextEditingController();
 
   Stream<List<CandleTicker>>? stream;
   bool autoSetCreated = false;
@@ -62,6 +63,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
     amount.dispose();
     purchasedAt.dispose();
     price.dispose();
+    quoteUnit.dispose();
     _yahooApi.dispose();
     super.dispose();
   }
@@ -98,6 +100,7 @@ class _EditTickerPageState extends State<EditTickerPage> {
           ..addColumns([
             marketDataDatabase.candles.date,
             marketDataDatabase.candles.close,
+            marketDataDatabase.candles.rawCurrency,
           ])
           ..where(
             marketDataDatabase.candles.symbol.equals(marketSymbol) &
@@ -121,6 +124,9 @@ class _EditTickerPageState extends State<EditTickerPage> {
                     ),
                     close: Value(
                       result.read(marketDataDatabase.candles.close)!,
+                    ),
+                    rawCurrency: Value(
+                      result.read(marketDataDatabase.candles.rawCurrency),
                     ),
                   ),
                 ),
@@ -158,21 +164,29 @@ class _EditTickerPageState extends State<EditTickerPage> {
             loading ? const Center(child: CircularProgressIndicator()) : null,
       );
     }
-    final centDiv = symbolCentDivisor(symbol.text.split(' ').first);
-    List<MarketLineChartPoint> spots = [];
-    for (var index = 0; index < candles.length; index++) {
-      spots.add(
+    final tickerSymbol = canonicalMarketSymbol(symbol.text.split(' ').first);
+    if (hasKnownQuoteCurrencyChange(tickerSymbol) &&
+        candles.any((candle) => candle.rawCurrency.value == null)) {
+      return const Text('Historical quote units need verification');
+    }
+    final nativePrices = [
+      for (final candle in candles)
+        candle.close.value /
+            (candle.rawCurrency.value == null
+                ? symbolCentDivisor(tickerSymbol)
+                : quoteUnitDivisor(candle.rawCurrency.value!)),
+    ];
+    final spots = [
+      for (var index = 0; index < nativePrices.length; index++)
         MarketLineChartPoint(
           index.toDouble(),
-          candles[index].close.value / centDiv,
+          nativePrices[index],
           column: index,
         ),
-      );
-    }
-
-    var percentChange = safePercentChange(
-      candles.first.close.value,
-      candles.lastOrNull?.close.value ?? 0,
+    ];
+    final percentChange = safePercentChange(
+      nativePrices.first,
+      nativePrices.last,
     );
 
     return material.Column(
@@ -299,6 +313,12 @@ class _EditTickerPageState extends State<EditTickerPage> {
                             requiredFrom: _requiredCandleStart(),
                           );
                           await fetchSymbolCurrencyAndRate(tickerSymbol);
+                          quoteUnit.text = rawCurrencyFromMetadata(
+                                await marketDataDatabase.readSymbolMetadata(
+                                  canonicalMarketSymbol(tickerSymbol),
+                                ),
+                              ) ??
+                              '';
                         } catch (error, stackTrace) {
                           talker.handle(
                             error,
@@ -364,9 +384,13 @@ class _EditTickerPageState extends State<EditTickerPage> {
                                 tickerSymbol,
                                 requiredFrom: _requiredCandleStart(),
                               );
-                              await fetchSymbolCurrencyAndRate(
-                                tickerSymbol,
-                              );
+                              await fetchSymbolCurrencyAndRate(tickerSymbol);
+                              quoteUnit.text = rawCurrencyFromMetadata(
+                                    await marketDataDatabase.readSymbolMetadata(
+                                      canonicalMarketSymbol(tickerSymbol),
+                                    ),
+                                  ) ??
+                                  '';
                             } catch (error, stackTrace) {
                               if (context.mounted)
                                 toast(context, error.toString());
@@ -423,10 +447,8 @@ class _EditTickerPageState extends State<EditTickerPage> {
                   TextField(
                     controller: price,
                     decoration: InputDecoration(
-                      labelText: context.l10n.text('Price'),
-                      prefix: Text(
-                        symbolPriceUnit(symbol.text.split(' ').first),
-                      ),
+                      labelText: 'Price',
+                      helperText: 'Enter the price in the original quote unit',
                     ),
                     onTap: () => selectAll(price),
                     keyboardType: TextInputType.number,
@@ -460,6 +482,15 @@ class _EditTickerPageState extends State<EditTickerPage> {
                         autoSetCreated = true;
                       });
                     },
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: quoteUnit,
+                    decoration: const InputDecoration(
+                      labelText: 'Original quote unit (USD, GBP, GBp, etc.)',
+                      helperText: 'Check the unit used on the trade date',
+                    ),
+                    textCapitalization: TextCapitalization.characters,
                   ),
                   const SizedBox(height: 8),
                   TextField(
@@ -575,6 +606,26 @@ class _EditTickerPageState extends State<EditTickerPage> {
               .join(' ')
               .replaceAll(RegExp(r'\(|\)'), '');
 
+          final rawCurrency = quoteUnit.text.trim();
+          if (!RegExp(r'^[A-Za-z]{3}$').hasMatch(rawCurrency)) {
+            if (context.mounted)
+              toast(context, 'Enter the original 3-letter quote unit');
+            return;
+          }
+          late final double historicalRate;
+          try {
+            historicalRate = await historicalTradeUsdRate(
+              rawCurrency,
+              _purchasedDate,
+            );
+          } catch (error) {
+            if (context.mounted) {
+              toast(context, 'Cannot verify historical FX rate: $error');
+            }
+            return;
+          }
+
+          if (!context.mounted) return;
           final accountName = context.read<AccountManager>().activeAccount;
           final profileId =
               await profileDataRepository.profileIdForName(accountName);
@@ -587,6 +638,8 @@ class _EditTickerPageState extends State<EditTickerPage> {
               price: enteredPrice,
               tradeType: _isSell ? 'close' : 'open',
               tradeDate: _purchasedDate,
+              rawCurrency: rawCurrency,
+              usdRateAtTrade: historicalRate,
             ),
           );
 

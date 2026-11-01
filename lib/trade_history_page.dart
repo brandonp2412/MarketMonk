@@ -91,7 +91,6 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
       builder: (context, snap) {
         final trades = snap.data ?? cachedTrades;
         final symbol = widget.summary.symbol;
-        final nativeCurr = symbolCurrency(symbol);
         final centDiv = symbolCentDivisor(symbol);
         final cachedPosition = widget.summary.position;
         final position = ibkrManaged
@@ -115,13 +114,19 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
           brokerTradeHistoryAvailable:
               widget.summary.brokerTradeHistoryAvailable,
         );
-        final totalRealized =
-            trades.fold(0.0, (sum, trade) => sum + trade.realizedPL);
-        final nativeRate = allRatesFromUsd[nativeCurr] ?? 1.0;
-        final totalRealizedUsd = totalRealized / centDiv / nativeRate;
+        double? totalRealizedUsd = 0;
+        for (final trade in trades) {
+          final amount = verifiedTradeAmountUsd(trade, trade.realizedPL);
+          if (amount == null) {
+            totalRealizedUsd = null;
+            break;
+          }
+          totalRealizedUsd = totalRealizedUsd! + amount;
+        }
         final unrealizedPL = position?.unrealizedPL ?? 0.0;
         final realizedToday = liveSummary.realizedTodayUsd();
-        final totalGain = totalRealizedUsd + unrealizedPL;
+        final totalGain =
+            totalRealizedUsd == null ? null : totalRealizedUsd + unrealizedPL;
 
         return Scaffold(
           appBar: AppBar(
@@ -204,22 +209,28 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                         if (trades.any((trade) => trade.realizedPL != 0)) ...[
                           _SummaryRow(
                             label: context.l10n.text('Imported realized P/L'),
-                            value:
-                                '${totalRealized >= 0 ? '+' : ''}${fmtNativeCurrency(totalRealized / centDiv, nativeCurr)}',
-                            color: totalRealized >= 0
-                                ? Colors.green
-                                : Colors.redAccent,
+                            value: totalRealizedUsd == null
+                                ? 'Historical FX unavailable'
+                                : '${totalRealizedUsd >= 0 ? '+' : ''}${fmtCurrency(totalRealizedUsd)}',
+                            color: totalRealizedUsd == null
+                                ? null
+                                : totalRealizedUsd >= 0
+                                    ? Colors.green
+                                    : Colors.redAccent,
                           ),
                         ],
                         if (position != null || trades.isNotEmpty)
                           _SummaryRow(
                             label: context.l10n.text('Total gain'),
                             // totalGain is in USD (both components converted above).
-                            value:
-                                '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}',
-                            color: totalGain >= 0
-                                ? Colors.green
-                                : Colors.redAccent,
+                            value: totalGain == null
+                                ? 'Historical FX unavailable'
+                                : '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}',
+                            color: totalGain == null
+                                ? null
+                                : totalGain >= 0
+                                    ? Colors.green
+                                    : Colors.redAccent,
                           ),
                       ],
                     ),
@@ -253,11 +264,10 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                         ],
                       ],
                       copyText:
-                          '${trade.symbol} ${trade.tradeType == 'open' ? 'BUY' : 'SELL'} ${trade.quantity.abs()} @ ${fmtNativeCurrency(trade.price / centDiv, nativeCurr)} · ${DateFormat('yyyy-MM-dd').format(trade.tradeDate)}',
+                          '${trade.symbol} ${trade.tradeType == 'open' ? 'BUY' : 'SELL'} ${trade.quantity.abs()} @ ${fmtTradeNative(trade, trade.price)} · ${DateFormat('yyyy-MM-dd').format(trade.tradeDate)}',
                       copyLabel: context.l10n.text('Copy trade'),
                       child: _TradeTile(
                         trade: trade,
-                        centDiv: centDiv,
                         onLongPress:
                             ibkrManaged ? null : () => _showTradeActions(trade),
                       ),
@@ -409,12 +419,10 @@ class _SummaryRow extends StatelessWidget {
 
 class _TradeTile extends StatelessWidget {
   final Trade trade;
-  final double centDiv;
   final VoidCallback? onLongPress;
 
   const _TradeTile({
     required this.trade,
-    required this.centDiv,
     this.onLongPress,
   });
 
@@ -423,7 +431,7 @@ class _TradeTile extends StatelessWidget {
     final isBuy = trade.tradeType == 'open';
     final dateStr = DateFormat('dd MMM yyyy').format(trade.tradeDate);
     final qty = trade.quantity.abs();
-    final total = (qty * trade.price / centDiv).abs();
+    final total = (qty * trade.price).abs();
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -447,16 +455,16 @@ class _TradeTile extends StatelessWidget {
           ),
         ),
         subtitle: Text(
-          '${qty.toStringAsFixed(4)} @ ${fmtNativeCurrency(trade.price / centDiv, symbolCurrency(trade.symbol))}  ·  $dateStr',
+          '${qty.toStringAsFixed(4)} @ ${fmtTradeNative(trade, trade.price)}  ·  $dateStr',
         ),
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(fmtNativeCurrency(total, symbolCurrency(trade.symbol))),
+            Text(fmtTradeNative(trade, total)),
             if (!isBuy && trade.realizedPL != 0)
               Text(
-                '${trade.realizedPL >= 0 ? '+' : ''}${fmtNativeCurrency(trade.realizedPL / centDiv, symbolCurrency(trade.symbol))}',
+                '${trade.realizedPL >= 0 ? '+' : ''}${fmtTradeNative(trade, trade.realizedPL)}',
                 style: TextStyle(
                   fontSize: 11,
                   color:
@@ -488,6 +496,7 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
   late TextEditingController _qty;
   late TextEditingController _price;
   late TextEditingController _realizedPL;
+  late TextEditingController _rawCurrency;
   late DateTime _tradeDate;
 
   @override
@@ -501,6 +510,7 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
     _realizedPL = TextEditingController(
       text: widget.trade.realizedPL.toStringAsFixed(2),
     );
+    _rawCurrency = TextEditingController(text: widget.trade.rawCurrency ?? '');
     _tradeDate = widget.trade.tradeDate;
   }
 
@@ -509,6 +519,7 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
     _qty.dispose();
     _price.dispose();
     _realizedPL.dispose();
+    _rawCurrency.dispose();
     super.dispose();
   }
 
@@ -528,6 +539,24 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
     final realizedPL = double.tryParse(_realizedPL.text) ?? 0.0;
     if (qty == null || qty <= 0 || price == null || price <= 0) return;
 
+    final rawCurrency = _rawCurrency.text.trim();
+    if (!RegExp(r'^[A-Za-z]{3}$').hasMatch(rawCurrency)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Confirm the original quote unit first')),
+      );
+      return;
+    }
+    late final double rate;
+    try {
+      rate = await historicalTradeUsdRate(rawCurrency, _tradeDate);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Historical FX unavailable: $error')),
+        );
+      }
+      return;
+    }
     final profileId =
         await profileDataRepository.profileIdForName(widget.accountName);
     await profileDataRepository.updateTrade(
@@ -538,6 +567,8 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
       tradeType: _isBuy ? 'open' : 'close',
       tradeDate: _tradeDate,
       realizedPL: realizedPL,
+      rawCurrency: rawCurrency,
+      usdRateAtTrade: rate,
     );
 
     if (mounted) Navigator.pop(context);
@@ -588,7 +619,16 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
               decoration: InputDecoration(
                 labelText: context.l10n.text('Price'),
                 border: const OutlineInputBorder(),
-                prefixText: symbolPriceUnit(widget.trade.symbol),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _rawCurrency,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                labelText: 'Original quote unit (USD, GBP, GBp, etc.)',
+                helperText: 'Required to verify an old trade',
+                border: OutlineInputBorder(),
               ),
             ),
             if (!_isBuy) ...[
@@ -602,7 +642,6 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
                 decoration: InputDecoration(
                   labelText: context.l10n.text('Realized P/L'),
                   border: const OutlineInputBorder(),
-                  prefixText: symbolPriceUnit(widget.trade.symbol),
                 ),
               ),
             ],

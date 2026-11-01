@@ -425,7 +425,8 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
 
 abstract class _$LegacyAppStateDatabase extends GeneratedDatabase {
   _$LegacyAppStateDatabase(QueryExecutor e) : super(e);
-  $AppStateDatabaseManager get managers => $AppStateDatabaseManager(this);
+  $LegacyAppStateDatabaseManager get managers =>
+      $LegacyAppStateDatabaseManager(this);
   late final $AppProfilesTable appProfiles = $AppProfilesTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
   @override
@@ -544,7 +545,11 @@ class $$AppProfilesTableTableManager extends RootTableManager<
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$AppProfilesTable, AppProfile>(table),
+                    BaseReferences<_$LegacyAppStateDatabase, $AppProfilesTable,
+                        AppProfile>(db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: null,
         ));
@@ -688,7 +693,11 @@ class $$AppSettingsTableTableManager extends RootTableManager<
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$AppSettingsTable, AppSetting>(table),
+                    BaseReferences<_$LegacyAppStateDatabase, $AppSettingsTable,
+                        AppSetting>(db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: null,
         ));
@@ -710,9 +719,9 @@ typedef $$AppSettingsTableProcessedTableManager = ProcessedTableManager<
     AppSetting,
     PrefetchHooks Function()>;
 
-class $AppStateDatabaseManager {
+class $LegacyAppStateDatabaseManager {
   final _$LegacyAppStateDatabase _db;
-  $AppStateDatabaseManager(this._db);
+  $LegacyAppStateDatabaseManager(this._db);
   $$AppProfilesTableTableManager get appProfiles =>
       $$AppProfilesTableTableManager(_db, _db.appProfiles);
   $$AppSettingsTableTableManager get appSettings =>

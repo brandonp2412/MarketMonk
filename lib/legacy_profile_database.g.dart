@@ -1655,7 +1655,11 @@ class $$CandlesTableTableManager extends RootTableManager<
             adjClose: adjClose,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$CandlesTable, Candle>(table),
+                    BaseReferences<_$LegacyProfileDatabase, $CandlesTable,
+                        Candle>(db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: null,
         ));
@@ -1874,7 +1878,11 @@ class $$TradesTableTableManager extends RootTableManager<
             commission: commission,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$TradesTable, Trade>(table),
+                    BaseReferences<_$LegacyProfileDatabase, $TradesTable,
+                        Trade>(db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: null,
         ));
@@ -2027,7 +2035,14 @@ class $$IbkrProfileSettingsTableTableManager extends RootTableManager<
             token: token,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$IbkrProfileSettingsTable, IbkrProfileSetting>(
+                        table),
+                    BaseReferences<
+                        _$LegacyProfileDatabase,
+                        $IbkrProfileSettingsTable,
+                        IbkrProfileSetting>(db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: null,
         ));
@@ -2188,7 +2203,11 @@ class $$IbkrCacheEntriesTableTableManager extends RootTableManager<
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$IbkrCacheEntriesTable, IbkrCacheEntry>(table),
+                    BaseReferences<_$LegacyProfileDatabase,
+                        $IbkrCacheEntriesTable, IbkrCacheEntry>(db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: null,
         ));
