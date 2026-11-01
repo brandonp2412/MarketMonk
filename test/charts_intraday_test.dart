@@ -64,6 +64,7 @@ void main() {
     Future<void> Function(AccountManager)? configureAccounts,
     Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
         ibkrPerformanceLoader,
+    Future<void> Function(String, DateTime)? favoriteHistoryPrefetcher,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1000, 900);
@@ -98,6 +99,7 @@ void main() {
               initialSymbol: initialSymbol,
               intradayData: loader,
               ibkrPerformanceLoader: ibkrPerformanceLoader,
+              favoriteHistoryPrefetcher: favoriteHistoryPrefetcher,
               isActive: active,
             ),
           ),
@@ -107,6 +109,76 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
   }
+
+  testWidgets('pull refresh awaits 10-year prefetch for every favorite', (
+    tester,
+  ) async {
+    final gate = Completer<void>();
+    final requested = <String, DateTime>{};
+    await mountChart(
+      tester,
+      IntradayMarketData(
+        yahooGet: (_) async => _prices(100, currency: 'USD'),
+      ),
+      initialSymbol: null,
+      favorites: const ['AAPL', 'MSFT'],
+      favoriteHistoryPrefetcher: (symbol, from) {
+        requested[symbol] = from;
+        return gate.future;
+      },
+      configureAccounts: (_) async {
+        final now = DateTime.now();
+        for (final symbol in ['AAPL', 'MSFT']) {
+          await testDatabase.upsertSymbolMetadata(
+            symbol: symbol,
+            currency: 'USD',
+            payloadJson: '{"rawCurrency":"USD"}',
+            cachedAt: now,
+          );
+          await seedTestCandle(
+            symbol,
+            now.subtract(const Duration(days: 15)),
+            100,
+          );
+          await seedTestCandle(symbol, now, 101);
+        }
+      },
+    );
+    await tester.pumpAndSettle();
+
+    final refreshFuture = tester
+        .widget<RefreshIndicator>(find.byType(RefreshIndicator))
+        .onRefresh();
+    await tester.pump();
+
+    expect(requested.keys.toSet(), {'AAPL', 'MSFT'});
+    final now = DateTime.now();
+    expect(
+      requested.values,
+      everyElement(DateTime(now.year - 10, now.month, now.day - 1)),
+    );
+    final refresh = find.byTooltip('Refresh');
+    expect(
+      tester
+          .widget<IconButton>(
+            find.ancestor(of: refresh, matching: find.byType(IconButton)),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    gate.complete();
+    await tester.pumpAndSettle();
+    await refreshFuture;
+    expect(
+      tester
+          .widget<IconButton>(
+            find.ancestor(of: refresh, matching: find.byType(IconButton)),
+          )
+          .onPressed,
+      isNotNull,
+    );
+  });
 
   testWidgets('uncached stock shows a spinner only until prices arrive', (
     tester,
@@ -344,18 +416,14 @@ void main() {
 
     await tester.tap(find.byKey(const Key('chart-period-5d')));
     await tester.pump();
-    expect(
-      tester.widget<MarketLineChart>(find.byType(MarketLineChart)),
-      same(previous),
-    );
+    expect(find.byKey(const Key('chart-period-loading')), findsOneWidget);
+    expect(find.byType(MarketLineChart), findsNothing);
 
     first.complete(_prices(200, currency: 'USD', count: 6));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-    expect(
-      tester.widget<MarketLineChart>(find.byType(MarketLineChart)),
-      same(previous),
-    );
+    expect(find.byKey(const Key('chart-period-loading')), findsOneWidget);
+    expect(find.byType(MarketLineChart), findsNothing);
 
     second.complete(_prices(300, currency: 'USD', count: 6));
     await tester.pumpAndSettle();
@@ -649,17 +717,13 @@ void main() {
       },
     );
     await tester.pumpAndSettle();
-    final previousChart = tester.widget<MarketLineChart>(
-      find.byType(MarketLineChart),
-    );
+    expect(find.byType(MarketLineChart), findsOneWidget);
     await tester.tap(find.byKey(const Key('chart-period-1m')));
     await tester.pump();
 
     expect(find.text('Historical prices unavailable'), findsNothing);
-    expect(
-      tester.widget<MarketLineChart>(find.byType(MarketLineChart)),
-      same(previousChart),
-    );
+    expect(find.byKey(const Key('chart-period-loading')), findsOneWidget);
+    expect(find.byType(MarketLineChart), findsNothing);
 
     final recentMonday = DateTime.now().subtract(
       Duration(days: DateTime.now().weekday - DateTime.monday),

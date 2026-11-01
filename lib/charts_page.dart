@@ -91,6 +91,7 @@ class ChartsPage extends StatefulWidget {
   final Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? _ibkrLoader;
   final Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
       _ibkrPerformanceLoader;
+  final Future<void> Function(String, DateTime)? _favoriteHistoryPrefetcher;
 
   const ChartsPage({
     super.key,
@@ -100,9 +101,11 @@ class ChartsPage extends StatefulWidget {
     Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? ibkrLoader,
     Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
         ibkrPerformanceLoader,
+    Future<void> Function(String, DateTime)? favoriteHistoryPrefetcher,
   })  : _intradayData = intradayData,
         _ibkrLoader = ibkrLoader,
-        _ibkrPerformanceLoader = ibkrPerformanceLoader;
+        _ibkrPerformanceLoader = ibkrPerformanceLoader,
+        _favoriteHistoryPrefetcher = favoriteHistoryPrefetcher;
 
   @override
   State<ChartsPage> createState() => ChartsPageState();
@@ -179,7 +182,6 @@ class ChartsPageState extends State<ChartsPage>
   bool _portfolioLoading = true;
   bool _periodTransition = false;
   int _periodTransitionGeneration = 0;
-  Widget? _lastPortfolioChart;
   final _chartPeriodCache = <String, _CachedChartPeriod>{};
   List<StoredCandle>? _restoredFavoriteCandles;
   bool _chartPeriodLoaded = false;
@@ -660,7 +662,7 @@ class ChartsPageState extends State<ChartsPage>
 
   /// Syncs candles for all accounts. Caller is responsible for setting
   /// [_networkLoading].
-  Future<void> _refreshAllPortfolioCandles() async {
+  Future<void> _refreshAllPortfolioCandles({DateTime? requiredFrom}) async {
     if (!mounted || !widget.isActive) return;
     final accountManager = context.read<AccountManager>();
 
@@ -680,7 +682,7 @@ class ChartsPageState extends State<ChartsPage>
             symbol,
             ibkrConfig: ibkrConfig,
             syncNamespace: accountName,
-            requiredFrom: _requiredCandleStart(),
+            requiredFrom: requiredFrom ?? _requiredCandleStart(),
             forceRefresh: true,
           );
         }
@@ -694,16 +696,54 @@ class ChartsPageState extends State<ChartsPage>
     }
   }
 
-  /// Refreshes whichever chart the user is currently viewing. This is used by
-  /// the page's pull-to-refresh gesture, keeping the chart controls focused on
-  /// navigation and actions other than loading data.
+  /// A manual refresh warms the largest daily chart range once per favorite.
+  /// The persisted candle store is shared by every smaller period (1m–10y).
+  /// Bound concurrency to avoid flooding Yahoo or the broker with requests.
+  Future<void> _prefetchFavoriteHistory(DateTime from) async {
+    final manager = context.read<AccountManager>();
+    final config = manager.ibkrConfigFor();
+    final namespace = manager.activeAccount;
+    final favorites = _favoriteStocks.toSet().toList(growable: false);
+    final failed = <String>[];
+
+    for (var offset = 0; offset < favorites.length; offset += 2) {
+      final batch = favorites.skip(offset).take(2);
+      await Future.wait(
+        batch.map((symbol) async {
+          try {
+            if (widget._favoriteHistoryPrefetcher case final prefetch?) {
+              await prefetch(symbol, from);
+            } else {
+              await syncCandles(
+                symbol,
+                ibkrConfig: config,
+                syncNamespace: namespace,
+                requiredFrom: from,
+                forceRefresh: true,
+              );
+            }
+          } catch (error, stackTrace) {
+            failed.add(symbol);
+            talker.handle(
+              error,
+              stackTrace,
+              'Failed to prefetch $symbol history',
+            );
+          }
+        }),
+      );
+    }
+    if (failed.isNotEmpty) {
+      talker.warning(
+        'Favorite history prefetch failed for: ${failed.join(', ')}',
+      );
+    }
+  }
+
+  /// Refresh portfolio, broker performance and all favorite daily ranges.
+  /// Do not finish the gesture until the caches are actually populated.
   Future<void> _refreshCurrentChart() async {
     if (!mounted || !widget.isActive || _networkLoading) return;
-
-    if (_mode == _ChartMode.stock && _selectedSymbol != null) {
-      await _loadSelectedStock(forceRefresh: true);
-      return;
-    }
     setState(() {
       _networkLoading = true;
       _stockError = null;
@@ -714,23 +754,28 @@ class ChartsPageState extends State<ChartsPage>
       _intradayPortfolioCache.clear();
       _chartPeriodCache.clear();
       _restoredFavoriteCandles = null;
-      await _refreshAllPortfolioCandles();
+      final now = DateTime.now();
+      final historyStart = DateTime(now.year - 10, now.month, now.day - 1);
+      await Future.wait([
+        _refreshAllPortfolioCandles(requiredFrom: historyStart),
+        _prefetchFavoriteHistory(historyStart),
+      ]);
+      if (!mounted || !widget.isActive) return;
       await _loadAllPortfolios(
         refreshIbkrPortfolio: true,
         forceIbkrPortfolioRefresh: true,
+        refreshIbkrPerformance: true,
+        forceIbkrPerformanceRefresh: true,
       );
-      if (mounted && widget.isActive) {
-        runDetachedTask(
-          _syncFavoriteCandles(forceRefresh: true),
-          'Failed to refresh favorite charts',
+      if (!mounted || !widget.isActive) return;
+      if (_usesIntraday && _selectedFavorites.isNotEmpty) {
+        await _syncFavoriteCandles(
+          forceRefresh: true,
+          selectedOnly: true,
         );
-        runDetachedTask(
-          _loadAllPortfolios(
-            refreshIbkrPerformance: true,
-            forceIbkrPerformanceRefresh: true,
-          ),
-          'Failed to refresh IBKR performance history',
-        );
+      }
+      if (_mode == _ChartMode.stock && _selectedSymbol != null) {
+        await _loadSelectedStock(forceRefresh: true);
       }
     } catch (error, stackTrace) {
       talker.handle(error, stackTrace, 'Chart refresh failed');
@@ -2123,6 +2168,14 @@ class ChartsPageState extends State<ChartsPage>
       _favoriteIntraday.clear();
       _favoriteIntradayErrors.clear();
       _restoredFavoriteCandles = null;
+      if (_mode == _ChartMode.stock) {
+        _stockLoadGeneration++;
+        _stockStream = null;
+        _stockContentKey = null;
+        _intradaySeries = null;
+        _stockDailyPreview = const [];
+        _networkLoading = true;
+      }
       if (_mode != _ChartMode.stock) {
         final cached = _chartPeriodCache[_chartPeriodCacheKey];
         if (cached != null) {
@@ -2652,6 +2705,25 @@ class ChartsPageState extends State<ChartsPage>
         child: Center(child: Text(snapshot.error.toString())),
       );
     }
+    // A wider range may initially stream only the shorter range's existing
+    // rows. Do not plot that partial history as if it covered the new period.
+    final cachedRows = snapshot.data;
+    final missingHistory = !_usesIntraday &&
+        _periodTransition &&
+        _networkLoading &&
+        (cachedRows == null ||
+            cachedRows.isEmpty ||
+            cachedRows.first.candle.date.value.isAfter(
+              _requiredCandleStart().add(const Duration(days: 7)),
+            ));
+    if (missingHistory) {
+      return SizedBox(
+        height: height,
+        child: const Center(
+          child: CircularProgressIndicator(key: Key('chart-period-loading')),
+        ),
+      );
+    }
     if (snapshot.data == null || snapshot.data!.isEmpty) {
       if (_stockError != null) {
         return SizedBox(
@@ -2661,7 +2733,7 @@ class ChartsPageState extends State<ChartsPage>
       }
       return SizedBox(
         height: height,
-        child: _networkLoading && (_usesIntraday || snapshot.hasData)
+        child: _networkLoading
             ? const Center(child: CircularProgressIndicator())
             : null,
       );
@@ -3152,8 +3224,12 @@ class ChartsPageState extends State<ChartsPage>
     required bool localPricesReady,
   }) {
     if (_periodTransition || !localPricesReady) {
-      return _lastPortfolioChart ??
-          SizedBox(height: MediaQuery.of(context).size.height * 0.30);
+      return SizedBox(
+        height: MediaQuery.of(context).size.height * 0.30,
+        child: const Center(
+          child: CircularProgressIndicator(key: Key('chart-period-loading')),
+        ),
+      );
     }
     final chart = _buildReadyPortfolioChart(
       context,
@@ -3186,7 +3262,6 @@ class ChartsPageState extends State<ChartsPage>
         error: _portfolioError,
       );
     }
-    _lastPortfolioChart = chart;
     return chart;
   }
 

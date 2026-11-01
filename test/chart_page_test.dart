@@ -1290,7 +1290,7 @@ void main() {
   });
 
   testWidgets(
-    'slow IBKR performance refresh does not keep chart refresh spinning',
+    'manual refresh waits for slow IBKR performance prefetch',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(1400, 900);
@@ -1375,7 +1375,7 @@ void main() {
       final refreshButton = tester.widget<IconButton>(
         find.ancestor(of: refresh, matching: find.byType(IconButton)),
       );
-      expect(refreshButton.onPressed, isNotNull);
+      expect(refreshButton.onPressed, isNull);
       expect(find.byType(MarketLineChart), findsOneWidget);
 
       pendingPerformance.complete(

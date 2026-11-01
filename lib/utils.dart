@@ -1069,10 +1069,11 @@ Future<void> syncCandles(
     );
   }
 
-  Future<({bool requested, bool progressed})> performSync() async {
+  Future<({bool requested, bool progressed, DateTime coverageFrom})>
+      performSync() async {
     final coverage = await readCoverage();
     if (!forceRefresh && coverage.covered) {
-      return (requested: false, progressed: false);
+      return (requested: false, progressed: false, coverageFrom: requiredStart);
     }
 
     var requestFrom = coverage.latestDay == null
@@ -1100,7 +1101,11 @@ Future<void> syncCandles(
       final progressed = coverage.oldestDay != after.oldestDay ||
           coverage.latestDay != after.latestDay ||
           coverage.needsReconciliation != after.needsReconciliation;
-      return (requested: true, progressed: progressed);
+      return (
+        requested: true,
+        progressed: progressed,
+        coverageFrom: requiredStart
+      );
     }
 
     await fetchSymbolCurrencyAndRate(canonicalSymbol);
@@ -1165,20 +1170,29 @@ Future<void> syncCandles(
     final after = await readCoverage();
     final progressed = coverage.oldestDay != after.oldestDay ||
         coverage.latestDay != after.latestDay;
-    return (requested: true, progressed: progressed);
+    return (
+      requested: true,
+      progressed: progressed,
+      coverageFrom: requiredStart
+    );
   }
 
   try {
     while (true) {
       final syncResult = await backgroundNetworkCoordinator
-          .coalesce<({bool requested, bool progressed})>(
+          .coalesce<({bool requested, bool progressed, DateTime coverageFrom})>(
         RequestCategory.marketCandles,
         canonicalSymbol,
         performSync,
       );
 
       if (forceRefresh) {
-        if (syncResult.requested) return;
+        // A simultaneous shorter-range load may have won coalescing. Its
+        // successful request cannot fulfill this wider manual prefetch.
+        if (syncResult.coverageFrom.isAfter(requiredStart)) continue;
+        if (syncResult.requested) {
+          if ((await readCoverage()).covered || !syncResult.progressed) return;
+        }
         continue;
       }
 

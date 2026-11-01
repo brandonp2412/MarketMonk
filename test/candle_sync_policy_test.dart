@@ -89,6 +89,43 @@ void main() {
     expect(rows.last.close, 102);
   });
 
+  test('one 10-year prefetch covers all smaller daily chart periods', () async {
+    final database = Database.connect(NativeDatabase.memory());
+    addTearDown(database.close);
+    final now = DateTime.now();
+    final oldest = DateTime(now.year - 10, now.month, now.day - 1);
+    final expected = _expectedMarketDay();
+    var requests = 0;
+
+    Future<List<YahooFinanceCandleData>> fetch(
+      String symbol,
+      DateTime startDate,
+    ) async {
+      requests++;
+      expect(startDate, canonicalMarketDay(oldest));
+      return [_candle(oldest), _candle(expected)];
+    }
+
+    await syncCandles(
+      'AAPL',
+      database: database,
+      requiredFrom: oldest,
+      forceRefresh: true,
+      yahooFetcher: fetch,
+    );
+    for (final months in [1, 2, 3, 6]) {
+      await syncCandles(
+        'AAPL',
+        database: database,
+        requiredFrom: DateTime(now.year, now.month - months, now.day - 1),
+        yahooFetcher: fetch,
+      );
+    }
+
+    expect(requests, 1);
+    expect((await _rows(database)), hasLength(2));
+  });
+
   test('warm DB performs no market-data request or writes', () async {
     final database = Database.connect(NativeDatabase.memory());
     addTearDown(database.close);
@@ -242,7 +279,7 @@ void main() {
     expect(await _rows(database), hasLength(2));
   });
 
-  test('overlapping ranges serialize and only backfill missing coverage',
+  test('forced wider prefetch rechecks coverage after sharing shorter sync',
       () async {
     final database = Database.connect(NativeDatabase.memory());
     addTearDown(database.close);
@@ -291,6 +328,7 @@ void main() {
       'AAPL',
       database: database,
       requiredFrom: longStart,
+      forceRefresh: true,
       yahooFetcher: fetch,
     );
 
