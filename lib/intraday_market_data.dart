@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
+import 'dart:io' show HttpDate;
 
 import 'package:http/http.dart' as http;
 import 'package:market_monk/background_network_coordinator.dart';
@@ -53,12 +54,16 @@ class IntradaySeries {
 
 /// Loads short stock ranges from IBKR with Yahoo fallback and a five-minute cache.
 class IntradayMarketData {
-  static const _maxConcurrentYahooRequests = 4;
+  static const _maxConcurrentYahooRequests = 2;
+  static const _minYahooRequestInterval = Duration(milliseconds: 250);
+  static const _defaultYahooRateLimitCooldown = Duration(minutes: 1);
 
   final Future<http.Response> Function(Uri) _yahooGet;
   final Future<void> Function(Duration) _retryDelay;
   final Queue<Completer<void>> _yahooWaiters = Queue();
   int _activeYahooRequests = 0;
+  DateTime? _nextYahooRequestAt;
+  DateTime? _yahooCooldownUntil;
   final Future<IbkrHistoricalSeries> Function(IbkrAccountConfig, String, int)
       _ibkrFetch;
   final Future<List<IbkrHistoricalSeries>> Function(IbkrAccountConfig, int)?
@@ -204,6 +209,28 @@ class IntradayMarketData {
       _activeYahooRequests++;
     }
     try {
+      final cooldownUntil = _yahooCooldownUntil;
+      if (cooldownUntil != null && cooldownUntil.isAfter(_now())) {
+        throw StateError(
+          'Yahoo Finance is rate-limited until ${cooldownUntil.toLocal()}',
+        );
+      }
+      final now = _now();
+      final nextRequestAt = _nextYahooRequestAt;
+      final requestAt = nextRequestAt == null || nextRequestAt.isBefore(now)
+          ? now
+          : nextRequestAt.add(_minYahooRequestInterval);
+      _nextYahooRequestAt = requestAt;
+      if (requestAt.isAfter(now)) {
+        await _retryDelay(requestAt.difference(now));
+      }
+      final cooldownAfterWait = _yahooCooldownUntil;
+      if (cooldownAfterWait != null && cooldownAfterWait.isAfter(_now())) {
+        throw StateError(
+          'Yahoo Finance is rate-limited until '
+          '${cooldownAfterWait.toLocal()}',
+        );
+      }
       return await backgroundNetworkCoordinator.observe(
         'yahoo.intradayRequest',
         () => _yahooGet(uri).timeout(const Duration(seconds: 15)),
@@ -223,8 +250,11 @@ class IntradayMarketData {
         final requestUri =
             attempt == 0 ? uri : uri.replace(host: 'query2.finance.yahoo.com');
         final response = await _limitedYahooGet(requestUri);
+        if (response.statusCode == 429) {
+          _yahooCooldownUntil = _retryTime(response);
+          return response;
+        }
         if (response.statusCode == 200 ||
-            response.statusCode == 429 ||
             attempt == 2 ||
             !{429, 500, 502, 503, 504}.contains(response.statusCode)) {
           return response;
@@ -235,6 +265,24 @@ class IntradayMarketData {
       await _retryDelay(Duration(milliseconds: 400 * (1 << attempt)));
     }
     throw StateError('Yahoo intraday request failed after retries');
+  }
+
+  DateTime _retryTime(http.Response response) {
+    final retryAfter = response.headers['retry-after'];
+    if (retryAfter != null) {
+      final seconds = int.tryParse(retryAfter.trim());
+      if (seconds != null && seconds > 0) {
+        return _now().add(Duration(seconds: seconds));
+      }
+      DateTime? date;
+      try {
+        date = HttpDate.parse(retryAfter);
+      } on FormatException {
+        date = null;
+      }
+      if (date != null && date.isAfter(_now())) return date;
+    }
+    return _now().add(_defaultYahooRateLimitCooldown);
   }
 
   Future<IntradaySeries> _fetchYahoo(

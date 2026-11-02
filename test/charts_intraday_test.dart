@@ -365,11 +365,19 @@ void main() {
   testWidgets('unavailable intraday data shows a retryable error', (
     tester,
   ) async {
+    var now = DateTime.utc(2026, 10, 9, 14);
     var calls = 0;
     final loader = IntradayMarketData(
+      now: () => now,
       yahooGet: (_) async {
         calls++;
-        return calls == 1 ? http.Response('rate limited', 429) : _prices(100);
+        return calls == 1
+            ? http.Response(
+                'rate limited',
+                429,
+                headers: {'retry-after': '1'},
+              )
+            : _prices(100);
       },
       retryDelay: (_) async {},
     );
@@ -379,6 +387,7 @@ void main() {
       find.textContaining('Yahoo intraday returned HTTP 429'),
       findsOneWidget,
     );
+    now = now.add(const Duration(seconds: 2));
     await tester.tap(find.byTooltip('Refresh'));
     await tester.pumpAndSettle();
     expect(find.byType(TickerLine), findsOneWidget);
@@ -747,7 +756,7 @@ void main() {
     expect(find.byType(MarketLineChart), findsOneWidget);
   });
 
-  testWidgets('portfolio starts independent holding requests concurrently', (
+  testWidgets('portfolio paces independent Yahoo holding requests', (
     tester,
   ) async {
     final requests = <String>[];
@@ -791,6 +800,7 @@ void main() {
       },
     );
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
     expect(requests, containsAll(['AAPL', 'MSFT']));
     for (final request in pending.values) {
       request.complete(_prices(100, currency: 'USD'));

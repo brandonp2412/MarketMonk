@@ -437,38 +437,60 @@ void main() {
     },
   );
 
-  test(
-    'Yahoo HTTP 429 remains visible for a manual retry',
-    () async {
-      var calls = 0;
-      final loader = IntradayMarketData(
-        retryDelay: (_) async {},
-        yahooGet: (_) async {
-          calls++;
-          return http.Response('rate limited', 429);
-        },
-      );
-      await expectLater(
-        loader.fetch('NVDA'),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            contains('HTTP 429'),
-          ),
+  test('Yahoo 429 cooldown is shared across symbols and then expires',
+      () async {
+    var now = DateTime.utc(2026, 10, 9, 14);
+    var calls = 0;
+    final loader = IntradayMarketData(
+      now: () => now,
+      yahooGet: (_) async {
+        calls++;
+        return calls == 1
+            ? http.Response(
+                'rate limited',
+                429,
+                headers: {'retry-after': '5'},
+              )
+            : _yahooResponse();
+      },
+    );
+    await expectLater(
+      loader.fetch('NVDA'),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          contains('HTTP 429'),
         ),
-      );
-      expect(calls, 1);
-    },
-  );
+      ),
+    );
+    await expectLater(
+      loader.fetch('AMD'),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          contains('rate-limited until'),
+        ),
+      ),
+    );
+    expect(calls, 1);
+
+    now = now.add(const Duration(seconds: 6));
+    expect((await loader.fetch('AMD')).source, 'Yahoo');
+    expect(calls, 2);
+  });
 
   test(
-    'parallel Yahoo requests refill four active slots immediately',
+    'Yahoo requests are paced and never exceed two active requests',
     () async {
       final pending = <Completer<http.Response>>[];
       var active = 0;
       var maximumActive = 0;
+      var now = DateTime.utc(2026, 10, 9, 14);
       final loader = IntradayMarketData(
+        now: () => now,
+        retryDelay: (duration) async => now = now.add(duration),
         yahooGet: (uri) async {
           active++;
           if (active > maximumActive) maximumActive = active;
@@ -489,20 +511,27 @@ void main() {
         loader.fetch('AMD'),
       ];
       await Future<void>.delayed(Duration.zero);
-      expect(pending, hasLength(4));
+      expect(pending, hasLength(2));
       pending.first.complete(_yahooResponse());
       await Future<void>.delayed(Duration.zero);
-      expect(pending, hasLength(5));
-      expect(maximumActive, 4);
-      for (final reply in pending.skip(1)) {
+      expect(pending, hasLength(3));
+      expect(maximumActive, 2);
+      for (var index = 0; index < requests.length; index++) {
+        while (pending.length <= index) {
+          await Future<void>.delayed(Duration.zero);
+        }
+        final reply = pending[index];
+        if (reply.isCompleted) continue;
         reply.complete(_yahooResponse());
+        await Future<void>.delayed(Duration.zero);
       }
       await Future.wait(requests);
       expect(active, 0);
+      expect(pending, hasLength(5));
     },
   );
 
-  test('eight favorite requests complete below sequential wait time', () async {
+  test('eight Yahoo requests finish within the paced wait budget', () async {
     final loader = IntradayMarketData(
       yahooGet: (_) async {
         await Future<void>.delayed(const Duration(milliseconds: 100));
@@ -526,7 +555,7 @@ void main() {
     ]);
 
     stopwatch.stop();
-    expect(stopwatch.elapsed, lessThan(const Duration(milliseconds: 700)));
+    expect(stopwatch.elapsed, lessThan(const Duration(seconds: 3)));
   });
 
   test('empty and error Yahoo responses report unavailable data', () async {

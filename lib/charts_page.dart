@@ -125,6 +125,7 @@ class ChartsPageState extends State<ChartsPage>
   String _favoriteChartStreamKey = '';
   final _favoriteIntraday = <String, IntradaySeries>{};
   final _favoriteIntradayErrors = <String, String>{};
+  Future<void> _favoriteDailySync = Future<void>.value();
   int _favoriteLoadGeneration = 0;
   bool _networkLoading = false;
   String? _stockContentKey;
@@ -866,15 +867,27 @@ class ChartsPageState extends State<ChartsPage>
         });
         return;
       }
-      await _withRemoteLoading(
-        () => syncCandles(
-          symbol,
-          ibkrConfig: accountManager.ibkrConfigFor(),
-          syncNamespace: accountManager.activeAccount,
-          requiredFrom: _requiredCandleStart(),
-          forceRefresh: forceRefresh,
-        ),
-      );
+      final previousSync = _favoriteDailySync;
+      final sync = previousSync.then((_) async {
+        if (!mounted ||
+            !widget.isActive ||
+            generation != _favoriteLoadGeneration) return;
+        try {
+          await _withRemoteLoading(
+            () => syncCandles(
+              symbol,
+              ibkrConfig: accountManager.ibkrConfigFor(),
+              syncNamespace: accountManager.activeAccount,
+              requiredFrom: _requiredCandleStart(),
+              forceRefresh: forceRefresh,
+            ),
+          );
+        } finally {
+          await Future<void>.delayed(const Duration(milliseconds: 250));
+        }
+      });
+      _favoriteDailySync = sync.catchError((Object _) {});
+      await sync;
     } catch (error, stackTrace) {
       talker.handle(error, stackTrace, 'Favorite ticker candle sync failed');
       if (intraday &&
