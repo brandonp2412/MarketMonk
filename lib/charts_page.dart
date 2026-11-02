@@ -849,6 +849,7 @@ class ChartsPageState extends State<ChartsPage>
             days: selectedDays,
             config: accountManager.ibkrConfigFor(),
             forceRefresh: forceRefresh,
+            brokerTimeout: const Duration(seconds: 2),
           ),
         );
         if (!mounted ||

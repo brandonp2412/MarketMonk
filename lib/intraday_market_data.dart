@@ -101,6 +101,7 @@ class IntradayMarketData {
     int days = 1,
     IbkrAccountConfig config = const IbkrAccountConfig(),
     bool forceRefresh = false,
+    Duration? brokerTimeout,
   }) {
     if (days != 1 && days != 5) {
       throw ArgumentError.value(days, 'days', 'Expected 1 or 5');
@@ -115,18 +116,15 @@ class IntradayMarketData {
     }
     return backgroundNetworkCoordinator.coalesce<IntradaySeries>(
       'market.intraday',
-      (this, key),
+      (this, key, brokerTimeout),
       () async {
         IntradaySeries? series;
-        final batchAt = _portfolioBatchAt[(config, days)];
-        final batchFresh = batchAt != null &&
-            _now().difference(batchAt) < const Duration(minutes: 5);
-        if (config.isConfigured && (!batchFresh || forceRefresh)) {
+        if (config.isConfigured) {
           try {
             final result = await backgroundNetworkCoordinator.observe(
               'ibkr.intradayAttempt',
               () => _ibkrFetch(config, canonicalSymbol, days)
-                  .timeout(_brokerTimeout),
+                  .timeout(brokerTimeout ?? _brokerTimeout),
             );
             series = IntradaySeries(
               currency: result.currency,
@@ -226,6 +224,7 @@ class IntradayMarketData {
             attempt == 0 ? uri : uri.replace(host: 'query2.finance.yahoo.com');
         final response = await _limitedYahooGet(requestUri);
         if (response.statusCode == 200 ||
+            response.statusCode == 429 ||
             attempt == 2 ||
             !{429, 500, 502, 503, 504}.contains(response.statusCode)) {
           return response;

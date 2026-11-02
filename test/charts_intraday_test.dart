@@ -369,7 +369,7 @@ void main() {
     final loader = IntradayMarketData(
       yahooGet: (_) async {
         calls++;
-        return calls <= 3 ? http.Response('rate limited', 429) : _prices(100);
+        return calls == 1 ? http.Response('rate limited', 429) : _prices(100);
       },
       retryDelay: (_) async {},
     );
@@ -382,7 +382,7 @@ void main() {
     await tester.tap(find.byTooltip('Refresh'));
     await tester.pumpAndSettle();
     expect(find.byType(TickerLine), findsOneWidget);
-    expect(calls, 4);
+    expect(calls, 2);
   });
 
   testWidgets('period changes replace favorite lines together', (tester) async {

@@ -280,7 +280,7 @@ void main() {
   );
 
   test(
-    'portfolio batch seeds individual prices without repeated broker requests',
+    'portfolio batch seeds held prices and fetches missing favorite symbols',
     () async {
       var batches = 0;
       var individual = 0;
@@ -302,6 +302,11 @@ void main() {
       expect(await loader.prefetchPortfolio(_config, days: 5), isTrue);
       expect(batches, 1);
       expect(individual, 0);
+      expect(
+        (await loader.fetch('MSFT', config: _config, days: 5)).source,
+        'IBKR',
+      );
+      expect(individual, 1);
       await loader.prefetchPortfolio(_config, days: 5, forceRefresh: true);
       expect(batches, 2);
       await loader.prefetchPortfolio(_config, days: 1);
@@ -406,7 +411,7 @@ void main() {
   );
 
   test(
-    'Yahoo automatically retries HTTP 429 through its alternate host',
+    'Yahoo stops immediately after an HTTP 429 rate limit',
     () async {
       final hosts = <String>[];
       final delays = <Duration>[];
@@ -414,20 +419,26 @@ void main() {
         retryDelay: (delay) async => delays.add(delay),
         yahooGet: (uri) async {
           hosts.add(uri.host);
-          return hosts.length == 1
-              ? http.Response('rate limited', 429)
-              : _yahooResponse();
+          return http.Response('rate limited', 429);
         },
       );
-      final series = await loader.fetch('NVDA');
-      expect(series.candles, hasLength(2));
-      expect(hosts, ['query1.finance.yahoo.com', 'query2.finance.yahoo.com']);
-      expect(delays, [const Duration(milliseconds: 400)]);
+      await expectLater(
+        loader.fetch('NVDA'),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            contains('HTTP 429'),
+          ),
+        ),
+      );
+      expect(hosts, ['query1.finance.yahoo.com']);
+      expect(delays, isEmpty);
     },
   );
 
   test(
-    'repeated Yahoo 429 exposes the HTTP status after bounded retries',
+    'Yahoo HTTP 429 remains visible for a manual retry',
     () async {
       var calls = 0;
       final loader = IntradayMarketData(
@@ -447,7 +458,7 @@ void main() {
           ),
         ),
       );
-      expect(calls, 3);
+      expect(calls, 1);
     },
   );
 
