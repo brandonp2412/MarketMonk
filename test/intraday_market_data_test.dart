@@ -452,7 +452,7 @@ void main() {
   );
 
   test(
-    'parallel Yahoo requests never exceed two active HTTP requests',
+    'parallel Yahoo requests refill four active slots immediately',
     () async {
       final pending = <Completer<http.Response>>[];
       var active = 0;
@@ -474,13 +474,15 @@ void main() {
         loader.fetch('AAPL'),
         loader.fetch('MSFT'),
         loader.fetch('NVDA'),
+        loader.fetch('TSLA'),
+        loader.fetch('AMD'),
       ];
       await Future<void>.delayed(Duration.zero);
-      expect(pending, hasLength(2));
+      expect(pending, hasLength(4));
       pending.first.complete(_yahooResponse());
       await Future<void>.delayed(Duration.zero);
-      expect(pending, hasLength(3));
-      expect(maximumActive, 2);
+      expect(pending, hasLength(5));
+      expect(maximumActive, 4);
       for (final reply in pending.skip(1)) {
         reply.complete(_yahooResponse());
       }
@@ -488,6 +490,33 @@ void main() {
       expect(active, 0);
     },
   );
+
+  test('eight favorite requests complete below sequential wait time', () async {
+    final loader = IntradayMarketData(
+      yahooGet: (_) async {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        return _yahooResponse();
+      },
+    );
+    final stopwatch = Stopwatch()..start();
+
+    await Future.wait([
+      for (final symbol in [
+        'AAPL',
+        'MSFT',
+        'NVDA',
+        'TSLA',
+        'AMD',
+        'GOOG',
+        'META',
+        'AMZN',
+      ])
+        loader.fetch(symbol),
+    ]);
+
+    stopwatch.stop();
+    expect(stopwatch.elapsed, lessThan(const Duration(milliseconds: 700)));
+  });
 
   test('empty and error Yahoo responses report unavailable data', () async {
     for (final body in [

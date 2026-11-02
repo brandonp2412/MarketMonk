@@ -820,18 +820,16 @@ class ChartsPageState extends State<ChartsPage>
         .where((symbol) => !selectedOnly || _selectedFavorites.contains(symbol))
         .toList(growable: false);
 
-    for (var offset = 0; offset < symbols.length; offset += 4) {
-      if (!mounted || !widget.isActive || generation != _favoriteLoadGeneration)
-        return;
-      await Future.wait(
-        symbols.skip(offset).take(4).map(
-              (symbol) => _syncFavoriteCandle(
-                symbol,
-                forceRefresh: forceRefresh,
-              ),
-            ),
-      );
-    }
+    if (!mounted || !widget.isActive || generation != _favoriteLoadGeneration)
+      return;
+    await Future.wait(
+      symbols.map(
+        (symbol) => _syncFavoriteCandle(
+          symbol,
+          forceRefresh: forceRefresh,
+        ),
+      ),
+    );
   }
 
   Future<void> _syncFavoriteCandle(

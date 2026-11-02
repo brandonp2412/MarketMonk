@@ -53,6 +53,8 @@ class IntradaySeries {
 
 /// Loads short stock ranges from IBKR with Yahoo fallback and a five-minute cache.
 class IntradayMarketData {
+  static const _maxConcurrentYahooRequests = 4;
+
   final Future<http.Response> Function(Uri) _yahooGet;
   final Future<void> Function(Duration) _retryDelay;
   final Queue<Completer<void>> _yahooWaiters = Queue();
@@ -196,7 +198,7 @@ class IntradayMarketData {
   }
 
   Future<http.Response> _limitedYahooGet(Uri uri) async {
-    if (_activeYahooRequests >= 2) {
+    if (_activeYahooRequests >= _maxConcurrentYahooRequests) {
       final waiter = Completer<void>();
       _yahooWaiters.addLast(waiter);
       await waiter.future;
