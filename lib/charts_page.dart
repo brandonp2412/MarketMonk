@@ -32,6 +32,7 @@ import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/sqlite_settings.dart';
 import 'package:market_monk/ticker_line.dart';
+import 'package:market_monk/ticker_search_loading.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 
@@ -2519,7 +2520,7 @@ class ChartsPageState extends State<ChartsPage>
           if (_searchLoading && index == _searchResults.length + 1) {
             return const Padding(
               padding: EdgeInsets.all(16),
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(child: TickerSearchLoading()),
             );
           }
           if (index == _searchResults.length) {
