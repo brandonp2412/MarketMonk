@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/charts_page.dart';
+import 'package:market_monk/market_chart_loading.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
@@ -292,12 +293,12 @@ void main() {
 
       // Pull-to-refresh belongs to the full-height scroll view behind the
       // floating search bar, so its indicator must start below the overlay.
-      final refreshIndicator = tester.widget<RefreshIndicator>(
-        find.byType(RefreshIndicator).first,
+      final refreshIndicator = tester.widget<MarketChartRefreshIndicator>(
+        find.byType(MarketChartRefreshIndicator).first,
       );
       expect(refreshIndicator.edgeOffset, greaterThanOrEqualTo(searchBottom));
       expect(
-        refreshIndicator.edgeOffset + refreshIndicator.displacement,
+        refreshIndicator.edgeOffset + 28,
         greaterThan(searchBottom + 20),
       );
       expect(find.text('Refresh'), findsNothing);
@@ -412,7 +413,7 @@ void main() {
       );
 
       expect(find.byType(MarketLineChart), findsNothing);
-      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byType(MarketChartLoading), findsNothing);
 
       await tester.pump();
 
@@ -1113,7 +1114,7 @@ void main() {
     expect(
       find.descendant(
         of: refresh,
-        matching: find.byType(CircularProgressIndicator),
+        matching: find.byType(MarketChartLoading),
       ),
       findsNothing,
     );

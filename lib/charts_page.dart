@@ -23,6 +23,7 @@ import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/market_data_store.dart';
+import 'package:market_monk/market_chart_loading.dart';
 import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/portfolio_chart_scale.dart';
 import 'package:market_monk/provisional_portfolio.dart';
@@ -2507,8 +2508,7 @@ class ChartsPageState extends State<ChartsPage>
       onTap: () => _selectSymbol(query),
     );
 
-    return RefreshIndicator(
-      triggerMode: RefreshIndicatorTriggerMode.anywhere,
+    return MarketChartRefreshIndicator(
       onRefresh: () => _runTickerSearch(_searchController.text),
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -2518,7 +2518,7 @@ class ChartsPageState extends State<ChartsPage>
           if (_searchLoading && index == _searchResults.length + 1) {
             return const Padding(
               padding: EdgeInsets.all(16),
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(child: MarketChartLoading()),
             );
           }
           if (index == _searchResults.length) {
@@ -2581,9 +2581,8 @@ class ChartsPageState extends State<ChartsPage>
         }
         return false;
       },
-      child: RefreshIndicator(
+      child: MarketChartRefreshIndicator(
         edgeOffset: _overlayHeight + 8,
-        triggerMode: RefreshIndicatorTriggerMode.anywhere,
         onRefresh: _refreshCurrentChart,
         child: ListView(
           key: const Key('charts-main-scroll'),
@@ -2739,7 +2738,7 @@ class ChartsPageState extends State<ChartsPage>
       return SizedBox(
         height: height,
         child: const Center(
-          child: CircularProgressIndicator(key: Key('chart-period-loading')),
+          child: MarketChartLoading(key: Key('chart-period-loading')),
         ),
       );
     }
@@ -2752,9 +2751,8 @@ class ChartsPageState extends State<ChartsPage>
       }
       return SizedBox(
         height: height,
-        child: _networkLoading
-            ? const Center(child: CircularProgressIndicator())
-            : null,
+        child:
+            _networkLoading ? const Center(child: MarketChartLoading()) : null,
       );
     }
 
@@ -3246,7 +3244,7 @@ class ChartsPageState extends State<ChartsPage>
       return SizedBox(
         height: MediaQuery.of(context).size.height * 0.30,
         child: const Center(
-          child: CircularProgressIndicator(key: Key('chart-period-loading')),
+          child: MarketChartLoading(key: Key('chart-period-loading')),
         ),
       );
     }
@@ -3306,7 +3304,7 @@ class ChartsPageState extends State<ChartsPage>
       return SizedBox(
         height: height,
         child: _pendingRemoteLoads > 0 && localPricesReady
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: MarketChartLoading())
             : null,
       );
     }
@@ -3387,7 +3385,7 @@ class ChartsPageState extends State<ChartsPage>
       if (_pendingRemoteLoads > 0 && localPricesReady) {
         return SizedBox(
           height: height,
-          child: const Center(child: CircularProgressIndicator()),
+          child: const Center(child: MarketChartLoading()),
         );
       }
       final allEmpty = _portfolioSeriesByAccount.values.every(

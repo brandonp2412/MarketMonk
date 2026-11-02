@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:market_monk/charts_page.dart';
+import 'package:market_monk/market_chart_loading.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/intraday_market_data.dart';
 import 'package:market_monk/main.dart';
@@ -180,7 +181,8 @@ void main() {
     );
   });
 
-  testWidgets('uncached stock shows a spinner only until prices arrive', (
+  testWidgets('uncached stock shows the chart loader only until prices arrive',
+      (
     tester,
   ) async {
     final pending = Completer<http.Response>();
@@ -188,11 +190,11 @@ void main() {
       tester,
       IntradayMarketData(yahooGet: (_) => pending.future),
     );
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(MarketChartLoading), findsOneWidget);
     expect(find.text('1d'), findsWidgets);
     pending.complete(_prices(100));
     await tester.pumpAndSettle();
-    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byType(MarketChartLoading), findsNothing);
     expect(find.byType(TickerLine), findsOneWidget);
   });
 
@@ -204,10 +206,10 @@ void main() {
       tester,
       IntradayMarketData(yahooGet: (_) => pending.future),
     );
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(MarketChartLoading), findsOneWidget);
     pending.complete(http.Response('Unavailable', 503));
     await tester.pumpAndSettle();
-    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byType(MarketChartLoading), findsNothing);
     expect(find.byType(TickerLine), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -264,7 +266,7 @@ void main() {
     expect(find.text('Yahoo · 1 day · Local time'), findsOneWidget);
     expect(ticker.nativeCurrency, 'GBP');
     expect(find.byType(MarketLineChart), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byType(MarketChartLoading), findsNothing);
     expect(find.textContaining('fixed-price asset'), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -872,7 +874,7 @@ void main() {
     );
     await tester.pump();
     expect(find.byType(TickerLine), findsNothing);
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(MarketChartLoading), findsOneWidget);
 
     pending.complete(
       _prices(200, currency: 'GBp', count: 12, intervalSeconds: 900),
