@@ -2508,7 +2508,8 @@ class ChartsPageState extends State<ChartsPage>
       onTap: () => _selectSymbol(query),
     );
 
-    return MarketChartRefreshIndicator(
+    return RefreshIndicator(
+      triggerMode: RefreshIndicatorTriggerMode.anywhere,
       onRefresh: () => _runTickerSearch(_searchController.text),
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -2518,7 +2519,7 @@ class ChartsPageState extends State<ChartsPage>
           if (_searchLoading && index == _searchResults.length + 1) {
             return const Padding(
               padding: EdgeInsets.all(16),
-              child: Center(child: MarketChartLoading()),
+              child: Center(child: CircularProgressIndicator()),
             );
           }
           if (index == _searchResults.length) {
@@ -2581,7 +2582,8 @@ class ChartsPageState extends State<ChartsPage>
         }
         return false;
       },
-      child: MarketChartRefreshIndicator(
+      child: RefreshIndicator(
+        triggerMode: RefreshIndicatorTriggerMode.anywhere,
         edgeOffset: _overlayHeight + 8,
         onRefresh: _refreshCurrentChart,
         child: ListView(

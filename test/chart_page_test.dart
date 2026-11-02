@@ -293,12 +293,12 @@ void main() {
 
       // Pull-to-refresh belongs to the full-height scroll view behind the
       // floating search bar, so its indicator must start below the overlay.
-      final refreshIndicator = tester.widget<MarketChartRefreshIndicator>(
-        find.byType(MarketChartRefreshIndicator).first,
+      final refreshIndicator = tester.widget<RefreshIndicator>(
+        find.byType(RefreshIndicator).first,
       );
       expect(refreshIndicator.edgeOffset, greaterThanOrEqualTo(searchBottom));
       expect(
-        refreshIndicator.edgeOffset + 28,
+        refreshIndicator.edgeOffset + refreshIndicator.displacement,
         greaterThan(searchBottom + 20),
       );
       expect(find.text('Refresh'), findsNothing);
