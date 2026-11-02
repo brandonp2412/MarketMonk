@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 class MarketChartLoading extends StatefulWidget {
@@ -13,7 +11,7 @@ class _MarketChartLoadingState extends State<MarketChartLoading>
     with SingleTickerProviderStateMixin {
   late final _animation = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1400),
+    duration: const Duration(milliseconds: 1800),
   );
 
   @override
@@ -21,7 +19,7 @@ class _MarketChartLoadingState extends State<MarketChartLoading>
     super.didChangeDependencies();
     if (MediaQuery.disableAnimationsOf(context)) {
       _animation.stop();
-      _animation.value = 0;
+      _animation.value = 1;
     } else {
       _animation.repeat();
     }
@@ -62,51 +60,37 @@ class _ChartLoadingPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.scale(size.width / 88, size.height / 56);
-    final paint = Paint()
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = 1;
-    for (final y in [16.0, 32.0, 48.0]) {
-      paint.color = colors.primary.withValues(alpha: 0.08);
-      canvas.drawLine(Offset(5, y), Offset(83, y), paint);
-    }
-    final points = <Offset>[];
-    for (var i = 0; i < 5; i++) {
-      final wave = (math.sin(animation.value * math.pi * 2 - i * 0.7) + 1) / 2;
-      final x = 12.0 + i * 16;
-      final y = 35.0 - i * 4 - wave * 8;
-      points.add(Offset(x, y));
-      paint
-        ..color = colors.primary.withValues(alpha: 0.45 + wave * 0.55)
-        ..strokeWidth = 1.5;
-      canvas.drawLine(Offset(x, y - 10), Offset(x, y + 10), paint);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(
-            center: Offset(x, y),
-            width: 7,
-            height: 10 + wave * 5,
-          ),
-          const Radius.circular(2),
-        ),
-        paint,
-      );
-    }
-    final path = Path()..moveTo(points.first.dx, points.first.dy);
-    for (final point in points.skip(1)) {
+    canvas.scale(size.width / 112, size.height / 72);
+    const trend = [
+      Offset(12, 51),
+      Offset(28, 40),
+      Offset(43, 46),
+      Offset(58, 25),
+      Offset(73, 33),
+      Offset(98, 16),
+    ];
+    final path = Path()..moveTo(trend.first.dx, trend.first.dy);
+    for (final point in trend.skip(1)) {
       path.lineTo(point.dx, point.dy);
     }
-    paint
-      ..color = colors.primary.withValues(alpha: 0.25)
+    final paint = Paint()
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..strokeWidth = 2
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
+      ..color = colors.primary.withValues(alpha: 0.12);
     canvas.drawPath(path, paint);
+    final metric = path.computeMetrics().first;
+    final distance = metric.length * animation.value;
+    paint.color = colors.primary;
+    canvas.drawPath(metric.extractPath(0, distance), paint);
+    final head = metric.getTangentForOffset(distance)?.position ?? trend.first;
     paint
       ..style = PaintingStyle.fill
       ..color = colors.primary.withValues(alpha: 0.12);
-    canvas.drawCircle(points.last, 7, paint);
+    canvas.drawCircle(head, 7, paint);
     paint.color = colors.primary;
-    canvas.drawCircle(points.last, 3, paint);
+    canvas.drawCircle(head, 3, paint);
   }
 
   @override

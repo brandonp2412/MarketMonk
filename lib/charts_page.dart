@@ -11,7 +11,6 @@ import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/candle_ticker.dart';
 import 'package:market_monk/chart_colors.dart';
-import 'package:market_monk/chart_loading_previews.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/edit_ticker_page.dart';
@@ -2600,7 +2599,6 @@ class ChartsPageState extends State<ChartsPage>
               ..._buildStockContent(settings)
             else
               ..._buildPortfolioContent(settings, accountColors),
-            const ChartLoadingPreviews(),
           ],
         ),
       ),
