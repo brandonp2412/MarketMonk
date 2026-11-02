@@ -606,7 +606,10 @@ class ChartsPageState extends State<ChartsPage>
     _favoriteLoadGeneration++;
     _favoriteIntraday.clear();
     _favoriteIntradayErrors.clear();
-    runDetachedTask(_syncFavoriteCandles(), 'Failed to reload favorite charts');
+    runDetachedTask(
+      _syncFavoriteCandles(selectedOnly: true),
+      'Failed to reload selected favorite charts',
+    );
     if (_selectedSymbol != null) {
       runDetachedTask(
         _loadSelectedStock(forceRefresh: ibkrChanged),
@@ -805,12 +808,6 @@ class ChartsPageState extends State<ChartsPage>
               symbol: name,
         };
       });
-    }
-    if (widget.isActive) {
-      runDetachedTask(
-        _syncFavoriteCandles(),
-        'Failed to sync favorite ticker candles',
-      );
     }
   }
 
