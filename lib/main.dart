@@ -885,6 +885,11 @@ class MyApp extends StatelessWidget {
                       : null,
                 ),
           useMaterial3: true,
+          sliderTheme: const SliderThemeData(
+            trackHeight: 3,
+            thumbShape: RoundSliderThumbShape(enabledThumbRadius: 7),
+            overlayShape: RoundSliderOverlayShape(overlayRadius: 14),
+          ),
           popupMenuTheme: const PopupMenuThemeData(
             menuPadding: EdgeInsets.zero,
           ),
@@ -912,6 +917,11 @@ class MyApp extends StatelessWidget {
                     : null,
           ),
           useMaterial3: true,
+          sliderTheme: const SliderThemeData(
+            trackHeight: 3,
+            thumbShape: RoundSliderThumbShape(enabledThumbRadius: 7),
+            overlayShape: RoundSliderOverlayShape(overlayRadius: 14),
+          ),
           popupMenuTheme: const PopupMenuThemeData(
             menuPadding: EdgeInsets.zero,
           ),
