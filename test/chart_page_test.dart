@@ -151,7 +151,7 @@ void main() {
     });
   }
 
-  testWidgets('short charts do not scroll just to clear the floating dock',
+  testWidgets('chart preview lab can scroll above the floating dock',
       (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(360, 900);
@@ -183,10 +183,10 @@ void main() {
     final scrollable = tester.state<ScrollableState>(
       find.descendant(of: scroll, matching: find.byType(Scrollable)).first,
     );
-    expect(scrollable.position.maxScrollExtent, 0);
+    expect(scrollable.position.maxScrollExtent, greaterThan(0));
     await tester.drag(scroll, const Offset(0, -120));
     await tester.pump();
-    expect(scrollable.position.pixels, 0);
+    expect(scrollable.position.pixels, greaterThan(0));
     expect(tester.takeException(), null);
   });
 
@@ -546,6 +546,16 @@ void main() {
     await tester.tap(showAll);
     await tester.pumpAndSettle();
     expect(find.text('All portfolios are hidden'), findsNothing);
+    final scroll = tester.state<ScrollableState>(
+      find
+          .descendant(
+            of: find.byKey(const Key('charts-main-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    scroll.position.jumpTo(0);
+    await tester.pumpAndSettle();
     expect(find.byType(MarketLineChart), findsOneWidget);
     expect(tester.takeException(), null);
   });
