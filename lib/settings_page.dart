@@ -655,6 +655,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 width: 220,
                 child: Slider(
                   value: settings.curveSmoothness,
+                  divisions: 20,
                   onChanged: settings.setCurveSmoothness,
                 ),
               ),
@@ -1120,6 +1121,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               Slider(
                 value: settings.curveSmoothness,
+                divisions: 20,
                 inactiveColor: Theme.of(
                   context,
                 ).colorScheme.primary.withValues(alpha: 0.24),
