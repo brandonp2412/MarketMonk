@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:csv/csv.dart';
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -266,10 +266,15 @@ void main() {
     expect(
       find.descendant(
         of: appleRow,
-        matching: find.textContaining('50.00%'),
+        matching: find.text('+50.00%'),
       ),
-      findsNothing,
+      findsOneWidget,
     );
+    final trailing = tester.widget<ListTile>(appleRow).trailing! as Column;
+    final valueText = trailing.children.first as Text;
+    final returnText = trailing.children.last as Text;
+    expect(valueText.style?.color, Colors.green);
+    expect(returnText.style?.color, Colors.green);
     expect(find.byType(MarketDonutChart), findsOneWidget);
     expect(tester.takeException(), null);
   });
