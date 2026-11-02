@@ -819,11 +819,21 @@ class ChartsPageState extends State<ChartsPage>
     bool selectedOnly = false,
   }) async {
     final generation = _favoriteLoadGeneration;
-    for (final symbol in _favoriteStocks) {
-      if (selectedOnly && !_selectedFavorites.contains(symbol)) continue;
+    final symbols = _favoriteStocks
+        .where((symbol) => !selectedOnly || _selectedFavorites.contains(symbol))
+        .toList(growable: false);
+
+    for (var offset = 0; offset < symbols.length; offset += 4) {
       if (!mounted || !widget.isActive || generation != _favoriteLoadGeneration)
         return;
-      await _syncFavoriteCandle(symbol, forceRefresh: forceRefresh);
+      await Future.wait(
+        symbols.skip(offset).take(4).map(
+              (symbol) => _syncFavoriteCandle(
+                symbol,
+                forceRefresh: forceRefresh,
+              ),
+            ),
+      );
     }
   }
 
