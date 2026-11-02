@@ -973,7 +973,6 @@ class PortfolioPageState extends State<PortfolioPage>
                   name: position.name,
                   value: val,
                   allocationPct: pct,
-                  changePct: position.change,
                   isHighlighted: index == selectedIndex,
                   onTap: () => setState(
                     () => touchedIndex = touchedIndex == index ? null : index,
@@ -1749,7 +1748,6 @@ class _LegendTile extends StatelessWidget {
   final String name;
   final double value;
   final double allocationPct;
-  final double changePct;
   final bool isHighlighted;
   final VoidCallback onTap;
 
@@ -1759,7 +1757,6 @@ class _LegendTile extends StatelessWidget {
     required this.name,
     required this.value,
     required this.allocationPct,
-    required this.changePct,
     required this.isHighlighted,
     required this.onTap,
   });
@@ -1781,24 +1778,10 @@ class _LegendTile extends StatelessWidget {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         title: Text(symbol),
-        subtitle: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              fmtCurrency(value),
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            Text(
-              '${allocationPct.toStringAsFixed(1)}%  '
-              '${changePct >= 0 ? '+' : ''}${changePct.toStringAsFixed(2)}%',
-              style: TextStyle(
-                fontSize: 13,
-                color: changePct >= 0 ? Colors.green : Colors.redAccent,
-              ),
-            ),
-          ],
+        subtitle: Text('${allocationPct.toStringAsFixed(1)}%'),
+        trailing: Text(
+          fmtCurrency(value),
+          style: Theme.of(context).textTheme.bodyMedium,
         ),
       ),
     );

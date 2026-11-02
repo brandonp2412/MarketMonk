@@ -194,7 +194,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('VOO'), findsOneWidget);
-      expect(find.text('VANGUARD S&P 500 ETF'), findsOneWidget);
+      expect(find.text('100.0%'), findsOneWidget);
       final mobileDonut = tester.widget<MarketDonutChart>(
         find.byType(MarketDonutChart),
       );
@@ -255,6 +255,21 @@ void main() {
     expect(find.byType(TextField), findsNothing);
     expect(find.text('VOO'), findsOneWidget);
     expect(find.text('AAPL'), findsOneWidget);
+    final appleRow = find.ancestor(
+      of: find.text('AAPL'),
+      matching: find.byType(ListTile),
+    );
+    expect(
+      (tester.widget<ListTile>(appleRow).subtitle! as Text).data,
+      '5.2%',
+    );
+    expect(
+      find.descendant(
+        of: appleRow,
+        matching: find.textContaining('50.00%'),
+      ),
+      findsNothing,
+    );
     expect(find.byType(MarketDonutChart), findsOneWidget);
     expect(tester.takeException(), null);
   });
