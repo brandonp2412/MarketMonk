@@ -545,9 +545,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byType(MarketLineChart), findsOneWidget);
-    final chartHeight = MediaQuery.of(
-      tester.element(find.byType(MarketLineChart)),
-    ).size.height * 0.30;
+    final chartHeight = tester.view.physicalSize.height * 0.30;
 
     final selector = find.byKey(const Key('chart-account-selector-Default'));
     await tester.ensureVisible(selector);
