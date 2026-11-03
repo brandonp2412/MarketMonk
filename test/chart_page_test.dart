@@ -545,6 +545,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byType(MarketLineChart), findsOneWidget);
+    final chartHeight = tester.getSize(find.byType(MarketLineChart)).height;
 
     final selector = find.byKey(const Key('chart-account-selector-Default'));
     await tester.ensureVisible(selector);
@@ -555,13 +556,15 @@ void main() {
     final showAll = find.widgetWithText(FilledButton, 'Show all');
     expect(find.text('All portfolios are hidden'), findsOneWidget);
     expect(showAll, findsOneWidget);
+    expect(tester.getSize(emptyState).height, closeTo(chartHeight, 0.01));
+
+    await tester.ensureVisible(showAll);
+    await tester.pumpAndSettle();
     expect(
       tester.getRect(showAll).bottom,
       lessThanOrEqualTo(tester.getRect(emptyState).bottom),
     );
-    expect(tester.getSize(emptyState).height, greaterThan(740 * 0.30));
 
-    await tester.ensureVisible(showAll);
     await tester.tap(showAll);
     await tester.pumpAndSettle();
     expect(find.text('All portfolios are hidden'), findsNothing);
