@@ -1,5 +1,6 @@
 import 'sqlite_test_support.dart';
 
+import 'package:drafter/painting.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
@@ -41,6 +42,59 @@ void main() {
     expect(chart.series.single.points, hasLength(10));
     expect(chart.leftInset, 64);
     expect(chart.pointCount, 10);
+  });
+
+  testWidgets('five-year range leaves missing earlier years blank', (
+    WidgetTester tester,
+  ) async {
+    await seedTestSqlite({});
+    final today = DateUtils.dateOnly(DateTime.now());
+    final start = DateTime(today.year - 5, today.month, today.day);
+    final dates = [
+      DateTime(today.year - 2, today.month, today.day),
+      DateTime(today.year - 1, today.month, today.day),
+      today,
+    ];
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (_) => SettingsState(),
+        child: MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              height: 300,
+              child: TickerLine(
+                dates: dates,
+                requestedStartDate: start,
+                spots: const [
+                  MarketLineChartPoint(0, 100, column: 0),
+                  MarketLineChartPoint(1, 120, column: 1),
+                  MarketLineChartPoint(2, 150, column: 2),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final chart = tester.widget<MarketLineChart>(find.byType(MarketLineChart));
+    expect(chart.series.single.points, hasLength(3));
+    expect(chart.xAxisBounds, isNotNull);
+    expect(chart.xAxisPositions!.first, greaterThan(1000));
+    expect(
+      chart.series.single.points.first.x / chart.xAxisBounds!.$2,
+      closeTo(0.6, 0.02),
+    );
+    expect(find.textContaining('Earlier history unavailable'), findsOneWidget);
+    final canvas = tester.widget<ChartCanvas>(find.byType(ChartCanvas));
+    final scene = (canvas.renderer as InteractiveRenderer)
+        .buildScene(tester.getSize(find.byType(ChartCanvas)));
+    expect(
+      scene.marks.first.center.dx,
+      greaterThan(scene.bounds!.left + scene.bounds!.width * 0.55),
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('intraday axis uses times while tooltips retain full dates', (

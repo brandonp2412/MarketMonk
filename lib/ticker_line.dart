@@ -3,6 +3,7 @@
 import 'package:drafter/drafter.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
@@ -29,6 +30,7 @@ class TickerLine extends StatelessWidget {
 
   /// Includes local clock time in labels for timestamped intraday bars.
   final bool intraday;
+  final DateTime? requestedStartDate;
 
   const TickerLine({
     super.key,
@@ -39,6 +41,7 @@ class TickerLine extends StatelessWidget {
     this.candleSelection,
     this.nativeCurrency = 'USD',
     this.intraday = false,
+    this.requestedStartDate,
     this.showRollingAverage = false,
     this.range,
     this.onRangeChanged,
@@ -65,50 +68,96 @@ class TickerLine extends StatelessWidget {
     final candlesByColumn = {
       for (final candle in candles) candle.column: candle,
     };
+    final chartStart = intraday ? null : requestedStartDate;
+    final datePositions = chartStart == null
+        ? null
+        : [
+            for (final date in datesList)
+              date.difference(chartStart).inMinutes / Duration.minutesPerDay,
+          ];
+    final chartEnd = DateUtils.dateOnly(DateTime.now());
+    final partialHistory = chartStart != null &&
+        datesList.isNotEmpty &&
+        datesList.first.isAfter(chartStart.add(const Duration(days: 14)));
 
-    return MarketLineChart(
-      range: range,
-      showRollingAverage: showRollingAverage,
-      onRangeChanged: onRangeChanged,
-      series: [
-        MarketLineChartSeries(
-          points: spots,
-          color: colorScheme.primary,
-          name: nativeCurrency,
-          fill: true,
-          strokeWidth: 3,
+    return Column(
+      children: [
+        Expanded(
+          child: MarketLineChart(
+            range: range,
+            showRollingAverage: showRollingAverage,
+            onRangeChanged: onRangeChanged,
+            series: [
+              MarketLineChartSeries(
+                points: datePositions == null
+                    ? spots
+                    : [
+                        for (var index = 0; index < spots.length; index++)
+                          MarketLineChartPoint(
+                            datePositions[index],
+                            spots[index].y,
+                            column: spots[index].column,
+                            comparisonValue: spots[index].comparisonValue,
+                          ),
+                      ],
+                color: colorScheme.primary,
+                name: nativeCurrency,
+                fill: true,
+                strokeWidth: 3,
+              ),
+            ],
+            xLabels: labels,
+            pointCount: spots.length,
+            xAxisPositions: datePositions,
+            xAxisBounds: chartStart == null
+                ? null
+                : (
+                    0.0,
+                    (chartEnd.difference(chartStart).inMinutes /
+                            Duration.minutesPerDay)
+                        .clamp(1.0, double.infinity),
+                  ),
+            candles: candles,
+            showCandlesticks: showCandlesticks,
+            candleSelection: candleSelection,
+            candleTooltipTitle: showCandlesticks
+                ? (index) => index < datesList.length
+                    ? tooltipFormatter.format(datesList[index])
+                    : ''
+                : null,
+            candleTooltipRows: showCandlesticks
+                ? (index) {
+                    final candle = candlesByColumn[index];
+                    if (candle == null) return const <String>[];
+                    return [
+                      'O ${fmtNativeCurrency(candle.open, nativeCurrency)}   H ${fmtNativeCurrency(candle.high, nativeCurrency)}',
+                      'L ${fmtNativeCurrency(candle.low, nativeCurrency)}   C ${fmtNativeCurrency(candle.close, nativeCurrency)}',
+                    ];
+                  }
+                : null,
+            yLabelFormatter: (value) =>
+                fmtCompactNativeCurrency(value, nativeCurrency),
+            tooltipRowLabel: (PlotMark mark) =>
+                tooltipTextAt(mark.index, tooltipFormatter),
+            curveLines: settings.curveLines,
+            curveSmoothness: settings.curveSmoothness,
+            leftInset: 64,
+            accessibilityLabel: 'Price history',
+            accessibilityValue:
+                spots.isEmpty ? 'No prices' : '${spots.length} price points',
+          ),
         ),
+        if (partialHistory && range == null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              '${context.l10n.text('Earlier history unavailable')} · '
+              '${tooltipFormatter.format(datesList.first)}',
+              style: Theme.of(context).textTheme.labelSmall,
+              textAlign: TextAlign.center,
+            ),
+          ),
       ],
-      xLabels: labels,
-      pointCount: spots.length,
-      candles: candles,
-      showCandlesticks: showCandlesticks,
-      candleSelection: candleSelection,
-      candleTooltipTitle: showCandlesticks
-          ? (index) => index < datesList.length
-              ? tooltipFormatter.format(datesList[index])
-              : ''
-          : null,
-      candleTooltipRows: showCandlesticks
-          ? (index) {
-              final candle = candlesByColumn[index];
-              if (candle == null) return const <String>[];
-              return [
-                'O ${fmtNativeCurrency(candle.open, nativeCurrency)}   H ${fmtNativeCurrency(candle.high, nativeCurrency)}',
-                'L ${fmtNativeCurrency(candle.low, nativeCurrency)}   C ${fmtNativeCurrency(candle.close, nativeCurrency)}',
-              ];
-            }
-          : null,
-      yLabelFormatter: (value) =>
-          fmtCompactNativeCurrency(value, nativeCurrency),
-      tooltipRowLabel: (PlotMark mark) =>
-          tooltipTextAt(mark.index, tooltipFormatter),
-      curveLines: settings.curveLines,
-      curveSmoothness: settings.curveSmoothness,
-      leftInset: 64,
-      accessibilityLabel: 'Price history',
-      accessibilityValue:
-          spots.isEmpty ? 'No prices' : '${spots.length} price points',
     );
   }
 }

@@ -612,7 +612,7 @@ void main() {
     expect(find.text('No trades yet'), findsNothing);
     await tester.pumpAndSettle();
     expect(find.text('No trades yet'), findsNothing);
-    expect(find.text('Historical prices unavailable'), findsWidgets);
+    expect(find.text('Historical prices unavailable'), findsOneWidget);
   });
 
   testWidgets('cached favorite draws while broker history is pending', (

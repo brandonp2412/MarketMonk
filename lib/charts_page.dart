@@ -320,11 +320,6 @@ class ChartsPageState extends State<ChartsPage>
         _usesIntraday ||
         !replaceExisting && _portfolioSeriesByAccount.isNotEmpty) return;
 
-    // The persisted IBKR performance cache is one year of history. It can
-    // faithfully satisfy any selected period up to one year, but must never be
-    // flashed for a longer saved period while the real series is rebuilding.
-    if (years > 1 || (years == 1 && (months > 0 || days > 0))) return;
-
     final cachedSeries = <String, List<_DateValue>>{};
     final cachedReturns = <String, List<_DateValue>>{};
     final cachedFlows = <String, Map<DateTime, double>>{};
@@ -1000,9 +995,7 @@ class ChartsPageState extends State<ChartsPage>
         forceRefresh: forceRefresh,
       );
       final brokerSeries = _buildBrokerPerformanceSeries(performance, loaded);
-      return brokerSeries.series.isEmpty || brokerSeries.returnSeries.length < 2
-          ? null
-          : brokerSeries;
+      return brokerSeries.series.length < 2 ? null : brokerSeries;
     } catch (error) {
       talker.warning(
         'IBKR performance history unavailable; '
@@ -1171,7 +1164,7 @@ class ChartsPageState extends State<ChartsPage>
           }
           return;
         }
-        if (ibkrConfig.isConfigured && years <= 1) {
+        if (ibkrConfig.enabled) {
           final brokerSeries = await _loadBrokerPerformanceSeries(
             accountName,
             ibkrConfig,
@@ -2726,25 +2719,6 @@ class ChartsPageState extends State<ChartsPage>
         child: Center(child: Text(snapshot.error.toString())),
       );
     }
-    // A wider range may initially stream only the shorter range's existing
-    // rows. Do not plot that partial history as if it covered the new period.
-    final cachedRows = snapshot.data;
-    final missingHistory = !_usesIntraday &&
-        _periodTransition &&
-        _networkLoading &&
-        (cachedRows == null ||
-            cachedRows.isEmpty ||
-            cachedRows.first.candle.date.value.isAfter(
-              _requiredCandleStart().add(const Duration(days: 7)),
-            ));
-    if (missingHistory) {
-      return SizedBox(
-        height: height,
-        child: const Center(
-          child: MarketChartLoading(key: Key('chart-period-loading')),
-        ),
-      );
-    }
     if (snapshot.data == null || snapshot.data!.isEmpty) {
       if (_stockError != null) {
         return SizedBox(
@@ -2864,6 +2838,7 @@ class ChartsPageState extends State<ChartsPage>
           showRollingAverage: _showRollingAverage,
           nativeCurrency: _nativeCurrency,
           intraday: _usesIntraday && _intradaySeries != null,
+          requestedStartDate: _usesIntraday ? null : _requiredCandleStart(),
         ),
       ),
     );
@@ -3457,6 +3432,26 @@ class ChartsPageState extends State<ChartsPage>
       }
     }
     final sortedDates = allDates.toList()..sort();
+    final chartStart = _usesIntraday ? null : _requiredCandleStart();
+    final chartPositions = chartStart == null
+        ? null
+        : [
+            for (final date in sortedDates)
+              date.difference(chartStart).inMinutes / Duration.minutesPerDay,
+          ];
+    final chartEnd = DateUtils.dateOnly(DateTime.now());
+    final chartBounds = chartStart == null
+        ? null
+        : (
+            0.0,
+            max(
+              1.0,
+              chartEnd.difference(chartStart).inMinutes /
+                  Duration.minutesPerDay,
+            ),
+          );
+    final partialHistory = chartStart != null &&
+        sortedDates.first.isAfter(chartStart.add(const Duration(days: 14)));
     final dateIndex = <DateTime, int>{
       for (var index = 0; index < sortedDates.length; index++)
         sortedDates[index]: index,
@@ -3551,7 +3546,8 @@ class ChartsPageState extends State<ChartsPage>
           points: [
             for (var index = 0; index < entry.value.length; index++)
               MarketLineChartPoint(
-                dateIndex[entry.value[index].date]!.toDouble(),
+                chartPositions?[dateIndex[entry.value[index].date]!] ??
+                    dateIndex[entry.value[index].date]!.toDouble(),
                 displayValues[index],
                 comparisonValue:
                     scaleForComparison ? comparisonValues[index] : null,
@@ -3581,63 +3577,84 @@ class ChartsPageState extends State<ChartsPage>
 
     return SizedBox(
       height: height,
-      child: MarketLineChart(
-        key: ValueKey('portfolio|$years|$months|$days'),
-        range: _chartRangeFor(sortedDates),
-        onRangeChanged: (range) => _setChartRange(sortedDates, range),
-        series: chartSeries,
-        candles: chartCandles,
-        showCandlesticks: _showCandlesticks,
-        candleSelection: _candleSelection,
-        candleTooltipTitle: (index) => index >= 0 && index < sortedDates.length
-            ? formatter.format(sortedDates[index])
-            : '',
-        candleTooltipRows: _showCandlesticks
-            ? (index) => candleTooltipRowsByIndex[index] ?? const []
-            : null,
-        showRollingAverage: _showRollingAverage,
-        xLabels: [for (final date in sortedDates) axisFormatter.format(date)],
-        pointCount: sortedDates.length,
-        yLabelFormatter: (value) => scaleForComparison
-            ? fmtChartAxisPercent(value)
-            : fmtCompactCurrency(value),
-        tooltipRowLabel: (PlotMark mark) {
-          final accountName = mark.seriesIndex < visibleKeys.length
-              ? visibleKeys[mark.seriesIndex]
-              : '';
-          final date = mark.index >= 0 && mark.index < sortedDates.length
-              ? sortedDates[mark.index]
-              : null;
-          double? actualValue;
-          if (date != null) {
-            for (final point
-                in visibleSeries[accountName] ?? const <_DateValue>[]) {
-              if (point.date == date) {
-                actualValue = point.value;
-                break;
-              }
-            }
-          }
-          final valueLabel = _selectedFavorites.contains(accountName)
-              ? fmtNativeCurrency(
-                  actualValue ?? mark.value,
-                  symbolCurrency(accountName),
-                )
-              : fmtCurrency(actualValue ?? mark.value);
-          final dateLabel = date == null ? '' : formatter.format(date);
-          final returnLabel = scaleForComparison
-              ? '${mark.value >= 0 ? '+' : ''}${mark.value.toStringAsFixed(2)}% · '
-              : '';
-          return dateLabel.isEmpty
-              ? '$returnLabel$valueLabel'
-              : '$returnLabel$valueLabel · $dateLabel';
-        },
-        curveLines: settings.curveLines,
-        curveSmoothness: settings.curveSmoothness,
-        leftInset: scaleForComparison ? 72 : 64,
-        accessibilityLabel: context.l10n.text('Portfolio performance'),
-        accessibilityValue:
-            '${chartSeries.length} ${context.l10n.text('portfolios')}',
+      child: Column(
+        children: [
+          Expanded(
+            child: MarketLineChart(
+              key: ValueKey('portfolio|$years|$months|$days'),
+              range: _chartRangeFor(sortedDates),
+              onRangeChanged: (range) => _setChartRange(sortedDates, range),
+              series: chartSeries,
+              candles: chartCandles,
+              showCandlesticks: _showCandlesticks,
+              candleSelection: _candleSelection,
+              candleTooltipTitle: (index) =>
+                  index >= 0 && index < sortedDates.length
+                      ? formatter.format(sortedDates[index])
+                      : '',
+              candleTooltipRows: _showCandlesticks
+                  ? (index) => candleTooltipRowsByIndex[index] ?? const []
+                  : null,
+              showRollingAverage: _showRollingAverage,
+              xLabels: [
+                for (final date in sortedDates) axisFormatter.format(date),
+              ],
+              pointCount: sortedDates.length,
+              xAxisPositions: chartPositions,
+              xAxisBounds: chartBounds,
+              yLabelFormatter: (value) => scaleForComparison
+                  ? fmtChartAxisPercent(value)
+                  : fmtCompactCurrency(value),
+              tooltipRowLabel: (PlotMark mark) {
+                final accountName = mark.seriesIndex < visibleKeys.length
+                    ? visibleKeys[mark.seriesIndex]
+                    : '';
+                final date = mark.index >= 0 && mark.index < sortedDates.length
+                    ? sortedDates[mark.index]
+                    : null;
+                double? actualValue;
+                if (date != null) {
+                  for (final point
+                      in visibleSeries[accountName] ?? const <_DateValue>[]) {
+                    if (point.date == date) {
+                      actualValue = point.value;
+                      break;
+                    }
+                  }
+                }
+                final valueLabel = _selectedFavorites.contains(accountName)
+                    ? fmtNativeCurrency(
+                        actualValue ?? mark.value,
+                        symbolCurrency(accountName),
+                      )
+                    : fmtCurrency(actualValue ?? mark.value);
+                final dateLabel = date == null ? '' : formatter.format(date);
+                final returnLabel = scaleForComparison
+                    ? '${mark.value >= 0 ? '+' : ''}${mark.value.toStringAsFixed(2)}% · '
+                    : '';
+                return dateLabel.isEmpty
+                    ? '$returnLabel$valueLabel'
+                    : '$returnLabel$valueLabel · $dateLabel';
+              },
+              curveLines: settings.curveLines,
+              curveSmoothness: settings.curveSmoothness,
+              leftInset: scaleForComparison ? 72 : 64,
+              accessibilityLabel: context.l10n.text('Portfolio performance'),
+              accessibilityValue:
+                  '${chartSeries.length} ${context.l10n.text('portfolios')}',
+            ),
+          ),
+          if (partialHistory && _customChartRange == null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '${context.l10n.text('Earlier history unavailable')} · '
+                '${formatter.format(sortedDates.first)}',
+                style: Theme.of(context).textTheme.labelSmall,
+                textAlign: TextAlign.center,
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -3744,9 +3761,8 @@ class ChartsPageState extends State<ChartsPage>
               ? <String>[if (pct >= 0) '+', pct.toStringAsFixed(2), '%'].join()
               : _portfolioLoading
                   ? '—'
-                  : context.l10n.text('History unavailable')),
+                  : '—'),
           maxLines: 1,
-          overflow: TextOverflow.ellipsis,
           style: theme.textTheme.titleMedium!.copyWith(color: returnColor),
         );
 
@@ -3762,9 +3778,8 @@ class ChartsPageState extends State<ChartsPage>
           ? (change >= 0 ? '+' : '') + fmtCurrency(change)
           : _portfolioLoading
               ? '—'
-              : context.l10n.text('Historical prices unavailable'),
+              : '—',
       maxLines: 1,
-      overflow: TextOverflow.ellipsis,
       style: TextStyle(color: returnColor, fontSize: 13, height: 1.1),
     );
     return Column(

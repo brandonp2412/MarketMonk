@@ -841,7 +841,8 @@ void main() {
     expect(allRatesFromUsd['NZD'], closeTo(10000 / 5750, 1e-9));
     final failedPerformanceLoads = performanceLoads;
     expect(failedPerformanceLoads, greaterThan(0));
-    expect(find.text('History unavailable'), findsOneWidget);
+    expect(find.text('History unavailable'), findsNothing);
+    expect(find.text('—'), findsWidgets);
     expect(find.textContaining('% holdings'), findsNothing);
 
     final accountSelector = find.byKey(
@@ -885,8 +886,18 @@ void main() {
     final successfulPerformanceLoads = performanceLoads;
     await tester.tap(find.text('10y'));
     await tester.pumpAndSettle();
-    expect(find.text('History unavailable'), findsOneWidget);
+    expect(find.text('History unavailable'), findsNothing);
     expect(find.textContaining('10,100'), findsWidgets);
+    expect(find.text('+11.69%'), findsOneWidget);
+    expect(find.textContaining('Earlier history unavailable'), findsOneWidget);
+    final longRange =
+        tester.widget<MarketLineChart>(find.byType(MarketLineChart));
+    expect(longRange.series.single.points, hasLength(2));
+    expect(longRange.xAxisBounds, isNotNull);
+    expect(
+      longRange.series.single.points.first.x,
+      greaterThan(longRange.xAxisBounds!.$2 * 0.8),
+    );
 
     expect(ibkrLoads, refreshedIbkrLoads);
     expect(performanceLoads, successfulPerformanceLoads);

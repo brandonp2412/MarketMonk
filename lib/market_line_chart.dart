@@ -242,6 +242,8 @@ class MarketLineChart extends StatelessWidget {
   final List<MarketLineChartSeries> series;
   final List<String> xLabels;
   final int pointCount;
+  final List<double>? xAxisPositions;
+  final (double, double)? xAxisBounds;
   final List<MarketCandlePoint> candles;
   final bool showCandlesticks;
   final ValueNotifier<int?>? candleSelection;
@@ -269,6 +271,8 @@ class MarketLineChart extends StatelessWidget {
     required this.series,
     required this.xLabels,
     required this.pointCount,
+    this.xAxisPositions,
+    this.xAxisBounds,
     this.candles = const [],
     this.showCandlesticks = false,
     this.candleSelection,
@@ -416,9 +420,14 @@ class MarketLineChart extends StatelessWidget {
         curveSmoothness: curveSmoothness,
         xLabels: [
           for (var i = 0; i < xLabels.length; i++)
-            _LineChartAxisLabel(i.toDouble(), xLabels[i], column: i),
+            _LineChartAxisLabel(
+              xAxisPositions?[i] ?? i.toDouble(),
+              xLabels[i],
+              column: i,
+            ),
         ],
-        uniformXCount: pointCount,
+        uniformXCount: xAxisPositions == null ? pointCount : null,
+        xAxisBounds: xAxisBounds,
         axisLabelColor: axisLabelColor,
         yLabelFormatter: yLabelFormatter,
         leftInset: leftInset,
@@ -915,6 +924,7 @@ class _MarketLineChartRenderer extends ChartRenderer
   final double curveSmoothness;
   final List<_LineChartAxisLabel> xLabels;
   final int? uniformXCount;
+  final (double, double)? xAxisBounds;
   final int firstColumn;
   final Color axisLabelColor;
   final String Function(double value) yLabelFormatter;
@@ -933,6 +943,7 @@ class _MarketLineChartRenderer extends ChartRenderer
     required this.curveSmoothness,
     required this.xLabels,
     required this.uniformXCount,
+    this.xAxisBounds,
     this.firstColumn = 0,
     required this.axisLabelColor,
     required this.yLabelFormatter,
@@ -1055,7 +1066,7 @@ class _MarketLineChartRenderer extends ChartRenderer
               (label.column ?? label.x) <= end)
             label,
       ],
-      uniformXCount: end - start + 1,
+      uniformXCount: uniformXCount == null ? null : end - start + 1,
       firstColumn: start,
       axisLabelColor: axisLabelColor,
       yLabelFormatter: yLabelFormatter,
@@ -1088,6 +1099,7 @@ class _MarketLineChartRenderer extends ChartRenderer
   }
 
   (double, double) get _xBounds {
+    if (xAxisBounds != null) return xAxisBounds!;
     final points = _allPoints;
     if (points.isEmpty) return (0, 1);
     final minX = points.map((point) => point.x).reduce(min);
@@ -1321,9 +1333,18 @@ class _MarketLineChartRenderer extends ChartRenderer
   void _drawCandles(Canvas canvas, ChartBounds bounds) {
     if (candles.isEmpty) return;
     final seriesCount = series.length;
-    final spacing = uniformXCount == null || uniformXCount! < 2
+    var spacing = uniformXCount == null || uniformXCount! < 2
         ? bounds.width
         : bounds.width / (uniformXCount! - 1);
+    if (uniformXCount == null) {
+      for (final line in series) {
+        if (line.points.length < 2) continue;
+        final first = _xForPoint(line.points.first, 0, bounds);
+        final last =
+            _xForPoint(line.points.last, line.points.length - 1, bounds);
+        spacing = min(spacing, (last - first).abs() / (line.points.length - 1));
+      }
+    }
     final groupSize = max(
       1,
       (3.5 * max(1, seriesCount) / max(spacing, 0.01)).ceil(),
