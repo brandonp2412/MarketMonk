@@ -14,6 +14,7 @@ import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/crash_logger.dart';
 import 'package:market_monk/database.dart';
+import 'package:market_monk/debug_hotkeys.dart';
 import 'package:market_monk/legacy_profile_database.dart' as legacy;
 import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/ibkr_api.dart';
@@ -39,6 +40,7 @@ Future<void> main() async {
   await runZonedGuarded<Future<void>>(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+      installDesktopDebugHotkeys();
       backgroundNetworkCoordinator.observeAppLifecycle();
       await CrashLogger.install(fileName: 'marketmonk-crash.log');
       installTalkerErrorHandlers();
