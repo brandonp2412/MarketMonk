@@ -710,6 +710,18 @@ void main() {
       );
       expect(find.text('+21.00%'), findsNothing);
       expect(pieValues(), {'VOO': 1000, 'MSFT': 3000, 'OLD': 4000});
+      final chartAnimation = tester
+          .widget<AnimatedBuilder>(
+            find.descendant(
+              of: find.byType(MarketDonutChart),
+              matching: find.byType(AnimatedBuilder),
+            ),
+          )
+          .animation as Animation<double>;
+      expect(chartAnimation.value, 0);
+      await tester.pump(const Duration(milliseconds: 90));
+      expect(chartAnimation.value, greaterThan(0));
+      expect(chartAnimation.value, lessThan(1));
       if (width >= 840) {
         expect(find.text(fmtCurrency(8000)), findsWidgets);
         expect(find.text('Holdings value'), findsOneWidget);

@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:drafter/drafter.dart';
 import 'package:drafter/painting.dart';
-import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 
 @immutable
@@ -16,6 +15,31 @@ class MarketDonutSlice {
   final double value;
   final Color color;
   final String label;
+}
+
+@immutable
+class _MarketDonutArc {
+  const _MarketDonutArc({
+    required this.label,
+    required this.color,
+    required this.startAngle,
+    required this.sweep,
+    required this.radius,
+  });
+
+  final String label;
+  final Color color;
+  final double startAngle;
+  final double sweep;
+  final double radius;
+
+  _MarketDonutArc withSweep(double nextSweep) => _MarketDonutArc(
+        label: label,
+        color: color,
+        startAngle: startAngle,
+        sweep: nextSweep,
+        radius: radius,
+      );
 }
 
 class MarketDonutChart extends StatefulWidget {
@@ -44,38 +68,86 @@ class _MarketDonutChartState extends State<MarketDonutChart>
     with SingleTickerProviderStateMixin {
   late final AnimationController _selectionAnimation = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 220),
+    duration: const Duration(milliseconds: 280),
     value: 1,
   );
-  late List<double> _fromRadii = _targetRadii();
-  late List<double> _toRadii = _targetRadii();
+  late Map<String, _MarketDonutArc> _fromArcs = _targetArcs();
+  late Map<String, _MarketDonutArc> _toArcs = _targetArcs();
 
-  List<double> _targetRadii() => List.generate(
-        widget.slices.length,
-        (index) => index == widget.selectedIndex
+  Map<String, _MarketDonutArc> _targetArcs() {
+    final total = widget.slices.fold<double>(
+      0,
+      (sum, slice) => sum + math.max(0, slice.value),
+    );
+    var startAngle = -math.pi / 2;
+    final arcs = <String, _MarketDonutArc>{};
+    for (var index = 0; index < widget.slices.length; index++) {
+      final slice = widget.slices[index];
+      final sweep =
+          total <= 0 ? 0.0 : math.max(0, slice.value) / total * math.pi * 2;
+      arcs[slice.label] = _MarketDonutArc(
+        label: slice.label,
+        color: slice.color,
+        startAngle: startAngle,
+        sweep: sweep,
+        radius: index == widget.selectedIndex
             ? widget.selectedRadius
             : widget.radius,
       );
+      startAngle += sweep;
+    }
+    return arcs;
+  }
 
-  double _animatedRadius(int index, double progress) {
+  bool _sameArcs(
+    Map<String, _MarketDonutArc> first,
+    Map<String, _MarketDonutArc> second,
+  ) {
+    if (first.length != second.length) return false;
+    for (final entry in first.entries) {
+      final other = second[entry.key];
+      if (other == null ||
+          entry.value.startAngle != other.startAngle ||
+          entry.value.sweep != other.sweep ||
+          entry.value.radius != other.radius ||
+          entry.value.color != other.color) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  _MarketDonutArc _animatedArc(String label, double eased) {
+    final from = _fromArcs[label] ?? _toArcs[label]!.withSweep(0);
+    final to = _toArcs[label] ?? _fromArcs[label]!.withSweep(0);
+    double between(double a, double b) => a + (b - a) * eased;
+    return _MarketDonutArc(
+      label: label,
+      color: Color.lerp(from.color, to.color, eased)!,
+      startAngle: between(from.startAngle, to.startAngle),
+      sweep: between(from.sweep, to.sweep),
+      radius: between(from.radius, to.radius),
+    );
+  }
+
+  List<_MarketDonutArc> _animatedArcs(double progress) {
     final eased = Curves.easeOutCubic.transform(progress);
-    return _fromRadii[index] + (_toRadii[index] - _fromRadii[index]) * eased;
+    return [
+      for (final label in {..._toArcs.keys, ..._fromArcs.keys})
+        _animatedArc(label, eased),
+    ];
   }
 
   @override
   void didUpdateWidget(covariant MarketDonutChart oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final targets = _targetRadii();
-    if (listEquals(targets, _toRadii)) {
-      return;
-    }
-    _fromRadii = List.generate(
-      targets.length,
-      (index) => index < _toRadii.length
-          ? _animatedRadius(index, _selectionAnimation.value)
-          : widget.radius,
-    );
-    _toRadii = targets;
+    final targets = _targetArcs();
+    if (_sameArcs(targets, _toArcs)) return;
+    _fromArcs = {
+      for (final arc in _animatedArcs(_selectionAnimation.value))
+        if (arc.sweep > 0.000001) arc.label: arc,
+    };
+    _toArcs = targets;
     _selectionAnimation.forward(from: 0);
   }
 
@@ -97,38 +169,29 @@ class _MarketDonutChartState extends State<MarketDonutChart>
           final delta = position - center;
           final distance = delta.distance;
 
-          var angle = math.atan2(delta.dy, delta.dx) + math.pi / 2;
-          if (angle < 0) angle += math.pi * 2;
-          final total = widget.slices.fold<double>(
-            0,
-            (sum, slice) => sum + math.max(0, slice.value),
-          );
-          if (total <= 0) return null;
-
-          var cursor = 0.0;
-          var hitIndex = widget.slices.length - 1;
-          for (var index = 0; index < widget.slices.length; index++) {
-            cursor +=
-                math.max(0, widget.slices[index].value) / total * math.pi * 2;
-            if (angle <= cursor) {
-              hitIndex = index;
-              break;
+          var angle = math.atan2(delta.dy, delta.dx);
+          if (angle < -math.pi / 2) angle += math.pi * 2;
+          final arcs = _animatedArcs(_selectionAnimation.value);
+          for (final arc in arcs.reversed) {
+            if (angle < arc.startAngle || angle >= arc.startAngle + arc.sweep) {
+              continue;
+            }
+            final availableOuter = math.min(
+              widget.centerSpaceRadius + arc.radius,
+              size.shortestSide / 2,
+            );
+            final availableInner = math.min(
+              widget.centerSpaceRadius,
+              math.max(0, availableOuter - 1),
+            );
+            if (distance >= availableInner && distance <= availableOuter) {
+              final index = widget.slices.indexWhere(
+                (slice) => slice.label == arc.label,
+              );
+              return index < 0 ? null : index;
             }
           }
-
-          final sectionRadius = _toRadii[hitIndex];
-          final availableOuter = math.min(
-            widget.centerSpaceRadius + sectionRadius,
-            size.shortestSide / 2,
-          );
-          final availableInner = math.min(
-            widget.centerSpaceRadius,
-            math.max(0, availableOuter - 1),
-          );
-          if (distance < availableInner || distance > availableOuter) {
-            return null;
-          }
-          return hitIndex;
+          return null;
         }
 
         void select(Offset position) =>
@@ -151,13 +214,12 @@ class _MarketDonutChartState extends State<MarketDonutChart>
                 builder: (context, _) => ChartCanvas(
                   renderer: _MarketDonutRenderer(
                     slices: widget.slices,
-                    selectedIndex: widget.selectedIndex,
+                    arcs: _animatedArcs(_selectionAnimation.value),
+                    selectedLabel: widget.selectedIndex == null ||
+                            widget.selectedIndex! >= widget.slices.length
+                        ? null
+                        : widget.slices[widget.selectedIndex!].label,
                     centerSpaceRadius: widget.centerSpaceRadius,
-                    sectionRadii: List.generate(
-                      _toRadii.length,
-                      (index) =>
-                          _animatedRadius(index, _selectionAnimation.value),
-                    ),
                   ),
                   animate: false,
                 ),
@@ -173,15 +235,15 @@ class _MarketDonutChartState extends State<MarketDonutChart>
 class _MarketDonutRenderer extends ChartRenderer {
   const _MarketDonutRenderer({
     required this.slices,
-    required this.selectedIndex,
+    required this.arcs,
+    required this.selectedLabel,
     required this.centerSpaceRadius,
-    required this.sectionRadii,
   });
 
   final List<MarketDonutSlice> slices;
-  final int? selectedIndex;
+  final List<_MarketDonutArc> arcs;
+  final String? selectedLabel;
   final double centerSpaceRadius;
-  final List<double> sectionRadii;
 
   @override
   void draw(
@@ -199,42 +261,40 @@ class _MarketDonutRenderer extends ChartRenderer {
 
     final center = Offset(size.width / 2, size.height / 2);
     final maxOuter = size.shortestSide / 2;
-    var startAngle = -math.pi / 2;
 
-    for (var index = 0; index < slices.length; index++) {
-      final slice = slices[index];
-      final sweep = math.max(0, slice.value) / total * math.pi * 2 * progress;
-      final sectionRadius = sectionRadii[index];
-      final outer = math.min(centerSpaceRadius + sectionRadius, maxOuter);
+    for (final arc in arcs) {
+      final sweep = arc.sweep * progress;
+      if (sweep <= 0) continue;
+      final outer = math.min(centerSpaceRadius + arc.radius, maxOuter);
       final inner = math.min(centerSpaceRadius, math.max(0, outer - 1));
       final strokeWidth = math.max(1.0, outer - inner);
       final ringRadius = inner + strokeWidth / 2;
 
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: ringRadius),
-        startAngle,
+        arc.startAngle,
         sweep,
         false,
         Paint()
-          ..color = slice.color
+          ..color = arc.color
           ..style = PaintingStyle.stroke
           ..strokeWidth = strokeWidth
           ..strokeCap = StrokeCap.butt
           ..isAntiAlias = true,
       );
 
-      if (index == selectedIndex && sweep > 0.16) {
-        final midAngle = startAngle + sweep / 2;
+      if (arc.label == selectedLabel && sweep > 0.16) {
+        final midAngle = arc.startAngle + sweep / 2;
         final labelRadius = inner + strokeWidth * 0.55;
         final point = center +
             Offset(
               math.cos(midAngle) * labelRadius,
               math.sin(midAngle) * labelRadius,
             );
-        final brightness = ThemeData.estimateBrightnessForColor(slice.color);
+        final brightness = ThemeData.estimateBrightnessForColor(arc.color);
         drawChartText(
           canvas,
-          '${(slice.value / total * 100).toStringAsFixed(1)}%',
+          '${(arc.sweep / (math.pi * 2) * 100).toStringAsFixed(1)}%',
           point,
           color: brightness == Brightness.dark ? Colors.white : Colors.black,
           fontSize: 12,
@@ -242,8 +302,6 @@ class _MarketDonutRenderer extends ChartRenderer {
           v: VAlign.center,
         );
       }
-
-      startAngle += math.max(0, slice.value) / total * math.pi * 2;
     }
   }
 
