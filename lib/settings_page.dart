@@ -129,7 +129,12 @@ class _SettingsPageState extends State<SettingsPage> {
       'Interactive Brokers' => 'IBKR broker',
       'Theme' => 'dark light system appearance',
       'Currencies' => 'currency exchange',
-      'Export database' || 'Import database' => 'backup',
+      'Export database' => 'backup',
+      'Import database' => 'backup restore',
+      'Hide dollar amounts' => 'privacy hide balances mask amounts',
+      'Sync' => 'refresh refresh prices update prices',
+      'Rolling average' => 'moving average',
+      'Candles' => 'candlestick candlesticks',
       'Curve line graphs' => 'graph lines',
       _ => '',
     };

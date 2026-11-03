@@ -204,4 +204,41 @@ void main() {
     expect(find.byKey(const Key('settings-candlestick-chart')), findsNothing);
     expect(find.text('Market closed indicator'), findsNothing);
   });
+  testWidgets('desktop search finds common alternative settings terms',
+      (tester) async {
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await pumpSettings(tester, const Size(1200, 900));
+    final search = find.byKey(const Key('settings-search'));
+    for (final entry in <String, String>{
+      'refresh prices': 'Sync',
+      'restore': 'Import database',
+      'privacy': 'Hide dollar amounts',
+    }.entries) {
+      await tester.enterText(search, entry.key);
+      await tester.pumpAndSettle();
+      expect(find.text(entry.value), findsOneWidget, reason: entry.key);
+    }
+  });
+
+  testWidgets('mobile chart search understands common chart terminology',
+      (tester) async {
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await pumpSettings(tester, const Size(430, 940));
+    final search = find.byKey(const Key('settings-search'));
+    await tester.enterText(search, 'moving average');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('settings-rolling-average')), findsOneWidget);
+    expect(find.byKey(const Key('settings-candlestick-chart')), findsNothing);
+
+    await tester.enterText(search, 'candlestick');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('settings-candlestick-chart')), findsOneWidget);
+    expect(find.byKey(const Key('settings-rolling-average')), findsNothing);
+  });
 }
