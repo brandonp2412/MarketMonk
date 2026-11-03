@@ -11,6 +11,7 @@ import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/candle_ticker.dart';
 import 'package:market_monk/chart_colors.dart';
+import 'package:market_monk/currency_buttons.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/edit_ticker_page.dart';
@@ -2328,7 +2329,9 @@ class ChartsPageState extends State<ChartsPage>
                       child: Column(
                         key: _overlayKey,
                         mainAxisSize: MainAxisSize.min,
-                        children: [_buildSearchBar()],
+                        children: [
+                          _buildSearchBar(availableWidth: constraints.maxWidth),
+                        ],
                       ),
                     ),
                   );
@@ -2341,11 +2344,14 @@ class ChartsPageState extends State<ChartsPage>
     );
   }
 
-  Widget _buildSearchBar() {
+  Widget _buildSearchBar({required double availableWidth}) {
     final canReturnToPortfolio =
         _mode != _ChartMode.portfolio || _searchController.text.isNotEmpty;
     final desktop = isDesktopLayout(context);
     final settings = context.watch<SettingsState>();
+    final inlineCurrencies = desktop &&
+        settings.visibleCurrencies.length > 1 &&
+        availableWidth >= 750 + settings.visibleCurrencies.length * 65;
     final leading = canReturnToPortfolio
         ? IconButton(
             icon: const Icon(Icons.arrow_back),
@@ -2390,97 +2396,116 @@ class ChartsPageState extends State<ChartsPage>
               tooltip: context.l10n.text('Refresh'),
               icon: const Icon(Icons.refresh_rounded),
             ),
-          PopupMenuButton<String>(
-            key: const Key('chart-menu-button'),
-            icon: const Icon(Icons.more_vert),
-            tooltip: context.l10n.text('Show menu'),
-            onSelected: (value) {
-              if (value == '__settings__') {
-                Navigator.push(
-                  context,
-                  adaptivePageRoute(
+          if (inlineCurrencies)
+            const CurrencyButtons(key: Key('chart-currency-buttons')),
+          if (!desktop ||
+              (settings.visibleCurrencies.length > 1 && !inlineCurrencies))
+            PopupMenuButton<String>(
+              key: const Key('chart-menu-button'),
+              icon: const Icon(Icons.more_vert),
+              tooltip: context.l10n.text('Show menu'),
+              onSelected: (value) {
+                if (value == '__settings__') {
+                  Navigator.push(
                     context,
-                    builder: (_) => const SettingsPage(),
-                  ),
-                );
-              } else if (value == '__rolling_average__') {
-                runDetachedTask(
-                  settings.setShowRollingAverage(!settings.showRollingAverage),
-                  'Failed to save rolling average',
-                );
-              } else if (value == '__candles__') {
-                _candleSelection.value = null;
-                runDetachedTask(
-                  settings.setShowCandlesticks(!settings.showCandlesticks),
-                  'Failed to save chart style',
-                );
-              } else if (value.startsWith('currency:')) {
-                runDetachedTask(
-                  settings.setDisplayCurrency(value.substring(9)),
-                  'Failed to change display currency',
-                );
-              }
-            },
-            itemBuilder: (context) => [
-              if (settings.visibleCurrencies.length > 1) ...[
-                for (final currencyCode in settings.visibleCurrencies)
-                  CheckedPopupMenuItem<String>(
-                    value: 'currency:$currencyCode',
-                    checked: currencyCode == settings.displayCurrency,
-                    child: Text(currencyCode),
-                  ),
-                const PopupMenuDivider(),
-              ],
-              if (!desktop) ...[
-                PopupMenuItem<String>(
-                  key: const Key('chart-menu-rolling-average'),
-                  value: '__rolling_average__',
-                  child: Row(
-                    children: [
-                      Icon(
-                        settings.showRollingAverage
-                            ? Icons.radio_button_checked
-                            : Icons.radio_button_unchecked,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(context.l10n.text('Rolling average')),
-                      if (settings.showRollingAverage) ...[
-                        const SizedBox(width: 8),
-                        const Icon(Icons.check, size: 18),
+                    adaptivePageRoute(
+                      context,
+                      builder: (_) => const SettingsPage(),
+                    ),
+                  );
+                } else if (value == '__rolling_average__') {
+                  runDetachedTask(
+                    settings
+                        .setShowRollingAverage(!settings.showRollingAverage),
+                    'Failed to save rolling average',
+                  );
+                } else if (value == '__candles__') {
+                  _candleSelection.value = null;
+                  runDetachedTask(
+                    settings.setShowCandlesticks(!settings.showCandlesticks),
+                    'Failed to save chart style',
+                  );
+                } else if (value.startsWith('currency:')) {
+                  runDetachedTask(
+                    settings.setDisplayCurrency(value.substring(9)),
+                    'Failed to change display currency',
+                  );
+                }
+              },
+              itemBuilder: (context) => [
+                if (settings.visibleCurrencies.length > 1) ...[
+                  for (final currencyCode in settings.visibleCurrencies)
+                    CheckedPopupMenuItem<String>(
+                      value: 'currency:$currencyCode',
+                      checked: currencyCode == settings.displayCurrency,
+                      child: Text(currencyCode),
+                    ),
+                  if (!desktop) const PopupMenuDivider(),
+                ],
+                if (!desktop) ...[
+                  PopupMenuItem<String>(
+                    key: const Key('chart-menu-rolling-average'),
+                    value: '__rolling_average__',
+                    child: Row(
+                      children: [
+                        Icon(
+                          settings.showRollingAverage
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(context.l10n.text('Rolling average')),
+                        if (settings.showRollingAverage) ...[
+                          const SizedBox(width: 8),
+                          const Icon(Icons.check, size: 18),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                PopupMenuItem<String>(
-                  key: const Key('chart-menu-candles'),
-                  value: '__candles__',
-                  child: Row(
-                    children: [
-                      Icon(
-                        settings.showCandlesticks
-                            ? Icons.candlestick_chart
-                            : Icons.candlestick_chart_outlined,
-                      ),
-                      const SizedBox(width: 12),
-                      const Text('Candles'),
-                      if (settings.showCandlesticks) ...[
-                        const SizedBox(width: 8),
-                        const Icon(Icons.check, size: 18),
+                  PopupMenuItem<String>(
+                    key: const Key('chart-menu-candles'),
+                    value: '__candles__',
+                    child: Row(
+                      children: [
+                        Icon(
+                          settings.showCandlesticks
+                              ? Icons.candlestick_chart
+                              : Icons.candlestick_chart_outlined,
+                        ),
+                        const SizedBox(width: 12),
+                        const Text('Candles'),
+                        if (settings.showCandlesticks) ...[
+                          const SizedBox(width: 8),
+                          const Icon(Icons.check, size: 18),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                const PopupMenuDivider(),
+                  const PopupMenuDivider(),
+                ],
+                if (!desktop)
+                  PopupMenuItem<String>(
+                    value: '__settings__',
+                    child: ListTile(
+                      leading: const Icon(Icons.settings),
+                      title: Text(context.l10n.text('Settings')),
+                    ),
+                  ),
               ],
-              PopupMenuItem<String>(
-                value: '__settings__',
-                child: ListTile(
-                  leading: const Icon(Icons.settings),
-                  title: Text(context.l10n.text('Settings')),
+            ),
+          if (desktop)
+            IconButton(
+              key: const Key('chart-settings-button'),
+              icon: const Icon(Icons.settings_outlined),
+              tooltip: context.l10n.text('Settings'),
+              onPressed: () => Navigator.push(
+                context,
+                adaptivePageRoute(
+                  context,
+                  builder: (_) => const SettingsPage(),
                 ),
               ),
-            ],
-          ),
+            ),
         ],
       ),
     );

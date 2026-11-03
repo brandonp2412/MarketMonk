@@ -11,6 +11,7 @@ import 'package:intl/intl.dart';
 import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/chart_colors.dart';
+import 'package:market_monk/currency_buttons.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/empty_state.dart';
@@ -1370,6 +1371,10 @@ class PortfolioPageState extends State<PortfolioPage>
         positions.map((position) => position.nativeCurrency).toSet().length;
     final positionLabel = positions.length == 1 ? 'position' : 'positions';
     final currencyLabel = currencyCount == 1 ? 'currency' : 'currencies';
+    final windowWidth = MediaQuery.sizeOf(context).width;
+    final expandedActions = windowWidth >= 1280;
+    final inlineCurrencies = settings.visibleCurrencies.length > 1 &&
+        windowWidth >= 1080 + settings.visibleCurrencies.length * 70;
     return LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
         child: SizedBox(
@@ -1384,11 +1389,13 @@ class PortfolioPageState extends State<PortfolioPage>
                   children: [
                     ProfilePicker(
                       key: const Key('portfolio-profile-picker'),
-                      onExport: () => runDetachedTask(
-                        _exportCsv(context, positions),
-                        'Failed to export portfolio CSV',
-                      ),
-                      onShare: _supportsFileSharing
+                      onExport: expandedActions
+                          ? null
+                          : () => runDetachedTask(
+                                _exportCsv(context, positions),
+                                'Failed to export portfolio CSV',
+                              ),
+                      onShare: !expandedActions && _supportsFileSharing
                           ? () => runDetachedTask(
                                 _shareCsv(context, positions),
                                 'Failed to share portfolio CSV',
@@ -1416,6 +1423,30 @@ class PortfolioPageState extends State<PortfolioPage>
                         ],
                       ),
                     ),
+                    if (expandedActions) ...[
+                      OutlinedButton.icon(
+                        key: const Key('desktop-portfolio-export'),
+                        onPressed: () => runDetachedTask(
+                          _exportCsv(context, positions),
+                          'Failed to export portfolio CSV',
+                        ),
+                        icon: const Icon(Icons.download_rounded),
+                        label: Text(context.l10n.text('Export CSV')),
+                      ),
+                      const SizedBox(width: 8),
+                      if (_supportsFileSharing) ...[
+                        OutlinedButton.icon(
+                          key: const Key('desktop-portfolio-share'),
+                          onPressed: () => runDetachedTask(
+                            _shareCsv(context, positions),
+                            'Failed to share portfolio CSV',
+                          ),
+                          icon: const Icon(Icons.share_rounded),
+                          label: Text(context.l10n.text('Share CSV')),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                    ],
                     Tooltip(
                       message: context.l10n.text('Refresh'),
                       child: IconButton(
@@ -1424,8 +1455,13 @@ class PortfolioPageState extends State<PortfolioPage>
                       ),
                     ),
                     if (settings.visibleCurrencies.length > 1)
-                      const SizedBox(width: 4),
-                    if (settings.visibleCurrencies.length > 1)
+                      const SizedBox(width: 8),
+                    if (inlineCurrencies)
+                      const CurrencyButtons(
+                        key: Key('portfolio-currency-buttons'),
+                      ),
+                    if (settings.visibleCurrencies.length > 1 &&
+                        !inlineCurrencies)
                       PopupMenuButton<String>(
                         key: const Key('portfolio-currency-menu'),
                         onSelected: (value) => runDetachedTask(

@@ -60,31 +60,50 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
 
       final menu = find.byKey(const Key('chart-menu-button'));
-      expect(menu, findsOneWidget);
       expect(find.byType(DropdownButton<String>), findsNothing);
-      await tester.tap(menu);
-      await tester.pumpAndSettle();
-      expect(find.text('NZD'), findsOneWidget);
-      expect(find.text('USD'), findsOneWidget);
-      final selected = tester.widget<CheckedPopupMenuItem<String>>(
-        find.widgetWithText(CheckedPopupMenuItem<String>, 'NZD'),
-      );
-      expect(selected.checked, true);
-      await tester.tap(
-        find.widgetWithText(CheckedPopupMenuItem<String>, 'USD'),
-      );
-      await tester.pumpAndSettle();
-      expect(settings.displayCurrency, 'USD');
+      if (width >= 1400) {
+        expect(menu, findsNothing);
+        final currencies = find.byKey(const Key('chart-currency-buttons'));
+        expect(currencies, findsOneWidget);
+        await tester.tap(
+          find.descendant(of: currencies, matching: find.text('USD')),
+        );
+        await tester.pumpAndSettle();
+        expect(settings.displayCurrency, 'USD');
+        final selector = tester.widget<SegmentedButton<String>>(
+          find.descendant(
+            of: currencies,
+            matching: find.byType(SegmentedButton<String>),
+          ),
+        );
+        expect(selector.selected, {'USD'});
+        await tester.tap(find.byKey(const Key('chart-settings-button')));
+      } else {
+        expect(menu, findsOneWidget);
+        await tester.tap(menu);
+        await tester.pumpAndSettle();
+        expect(find.text('NZD'), findsOneWidget);
+        expect(find.text('USD'), findsOneWidget);
+        final selected = tester.widget<CheckedPopupMenuItem<String>>(
+          find.widgetWithText(CheckedPopupMenuItem<String>, 'NZD'),
+        );
+        expect(selected.checked, true);
+        await tester.tap(
+          find.widgetWithText(CheckedPopupMenuItem<String>, 'USD'),
+        );
+        await tester.pumpAndSettle();
+        expect(settings.displayCurrency, 'USD');
 
-      await tester.tap(menu);
-      await tester.pumpAndSettle();
-      final updated = tester.widget<CheckedPopupMenuItem<String>>(
-        find.widgetWithText(CheckedPopupMenuItem<String>, 'USD'),
-      );
-      expect(updated.checked, true);
-      await tester.tap(
-        find.widgetWithText(PopupMenuItem<String>, 'Settings'),
-      );
+        await tester.tap(menu);
+        await tester.pumpAndSettle();
+        final updated = tester.widget<CheckedPopupMenuItem<String>>(
+          find.widgetWithText(CheckedPopupMenuItem<String>, 'USD'),
+        );
+        expect(updated.checked, true);
+        await tester.tap(
+          find.widgetWithText(PopupMenuItem<String>, 'Settings'),
+        );
+      }
       await tester.pumpAndSettle();
       expect(find.text('Appearance'), findsWidgets);
       expect(tester.takeException(), null);

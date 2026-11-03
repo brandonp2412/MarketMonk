@@ -904,6 +904,53 @@ void main() {
     },
   );
 
+  testWidgets('wide portfolio shows currency and CSV actions inline',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1600, 900);
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    addTearDown(() {
+      debugDefaultTargetPlatformOverride = null;
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({
+      'visibleCurrencies': ['NZD', 'USD'],
+      'displayCurrency': 'NZD',
+    });
+    final accounts = await configuredAccounts();
+    await accounts.cachePortfolio(
+      'Default',
+      [cachedPosition()],
+      const IbkrAccountValue(value: 5500, currency: 'USD'),
+    );
+    final pending = Completer<IbkrPortfolioSnapshot>();
+    await tester.pumpWidget(
+      app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.byKey(const Key('desktop-portfolio-export')), findsOneWidget);
+    expect(find.byKey(const Key('desktop-portfolio-share')), findsOneWidget);
+    expect(find.byKey(const Key('portfolio-currency-menu')), findsNothing);
+    final currencies = find.byKey(const Key('portfolio-currency-buttons'));
+    expect(currencies, findsOneWidget);
+    await tester.tap(
+      find.descendant(of: currencies, matching: find.text('USD')),
+    );
+    await tester.pump();
+    final selector = tester.widget<SegmentedButton<String>>(
+      find.descendant(
+        of: currencies,
+        matching: find.byType(SegmentedButton<String>),
+      ),
+    );
+    expect(selector.selected, {'USD'});
+    debugDefaultTargetPlatformOverride = null;
+    expect(tester.takeException(), null);
+  });
+
   for (final fails in [false, true]) {
     testWidgets(
         'Android share CSV ${fails ? 'shows errors' : 'passes a named file'}', (
