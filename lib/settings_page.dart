@@ -142,24 +142,32 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _searchField() => Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-        child: TextField(
-          key: const Key('settings-search'),
-          controller: _searchController,
-          onChanged: (value) => setState(() => _searchQuery = value),
-          decoration: InputDecoration(
-            hintText: context.l10n.text('Search settings'),
-            prefixIcon: const Icon(Icons.search),
-            suffixIcon: _searchQuery.isEmpty
-                ? null
-                : IconButton(
-                    tooltip: context.l10n.text('Clear search'),
-                    icon: const Icon(Icons.close),
-                    onPressed: () {
-                      _searchController.clear();
-                      setState(() => _searchQuery = '');
-                    },
-                  ),
-            border: const OutlineInputBorder(),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isDesktopLayout(context) ? 520 : double.infinity,
+            ),
+            child: TextField(
+              key: const Key('settings-search'),
+              controller: _searchController,
+              onChanged: (value) => setState(() => _searchQuery = value),
+              decoration: InputDecoration(
+                hintText: context.l10n.text('Search settings'),
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchQuery.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: context.l10n.text('Clear search'),
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      ),
+                border: const OutlineInputBorder(),
+              ),
+            ),
           ),
         ),
       );
