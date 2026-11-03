@@ -114,6 +114,60 @@ void main() {
     });
   }
 
+  testWidgets('desktop open positions summary colors gains and losses',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1400, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    Position position(String symbol, double price) => Position(
+          symbol: symbol,
+          name: symbol,
+          nativeCurrency: 'USD',
+          netShares: 1,
+          avgCost: 100,
+          currentPrice: price,
+          firstBuyDate: DateTime(2025),
+          lastBuyDate: DateTime(2026),
+        );
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          theme: ThemeData(platform: TargetPlatform.linux),
+          home: HoldingsPage(
+            positionsLoader: (_) async => [
+              position('GAIN', 110),
+              position('LOSS', 90),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final breakdown = tester.widget<Text>(
+      find.byKey(const Key('desktop-holdings-position-breakdown')),
+    );
+    final spans = (breakdown.textSpan as TextSpan).children!;
+    expect(spans[0].toPlainText(), '1 positive');
+    expect((spans[0] as TextSpan).style?.color, Colors.green);
+    expect(spans[1].toPlainText(), ' · ');
+    expect(spans[2].toPlainText(), '1 negative');
+    expect((spans[2] as TextSpan).style?.color, Colors.redAccent);
+  });
+
   testWidgets('desktop holdings renders sortable data table', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1400, 900);

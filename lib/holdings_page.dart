@@ -1078,6 +1078,7 @@ class HoldingsPageState extends State<HoldingsPage>
     required String label,
     required String value,
     String? detail,
+    Widget? detailWidget,
     Color? valueColor,
   }) {
     final theme = Theme.of(context);
@@ -1107,16 +1108,17 @@ class HoldingsPageState extends State<HoldingsPage>
                 color: valueColor,
               ),
             ),
-            if (detail != null) ...[
+            if (detail != null || detailWidget != null) ...[
               const SizedBox(height: 3),
-              Text(
-                detail,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
+              detailWidget ??
+                  Text(
+                    detail!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
             ],
           ],
         ),
@@ -1246,7 +1248,27 @@ class HoldingsPageState extends State<HoldingsPage>
                 context,
                 label: context.l10n.text('Open positions'),
                 value: open.length.toString(),
-                detail: '$winners positive · ${open.length - winners} negative',
+                detailWidget: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '$winners positive',
+                        style: const TextStyle(color: Colors.green),
+                      ),
+                      const TextSpan(text: ' · '),
+                      TextSpan(
+                        text: '${open.length - winners} negative',
+                        style: const TextStyle(color: Colors.redAccent),
+                      ),
+                    ],
+                  ),
+                  key: const Key('desktop-holdings-position-breakdown'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ),
             ],
           ),
