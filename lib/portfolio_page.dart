@@ -115,6 +115,8 @@ class PortfolioPageState extends State<PortfolioPage>
     '1M',
     '1W',
     '1D',
+    '2M',
+    '2W',
   ];
   int _period = 0;
   String? _historyAccount;
@@ -136,15 +138,28 @@ class PortfolioPageState extends State<PortfolioPage>
     if (performance != null &&
         netLiquidation != null &&
         performance.dates.isNotEmpty) {
+      final knownDates = [
+        ...performance.dates,
+        ..._returnTrades.map((trade) => trade.tradeDate),
+      ];
+      final firstKnownDate = knownDates.reduce(
+        (first, second) => first.isBefore(second) ? first : second,
+      );
       return [
         0,
         for (var period = 1; period < _periods.length; period++)
-          if (accountPeriodReturn(
-                    performance,
-                    netLiquidation.value,
-                    portfolioReturnCutoff(period, DateTime.now())!,
-                  ) !=
-                  null &&
+          if (!portfolioReturnCutoff(period, DateTime.now())!
+                  .isBefore(firstKnownDate) &&
+              (accountPeriodReturn(
+                        performance,
+                        netLiquidation.value,
+                        portfolioReturnCutoff(period, DateTime.now())!,
+                      ) !=
+                      null ||
+                  positions.every(
+                    (position) =>
+                        _holdingReturn(position, period: period) != null,
+                  )) &&
               _allocationAt(positions, period) != null)
             period,
       ];
@@ -283,14 +298,26 @@ class PortfolioPageState extends State<PortfolioPage>
     );
   }
 
-  Widget _periodPicker() => PortfolioPeriodPicker(
-        labels: [for (final period in _availablePeriods) _periods[period]],
-        value: _availablePeriods.indexOf(_period),
-        onChanged: (index) => setState(() {
-          _period = _availablePeriods[index];
-          touchedIndex = null;
-        }),
+  Widget _periodPicker() {
+    final now = DateTime.now();
+    final past = _availablePeriods.where((period) => period != 0).toList()
+      ..sort(
+        (a, b) => portfolioReturnCutoff(b, now)!
+            .compareTo(portfolioReturnCutoff(a, now)!),
       );
+    final ordered = [0, ...past];
+    return PortfolioPeriodPicker(
+      labels: [
+        for (final period in ordered) period == 0 ? 'Now' : _periods[period],
+      ],
+      dates: [for (final period in ordered) portfolioReturnCutoff(period, now)],
+      value: ordered.indexOf(_period),
+      onChanged: (index) => setState(() {
+        _period = ordered[index];
+        touchedIndex = null;
+      }),
+    );
+  }
 
   Object? _loadError;
   int? touchedIndex;
@@ -344,6 +371,7 @@ class PortfolioPageState extends State<PortfolioPage>
     final refreshVersion = accounts.ibkrRefreshVersion;
     final cached = accounts.portfolioCacheFor(account);
     final hadAccount = _lastAccount.isNotEmpty;
+    final accountChanged = account != _lastAccount;
     final refreshRequested =
         hadAccount && refreshVersion != _lastIbkrRefreshVersion;
 
@@ -362,6 +390,7 @@ class PortfolioPageState extends State<PortfolioPage>
       _positions = cached?.positions ?? [];
       _netLiquidation = cached?.netLiquidation;
       _hasCachedPortfolio = cached != null;
+      if (accountChanged) _period = 0;
       touchedIndex = null;
     });
     if (widget.isActive) {
@@ -1632,7 +1661,9 @@ class PortfolioPageState extends State<PortfolioPage>
                                 ),
                                 const SizedBox(height: 3),
                                 Text(
-                                  '${_periods[_period]} · open holdings',
+                                  _returnCutoff == null
+                                      ? 'Current · open holdings'
+                                      : 'Since ${DateFormat.yMMMd().format(_returnCutoff!)} · open holdings',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
                                   ),

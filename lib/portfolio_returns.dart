@@ -67,5 +67,8 @@ DateTime? portfolioReturnCutoff(int period, DateTime now) => switch (period) {
       7 => DateTime(now.year, now.month - 3, now.day),
       8 => DateTime(now.year, now.month - 1, now.day),
       9 => DateTime(now.year, now.month, now.day - 7),
+      10 => DateTime(now.year, now.month, now.day - 1),
+      11 => DateTime(now.year, now.month - 2, now.day),
+      12 => DateTime(now.year, now.month, now.day - 14),
       _ => DateTime(now.year, now.month, now.day - 1),
     };

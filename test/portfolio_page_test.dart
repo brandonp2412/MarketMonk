@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
@@ -642,7 +643,7 @@ void main() {
         commission: 0,
         rawCurrency: 'USD',
       );
-      for (final period in [7, 8, 9, 10]) {
+      for (final period in [7, 8, 9, 10, 11, 12]) {
         final date = portfolioReturnCutoff(period, now)!;
         for (final symbol in ['VOO', 'MSFT', 'OLD']) {
           await testDatabase.into(testDatabase.candles).insert(
@@ -668,14 +669,15 @@ void main() {
       await tester.pumpAndSettle();
       final finder = find.byKey(const Key('portfolio-return-period'));
       var slider = tester.widget<Slider>(finder);
-      expect(slider.divisions, 4);
-      expect(
-        [
-          for (var i = 0; i <= 4; i++)
-            slider.semanticFormatterCallback!(i.toDouble()),
-        ],
-        ['All time', '3M', '1M', '1W', '1D'],
-      );
+      expect(slider.divisions, 6);
+      expect(slider.semanticFormatterCallback!(0), 'Now, current allocation');
+      expect(slider.semanticFormatterCallback!(1), contains('1D ago'));
+      expect(slider.semanticFormatterCallback!(2), contains('1W ago'));
+      expect(slider.semanticFormatterCallback!(3), contains('2W ago'));
+      expect(slider.semanticFormatterCallback!(4), contains('1M ago'));
+      expect(slider.semanticFormatterCallback!(5), contains('2M ago'));
+      expect(slider.semanticFormatterCallback!(6), contains('3M ago'));
+
       expect(find.textContaining('Open holdings returns'), findsNothing);
       expect(
         find.textContaining('purchase history when available'),
@@ -688,17 +690,27 @@ void main() {
               slice.label: slice.value,
           };
       expect(pieValues(), {'VOO': 5500, 'MSFT': 1000});
-      slider.onChanged!(1);
+      slider.onChanged!(6);
       await tester.pump();
-      expect(find.text('3M'), findsOneWidget);
+      expect(
+        find.text(
+          DateFormat('d MMM yyyy').format(portfolioReturnCutoff(7, now)!),
+        ),
+        findsOneWidget,
+      );
       if (width >= 840) expect(find.text('+21.00%'), findsOneWidget);
       expect(pieValues(), {'VOO': 1000, 'MSFT': 3000, 'OLD': 4000});
       expect(find.text('50.0%'), findsOneWidget);
       expect(find.text(fmtCurrency(4000)), findsOneWidget);
       slider = tester.widget<Slider>(finder);
-      slider.onChanged!(4);
+      slider.onChanged!(1);
       await tester.pump();
-      expect(find.text('1D'), findsOneWidget);
+      expect(
+        find.text(
+          DateFormat('d MMM yyyy').format(portfolioReturnCutoff(10, now)!),
+        ),
+        findsOneWidget,
+      );
       if (width >= 840) expect(find.text('+10.00%'), findsOneWidget);
       expect(pieValues(), {'VOO': 2000, 'MSFT': 1000, 'OLD': 1000});
       expect(find.text('50.0%'), findsOneWidget);
@@ -735,7 +747,10 @@ void main() {
     final periodSlider =
         tester.widget<Slider>(find.byKey(const Key('portfolio-return-period')));
     expect(periodSlider.value, 0);
-    expect(periodSlider.semanticFormatterCallback!(0), 'All time');
+    expect(
+      periodSlider.semanticFormatterCallback!(0),
+      'Now, current allocation',
+    );
 
     expect(
       (tester.getTopLeft(find.text('Account value')).dy -

@@ -1,17 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:market_monk/portfolio_period_picker.dart';
 
 void main() {
-  testWidgets('period picker snaps while dragging and uses a dotted track',
+  testWidgets('timeline starts at Now and travels back through account history',
       (tester) async {
     var selected = 0;
+    final today = DateTime(2026, 11, 3);
+    final dates = [
+      null,
+      today.subtract(const Duration(days: 1)),
+      today.subtract(const Duration(days: 7)),
+      DateTime(2026, 9, 3),
+    ];
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: StatefulBuilder(
             builder: (context, setState) => PortfolioPeriodPicker(
-              labels: const ['All time', '3M', '1M', '1W', '1D'],
+              labels: const ['Now', '1D', '1W', '2M'],
+              dates: dates,
               value: selected,
               onChanged: (value) => setState(() => selected = value),
             ),
@@ -22,30 +31,44 @@ void main() {
     final finder = find.byKey(const Key('portfolio-return-period'));
     final slider = tester.widget<Slider>(finder);
     final theme = SliderTheme.of(tester.element(finder));
-    expect(theme.trackShape.runtimeType.toString(), '_DottedPeriodTrack');
-    expect(theme.thumbShape, isA<RoundSliderThumbShape>());
+    expect(slider.value, 0);
+    expect(slider.divisions, 3);
+    expect(theme.trackShape.runtimeType.toString(), '_TimeRulerTrack');
     expect(theme.tickMarkShape, SliderTickMarkShape.noTickMark);
+    expect(find.text('WHEN'), findsOneWidget);
+    expect(find.text('Now'), findsOneWidget);
+    expect(find.text('FURTHEST · SEP 2026'), findsOneWidget);
+    expect(slider.semanticFormatterCallback!(0), 'Now, current allocation');
+    expect(slider.semanticFormatterCallback!(3), contains('September 3, 2026'));
+
     final bounds = tester.getRect(finder);
     final gesture =
         await tester.startGesture(Offset(bounds.left + 24, bounds.center.dy));
     await gesture.moveTo(Offset(bounds.right - 24, bounds.center.dy));
     await tester.pump();
-    expect(selected, 4);
-    expect(find.text('1D'), findsOneWidget);
+    expect(selected, 3);
+    expect(
+      find.text(DateFormat('d MMM yyyy').format(dates.last!)),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Allocation then · returns since this date'),
+      findsOneWidget,
+    );
     await gesture.up();
-    expect(slider.divisions, 4);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('no alternative period leaves the picker disabled',
+  testWidgets('one available instant leaves the timeline disabled',
       (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: PortfolioPeriodPicker(
-            labels: const ['All time'],
+            labels: const ['Now'],
+            dates: const [null],
             value: 0,
-            onChanged: (_) => fail('No available periods'),
+            onChanged: (_) => fail('No available dates'),
           ),
         ),
       ),
@@ -53,7 +76,8 @@ void main() {
     final slider =
         tester.widget<Slider>(find.byKey(const Key('portfolio-return-period')));
     expect(slider.onChanged, isNull);
-    expect(find.text('All time'), findsOneWidget);
+    expect(find.text('Now'), findsOneWidget);
+    expect(find.text('FURTHEST · NOW'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
