@@ -3660,6 +3660,8 @@ class ChartsPageState extends State<ChartsPage>
               },
               curveLines: settings.curveLines,
               curveSmoothness: settings.curveSmoothness,
+              showGridlines: settings.showChartGridlines,
+              fillChartArea: settings.fillChartArea,
               leftInset: scaleForComparison ? 72 : 64,
               accessibilityLabel: context.l10n.text('Portfolio performance'),
               accessibilityValue:

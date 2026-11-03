@@ -141,6 +141,8 @@ class TickerLine extends StatelessWidget {
                 tooltipTextAt(mark.index, tooltipFormatter),
             curveLines: settings.curveLines,
             curveSmoothness: settings.curveSmoothness,
+            showGridlines: settings.showChartGridlines,
+            fillChartArea: settings.fillChartArea,
             leftInset: 64,
             accessibilityLabel: 'Price history',
             accessibilityValue:

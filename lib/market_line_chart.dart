@@ -256,6 +256,8 @@ class MarketLineChart extends StatelessWidget {
   /// Replaces each series with its trailing average of up to 20 observations.
   final bool showRollingAverage;
   final double curveSmoothness;
+  final bool showGridlines;
+  final bool fillChartArea;
   final double leftInset;
   final String accessibilityLabel;
   final String? accessibilityValue;
@@ -283,6 +285,8 @@ class MarketLineChart extends StatelessWidget {
     required this.curveLines,
     this.showRollingAverage = false,
     required this.curveSmoothness,
+    this.showGridlines = false,
+    this.fillChartArea = true,
     this.leftInset = 64,
     this.accessibilityLabel = 'Price chart',
     this.accessibilityValue,
@@ -418,6 +422,8 @@ class MarketLineChart extends StatelessWidget {
         curveLines: curveLines,
         showRollingAverage: showRollingAverage,
         curveSmoothness: curveSmoothness,
+        showGridlines: showGridlines,
+        fillChartArea: fillChartArea,
         xLabels: [
           for (var i = 0; i < xLabels.length; i++)
             _LineChartAxisLabel(
@@ -922,6 +928,8 @@ class _MarketLineChartRenderer extends ChartRenderer
   /// Replaces each series with its trailing average of up to 20 observations.
   final bool showRollingAverage;
   final double curveSmoothness;
+  final bool showGridlines;
+  final bool fillChartArea;
   final List<_LineChartAxisLabel> xLabels;
   final int? uniformXCount;
   final (double, double)? xAxisBounds;
@@ -941,6 +949,8 @@ class _MarketLineChartRenderer extends ChartRenderer
     required this.curveLines,
     this.showRollingAverage = false,
     required this.curveSmoothness,
+    required this.showGridlines,
+    required this.fillChartArea,
     required this.xLabels,
     required this.uniformXCount,
     this.xAxisBounds,
@@ -955,6 +965,8 @@ class _MarketLineChartRenderer extends ChartRenderer
 
   List<Object> get dataSignature => [
         uniformXCount ?? -1,
+        showGridlines,
+        fillChartArea,
         for (final candle in candles)
           (
             candle.column,
@@ -1060,6 +1072,8 @@ class _MarketLineChartRenderer extends ChartRenderer
       curveLines: curveLines,
       showRollingAverage: showRollingAverage,
       curveSmoothness: curveSmoothness,
+      showGridlines: showGridlines,
+      fillChartArea: fillChartArea,
       xLabels: [
         for (final label in xLabels)
           if ((label.column ?? label.x) >= start &&
@@ -1187,7 +1201,7 @@ class _MarketLineChartRenderer extends ChartRenderer
       }
     }
 
-    if (fill) {
+    if (fill && fillChartArea) {
       final fillPath = Path.from(path)
         ..lineTo(points.last.dx, bounds.bottom)
         ..lineTo(points.first.dx, bounds.bottom)
@@ -1307,6 +1321,19 @@ class _MarketLineChartRenderer extends ChartRenderer
   ) {
     if (size.isEmpty) return;
     final bounds = _bounds(size);
+    if (showGridlines) {
+      final gridPaint = Paint()
+        ..color = axisLabelColor.withValues(alpha: 0.12)
+        ..strokeWidth = 1;
+      for (var i = 0; i <= 4; i++) {
+        final y = bounds.top + bounds.height * i / 4;
+        canvas.drawLine(
+          Offset(bounds.left, y),
+          Offset(bounds.right, y),
+          gridPaint,
+        );
+      }
+    }
     _drawAxes(canvas, bounds);
 
     final displayedSeries = _displaySeries;

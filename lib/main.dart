@@ -945,15 +945,19 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  final _pageController = PageController();
-  final _selectedPage = ValueNotifier<int>(0);
-  var _currentIndex = 0;
+  late final PageController _pageController;
+  late final ValueNotifier<int> _selectedPage;
+  late int _currentIndex;
 
   static const _tabs = ['ChartPage', 'PortfolioPage', 'HoldingsPage'];
 
   @override
   void initState() {
     super.initState();
+    final startPage = context.read<SettingsState>().startPage;
+    _pageController = PageController(initialPage: startPage);
+    _selectedPage = ValueNotifier<int>(startPage);
+    _currentIndex = startPage;
     WidgetsBinding.instance.addPostFrameCallback((_) => _showUpdateNotice());
   }
 

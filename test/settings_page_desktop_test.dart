@@ -63,7 +63,7 @@ void main() {
       ),
       findsNothing,
     );
-    expect(find.text('Charts'), findsOneWidget);
+    expect(find.text('Charts'), findsWidgets);
     expect(find.text('Market closed indicator'), findsNothing);
     expect(find.text('Accounts'), findsOneWidget);
     expect(find.text('Data'), findsOneWidget);
@@ -139,6 +139,49 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('new chart controls update persisted settings on mobile',
+      (tester) async {
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await pumpSettings(tester, const Size(430, 940));
+    for (final (key, setting, value) in [
+      ('settings-chart-gridlines', 'showChartGridlines', true),
+      ('settings-chart-shading', 'fillChartArea', false),
+    ]) {
+      final control = find.byKey(Key(key));
+      await tester.ensureVisible(control);
+      await tester.pumpAndSettle();
+      await tester.tap(control);
+      await tester.pumpAndSettle();
+      expect(
+        (await SqliteSettings.getInstance()).getBool(setting),
+        value,
+      );
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('start page choice saves from desktop settings search',
+      (tester) async {
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await pumpSettings(tester, const Size(1200, 900));
+    await tester.enterText(find.byKey(const Key('settings-search')), 'home');
+    await tester.pumpAndSettle();
+    final selector = find.byKey(const Key('settings-start-page'));
+    expect(selector, findsOneWidget);
+    await tester.tap(selector);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Holdings').last);
+    await tester.pumpAndSettle();
+    expect((await SqliteSettings.getInstance()).getInt('startPage'), 2);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('desktop search filters settings and restores them on clear',
       (tester) async {
     addTearDown(() {
@@ -158,7 +201,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Appearance'), findsOneWidget);
     expect(find.text('Currencies'), findsOneWidget);
-    expect(find.text('Charts'), findsOneWidget);
+    expect(find.text('Charts'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 

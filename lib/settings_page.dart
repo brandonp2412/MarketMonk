@@ -64,12 +64,18 @@ class _SettingsPageState extends State<SettingsPage> {
     'Appearance': [
       'Theme',
       'Language',
+      'Start page',
       'Hide dollar amounts',
       'System color scheme',
       'Pure black (AMOLED)',
       'Date format',
     ],
-    'Charts': ['Curve line graphs', 'Curve smoothness'],
+    'Charts': [
+      'Curve line graphs',
+      'Curve smoothness',
+      'Chart gridlines',
+      'Chart shading',
+    ],
     'Accounts': ['Manage accounts', 'Currencies', 'Interactive Brokers'],
     'Data': [
       'Export database',
@@ -84,6 +90,7 @@ class _SettingsPageState extends State<SettingsPage> {
     'Appearance': [
       'Theme',
       'Language',
+      'Start page',
       'Hide dollar amounts',
       'System color scheme',
       'Pure black (AMOLED)',
@@ -94,6 +101,8 @@ class _SettingsPageState extends State<SettingsPage> {
       'Candles',
       'Curve line graphs',
       'Curve smoothness',
+      'Chart gridlines',
+      'Chart shading',
     ],
     'Accounts': ['Manage accounts', 'Currencies', 'Interactive Brokers'],
     'Data': [
@@ -136,6 +145,9 @@ class _SettingsPageState extends State<SettingsPage> {
       'Rolling average' => 'moving average',
       'Candles' => 'candlestick candlesticks',
       'Curve line graphs' => 'graph lines',
+      'Start page' => 'home launch default tab navigation',
+      'Chart gridlines' => 'grid guide horizontal lines',
+      'Chart shading' => 'fill shaded area gradient',
       _ => '',
     };
     final searchable =
@@ -615,6 +627,57 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  Widget _startPageDropdown(
+    SettingsState settings, {
+    EdgeInsetsGeometry padding = const EdgeInsets.symmetric(horizontal: 16),
+  }) =>
+      Padding(
+        padding: padding,
+        child: DropdownButtonFormField<int>(
+          key: const Key('settings-start-page'),
+          initialValue: settings.startPage,
+          isExpanded: true,
+          decoration: InputDecoration(
+            labelText: context.l10n.text('Start page'),
+            prefixIcon: const Icon(Icons.home_outlined),
+            border: const OutlineInputBorder(),
+          ),
+          items: [
+            DropdownMenuItem(
+              value: 0,
+              child: Text(context.l10n.text('Charts')),
+            ),
+            DropdownMenuItem(
+              value: 1,
+              child: Text(context.l10n.text('Portfolio')),
+            ),
+            DropdownMenuItem(
+              value: 2,
+              child: Text(context.l10n.text('Holdings')),
+            ),
+          ],
+          onChanged: (value) async {
+            if (value != null) await settings.setStartPage(value);
+          },
+        ),
+      );
+
+  Widget _chartSwitch({
+    required String label,
+    required IconData icon,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+    EdgeInsetsGeometry? padding,
+  }) =>
+      ListTile(
+        key: Key('settings-${label.toLowerCase().replaceAll(' ', '-')}'),
+        contentPadding: padding,
+        leading: Icon(icon),
+        title: Text(context.l10n.text(label)),
+        trailing: Switch(value: value, onChanged: onChanged),
+        onTap: () => onChanged(!value),
+      );
+
   Widget _desktopSettingsCard({
     required IconData icon,
     required String title,
@@ -689,6 +752,9 @@ class _SettingsPageState extends State<SettingsPage> {
         const SizedBox(height: 16),
         if (_matchesSearch('Appearance', 'Language'))
           _languageDropdown(settings, padding: EdgeInsets.zero),
+        const SizedBox(height: 8),
+        if (_matchesSearch('Appearance', 'Start page'))
+          _startPageDropdown(settings, padding: EdgeInsets.zero),
         const SizedBox(height: 8),
         if (_matchesSearch('Appearance', 'Hide dollar amounts'))
           ListTile(
@@ -767,6 +833,22 @@ class _SettingsPageState extends State<SettingsPage> {
       icon: Icons.insights_outlined,
       title: context.l10n.text('Charts'),
       children: [
+        if (_matchesSearch('Charts', 'Chart gridlines'))
+          _chartSwitch(
+            label: 'Chart gridlines',
+            icon: Icons.grid_on_outlined,
+            value: settings.showChartGridlines,
+            onChanged: settings.setShowChartGridlines,
+            padding: EdgeInsets.zero,
+          ),
+        if (_matchesSearch('Charts', 'Chart shading'))
+          _chartSwitch(
+            label: 'Chart shading',
+            icon: Icons.gradient_outlined,
+            value: settings.fillChartArea,
+            onChanged: settings.setFillChartArea,
+            padding: EdgeInsets.zero,
+          ),
         if (_matchesSearch('Charts', 'Curve line graphs'))
           ListTile(
             contentPadding: EdgeInsets.zero,
@@ -1172,6 +1254,9 @@ class _SettingsPageState extends State<SettingsPage> {
           if (_matchesSearch('Appearance', 'Language'))
             _languageDropdown(settings),
           const SizedBox(height: 8),
+          if (_matchesSearch('Appearance', 'Start page'))
+            _startPageDropdown(settings),
+          const SizedBox(height: 8),
           if (_matchesSearch('Appearance', 'Hide dollar amounts'))
             ListTile(
               leading: Icon(
@@ -1302,6 +1387,20 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               onTap: () =>
                   settings.setShowCandlesticks(!settings.showCandlesticks),
+            ),
+          if (_matchesSearch('Charts', 'Chart gridlines'))
+            _chartSwitch(
+              label: 'Chart gridlines',
+              icon: Icons.grid_on_outlined,
+              value: settings.showChartGridlines,
+              onChanged: settings.setShowChartGridlines,
+            ),
+          if (_matchesSearch('Charts', 'Chart shading'))
+            _chartSwitch(
+              label: 'Chart shading',
+              icon: Icons.gradient_outlined,
+              value: settings.fillChartArea,
+              onChanged: settings.setFillChartArea,
             ),
           if (_matchesSearch('Charts', 'Curve line graphs'))
             Tooltip(

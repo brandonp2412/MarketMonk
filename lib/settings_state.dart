@@ -75,6 +75,9 @@ class SettingsState extends ChangeNotifier {
   List<String> visibleCurrencies = ['USD'];
   bool pureBlack = false;
   bool hideDollarAmounts = false;
+  int startPage = 0;
+  bool showChartGridlines = false;
+  bool fillChartArea = true;
 
   SettingsState({
     Future<http.Response> Function(Uri)? rateFetcher,
@@ -189,6 +192,13 @@ class SettingsState extends ChangeNotifier {
     pureBlack = prefs.getBool('pureBlack') ?? false;
     hideDollarAmounts = prefs.getBool('hideDollarAmounts') ?? false;
     maskCurrencyAmounts = hideDollarAmounts;
+    final savedStartPage = prefs.getInt('startPage');
+    startPage =
+        savedStartPage != null && savedStartPage >= 0 && savedStartPage <= 2
+            ? savedStartPage
+            : 0;
+    showChartGridlines = prefs.getBool('showChartGridlines') ?? false;
+    fillChartArea = prefs.getBool('fillChartArea') ?? true;
 
     displayCurrency = prefs.getString('displayCurrency') ?? homeCurrency;
     if (!visibleCurrencies.contains(displayCurrency)) {
@@ -309,6 +319,26 @@ class SettingsState extends ChangeNotifier {
   }
 
   /// Persists the interpolation strength used by charts.
+  Future<void> setStartPage(int value) async {
+    if (value < 0 || value > 2) return;
+    startPage = value;
+    notifyListeners();
+    await (await SqliteSettings.getInstance()).setInt('startPage', value);
+  }
+
+  Future<void> setShowChartGridlines(bool value) async {
+    showChartGridlines = value;
+    notifyListeners();
+    await (await SqliteSettings.getInstance())
+        .setBool('showChartGridlines', value);
+  }
+
+  Future<void> setFillChartArea(bool value) async {
+    fillChartArea = value;
+    notifyListeners();
+    await (await SqliteSettings.getInstance()).setBool('fillChartArea', value);
+  }
+
   Future<void> setCurveSmoothness(double value) async {
     curveSmoothness = value;
     notifyListeners();

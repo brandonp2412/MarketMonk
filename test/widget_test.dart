@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/accounts_page.dart';
 import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/charts_page.dart';
+import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/settings_state.dart';
@@ -35,6 +36,35 @@ void main() {
     expect(find.text('Charts'), findsOneWidget);
     expect(find.bySemanticsLabel('Portfolio'), findsOneWidget);
     expect(find.bySemanticsLabel('Holdings'), findsOneWidget);
+  });
+
+  testWidgets('saved start page opens the matching tab on launch',
+      (tester) async {
+    await seedTestSqlite({'startPage': 2});
+    final accounts = testAccountManager();
+    final settings = SettingsState();
+    await settings.initialized;
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: settings),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: const MyApp(),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      tester.widget<PageView>(find.byType(PageView)).controller!.initialPage,
+      2,
+    );
+    expect(
+      tester.widget<HoldingsPage>(find.byType(HoldingsPage)).isActive,
+      isTrue,
+    );
+    await _disposeTestApp(tester);
   });
 
   testWidgets('mobile pages activate only after the slide settles',
