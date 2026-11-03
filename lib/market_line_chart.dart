@@ -1357,6 +1357,11 @@ class _MarketLineChartRenderer extends ChartRenderer
         for (final candle in candles)
           if (candle.seriesIndex == seriesIndex) candle,
       ];
+      final linePoints = series[seriesIndex].points;
+      final xByColumn = <int, double>{
+        for (var i = 0; i < linePoints.length; i++)
+          (linePoints[i].column ?? i): linePoints[i].x,
+      };
       final seriesColor = series[seriesIndex].color;
       for (var start = 0; start < source.length; start += groupSize) {
         final group = source.skip(start).take(groupSize).toList();
@@ -1366,7 +1371,7 @@ class _MarketLineChartRenderer extends ChartRenderer
         final low = group.map((candle) => candle.low).reduce(min);
         final startX = _xForPoint(
           MarketLineChartPoint(
-            first.column.toDouble(),
+            xByColumn[first.column] ?? first.column.toDouble(),
             first.close,
             column: first.column,
           ),
@@ -1375,7 +1380,7 @@ class _MarketLineChartRenderer extends ChartRenderer
         );
         final endX = _xForPoint(
           MarketLineChartPoint(
-            last.column.toDouble(),
+            xByColumn[last.column] ?? last.column.toDouble(),
             last.close,
             column: last.column,
           ),

@@ -1,7 +1,10 @@
+import 'dart:ui' as ui;
+
 import 'package:drafter/drafter.dart';
 import 'package:drafter/painting.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/desktop_context_menu.dart';
@@ -220,6 +223,106 @@ void main() {
       [for (final mark in before.marks) mark.center],
     );
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('candles align with calendar dates before and after zoom',
+      (tester) async {
+    const positions = [0.0, 4.0, 8.0];
+    final boundaryKey = GlobalKey();
+
+    Widget build((int, int)? range) => MaterialApp(
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.topLeft,
+              child: RepaintBoundary(
+                key: boundaryKey,
+                child: SizedBox(
+                  width: 800,
+                  height: 300,
+                  child: MarketLineChart(
+                    series: [
+                      MarketLineChartSeries(
+                        color: Colors.blue,
+                        points: [
+                          for (var i = 0; i < positions.length; i++)
+                            MarketLineChartPoint(
+                              positions[i],
+                              50,
+                              column: i,
+                            ),
+                        ],
+                      ),
+                    ],
+                    candles: [
+                      for (var i = 0; i < positions.length; i++)
+                        MarketCandlePoint(
+                          column: i,
+                          open: 20,
+                          high: 60,
+                          low: 10,
+                          close: 50,
+                        ),
+                    ],
+                    showCandlesticks: true,
+                    xLabels: const ['Monday', 'Friday', 'Tuesday'],
+                    xAxisPositions: positions,
+                    xAxisBounds: (0, 12),
+                    pointCount: positions.length,
+                    yLabelFormatter: (value) => value.toStringAsFixed(1),
+                    tooltipRowLabel: (_) => 'Value',
+                    curveLines: false,
+                    curveSmoothness: 0,
+                    range: range,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+    Future<void> expectAlignedCandles() async {
+      final rendered = scene(tester);
+      final capture = (await tester.runAsync(() async {
+        final image = await tester
+            .renderObject<RenderRepaintBoundary>(find.byKey(boundaryKey))
+            .toImage(pixelRatio: 1);
+        final pixels =
+            (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!;
+        final width = image.width;
+        image.dispose();
+        return (pixels: pixels, width: width);
+      }))!;
+      for (final mark in rendered.marks) {
+        var painted = 0;
+        final center = mark.center.dx.round();
+        for (var x = center - 4; x <= center + 4; x++) {
+          if (x < 0 || x >= capture.width) continue;
+          for (var y = rendered.bounds!.top.ceil();
+              y <= rendered.bounds!.bottom.floor();
+              y++) {
+            final offset = (y * capture.width + x) * 4;
+            final red = capture.pixels.getUint8(offset);
+            final green = capture.pixels.getUint8(offset + 1);
+            final blue = capture.pixels.getUint8(offset + 2);
+            if (red < 90 && green > 130 && blue > 110) painted++;
+          }
+        }
+        expect(
+          painted,
+          greaterThan(20),
+          reason: 'Candle for column ${mark.index} must sit on its date',
+        );
+      }
+    }
+
+    await tester.pumpWidget(build(null));
+    await tester.pump();
+    await expectAlignedCandles();
+
+    await tester.pumpWidget(build((1, 2)));
+    await tester.pump();
+    expect(scene(tester).marks.map((mark) => mark.index), [1, 2]);
+    await expectAlignedCandles();
   });
 
   testWidgets('candle and line switches preserve every chart coordinate',
