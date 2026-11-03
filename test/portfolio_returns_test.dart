@@ -1,0 +1,59 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:market_monk/ibkr_api.dart';
+import 'package:market_monk/portfolio_returns.dart';
+
+void main() {
+  final cutoff = DateTime(2026, 1, 2);
+  final history = IbkrPerformanceSeries(
+    period: '1Y',
+    measure: 'TWR',
+    currency: 'USD',
+    startDate: DateTime(2026),
+    startNav: 0,
+    dates: [DateTime(2026, 1, 1), cutoff, DateTime(2026, 1, 3)],
+    nav: const [100, 110, 242],
+    returnDates: [DateTime(2026, 1, 1), cutoff, DateTime(2026, 1, 3)],
+    returns: const [0, .1, .21],
+  );
+
+  test('period gain excludes additional contributions', () {
+    final result = accountPeriodReturn(history, 242, cutoff)!;
+    expect(result.basis, closeTo(220, 1e-6));
+    expect(result.gain, closeTo(22, 1e-6));
+    expect(result.percent, closeTo(10, 1e-6));
+  });
+
+  test('missing period coverage is unavailable', () {
+    expect(accountPeriodReturn(history, 242, DateTime(2025)), isNull);
+  });
+
+  test('holding baseline accounts for later purchases and partial sales', () {
+    final result = openHoldingPeriodReturn(
+      currentValue: 180,
+      currentShares: 10,
+      baselinePrice: 10,
+      cutoff: cutoff,
+      trades: [
+        (date: DateTime(2025), quantity: 10, price: 5),
+        (date: DateTime(2026, 1, 3), quantity: 10, price: 20),
+        (date: DateTime(2026, 1, 4), quantity: -10, price: 30),
+      ],
+    )!;
+    expect(result.basis, 150);
+    expect(result.gain, 30);
+    expect(result.percent, 20);
+  });
+
+  test('incomplete holding trade history is unavailable', () {
+    expect(
+      openHoldingPeriodReturn(
+        currentValue: 100,
+        currentShares: 10,
+        baselinePrice: 5,
+        cutoff: cutoff,
+        trades: [(date: DateTime(2025), quantity: 5, price: 5)],
+      ),
+      isNull,
+    );
+  });
+}

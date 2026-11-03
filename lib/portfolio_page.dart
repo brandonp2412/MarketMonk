@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:csv/csv.dart';
+import 'package:drift/drift.dart' hide Column;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -19,8 +20,10 @@ import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/market_donut_chart.dart';
+import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/profile_picker.dart';
+import 'package:market_monk/portfolio_returns.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/sqlite_settings.dart';
@@ -98,6 +101,187 @@ class PortfolioPageState extends State<PortfolioPage>
     }
   }
 
+  static const _periods = [
+    'All time',
+    '5Y',
+    '4Y',
+    '3Y',
+    '2Y',
+    '1Y',
+    '6M',
+    '3M',
+    '1M',
+    '1W',
+    '1D',
+  ];
+  int _period = 0;
+  String? _historyAccount;
+  Map<String, List<StoredCandle>> _returnCandles = {};
+  List<Trade> _returnTrades = [];
+  bool _historyLoading = false;
+  bool _historyFailed = false;
+
+  DateTime? get _returnCutoff {
+    final now = DateTime.now();
+    return switch (_period) {
+      0 => null,
+      >= 1 && <= 5 => DateTime(now.year - (6 - _period), now.month, now.day),
+      6 => DateTime(now.year, now.month - 6, now.day),
+      7 => DateTime(now.year, now.month - 3, now.day),
+      8 => DateTime(now.year, now.month - 1, now.day),
+      9 => DateTime(now.year, now.month, now.day - 7),
+      _ => DateTime(now.year, now.month, now.day - 1),
+    };
+  }
+
+  Future<void> _loadReturnHistory(
+    String account,
+    List<Position> positions,
+  ) async {
+    _historyAccount = account;
+    _historyLoading = true;
+    _historyFailed = false;
+    _returnCandles = {};
+    _returnTrades = [];
+    final accounts = context.read<AccountManager>();
+    final accountName = accounts.activeAccount;
+    final config = accounts.ibkrConfigFor(accountName);
+    try {
+      final trades =
+          await profileDataRepository.readTradesForAccount(accountName);
+      final candles = <String, List<StoredCandle>>{};
+      for (final position in positions) {
+        await syncCandles(
+          position.symbol,
+          ibkrConfig: config,
+          requiredFrom: DateTime(
+            DateTime.now().year - 5,
+            DateTime.now().month,
+            DateTime.now().day - 7,
+          ),
+        );
+        candles[position.symbol] = await (marketDataDatabase.candles.select()
+              ..where(
+                (row) =>
+                    row.symbol.equals(canonicalMarketSymbol(position.symbol)),
+              ))
+            .get();
+        candles[position.symbol]!.sort((a, b) => a.date.compareTo(b.date));
+      }
+      if (!mounted || _historyAccount != account) return;
+      setState(() {
+        _returnTrades = trades;
+        _returnCandles = candles;
+        _historyLoading = false;
+      });
+    } catch (error, stack) {
+      talker.handle(error, stack, 'Failed to load portfolio return history');
+      if (!mounted || _historyAccount != account) return;
+      setState(() {
+        _historyLoading = false;
+        _historyFailed = true;
+      });
+    }
+  }
+
+  PortfolioReturn? _holdingReturn(Position position) {
+    final cutoff = _returnCutoff;
+    if (cutoff == null) {
+      return PortfolioReturn(position.unrealizedPL, position.costBasis);
+    }
+    if (_historyLoading || _historyFailed) return null;
+    final trades = _returnTrades
+        .where((trade) => trade.symbol == position.symbol)
+        .toList()
+      ..sort((a, b) => a.tradeDate.compareTo(b.tradeDate));
+    if (trades.isNotEmpty &&
+        trades.every(
+          (trade) => DateTime(
+            trade.tradeDate.year,
+            trade.tradeDate.month,
+            trade.tradeDate.day,
+          ).isAfter(cutoff),
+        ) &&
+        (trades.fold<double>(0, (sum, trade) => sum + trade.quantity) -
+                    position.netShares)
+                .abs() <
+            1e-6) {
+      return PortfolioReturn(position.unrealizedPL, position.costBasis);
+    }
+    StoredCandle? baseline;
+    for (final candle in _returnCandles[position.symbol] ?? <StoredCandle>[]) {
+      if (!candle.date.isAfter(cutoff)) baseline = candle;
+    }
+    if (baseline == null || cutoff.difference(baseline.date).inDays > 7)
+      return null;
+    final currency = normalizedQuoteCurrency(
+      baseline.rawCurrency ?? symbolCurrency(position.symbol),
+    );
+    final basis = position.netShares *
+        baseline.close /
+        candleCentDivisor(baseline) /
+        requireUsdRate(currency);
+    if (trades
+        .any((trade) => verifiedTradeAmountUsd(trade, trade.price) == null))
+      return null;
+    if (trades.isEmpty)
+      return PortfolioReturn(position.currentValue - basis, basis);
+    return openHoldingPeriodReturn(
+      currentValue: position.currentValue,
+      currentShares: position.netShares,
+      baselinePrice: basis / position.netShares,
+      cutoff: cutoff,
+      trades: [
+        for (final trade in trades)
+          (
+            date: trade.tradeDate,
+            quantity: trade.quantity,
+            price: tradeAmountUsd(trade, trade.price)
+          ),
+      ],
+    );
+  }
+
+  Widget _periodPicker({required bool wholeAccount}) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '${wholeAccount ? 'Account returns' : 'Open holdings returns'} · ${_periods[_period]}',
+          style: theme.textTheme.labelLarge,
+        ),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            trackHeight: 0,
+            activeTickMarkColor: theme.colorScheme.primary,
+            inactiveTickMarkColor: theme.colorScheme.outlineVariant,
+            tickMarkShape: const RoundSliderTickMarkShape(tickMarkRadius: 3),
+          ),
+          child: Slider(
+            key: const Key('portfolio-return-period'),
+            value: _period.toDouble(),
+            max: (_periods.length - 1).toDouble(),
+            divisions: _periods.length - 1,
+            label: _periods[_period],
+            semanticFormatterCallback: (value) => _periods[value.round()],
+            onChanged: (value) => setState(() => _period = value.round()),
+          ),
+        ),
+        if (_period > 0)
+          Text(
+            _historyLoading
+                ? 'Loading return history…'
+                : _historyFailed
+                    ? 'Return history unavailable'
+                    : 'Open holdings use purchase history when available; otherwise price change.',
+            style: theme.textTheme.bodySmall,
+          ),
+      ],
+    );
+  }
+
   Object? _loadError;
   int? touchedIndex;
   List<String> _chartFavorites = [];
@@ -159,6 +343,7 @@ class PortfolioPageState extends State<PortfolioPage>
       return;
     }
 
+    _historyAccount = null;
     _lastAccount = account;
     _lastIbkrConfig = ibkrConfig;
     _lastIbkrRefreshVersion = refreshVersion;
@@ -495,6 +680,7 @@ class PortfolioPageState extends State<PortfolioPage>
   }
 
   Future<void> _updateCandles() async {
+    _historyAccount = null;
     clearAllSyncCache();
     await _preload(forceRefresh: true);
     await _syncAllInBackground();
@@ -825,6 +1011,12 @@ class PortfolioPageState extends State<PortfolioPage>
       );
     }
 
+    final historyKey =
+        '${accounts.activeAccount}:${positions.map((p) => '${p.symbol}:${p.netShares}:${p.costBasis}').join(',')}';
+    if (_period > 0 && _historyAccount != historyKey) {
+      unawaited(_loadReturnHistory(historyKey, positions));
+    }
+
     final totalValue = positions.fold(
       0.0,
       (sum, position) => sum + position.currentValue,
@@ -835,9 +1027,35 @@ class PortfolioPageState extends State<PortfolioPage>
     );
     final costBasisGain = totalValue - totalCost;
     final cashOutSummary = _ibkrCashOutSummary(performance, netLiquidation);
-    final totalGain = cashOutSummary?.gainUsd ?? costBasisGain;
-    final totalGainPct = cashOutSummary?.gainPct ??
-        (totalCost > 0 ? (costBasisGain / totalCost) * 100 : 0.0);
+    final cutoff = _returnCutoff;
+    final accountReturn =
+        cutoff != null && performance != null && netLiquidation != null
+            ? accountPeriodReturn(performance, netLiquidation.value, cutoff)
+            : null;
+    final holdingReturns = positions.map(_holdingReturn).toList();
+    final holdingsAvailable = holdingReturns.every((value) => value != null);
+    final periodGain = holdingReturns.fold<double>(
+      0,
+      (sum, value) => sum + (value?.gain ?? 0),
+    );
+    final periodBasis = holdingReturns.fold<double>(
+      0,
+      (sum, value) => sum + (value?.basis ?? 0),
+    );
+    final totalGain = cutoff == null
+        ? cashOutSummary?.gainUsd ?? costBasisGain
+        : accountReturn != null
+            ? accountReturn.gain / requireUsdRate(performance!.currency)
+            : holdingsAvailable
+                ? periodGain
+                : double.nan;
+    final totalGainPct = cutoff == null
+        ? cashOutSummary?.gainPct ??
+            (totalCost > 0 ? (costBasisGain / totalCost) * 100 : 0.0)
+        : accountReturn?.percent ??
+            (holdingsAvailable
+                ? (periodBasis > 0 ? periodGain / periodBasis * 100 : 0.0)
+                : double.nan);
 
     final sorted = [...positions]..sort(
         (firstPosition, secondPosition) =>
@@ -874,7 +1092,8 @@ class PortfolioPageState extends State<PortfolioPage>
         netLiquidation: netLiquidation,
         totalGain: totalGain,
         totalGainPct: totalGainPct,
-        isCashOut: cashOutSummary != null,
+        isCashOut:
+            cutoff == null ? cashOutSummary != null : accountReturn != null,
         hasRefreshWarning: hasLoadError,
       );
     }
@@ -908,6 +1127,16 @@ class PortfolioPageState extends State<PortfolioPage>
                   _shareCsv(context, positions),
                   'Failed to share portfolio CSV',
                 ),
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(36, 12, 36, 8),
+              child: _periodPicker(
+                wholeAccount: cutoff == null
+                    ? cashOutSummary != null
+                    : accountReturn != null,
               ),
             ),
           ),
@@ -973,7 +1202,7 @@ class PortfolioPageState extends State<PortfolioPage>
                   name: position.name,
                   value: val,
                   allocationPct: pct,
-                  changePct: position.change,
+                  changePct: _holdingReturn(position)?.percent ?? double.nan,
                   isHighlighted: index == selectedIndex,
                   onTap: () => setState(
                     () => touchedIndex = touchedIndex == index ? null : index,
@@ -1065,7 +1294,10 @@ class PortfolioPageState extends State<PortfolioPage>
     final accounts = context.watch<AccountManager>();
     final byReturn = [...positions]..sort(
         (firstPosition, secondPosition) =>
-            secondPosition.change.compareTo(firstPosition.change),
+            (_holdingReturn(secondPosition)?.percent ?? double.negativeInfinity)
+                .compareTo(
+          _holdingReturn(firstPosition)?.percent ?? double.negativeInfinity,
+        ),
       );
     final currencyCount =
         positions.map((position) => position.nativeCurrency).toSet().length;
@@ -1075,311 +1307,344 @@ class PortfolioPageState extends State<PortfolioPage>
         ? fmtCurrency(totalValue)
         : fmtNativeCurrency(netLiquidation.value, netLiquidation.currency);
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(32, 28, 32, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              ProfilePicker(
-                key: const Key('portfolio-profile-picker'),
-                onExport: () => runDetachedTask(
-                  _exportCsv(context, positions),
-                  'Failed to export portfolio CSV',
-                ),
-                onShare: _supportsFileSharing
-                    ? () => runDetachedTask(
-                          _shareCsv(context, positions),
-                          'Failed to share portfolio CSV',
-                        )
-                    : null,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${accounts.activeAccount} · ${context.l10n.text('Portfolio')}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${positions.length} $positionLabel · $currencyCount $currencyLabel',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Tooltip(
-                message: context.l10n.text('Refresh'),
-                child: IconButton(
-                  onPressed: _updateCandles,
-                  icon: const Icon(Icons.refresh_rounded),
-                ),
-              ),
-              if (settings.visibleCurrencies.length > 1)
-                const SizedBox(width: 4),
-              if (settings.visibleCurrencies.length > 1)
-                PopupMenuButton<String>(
-                  key: const Key('portfolio-currency-menu'),
-                  onSelected: (value) => runDetachedTask(
-                    settings.setDisplayCurrency(value),
-                    'Failed to change display currency',
-                  ),
-                  itemBuilder: (_) => [
-                    for (final currencyCode in settings.visibleCurrencies)
-                      CheckedPopupMenuItem(
-                        value: currencyCode,
-                        checked: currencyCode == settings.displayCurrency,
-                        child: Text(currencyCode),
-                      ),
-                  ],
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: colorScheme.outlineVariant),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          settings.displayCurrency,
-                          style: theme.textTheme.labelLarge,
-                        ),
-                        const SizedBox(width: 6),
-                        const Icon(Icons.expand_more_rounded, size: 20),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          if (hasRefreshWarning) ...[
-            const SizedBox(height: 16),
-            _buildRefreshWarning(context),
-          ],
-          const SizedBox(height: 20),
-          desktopMetricGrid(
-            key: const Key('desktop-portfolio-metrics'),
-            minCardWidth: 270,
-            cards: [
-              _DesktopPortfolioMetric(
-                label: context.l10n.text('Account value'),
-                value: accountValue,
-                icon: Icons.account_balance_wallet_outlined,
-              ),
-              _DesktopPortfolioMetric(
-                label: context.l10n.text('Market value'),
-                value: fmtCurrency(totalValue),
-                detail: context.l10n.text('Open stock positions'),
-                icon: Icons.show_chart_rounded,
-              ),
-              _DesktopPortfolioMetric(
-                label: context.l10n.text(
-                  isCashOut ? 'Total P/L' : 'Unrealized P/L',
-                ),
-                value: '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}',
-                detail:
-                    '${totalGainPct >= 0 ? '+' : ''}${totalGainPct.toStringAsFixed(2)}%',
-                valueColor: totalGain >= 0 ? Colors.green : Colors.redAccent,
-                icon: totalGain >= 0
-                    ? Icons.trending_up_rounded
-                    : Icons.trending_down_rounded,
-              ),
-              _DesktopPortfolioMetric(
-                label: context.l10n.text('Positions'),
-                value: positions.length.toString(),
-                detail: context.l10n.text('Currently open'),
-                icon: Icons.view_list_outlined,
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: Row(
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        child: SizedBox(
+          height: constraints.maxHeight < 840 ? 840 : constraints.maxHeight,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(32, 28, 32, 24),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  flex: 7,
-                  child: Card(
-                    margin: EdgeInsets.zero,
-                    clipBehavior: Clip.antiAlias,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 22, 24, 20),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    ProfilePicker(
+                      key: const Key('portfolio-profile-picker'),
+                      onExport: () => runDetachedTask(
+                        _exportCsv(context, positions),
+                        'Failed to export portfolio CSV',
+                      ),
+                      onShare: _supportsFileSharing
+                          ? () => runDetachedTask(
+                                _shareCsv(context, positions),
+                                'Failed to share portfolio CSV',
+                              )
+                          : null,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            context.l10n.text('Allocation'),
-                            style: theme.textTheme.titleLarge,
+                            '${accounts.activeAccount} · ${context.l10n.text('Portfolio')}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.headlineMedium,
                           ),
-                          const SizedBox(height: 3),
+                          const SizedBox(height: 4),
                           Text(
-                            context.l10n.text(
-                              'How your stock portfolio is distributed',
-                            ),
-                            style: theme.textTheme.bodySmall?.copyWith(
+                            '${positions.length} $positionLabel · $currencyCount $currencyLabel',
+                            style: theme.textTheme.bodyMedium?.copyWith(
                               color: colorScheme.onSurfaceVariant,
                             ),
                           ),
-                          const SizedBox(height: 28),
-                          Expanded(
-                            child: LayoutBuilder(
-                              builder: (context, constraints) {
-                                final holdingsList = Scrollbar(
-                                  key:
-                                      const Key('desktop-allocation-scrollbar'),
-                                  controller: _allocationScrollController,
-                                  child: ListView.separated(
-                                    controller: _allocationScrollController,
-                                    padding: const EdgeInsets.only(right: 12),
-                                    itemCount: sorted.length,
-                                    separatorBuilder: (_, __) =>
-                                        const SizedBox(height: 14),
-                                    itemBuilder: (context, index) {
-                                      final position = sorted[index];
-                                      final allocationPct = totalValue > 0
-                                          ? position.currentValue /
-                                              totalValue *
-                                              100
-                                          : 0.0;
-                                      return _DesktopAllocationRow(
-                                        color: colors[index],
-                                        symbol: position.symbol,
-                                        name: position.name,
-                                        value: position.currentValue,
-                                        allocationPct: allocationPct,
-                                        selected: selectedIndex == index,
-                                        onTap: () => setState(
-                                          () => touchedIndex =
-                                              touchedIndex == index
-                                                  ? null
-                                                  : index,
+                        ],
+                      ),
+                    ),
+                    Tooltip(
+                      message: context.l10n.text('Refresh'),
+                      child: IconButton(
+                        onPressed: _updateCandles,
+                        icon: const Icon(Icons.refresh_rounded),
+                      ),
+                    ),
+                    if (settings.visibleCurrencies.length > 1)
+                      const SizedBox(width: 4),
+                    if (settings.visibleCurrencies.length > 1)
+                      PopupMenuButton<String>(
+                        key: const Key('portfolio-currency-menu'),
+                        onSelected: (value) => runDetachedTask(
+                          settings.setDisplayCurrency(value),
+                          'Failed to change display currency',
+                        ),
+                        itemBuilder: (_) => [
+                          for (final currencyCode in settings.visibleCurrencies)
+                            CheckedPopupMenuItem(
+                              value: currencyCode,
+                              checked: currencyCode == settings.displayCurrency,
+                              child: Text(currencyCode),
+                            ),
+                        ],
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            border:
+                                Border.all(color: colorScheme.outlineVariant),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                settings.displayCurrency,
+                                style: theme.textTheme.labelLarge,
+                              ),
+                              const SizedBox(width: 6),
+                              const Icon(Icons.expand_more_rounded, size: 20),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                if (hasRefreshWarning) ...[
+                  const SizedBox(height: 16),
+                  _buildRefreshWarning(context),
+                ],
+                const SizedBox(height: 20),
+                _periodPicker(wholeAccount: isCashOut),
+                const SizedBox(height: 12),
+                desktopMetricGrid(
+                  key: const Key('desktop-portfolio-metrics'),
+                  minCardWidth: 270,
+                  cards: [
+                    _DesktopPortfolioMetric(
+                      label: context.l10n.text('Account value'),
+                      value: accountValue,
+                      icon: Icons.account_balance_wallet_outlined,
+                    ),
+                    _DesktopPortfolioMetric(
+                      label: context.l10n.text('Market value'),
+                      value: fmtCurrency(totalValue),
+                      detail: context.l10n.text('Open stock positions'),
+                      icon: Icons.show_chart_rounded,
+                    ),
+                    _DesktopPortfolioMetric(
+                      label: context.l10n.text(
+                        isCashOut
+                            ? 'Total P/L'
+                            : _period == 0
+                                ? 'Unrealized P/L'
+                                : 'Open holdings P/L',
+                      ),
+                      value: totalGain.isFinite
+                          ? '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}'
+                          : 'Unavailable',
+                      detail: totalGainPct.isFinite
+                          ? '${totalGainPct >= 0 ? '+' : ''}${totalGainPct.toStringAsFixed(2)}%'
+                          : 'History does not cover this period',
+                      valueColor:
+                          totalGain >= 0 ? Colors.green : Colors.redAccent,
+                      icon: totalGain >= 0
+                          ? Icons.trending_up_rounded
+                          : Icons.trending_down_rounded,
+                    ),
+                    _DesktopPortfolioMetric(
+                      label: context.l10n.text('Positions'),
+                      value: positions.length.toString(),
+                      detail: context.l10n.text('Currently open'),
+                      icon: Icons.view_list_outlined,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        flex: 7,
+                        child: Card(
+                          margin: EdgeInsets.zero,
+                          clipBehavior: Clip.antiAlias,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(24, 22, 24, 20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  context.l10n.text('Allocation'),
+                                  style: theme.textTheme.titleLarge,
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  context.l10n.text(
+                                    'How your stock portfolio is distributed',
+                                  ),
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                const SizedBox(height: 28),
+                                Expanded(
+                                  child: LayoutBuilder(
+                                    builder: (context, constraints) {
+                                      final holdingsList = Scrollbar(
+                                        key: const Key(
+                                          'desktop-allocation-scrollbar',
                                         ),
+                                        controller: _allocationScrollController,
+                                        child: ListView.separated(
+                                          controller:
+                                              _allocationScrollController,
+                                          padding:
+                                              const EdgeInsets.only(right: 12),
+                                          itemCount: sorted.length,
+                                          separatorBuilder: (_, __) =>
+                                              const SizedBox(height: 14),
+                                          itemBuilder: (context, index) {
+                                            final position = sorted[index];
+                                            final allocationPct = totalValue > 0
+                                                ? position.currentValue /
+                                                    totalValue *
+                                                    100
+                                                : 0.0;
+                                            return _DesktopAllocationRow(
+                                              color: colors[index],
+                                              symbol: position.symbol,
+                                              name: position.name,
+                                              value: position.currentValue,
+                                              allocationPct: allocationPct,
+                                              selected: selectedIndex == index,
+                                              onTap: () => setState(
+                                                () => touchedIndex =
+                                                    touchedIndex == index
+                                                        ? null
+                                                        : index,
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      );
+                                      final compact =
+                                          constraints.maxWidth < 600;
+                                      final chart = Center(
+                                        child: AspectRatio(
+                                          aspectRatio: 1,
+                                          child: _buildDesktopAllocationChart(
+                                            slices: slices,
+                                            sorted: sorted,
+                                            selectedIndex: selectedIndex,
+                                            compact: compact,
+                                          ),
+                                        ),
+                                      );
+
+                                      if (compact) {
+                                        if (constraints.maxHeight < 280) {
+                                          return Row(
+                                            key: const Key(
+                                              'desktop-allocation-compact',
+                                            ),
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
+                                              Expanded(flex: 4, child: chart),
+                                              const SizedBox(width: 14),
+                                              Expanded(
+                                                flex: 6,
+                                                child: holdingsList,
+                                              ),
+                                            ],
+                                          );
+                                        }
+
+                                        return Column(
+                                          key: const Key(
+                                            'desktop-allocation-compact',
+                                          ),
+                                          children: [
+                                            SizedBox(height: 220, child: chart),
+                                            const SizedBox(height: 14),
+                                            Expanded(child: holdingsList),
+                                          ],
+                                        );
+                                      }
+
+                                      return Row(
+                                        children: [
+                                          Expanded(flex: 5, child: chart),
+                                          const SizedBox(width: 28),
+                                          Expanded(
+                                            flex: 6,
+                                            child: holdingsList,
+                                          ),
+                                        ],
                                       );
                                     },
                                   ),
-                                );
-                                final compact = constraints.maxWidth < 600;
-                                final chart = Center(
-                                  child: AspectRatio(
-                                    aspectRatio: 1,
-                                    child: _buildDesktopAllocationChart(
-                                      slices: slices,
-                                      sorted: sorted,
-                                      selectedIndex: selectedIndex,
-                                      compact: compact,
-                                    ),
-                                  ),
-                                );
-
-                                if (compact) {
-                                  if (constraints.maxHeight < 280) {
-                                    return Row(
-                                      key: const Key(
-                                        'desktop-allocation-compact',
-                                      ),
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        Expanded(flex: 4, child: chart),
-                                        const SizedBox(width: 14),
-                                        Expanded(flex: 6, child: holdingsList),
-                                      ],
-                                    );
-                                  }
-
-                                  return Column(
-                                    key: const Key(
-                                      'desktop-allocation-compact',
-                                    ),
-                                    children: [
-                                      SizedBox(height: 220, child: chart),
-                                      const SizedBox(height: 14),
-                                      Expanded(child: holdingsList),
-                                    ],
-                                  );
-                                }
-
-                                return Row(
-                                  children: [
-                                    Expanded(flex: 5, child: chart),
-                                    const SizedBox(width: 28),
-                                    Expanded(flex: 6, child: holdingsList),
-                                  ],
-                                );
-                              },
+                                ),
+                              ],
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  flex: 5,
-                  child: Card(
-                    margin: EdgeInsets.zero,
-                    clipBehavior: Clip.antiAlias,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(22, 22, 10, 18),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            context.l10n.text('Return by holding'),
-                            style: theme.textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            context.l10n.text('Since average cost'),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          Expanded(
-                            child: Scrollbar(
-                              key: const Key('desktop-return-scrollbar'),
-                              controller: _returnScrollController,
-                              child: ListView.separated(
-                                controller: _returnScrollController,
-                                padding: const EdgeInsets.only(right: 24),
-                                itemCount: byReturn.length,
-                                separatorBuilder: (_, __) => Divider(
-                                  height: 1,
-                                  color: colorScheme.outlineVariant.withValues(
-                                    alpha: 0.7,
+                      const SizedBox(width: 16),
+                      Expanded(
+                        flex: 5,
+                        child: Card(
+                          margin: EdgeInsets.zero,
+                          clipBehavior: Clip.antiAlias,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(22, 22, 10, 18),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  context.l10n.text('Return by holding'),
+                                  style: theme.textTheme.titleLarge,
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  '${_periods[_period]} · open holdings',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
                                   ),
                                 ),
-                                itemBuilder: (context, index) {
-                                  final position = byReturn[index];
-                                  return _DesktopReturnRow(position: position);
-                                },
-                              ),
+                                const SizedBox(height: 14),
+                                Expanded(
+                                  child: Scrollbar(
+                                    key: const Key('desktop-return-scrollbar'),
+                                    controller: _returnScrollController,
+                                    child: ListView.separated(
+                                      controller: _returnScrollController,
+                                      padding: const EdgeInsets.only(right: 24),
+                                      itemCount: byReturn.length,
+                                      separatorBuilder: (_, __) => Divider(
+                                        height: 1,
+                                        color: colorScheme.outlineVariant
+                                            .withValues(
+                                          alpha: 0.7,
+                                        ),
+                                      ),
+                                      itemBuilder: (context, index) {
+                                        final position = byReturn[index];
+                                        return _DesktopReturnRow(
+                                          position: position,
+                                          periodReturn:
+                                              _holdingReturn(position),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1574,14 +1839,17 @@ class _DesktopAllocationRow extends StatelessWidget {
 class _DesktopReturnRow extends StatelessWidget {
   final Position position;
 
-  const _DesktopReturnRow({required this.position});
+  final PortfolioReturn? periodReturn;
+
+  const _DesktopReturnRow({required this.position, required this.periodReturn});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final positive = position.change >= 0;
+    final change = periodReturn?.percent ?? double.nan;
+    final positive = change >= 0;
     final color = positive ? Colors.green : Colors.redAccent;
-    final pnl = position.unrealizedPL;
+    final pnl = periodReturn?.gain ?? double.nan;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 13),
@@ -1608,14 +1876,18 @@ class _DesktopReturnRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                (pnl >= 0 ? '+' : '') + fmtCurrency(pnl),
+                pnl.isFinite
+                    ? (pnl >= 0 ? '+' : '') + fmtCurrency(pnl)
+                    : 'Unavailable',
                 style: theme.textTheme.labelLarge?.copyWith(
                   color: pnl >= 0 ? Colors.green : Colors.redAccent,
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
               Text(
-                '${positive ? '+' : ''}${position.change.toStringAsFixed(2)}%',
+                change.isFinite
+                    ? '${positive ? '+' : ''}${change.toStringAsFixed(2)}%'
+                    : '—',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: color,
                   fontFeatures: const [FontFeature.tabularFigures()],
@@ -1706,8 +1978,10 @@ class _SummaryCard extends StatelessWidget {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 Text(
-                  '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}'
-                  '  (${totalGainPct.toStringAsFixed(2)}%)',
+                  totalGain.isFinite
+                      ? '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}'
+                          '  (${totalGainPct.toStringAsFixed(2)}%)'
+                      : 'Return history unavailable',
                   style: TextStyle(color: gainColor, fontSize: 13),
                 ),
               ],
@@ -1793,7 +2067,9 @@ class _LegendTile extends StatelessWidget {
                   ),
             ),
             Text(
-              '${changePct >= 0 ? '+' : ''}${changePct.toStringAsFixed(2)}%',
+              changePct.isFinite
+                  ? '${changePct >= 0 ? '+' : ''}${changePct.toStringAsFixed(2)}%'
+                  : '—',
               style: TextStyle(
                 fontSize: 13,
                 color: changePct >= 0 ? Colors.green : Colors.redAccent,

@@ -607,6 +607,12 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const Key('desktop-portfolio-metrics')), findsOneWidget);
+    final periodSlider =
+        tester.widget<Slider>(find.byKey(const Key('portfolio-return-period')));
+    expect(periodSlider.value, 0);
+    expect(periodSlider.divisions, 10);
+    expect(periodSlider.semanticFormatterCallback!(0), 'All time');
+    expect(periodSlider.semanticFormatterCallback!(10), '1D');
     expect(
       (tester.getTopLeft(find.text('Account value')).dy -
               tester.getTopLeft(find.text('Market value')).dy)
