@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/ticker_context_actions.dart';
 import 'package:market_monk/adaptive_layout.dart';
@@ -202,7 +203,8 @@ class HoldingsPageState extends State<HoldingsPage>
     _lastProfileId = profileId;
     _lastIbkrConfig = ibkrConfig;
     _lastIbkrRefreshVersion = refreshVersion;
-    if (accountChanged) {
+    if (accountChanged ||
+        (previousProfileId.isNotEmpty && previousProfileId != profileId)) {
       if (_search.text.isEmpty) {
         _profileSummaries[previousProfileId] = _summaries;
       }
@@ -637,24 +639,50 @@ class HoldingsPageState extends State<HoldingsPage>
     });
   }
 
-  void _toggleSelectAll() {
+  void _toggleHoldingSelection(String symbol) {
     setState(() {
-      if (_selectedSymbols.length == _summaries.length) {
-        _selectedSymbols.clear();
-      } else {
-        _selectedSymbols
-          ..clear()
-          ..addAll(_summaries.map((summary) => summary.symbol));
+      if (!_selectedSymbols.remove(symbol)) {
+        _selectedSymbols.add(symbol);
       }
+      _selecting = _selectedSymbols.isNotEmpty;
     });
+  }
+
+  void _toggleSelectAll() {
+    final visibleSymbols = _summaries.map((summary) => summary.symbol).toSet();
+    if (visibleSymbols.isEmpty) return;
+    setState(() {
+      if (_selectedSymbols.containsAll(visibleSymbols)) {
+        _selectedSymbols.removeAll(visibleSymbols);
+      } else {
+        _selectedSymbols.addAll(visibleSymbols);
+      }
+      _selecting = _selectedSymbols.isNotEmpty;
+    });
+  }
+
+  Future<void> _copySelectedSymbols() async {
+    if (_selectedSymbols.isEmpty) return;
+    final symbols = _selectedSymbols.toList()..sort();
+    await Clipboard.setData(ClipboardData(text: symbols.join('\n')));
+    if (mounted) {
+      toast(
+        context,
+        context.l10n.text('Copied {count} symbols', {
+          'count': symbols.length,
+        }),
+      );
+    }
   }
 
   Future<void> _deleteSelected(
     BuildContext context, {
     Set<String>? symbols,
   }) async {
-    final targets = symbols ?? _selectedSymbols;
-    if (targets.isEmpty) return;
+    final targets = Set<String>.of(symbols ?? _selectedSymbols);
+    if (targets.isEmpty || context.read<AccountManager>().ibkrConfigFor().enabled) {
+      return;
+    }
 
     final count = targets.length;
     final ctx = context;
@@ -712,8 +740,10 @@ class HoldingsPageState extends State<HoldingsPage>
     final desktop = isDesktopLayout(context);
     final accounts = context.watch<AccountManager>();
     final ibkrManaged = accounts.ibkrConfigFor().enabled;
-    final allSelected =
-        _summaries.isNotEmpty && _selectedSymbols.length == _summaries.length;
+    final allSelected = _summaries.isNotEmpty &&
+        _selectedSymbols.containsAll(
+          _summaries.map((summary) => summary.symbol),
+        );
 
     final menuButton = PopupMenuButton<String>(
       key: const Key('holdings-menu-button'),
@@ -721,25 +751,34 @@ class HoldingsPageState extends State<HoldingsPage>
       tooltip: context.l10n.text('Show menu'),
       onSelected: accounts.switchAccount,
       itemBuilder: (context) => <PopupMenuEntry<String>>[
+        PopupMenuItem<String>(
+          enabled: _summaries.isNotEmpty,
+          onTap: _toggleSelectAll,
+          child: ListTile(
+            leading: Icon(allSelected ? Icons.deselect : Icons.select_all),
+            title: Text(
+              allSelected
+                  ? context.l10n.text('Deselect all')
+                  : context.l10n.text('Select all'),
+            ),
+          ),
+        ),
         if (_selecting) ...[
           PopupMenuItem<String>(
-            onTap: _toggleSelectAll,
+            onTap: _copySelectedSymbols,
             child: ListTile(
-              leading: Icon(allSelected ? Icons.deselect : Icons.select_all),
-              title: Text(
-                allSelected
-                    ? context.l10n.text('Deselect all')
-                    : context.l10n.text('Select all'),
+              leading: const Icon(Icons.copy),
+              title: Text(context.l10n.text('Copy selected symbols')),
+            ),
+          ),
+          if (!ibkrManaged)
+            PopupMenuItem<String>(
+              onTap: () => _deleteSelected(context),
+              child: ListTile(
+                leading: const Icon(Icons.delete),
+                title: Text(context.l10n.text('Delete selected')),
               ),
             ),
-          ),
-          PopupMenuItem<String>(
-            onTap: () => _deleteSelected(context),
-            child: ListTile(
-              leading: const Icon(Icons.delete),
-              title: Text(context.l10n.text('Delete selected')),
-            ),
-          ),
           PopupMenuItem<String>(
             onTap: _exitSelecting,
             child: ListTile(
@@ -747,33 +786,33 @@ class HoldingsPageState extends State<HoldingsPage>
               title: Text(context.l10n.text('Cancel selection')),
             ),
           ),
-        ] else ...[
-          if (accounts.accounts.length > 1) ...[
-            ...accounts.accounts.map(
-              (account) => CheckedPopupMenuItem<String>(
-                value: account,
-                checked: account == accounts.activeAccount,
-                child: Text(account),
-              ),
-            ),
-            const PopupMenuDivider(),
-          ],
-          PopupMenuItem<String>(
-            onTap: () async {
-              await Navigator.push(
-                context,
-                adaptivePageRoute(
-                  context,
-                  builder: (_) => const SettingsPage(),
-                ),
-              );
-            },
-            child: ListTile(
-              leading: const Icon(Icons.settings),
-              title: Text(context.l10n.text('Settings')),
+        ],
+        const PopupMenuDivider(),
+        if (accounts.accounts.length > 1) ...[
+          ...accounts.accounts.map(
+            (account) => CheckedPopupMenuItem<String>(
+              value: account,
+              checked: account == accounts.activeAccount,
+              child: Text(account),
             ),
           ),
+          const PopupMenuDivider(),
         ],
+        PopupMenuItem<String>(
+          onTap: () async {
+            await Navigator.push(
+              context,
+              adaptivePageRoute(
+                context,
+                builder: (_) => const SettingsPage(),
+              ),
+            );
+          },
+          child: ListTile(
+            leading: const Icon(Icons.settings),
+            title: Text(context.l10n.text('Settings')),
+          ),
+        ),
       ],
     );
 
@@ -864,15 +903,23 @@ class HoldingsPageState extends State<HoldingsPage>
                         ),
                       ),
                       const SizedBox(width: 8),
-                      FilledButton.tonalIcon(
-                        onPressed: () => _deleteSelected(context),
-                        icon: const Icon(Icons.delete_outline),
-                        label: Text(
-                          context.l10n.text('Delete ({count})', {
-                            'count': _selectedSymbols.length,
-                          }),
-                        ),
+                      OutlinedButton.icon(
+                        onPressed: _copySelectedSymbols,
+                        icon: const Icon(Icons.copy_rounded),
+                        label: Text(context.l10n.text('Copy symbols')),
                       ),
+                      if (!ibkrManaged) ...[
+                        const SizedBox(width: 8),
+                        FilledButton.tonalIcon(
+                          onPressed: () => _deleteSelected(context),
+                          icon: const Icon(Icons.delete_outline),
+                          label: Text(
+                            context.l10n.text('Delete ({count})', {
+                              'count': _selectedSymbols.length,
+                            }),
+                          ),
+                        ),
+                      ],
                       const SizedBox(width: 8),
                       IconButton(
                         onPressed: _exitSelecting,
@@ -880,14 +927,6 @@ class HoldingsPageState extends State<HoldingsPage>
                         icon: const Icon(Icons.close),
                       ),
                     ] else if (!ibkrManaged) ...[
-                      OutlinedButton.icon(
-                        onPressed: _summaries.isEmpty
-                            ? null
-                            : () => setState(() => _selecting = true),
-                        icon: const Icon(Icons.checklist_rounded),
-                        label: Text(context.l10n.text('Select')),
-                      ),
-                      const SizedBox(width: 8),
                       FilledButton.icon(
                         onPressed: () => Navigator.push(
                           context,
@@ -1191,18 +1230,7 @@ class HoldingsPageState extends State<HoldingsPage>
     final winners = open.where((position) => position.change >= 0).length;
     final sorted = _sortDesktopSummaries(summaries);
 
-    void toggleSelection(SymbolSummary summary) {
-      setState(() {
-        if (_selectedSymbols.contains(summary.symbol)) {
-          _selectedSymbols.remove(summary.symbol);
-          if (_selectedSymbols.isEmpty) _selecting = false;
-        } else {
-          _selectedSymbols.add(summary.symbol);
-        }
-      });
-    }
-
-    DataCell textCell(
+     DataCell textCell(
       String text, {
       required SymbolSummary summary,
       bool numeric = true,
@@ -1317,7 +1345,8 @@ class HoldingsPageState extends State<HoldingsPage>
                             child: SingleChildScrollView(
                               controller: _desktopTableScrollController,
                               child: DataTable(
-                                showCheckboxColumn: _selecting && !ibkrManaged,
+                                showCheckboxColumn: true,
+                                onSelectAll: (_) => _toggleSelectAll(),
                                 sortColumnIndex: switch (_desktopSort) {
                                   _HoldingsSort.symbol => 0,
                                   _HoldingsSort.shares => 1,
@@ -1432,10 +1461,8 @@ class HoldingsPageState extends State<HoldingsPage>
                                         selected: _selectedSymbols.contains(
                                           summary.symbol,
                                         ),
-                                        onSelectChanged: _selecting &&
-                                                !ibkrManaged
-                                            ? (_) => toggleSelection(summary)
-                                            : null,
+                                        onSelectChanged: (_) =>
+                                            _toggleHoldingSelection(summary.symbol),
                                         cells: [
                                           DataCell(
                                             DesktopContextMenu(
@@ -1714,26 +1741,16 @@ class HoldingsPageState extends State<HoldingsPage>
               isSelected: _selectedSymbols.contains(summary.symbol),
               onTap: () {
                 if (_selecting) {
-                  setState(() {
-                    if (_selectedSymbols.contains(summary.symbol)) {
-                      _selectedSymbols.remove(summary.symbol);
-                      if (_selectedSymbols.isEmpty) _selecting = false;
-                    } else {
-                      _selectedSymbols.add(summary.symbol);
-                    }
-                  });
+                  _toggleHoldingSelection(summary.symbol);
                 } else {
                   _openDetail(summary);
                 }
               },
-              onLongPress: ibkrManaged
-                  ? null
-                  : () {
-                      setState(() {
-                        _selecting = true;
-                        _selectedSymbols.add(summary.symbol);
-                      });
-                    },
+              onLongPress: () {
+                if (!_selectedSymbols.contains(summary.symbol)) {
+                  _toggleHoldingSelection(summary.symbol);
+                }
+              },
             ),
           );
         },
@@ -1767,12 +1784,7 @@ class HoldingsPageState extends State<HoldingsPage>
                     ? 'Deselect holding'
                     : 'Select holding',
               ),
-              () => setState(() {
-                if (!_selectedSymbols.remove(summary.symbol)) {
-                  _selectedSymbols.add(summary.symbol);
-                }
-                _selecting = _selectedSymbols.isNotEmpty;
-              }),
+              () => _toggleHoldingSelection(summary.symbol),
             ),
           ],
         ],
@@ -1863,7 +1875,7 @@ class _SymbolTile extends StatelessWidget {
     return ListTile(
       selected: isSelected,
       selectedTileColor:
-          Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+          Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.18),
       leading: leadingWidget,
       title: Text(summary.symbol),
       subtitle: position != null

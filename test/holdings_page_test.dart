@@ -15,6 +15,157 @@ import 'sqlite_test_support.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  testWidgets(
+    'mobile long press and search-menu select all retain hidden picks',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(400, 900);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      await seedTestSqlite({});
+      final accounts = testAccountManager();
+      await accounts.init();
+      Position position(String symbol) => Position(
+        symbol: symbol,
+        name: symbol,
+        nativeCurrency: 'USD',
+        netShares: 1,
+        avgCost: 10,
+        currentPrice: 12,
+        firstBuyDate: DateTime(2025),
+        lastBuyDate: DateTime(2026),
+      );
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => SettingsState()),
+            ChangeNotifierProvider.value(value: accounts),
+          ],
+          child: MaterialApp(
+            home: HoldingsPage(
+              positionsLoader: (_) async => [
+                position('AAA'),
+                position('BBB'),
+                position('CCC'),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      ListTile tile(String symbol) => tester.widget<ListTile>(
+        find.ancestor(of: find.text(symbol), matching: find.byType(ListTile)),
+      );
+
+      await tester.tap(find.byKey(const Key('holdings-menu-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Select all'));
+      await tester.pumpAndSettle();
+      expect(tile('AAA').selected, isTrue);
+      expect(tile('CCC').selected, isTrue);
+      await tester.tap(find.byKey(const Key('holdings-menu-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Deselect all'));
+      await tester.pumpAndSettle();
+      expect(tile('AAA').selected, isFalse);
+
+      await tester.longPress(find.text('AAA'));
+      await tester.pumpAndSettle();
+      expect(tile('AAA').selected, isTrue);
+      expect(tile('BBB').selected, isFalse);
+
+      await tester.tap(find.text('BBB'));
+      await tester.pumpAndSettle();
+      expect(tile('BBB').selected, isTrue);
+
+      await tester.tap(find.byKey(const Key('holdings-menu-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Select all'));
+      await tester.pumpAndSettle();
+      expect(tile('CCC').selected, isTrue);
+
+      await tester.enterText(find.byType(EditableText).first, 'AAA');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('holdings-menu-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Deselect all'));
+      await tester.pumpAndSettle();
+      expect(tile('AAA').selected, isFalse);
+
+      await tester.enterText(find.byType(EditableText).first, '');
+      await tester.pumpAndSettle();
+      expect(tile('BBB').selected, isTrue);
+      expect(tile('CCC').selected, isTrue);
+    },
+  );
+
+  testWidgets('desktop holdings show permanent selectable checkbox column', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1400, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    Position position(String symbol) => Position(
+      symbol: symbol,
+      name: symbol,
+      nativeCurrency: 'USD',
+      netShares: 1,
+      avgCost: 10,
+      currentPrice: 12,
+      firstBuyDate: DateTime(2025),
+      lastBuyDate: DateTime(2026),
+    );
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: HoldingsPage(
+            positionsLoader: (_) async => [
+              position('AAA'),
+              position('BBB'),
+              position('CCC'),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    DataTable table() => tester.widget<DataTable>(find.byType(DataTable));
+    expect(table().showCheckboxColumn, isTrue);
+    expect(table().rows.every((row) => row.onSelectChanged != null), isTrue);
+    expect(table().rows.every((row) => !row.selected), isTrue);
+
+    table().rows.first.onSelectChanged!(true);
+    await tester.pumpAndSettle();
+    expect(table().rows.first.selected, isTrue);
+    expect(find.text('Delete (1)'), findsOneWidget);
+
+    table().onSelectAll!(true);
+    await tester.pumpAndSettle();
+    expect(table().rows.every((row) => row.selected), isTrue);
+
+    table().onSelectAll!(false);
+    await tester.pumpAndSettle();
+    expect(table().rows.every((row) => !row.selected), isTrue);
+    expect(table().showCheckboxColumn, isTrue);
+  });
+
+
+
+
   testWidgets('switching back to a profile reuses its holdings immediately', (
     tester,
   ) async {
