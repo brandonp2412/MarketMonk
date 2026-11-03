@@ -27,6 +27,28 @@ void main() {
     expect(accountPeriodReturn(history, 242, DateTime(2025)), isNull);
   });
 
+  test('historical account value chooses the latest fresh NAV', () {
+    expect(accountNetAssetValueAt(history, cutoff), 110);
+    expect(accountNetAssetValueAt(history, DateTime(2026, 1, 2, 12)), 110);
+    expect(accountNetAssetValueAt(history, DateTime(2025, 12, 31)), isNull);
+    expect(accountNetAssetValueAt(history, DateTime(2026, 1, 11)), isNull);
+  });
+
+  test('historical account value rejects invalid NAV', () {
+    final invalid = IbkrPerformanceSeries(
+      period: '1Y',
+      measure: 'TWR',
+      currency: 'USD',
+      startDate: cutoff,
+      startNav: 0,
+      dates: [cutoff],
+      nav: const [double.nan],
+      returnDates: [cutoff],
+      returns: const [0],
+    );
+    expect(accountNetAssetValueAt(invalid, cutoff), isNull);
+  });
+
   test('holding baseline accounts for later purchases and partial sales', () {
     final result = openHoldingPeriodReturn(
       currentValue: 180,

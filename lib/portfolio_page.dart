@@ -1103,6 +1103,21 @@ class PortfolioPageState extends State<PortfolioPage>
     final allocation = _allocationAt(positions, _period) ?? [];
     final allocationTotal =
         allocation.fold<double>(0, (sum, holding) => sum + holding.value);
+    final historicalNav = cutoff == null || performance == null
+        ? null
+        : accountNetAssetValueAt(performance, cutoff);
+    final displayTotal = cutoff == null
+        ? netLiquidation == null
+            ? fmtCurrency(totalValue)
+            : fmtNativeCurrency(netLiquidation.value, netLiquidation.currency)
+        : historicalNav == null
+            ? fmtCurrency(allocationTotal)
+            : fmtNativeCurrency(historicalNav, performance!.currency);
+    final totalLabel = cutoff == null && netLiquidation == null
+        ? 'Market value'
+        : cutoff != null && historicalNav == null
+            ? 'Holdings value'
+            : 'Account value';
     final sorted = [...allocation]..sort((a, b) => b.value.compareTo(a.value));
     final currentBySymbol = {
       for (final position in positions) position.symbol: position,
@@ -1134,8 +1149,8 @@ class PortfolioPageState extends State<PortfolioPage>
         colors: colors,
         slices: slices,
         selectedIndex: selectedIndex,
-        totalValue: totalValue,
-        netLiquidation: netLiquidation,
+        displayTotal: displayTotal,
+        totalLabel: totalLabel,
         totalGain: totalGain,
         totalGainPct: totalGainPct,
         isCashOut:
@@ -1161,8 +1176,8 @@ class PortfolioPageState extends State<PortfolioPage>
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: _SummaryCard(
-                totalValue: totalValue,
-                netLiquidation: netLiquidation,
+                displayTotal: displayTotal,
+                totalLabel: totalLabel,
                 totalGain: totalGain,
                 totalGainPct: totalGainPct,
                 onExport: () => runDetachedTask(
@@ -1335,8 +1350,8 @@ class PortfolioPageState extends State<PortfolioPage>
     required List<Color> colors,
     required List<MarketDonutSlice> slices,
     required int? selectedIndex,
-    required double totalValue,
-    required IbkrAccountValue? netLiquidation,
+    required String displayTotal,
+    required String totalLabel,
     required double totalGain,
     required double totalGainPct,
     required bool isCashOut,
@@ -1359,10 +1374,6 @@ class PortfolioPageState extends State<PortfolioPage>
         positions.map((position) => position.nativeCurrency).toSet().length;
     final positionLabel = positions.length == 1 ? 'position' : 'positions';
     final currencyLabel = currencyCount == 1 ? 'currency' : 'currencies';
-    final accountValue = netLiquidation == null
-        ? fmtCurrency(totalValue)
-        : fmtNativeCurrency(netLiquidation.value, netLiquidation.currency);
-
     return LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
         child: SizedBox(
@@ -1470,13 +1481,13 @@ class PortfolioPageState extends State<PortfolioPage>
                   minCardWidth: 270,
                   cards: [
                     _DesktopPortfolioMetric(
-                      label: context.l10n.text('Account value'),
-                      value: accountValue,
+                      label: context.l10n.text(totalLabel),
+                      value: displayTotal,
                       icon: Icons.account_balance_wallet_outlined,
                     ),
                     _DesktopPortfolioMetric(
                       label: context.l10n.text('Market value'),
-                      value: fmtCurrency(totalValue),
+                      value: fmtCurrency(allocationTotal),
                       detail: context.l10n.text('Open stock positions'),
                       icon: Icons.show_chart_rounded,
                     ),
@@ -1996,16 +2007,16 @@ class _PieHeaderDelegate extends SliverPersistentHeaderDelegate {
 }
 
 class _SummaryCard extends StatelessWidget {
-  final double totalValue;
-  final IbkrAccountValue? netLiquidation;
+  final String displayTotal;
+  final String totalLabel;
   final double totalGain;
   final double totalGainPct;
   final VoidCallback onExport;
   final VoidCallback onShare;
 
   const _SummaryCard({
-    required this.totalValue,
-    required this.netLiquidation,
+    required this.displayTotal,
+    required this.totalLabel,
     required this.totalGain,
     required this.totalGainPct,
     required this.onExport,
@@ -2031,12 +2042,12 @@ class _SummaryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  netLiquidation == null
-                      ? fmtCurrency(totalValue)
-                      : fmtNativeCurrency(
-                          netLiquidation!.value,
-                          netLiquidation!.currency,
-                        ),
+                  totalLabel,
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+                Text(
+                  displayTotal,
+                  key: const Key('portfolio-total-value'),
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 Text(

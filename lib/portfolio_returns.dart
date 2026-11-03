@@ -33,6 +33,29 @@ PortfolioReturn? accountPeriodReturn(
   return PortfolioReturn(currentValue - basis, basis);
 }
 
+double? accountNetAssetValueAt(
+  IbkrPerformanceSeries history,
+  DateTime cutoff,
+) {
+  if (history.dates.length != history.nav.length || history.nav.isEmpty) {
+    return null;
+  }
+  var selectedIndex = -1;
+  for (var index = 0; index < history.dates.length; index++) {
+    final date = history.dates[index];
+    if (!date.isAfter(cutoff) &&
+        (selectedIndex < 0 || date.isAfter(history.dates[selectedIndex]))) {
+      selectedIndex = index;
+    }
+  }
+  if (selectedIndex < 0 ||
+      cutoff.difference(history.dates[selectedIndex]).inDays > 7) {
+    return null;
+  }
+  final value = history.nav[selectedIndex];
+  return value.isFinite && value >= 0 ? value : null;
+}
+
 PortfolioReturn? openHoldingPeriodReturn({
   required double currentValue,
   required double currentShares,

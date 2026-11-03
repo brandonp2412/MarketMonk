@@ -690,6 +690,16 @@ void main() {
               slice.label: slice.value,
           };
       expect(pieValues(), {'VOO': 5500, 'MSFT': 1000});
+      if (width >= 840) {
+        expect(find.text(fmtNativeCurrency(121, 'USD')), findsOneWidget);
+      } else {
+        expect(
+          tester
+              .widget<Text>(find.byKey(const Key('portfolio-total-value')))
+              .data,
+          fmtNativeCurrency(121, 'USD'),
+        );
+      }
       slider.onChanged!(6);
       await tester.pump();
       expect(
@@ -700,6 +710,18 @@ void main() {
       );
       if (width >= 840) expect(find.text('+21.00%'), findsOneWidget);
       expect(pieValues(), {'VOO': 1000, 'MSFT': 3000, 'OLD': 4000});
+      if (width >= 840) {
+        expect(find.text(fmtCurrency(8000)), findsWidgets);
+        expect(find.text('Holdings value'), findsOneWidget);
+      } else {
+        expect(
+          tester
+              .widget<Text>(find.byKey(const Key('portfolio-total-value')))
+              .data,
+          fmtCurrency(8000),
+        );
+        expect(find.text('Holdings value'), findsOneWidget);
+      }
       expect(find.text('50.0%'), findsOneWidget);
       expect(find.text(fmtCurrency(4000)), findsOneWidget);
       slider = tester.widget<Slider>(finder);
@@ -713,10 +735,28 @@ void main() {
       );
       if (width >= 840) expect(find.text('+10.00%'), findsOneWidget);
       expect(pieValues(), {'VOO': 2000, 'MSFT': 1000, 'OLD': 1000});
+      if (width >= 840) {
+        expect(find.text(fmtNativeCurrency(110, 'USD')), findsOneWidget);
+      } else {
+        expect(
+          tester
+              .widget<Text>(find.byKey(const Key('portfolio-total-value')))
+              .data,
+          fmtNativeCurrency(110, 'USD'),
+        );
+      }
       expect(find.text('50.0%'), findsOneWidget);
       tester.widget<Slider>(finder).onChanged!(0);
       await tester.pump();
       expect(pieValues(), {'VOO': 5500, 'MSFT': 1000});
+      if (width < 840) {
+        expect(
+          tester
+              .widget<Text>(find.byKey(const Key('portfolio-total-value')))
+              .data,
+          fmtNativeCurrency(121, 'USD'),
+        );
+      }
       expect(tester.takeException(), null);
     });
   }

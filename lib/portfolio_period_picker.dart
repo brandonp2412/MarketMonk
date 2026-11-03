@@ -185,30 +185,44 @@ class _TimeRulerTrack extends RoundedRectSliderTrackShape {
         ..color = neutral
         ..strokeWidth = 1,
     );
-    if (stops < 2) return;
-    for (var index = 0; index < stops; index++) {
-      final x = track.left + track.width * index / (stops - 1);
-      final selected = (x - thumbCenter.dx).abs() < 2;
-      final height = index == 0 || index == stops - 1 ? 13.0 : 9.0;
-      canvas.drawLine(
-        Offset(x, center - height / 2),
-        Offset(x, center + height / 2),
-        Paint()
-          ..color = selected ? selectedColor : tickColor.withValues(alpha: 0.6)
-          ..strokeWidth = selected ? 2.5 : 1.5
-          ..strokeCap = StrokeCap.round,
-      );
-      if (index == stops - 1) continue;
-      for (var sub = 1; sub < 4; sub++) {
-        final minorX = x + track.width * sub / ((stops - 1) * 4);
-        canvas.drawLine(
-          Offset(minorX, center - 2),
-          Offset(minorX, center + 2),
-          Paint()
-            ..color = neutral
-            ..strokeWidth = 1,
-        );
+    if (stops > 1) {
+      final selectedIndex =
+          ((thumbCenter.dx - track.left) / track.width * (stops - 1))
+              .round()
+              .clamp(0, stops - 1);
+      for (var index = 0; index < stops; index++) {
+        final x = track.left + track.width * index / (stops - 1);
+        if (index != selectedIndex) {
+          final height = index == 0 || index == stops - 1 ? 13.0 : 9.0;
+          canvas.drawLine(
+            Offset(x, center - height / 2),
+            Offset(x, center + height / 2),
+            Paint()
+              ..color = tickColor.withValues(alpha: 0.6)
+              ..strokeWidth = 1.5
+              ..strokeCap = StrokeCap.round,
+          );
+        }
+        if (index == stops - 1) continue;
+        for (var sub = 1; sub < 4; sub++) {
+          final minorX = x + track.width * sub / ((stops - 1) * 4);
+          canvas.drawLine(
+            Offset(minorX, center - 2),
+            Offset(minorX, center + 2),
+            Paint()
+              ..color = neutral
+              ..strokeWidth = 1,
+          );
+        }
       }
     }
+    canvas.drawLine(
+      Offset(thumbCenter.dx, center - 16),
+      Offset(thumbCenter.dx, center + 16),
+      Paint()
+        ..color = selectedColor
+        ..strokeWidth = 2.5
+        ..strokeCap = StrokeCap.round,
+    );
   }
 }
