@@ -1,11 +1,14 @@
-import 'package:market_monk/sqlite_settings.dart';
-import 'package:market_monk/update_notice.dart';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
+import 'package:market_monk/sqlite_settings.dart';
+import 'package:market_monk/update_notice.dart';
 import 'package:market_monk/utils.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 
 class WhatsNew extends StatefulWidget {
   const WhatsNew({super.key});
@@ -14,19 +17,33 @@ class WhatsNew extends StatefulWidget {
   State<WhatsNew> createState() => _WhatsNewState();
 }
 
-class _Changelog {
-  final String created;
-  final String content;
+class _ReleaseNote {
+  final String version;
+  final String date;
+  final String sourceUrl;
+  final List<String> changes;
 
-  _Changelog({required this.created, required this.content});
+  const _ReleaseNote({
+    required this.version,
+    required this.date,
+    required this.sourceUrl,
+    required this.changes,
+  });
+
+  factory _ReleaseNote.fromJson(Map<String, dynamic> json) => _ReleaseNote(
+        version: json['version'] as String,
+        date: json['date'] as String,
+        sourceUrl: json['sourceUrl'] as String,
+        changes: (json['changes'] as List<dynamic>).cast<String>(),
+      );
 }
 
 class _WhatsNewState extends State<WhatsNew> {
   static const _pageSize = 10;
-  List<_Changelog> _changelogs = [];
-  List<String> _changelogFiles = [];
-  int _page = 0;
-  int _pageLoadGeneration = 0;
+  static const _previewChanges = 5;
+  List<_ReleaseNote> _releases = [];
+  final Set<String> _expandedVersions = {};
+  int _visibleCount = _pageSize;
   bool _isLoading = true;
   bool _loadFailed = false;
   bool _showUpdateNotices = true;
@@ -34,7 +51,7 @@ class _WhatsNewState extends State<WhatsNew> {
   @override
   void initState() {
     super.initState();
-    runDetachedTask(_loadChangelogs(), 'Failed to load changelog');
+    runDetachedTask(_loadHistory(), 'Failed to load changelog');
     runDetachedTask(
       _loadUpdateNoticePreference(),
       'Failed to load update preference',
@@ -56,31 +73,19 @@ class _WhatsNewState extends State<WhatsNew> {
     if (mounted) setState(() => _showUpdateNotices = enabled);
   }
 
-  Future<void> _loadChangelogs() async {
+  Future<void> _loadHistory() async {
     try {
-      final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
-      final files = manifest
-          .listAssets()
-          .where(
-            (key) =>
-                key.startsWith('assets/changelogs/') && key.endsWith('.txt'),
-          )
+      final data = jsonDecode(
+        await rootBundle.loadString('assets/release_history.json'),
+      ) as List<dynamic>;
+      final releases = data
+          .map((entry) => _ReleaseNote.fromJson(entry as Map<String, dynamic>))
           .toList();
-
-      files.sort((firstPath, secondPath) {
-        final firstTimestamp =
-            int.tryParse(firstPath.split('/').last.split('.').first) ?? 0;
-        final secondTimestamp =
-            int.tryParse(secondPath.split('/').last.split('.').first) ?? 0;
-        return secondTimestamp.compareTo(firstTimestamp);
-      });
-
       if (!mounted) return;
       setState(() {
-        _changelogFiles = files;
-        _page = 0;
+        _releases = releases;
+        _isLoading = false;
       });
-      await _loadPage(0);
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -90,58 +95,102 @@ class _WhatsNewState extends State<WhatsNew> {
     }
   }
 
-  Future<void> _loadPage(int page) async {
-    final generation = ++_pageLoadGeneration;
-    final pageFiles = _changelogFiles.skip(page * _pageSize).take(_pageSize);
-    final result = <_Changelog>[];
-    for (final path in pageFiles) {
-      final changelog = await _loadChangelogFile(path);
-      if (changelog != null) result.add(changelog);
-    }
-    if (!mounted || generation != _pageLoadGeneration) return;
-    setState(() {
-      _page = page;
-      _changelogs = result;
-      _isLoading = false;
-    });
-  }
+  Widget _buildRelease(_ReleaseNote release) {
+    final expanded = _expandedVersions.contains(release.version);
+    final changes =
+        expanded ? release.changes : release.changes.take(_previewChanges);
+    final hasHiddenChanges = release.changes.length > _previewChanges;
 
-  Future<void> _setPage(int page) async {
-    final pageCount = (_changelogFiles.length / _pageSize).ceil();
-    if (page < 0 || page >= pageCount) return;
-    await _loadPage(page);
-  }
-
-  Future<_Changelog?> _loadChangelogFile(String path) async {
-    try {
-      final content = await rootBundle.loadString(path);
-      if (content.trim().isEmpty) return null;
-
-      final filename = path.split('/').last.replaceAll('.txt', '');
-      final timestamp = int.tryParse(filename);
-      if (timestamp == null) return null;
-
-      return _Changelog(
-        created: DateFormat.yMMMd().format(
-          DateTime.fromMillisecondsSinceEpoch(timestamp * 1000),
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 840),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              release.version,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              DateFormat.yMMMd().format(
+                                DateTime.parse(release.date),
+                              ),
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () async {
+                          await launchUrlString(release.sourceUrl);
+                        },
+                        icon: const Icon(Icons.open_in_new, size: 18),
+                        label: const Text('Source'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (release.changes.isEmpty)
+                    const Text('No separate changes recorded for this release.')
+                  else
+                    for (final change in changes)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.only(top: 6, right: 10),
+                              child: Icon(Icons.circle, size: 6),
+                            ),
+                            Expanded(child: Text(change)),
+                          ],
+                        ),
+                      ),
+                  if (hasHiddenChanges)
+                    TextButton(
+                      onPressed: () => setState(() {
+                        if (expanded) {
+                          _expandedVersions.remove(release.version);
+                        } else {
+                          _expandedVersions.add(release.version);
+                        }
+                      }),
+                      child: Text(
+                        expanded
+                            ? 'Show fewer changes'
+                            : 'Show all ${release.changes.length} changes',
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
         ),
-        content: content.trim(),
-      );
-    } catch (_) {
-      return null;
-    }
+      ),
+    );
   }
 
   Widget _buildBody() {
-    if (_isLoading) {
-      return const SizedBox.expand();
-    }
+    if (_isLoading) return const SizedBox.expand();
     if (_loadFailed) {
       return Center(
         child: Text(context.l10n.text('Unable to load release notes.')),
       );
     }
-    if (_changelogs.isEmpty) {
+    if (_releases.isEmpty) {
       return AppEmptyState(
         icon: Icons.newspaper_rounded,
         title: context.l10n.text('No release notes available'),
@@ -149,56 +198,34 @@ class _WhatsNewState extends State<WhatsNew> {
       );
     }
 
-    final pageCount = (_changelogFiles.length / _pageSize).ceil();
-    return Column(
-      children: [
-        Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            itemCount: _changelogs.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              final log = _changelogs[index];
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      log.created,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(log.content),
-                  ],
+    final visibleCount = _visibleCount.clamp(0, _releases.length);
+    final hasMore = visibleCount < _releases.length;
+    return ListView.builder(
+      key: const PageStorageKey('whats-new-history'),
+      padding: const EdgeInsets.only(top: 8, bottom: 24),
+      itemCount: visibleCount + (hasMore ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index < visibleCount) return _buildRelease(_releases[index]);
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                Text('Showing $visibleCount of ${_releases.length} releases'),
+                const SizedBox(height: 8),
+                FilledButton.tonalIcon(
+                  key: const Key('load-more-releases'),
+                  onPressed: () => setState(() {
+                    _visibleCount += _pageSize;
+                  }),
+                  icon: const Icon(Icons.expand_more),
+                  label: Text(context.l10n.text('Load more')),
                 ),
-              );
-            },
+              ],
+            ),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                onPressed: _page > 0 ? () => _setPage(_page - 1) : null,
-                icon: const Icon(Icons.chevron_left),
-                tooltip: 'Previous page',
-              ),
-              Text('${_page + 1} / $pageCount'),
-              IconButton(
-                onPressed:
-                    _page + 1 < pageCount ? () => _setPage(_page + 1) : null,
-                icon: const Icon(Icons.chevron_right),
-                tooltip: 'Next page',
-              ),
-            ],
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 

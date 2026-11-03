@@ -67,6 +67,8 @@ void main() {
     expect(find.text('Market closed indicator'), findsNothing);
     expect(find.text('Accounts'), findsOneWidget);
     expect(find.text('Data'), findsOneWidget);
+    expect(find.text('About'), findsOneWidget);
+    expect(find.text("What's New"), findsOneWidget);
 
     final export = tester.getTopLeft(find.text('Export database'));
     final import = tester.getTopLeft(find.text('Import database'));

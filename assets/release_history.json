@@ -1,0 +1,1525 @@
+[
+  {
+    "version": "Unreleased (app 1.0.114)",
+    "date": "2026-11-03",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.112...main",
+    "changes": [
+      "Keep holdings visible while switching profiles",
+      "Add Linux desktop debug hot reload shortcuts",
+      "Add configurable start page and chart appearance",
+      "Color desktop holdings position counts",
+      "Align candles with calendar dates in portfolio charts",
+      "Flatten wide-screen chart and portfolio actions",
+      "Suppress favorite removal toast notification",
+      "Animate portfolio allocation slices on time changes",
+      "Show cumulative portfolio P/L at selected date",
+      "Improve settings search for common finance terms",
+      "Sync portfolio total and time ruler marker",
+      "Turn portfolio range into adaptive time ruler",
+      "Add searchable settings on mobile and desktop",
+      "Update portfolio allocation with the selected period",
+      "Show available history across longer chart ranges",
+      "Limit portfolio periods and correct dotted slider",
+      "Add dotted portfolio slider for historical returns",
+      "Add dotted ticks to curve sliders",
+      "Apply compact slider theme across app",
+      "Restore colored returns on mobile portfolio rows",
+      "Show mobile portfolio allocation in the subtitle",
+      "Add themed magnifying glass ticker search loader",
+      "Restore standard pull-to-refresh on charts page",
+      "Use drawing trend design for chart loading states",
+      "Add ten chart loading designs for in-app preview",
+      "Add bouncing chart loader for MarketMonk charts",
+      "Pace Yahoo requests and honor rate limits",
+      "Fetch unheld favorites from integrated broker",
+      "Keep favorite requests moving concurrently",
+      "Skip loading unselected favorite data",
+      "Fetch favorite chart data concurrently",
+      "Fix chart period loading and prefetch favorites on refresh",
+      "Preserve historical share quote currencies",
+      "Replay intraday portfolio trades and cash flows",
+      "Remove private development host details",
+      "Remove internal device identifiers from public text (2 commits)",
+      "Harden FX refresh with two CDN fallback sources",
+      "Validate main pushes and require manual releases",
+      "Align chart period checks with cached rendering",
+      "Include daily fund valuations in one-day charts",
+      "Preserve recovered Glass changes for reconciliation",
+      "Reduce chart text layout and line painting overhead",
+      "Restore cached chart periods without waiting for sync",
+      "Render all chart lines together after period loads",
+      "Preserve chart history while changing selected period",
+      "Hide unavailable history message while periods load",
+      "Summarize positions and currencies in portfolio header",
+      "Show active profile in desktop portfolio title",
+      "Move the debug banner to the bottom right corner",
+      "Align desktop charts padding with portfolio pages",
+      "Match holdings content padding to portfolio page",
+      "Show active profile in desktop holdings title",
+      "Seed complete offline data for screenshot actions",
+      "Replace the debug ribbon with a themed badge",
+      "Align desktop holdings with portfolio profile picker",
+      "Align chart tooltip order with favorites and profiles",
+      "Show selected stock symbol in chart search bar",
+      "Move desktop return scrollbar clear of dollar values",
+      "Restore back navigation from favorite stock charts",
+      "Keep chart details visible while loading periods",
+      "Resume interrupted network requests when app returns",
+      "Pause intraday broker requests after connection failures",
+      "Allow renaming favorites from their action sheet",
+      "Add long-press bottom sheet for favorite removal",
+      "Restore spinners for missing remote market data",
+      "Reduce spinners",
+      "Remove market-closed chart indicator",
+      "Move chart toggles into mobile menu and settings",
+      "Keep portfolio views fresh across profiles and imports",
+      "Add compact profile and favorites candle chart view",
+      "Align candle and line plot geometry and navigation",
+      "Label stock candlestick chart switch",
+      "Improve candle tooltips and long-press scrubbing",
+      "Add OHLC candlestick views for stock charts",
+      "Prevent language picker label clipping",
+      "Match release badges to default app seed color",
+      "Simplify portfolio loading and currency controls",
+      "Focus project copy on Android, Windows, and Linux",
+      "Move portfolio CSV actions into profile picker",
+      "Add portfolio profile initial picker",
+      "Remove hedged valuation copy and non-error notices",
+      "Defer page refreshes until swipe settles",
+      "Prevent stalled IBKR portfolio chart refreshes",
+      "Keep chart tooltips responsive while scrubbing",
+      "Show cached favorites during broker chart loading",
+      "Allow disabling new-version update notices",
+      "Satisfy trailing-comma lint",
+      "Constrain account values on narrow phones",
+      "Remove unused Yahoo request category constants (#56)",
+      "Remove unused bottom navigation long-press handler (#59)",
+      "Remove unused Cupertino icons dependency (#58)",
+      "Remove unused duplicate runner sources (#57)",
+      "Remove dead splash bitmap template markup (#55)",
+      "Drop unreachable pre-21 splash resource (#54)",
+      "Remove unused chart and legacy database helpers (#50)",
+      "Remove unused round launcher icon assets (#51)",
+      "Remove unreachable pre-N currency fallback (#53)",
+      "Remove unused generated launcher icons (#52)",
+      "Revert \"fix: refine shared chart and portfolio colors\"",
+      "Refine shared chart and portfolio colors",
+      "Align portfolio colors and prevent chart loading flicker",
+      "Align IBKR chart dates with favourite market sessions",
+      "Prove provisional IBKR values in Linux charts",
+      "Refresh provisional IBKR charts from live stock quotes",
+      "Estimate recent IBKR account values from market closes",
+      "Show upgrade changelog snackbar no more than every 14 days",
+      "Upgrade Flutter, dependencies and Android build tooling",
+      "Fix external link buttons on Android",
+      "Reuse Play Store screenshots in README",
+      "Round README screenshots in release pipeline",
+      "Update README",
+      "Center first few things of README",
+      "Shorten AGENTS.md",
+      "Persist IBKR trade history for instant holding details",
+      "Recover IBKR trade history after unavailable loads",
+      "Remove passive chart valuation and preview disclaimers",
+      "Stabilize chart drag tooltips",
+      "Keep hidden portfolio restore button fully visible",
+      "Chart indicative current IBKR valuation alongside official history",
+      "Stop tracking Serena project files",
+      "Complete unified SQLite backup and import",
+      "Use package codec for imports and exports",
+      "Avoid false no-trades state on period switch",
+      "Format portfolio_page.dart",
+      "Remove unreliable Patrol integration from MarketMonk",
+      "Preview five-day history before intraday",
+      "Recover Yahoo intraday quote failures",
+      "Target daily NAV regression with monthly range",
+      "Append broker NAV after stale performance dates",
+      "Integrate read-only LumiBot market data backend",
+      "Parallelize portfolio intraday through IBKR proxy",
+      "Align refresh spinner and remove filter",
+      "Animate mobile donut slice selection",
+      "Increase refresh spinner edge spacing",
+      "Leave GTK theme selection to system",
+      "Respect GTK theme and refine holdings UI",
+      "Move Charts currency picker into search bar menu",
+      "Follow system titlebar color scheme",
+      "Improve charts scrolling, holdings layout and CSV share",
+      "Reliably share portfolio CSV from Android release",
+      "Default MarketMonk theme to golden monk icon color",
+      "Sync Fastlane artwork with golden monk launcher icon",
+      "Align portfolio benchmarks and returns on zoom",
+      "Size holdings column to its contents",
+      "Keep all holdings columns horizontally scrollable",
+      "Keep desktop portfolio and holdings cards legible",
+      "Remove warning slop",
+      "Add supported portfolio CSV sharing action",
+      "Cache portfolio ranges and batch intraday requests",
+      "Save portfolio CSV on desktop instead of sharing",
+      "Show intraday portfolio charts from current holdings",
+      "Render intraday favorites and serialize TWS requests",
+      "Add Yahoo and IBKR intraday stock chart support",
+      "Refine rolling average spacing and radio indicator",
+      "Align rolling average chip with favorites layout",
+      "Replace chart values with the selected rolling average",
+      "Place rolling average alongside favorite chart chips",
+      "Move rolling average into chart action chip controls",
+      "Distinguish chart colors while preserving theme awareness",
+      "Add rolling average toggle to chart page controls",
+      "Match favorite chip percentage to selected period",
+      "Rebase comparisons and retain custom chart dates",
+      "Prevent refresh menu from covering chart context menu",
+      "Show context menu before changing chart start date",
+      "Set desktop chart start point with right click",
+      "Use pinned Flutter and scope hot reload watchers",
+      "Add desktop drag zoom to stock and portfolio charts",
+      "Open desktop context menus without an animation",
+      "Replace redundant menus with useful stock actions",
+      "Add desktop context menus across app interactions",
+      "Upgrade Kotlin Gradle plugin to 2.4.20",
+      "Give favorites distinct accents near the theme hue",
+      "Use theme colors for favorite chart selections",
+      "Soften favorite card outlines and selected tint",
+      "Toggle favorite comparison lines in portfolio charts",
+      "Require HTTPS for remote IBKR portfolio connections",
+      "Update server README.md",
+      "Add more space to right of charts",
+      "Refresh holdings amounts when privacy setting changes",
+      "Give chart tooltip dots a polished neon treatment",
+      "Refine chart tooltip dots with rings and halos",
+      "Disable Impeller in the active Linux application",
+      "Align Linux rendering SDK with Flexify",
+      "Disable Impeller for Linux runner",
+      "Fix spacing between favorite $ and %",
+      "Fix spacing between appearance and language picker",
+      "Add setting for hiding $ amounts",
+      "Remove dot blur",
+      "Sync lockfile with pinned Flutter SDK",
+      "Respect fortnightly release gate for checks",
+      "Keep realized P/L out of holdings lists",
+      "Keep IBKR holdings across profile refresh races",
+      "Reconcile IBKR returns and realized daily P/L",
+      "Serve IBKR performance from SQLite cache",
+      "Fix IBKR refresh stalls",
+      "Prevent portfolio chart row overflow",
+      "Make the profile picker dense",
+      "Shorten divider between accounts on Charts",
+      "Remove bolds",
+      "Keep chart period selectors on one row",
+      "Restore chart and compact portfolio layouts",
+      "Improve style",
+      "Keep chart period selectors in one row",
+      "Seed screenshot fixtures in each app",
+      "Finish desktop chart and refresh polish",
+      "Restore stable market data synchronization",
+      "Finish MarketMonk worktree integration",
+      "Center Market Monk chart tooltip text",
+      "Document uv setup for IBKR bridge (2 commits)",
+      "Preserve IBKR cache during outages (2 commits)",
+      "Clean up suite diagnostics and async handling (2 commits)",
+      "Use configured helper for IBKR performance (2 commits)",
+      "Consolidate persistence into database (2 commits)",
+      "Restore allocation donut thickness (2 commits)",
+      "Disable Impeller in Linux runner (2 commits)",
+      "Finalize Drafter migration (2 commits)",
+      "Migrate MarketMonk charts to Drafter (2 commits)",
+      "Finish IBKR cache and persistence updates (2 commits)",
+      "Handle navigation futures explicitly",
+      "Reset holdings stream snapshots",
+      "Invalidate empty IBKR portfolio cache",
+      "Refresh stale holdings cache",
+      "Add holdings account switcher",
+      "Keep chart refresh indicator below search",
+      "Stop candle sync when coverage cannot advance",
+      "Finish unified persistence lifecycle cleanup",
+      "Fix async and interpolation lints",
+      "Add deterministic request observability",
+      "Finish unified backup restore",
+      "Match Flexify popup menu hover behavior across apps",
+      "Fix-IBKR-historical-trade-history",
+      "Fix outdated lock file",
+      "Update vscode settings and pubspec.lock",
+      "Refine chart spacing",
+      "Bound background request fanout",
+      "Finalize unified persistence cleanup",
+      "Keep account switching on unified profile state",
+      "Harden persistence migrations",
+      "Cut app data access to unified profiles",
+      "Unify candle market data storage",
+      "Balance chart side margins",
+      "Migrate legacy databases into unified store",
+      "Make candle sync range driven",
+      "Add unified database foundation",
+      "Decouple backup storage layout",
+      "Own and coalesce async background work",
+      "Pause hidden market pages",
+      "Coordinate background market data requests",
+      "Paginate changelog entries",
+      "Isolate legacy preferences migration",
+      "Tighten market data lifecycle and persistence",
+      "Fit Talker logs to terminal width",
+      "Recover profiles across sqlite cutover",
+      "Prevent Holdings SQLite lock errors",
+      "Detect local currency from device region",
+      "Delete codex hooks",
+      "Complete the SQLite persistence cutover safely",
+      "Fail screenshots on Flutter errors",
+      "Standardize screenshot runner",
+      "Keep candle database alive during sync",
+      "Remove obsolete icon attribution",
+      "Align desktop holdings account summary",
+      "Show dates in portfolio chart tooltips",
+      "Show chart tooltip date inline",
+      "Disable desktop tab transitions",
+      "Use desktop fade transitions for tabs",
+      "Polish desktop content gutters",
+      "Fix desktop chart and portfolio polish regressions",
+      "Fix compact portfolio allocation overflow",
+      "Add SQLite persistence foundation",
+      "Fix desktop scrollbar controllers",
+      "Polish Market Monk desktop layouts",
+      "Report IBKR cash-out portfolio P&L",
+      "Install and showcase mm CLI",
+      "Use circular pull-to-refresh indicators",
+      "Use Market Monk desktop title",
+      "Simplify chart portfolio summary",
+      "Add Market Monk data CLI",
+      "Fix mobile bottom nav scroll clearance",
+      "Restore all portfolio profiles from backup",
+      "Reflow compact desktop portfolio allocation",
+      "Support desktop navigation in screenshots",
+      "Fit Spanish Play title limit",
+      "Restore GitHub Actions builds",
+      "Keep chart summary inside compact desktop",
+      "Support compact desktop windows",
+      "Rethink desktop portfolio and holdings",
+      "Redesign desktop layout",
+      "Add European Portuguese localization",
+      "Add Ukrainian localization",
+      "Restore pinned Flutter lockfile compatibility",
+      "Add Malay localization",
+      "Add Persian localization",
+      "Add Urdu localization",
+      "Add Bengali localization",
+      "Migrate Android build to built-in Kotlin",
+      "Restore chart state before cached render",
+      "Render cached charts immediately",
+      "Make portfolio account switching instant",
+      "Improve multi-account chart rendering",
+      "Standardize Android device installs",
+      "Simplify IBKR chart tooltips",
+      "Cache IBKR portfolio and performance data",
+      "Apply Dart formatting",
+      "Improve multi-account charts",
+      "Translations & tests",
+      "Add Italian localization",
+      "Complete Dutch localization",
+      "Complete Polish localization",
+      "Fix IBKR portfolio account switching",
+      "Exclude transfers from IBKR return amount",
+      "Require real IBKR performance history",
+      "Align trade edit e2e dialog label",
+      "Replay IBKR history when broker performance is unavailable",
+      "Isolate IBKR performance account",
+      "Expose IBKR performance in native mode",
+      "Refresh IBKR NAV when charts open",
+      "Align IBKR chart data with broker NAV",
+      "Complete Thai localization",
+      "Complete Vietnamese localization",
+      "Complete Turkish localization",
+      "Complete Indonesian localization",
+      "Update MarketMonk app icon",
+      "Complete Russian localization",
+      "Hide empty ticker fallback",
+      "Add Arabic localization",
+      "Release on a fortnightly cadence"
+    ]
+  },
+  {
+    "version": "1.0.112",
+    "date": "2026-09-27",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.111...v1.0.112",
+    "changes": [
+      "Complete Hindi localization"
+    ]
+  },
+  {
+    "version": "1.0.111",
+    "date": "2026-09-27",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.110...v1.0.111",
+    "changes": [
+      "Complete Traditional Chinese localization"
+    ]
+  },
+  {
+    "version": "1.0.110",
+    "date": "2026-09-27",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.109...v1.0.110",
+    "changes": [
+      "Complete Simplified Chinese localization"
+    ]
+  },
+  {
+    "version": "1.0.109",
+    "date": "2026-09-27",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.108...v1.0.109",
+    "changes": [
+      "Complete Korean localization"
+    ]
+  },
+  {
+    "version": "1.0.108",
+    "date": "2026-09-27",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.107...v1.0.108",
+    "changes": [
+      "Complete Japanese localization"
+    ]
+  },
+  {
+    "version": "1.0.107",
+    "date": "2026-09-27",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.106...v1.0.107",
+    "changes": [
+      "Complete German localization"
+    ]
+  },
+  {
+    "version": "1.0.106",
+    "date": "2026-09-26",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.105...v1.0.106",
+    "changes": [
+      "Complete French localization"
+    ]
+  },
+  {
+    "version": "1.0.105",
+    "date": "2026-09-26",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.104...v1.0.105",
+    "changes": [
+      "Complete Brazilian Portuguese localization"
+    ]
+  },
+  {
+    "version": "1.0.104",
+    "date": "2026-09-26",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.103...v1.0.104",
+    "changes": [
+      "Complete Spanish localization"
+    ]
+  },
+  {
+    "version": "1.0.103",
+    "date": "2026-09-26",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.102...v1.0.103",
+    "changes": [
+      "Use Brandon Dick in app references"
+    ]
+  },
+  {
+    "version": "1.0.102",
+    "date": "2026-09-25",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.101...v1.0.102",
+    "changes": [
+      "Add Hindi translations (#48)"
+    ]
+  },
+  {
+    "version": "1.0.101",
+    "date": "2026-09-24",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.100...v1.0.101",
+    "changes": [
+      "Add language selection and core translations (#47)"
+    ]
+  },
+  {
+    "version": "1.0.100",
+    "date": "2026-09-22",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.99...v1.0.100",
+    "changes": [
+      "Fix database import refresh"
+    ]
+  },
+  {
+    "version": "1.0.99",
+    "date": "2026-09-21",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.98...v1.0.99",
+    "changes": [
+      "Fix Flutter SDK lockfile compatibility"
+    ]
+  },
+  {
+    "version": "1.0.98",
+    "date": "2026-09-21",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.97...v1.0.98",
+    "changes": [
+      "Preserve pending MarketMonk cleanup"
+    ]
+  },
+  {
+    "version": "1.0.97",
+    "date": "2026-09-18",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.96...v1.0.97",
+    "changes": [
+      "Populate README chart screenshot"
+    ]
+  },
+  {
+    "version": "1.0.96",
+    "date": "2026-09-18",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.95...v1.0.96",
+    "changes": [
+      "Harden screenshot automation",
+      "Use generated screenshots in README"
+    ]
+  },
+  {
+    "version": "1.0.95",
+    "date": "2026-09-18",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.94...v1.0.95",
+    "changes": [
+      "Show IBKR holdings history without trades"
+    ]
+  },
+  {
+    "version": "1.0.94",
+    "date": "2026-09-18",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.93...v1.0.94",
+    "changes": [
+      "Correct IBKR portfolio performance history",
+      "Make Patrol diagnostics manual"
+    ]
+  },
+  {
+    "version": "1.0.93",
+    "date": "2026-09-16",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.92...v1.0.93",
+    "changes": [
+      "Fix native-currency valuation fallback (#25)"
+    ]
+  },
+  {
+    "version": "1.0.92",
+    "date": "2026-09-11",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.91...v1.0.92",
+    "changes": [
+      "Harden Patrol tests against timing"
+    ]
+  },
+  {
+    "version": "1.0.91",
+    "date": "2026-09-11",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.90...v1.0.91",
+    "changes": [
+      "Publish MarketMonk releases to Google Play",
+      "Repair stale portfolio account state",
+      "Protect default portfolio account",
+      "Fix average cost after position sales",
+      "Accept current IBKR Flex trade columns",
+      "Fix trade editor lifecycle cleanup",
+      "Preserve Nox MarketMonk fixes"
+    ]
+  },
+  {
+    "version": "1.0.90",
+    "date": "2026-09-10",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.89...v1.0.90",
+    "changes": [
+      "Guard invalid trade input",
+      "Harden broker trade imports"
+    ]
+  },
+  {
+    "version": "1.0.89",
+    "date": "2026-09-10",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.88...v1.0.89",
+    "changes": [
+      "Skip truncated IBKR CSV rows"
+    ]
+  },
+  {
+    "version": "1.0.88",
+    "date": "2026-09-09",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.87...v1.0.88",
+    "changes": [
+      "Flatten favorite toggle flow",
+      "Flatten cached IBKR portfolio flow",
+      "Prefer visible chart readiness selector",
+      "Prefer visible trade save selector"
+    ]
+  },
+  {
+    "version": "1.0.87",
+    "date": "2026-09-08",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.86...v1.0.87",
+    "changes": [
+      "Remove redundant exchange-rate comment",
+      "Prefer visible account action selector"
+    ]
+  },
+  {
+    "version": "1.0.86",
+    "date": "2026-09-07",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.85...v1.0.86",
+    "changes": [
+      "Prefer user-visible chart navigation",
+      "Remove redundant chart comments"
+    ]
+  },
+  {
+    "version": "1.0.85",
+    "date": "2026-09-07",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.84...v1.0.85",
+    "changes": [
+      "Simplify portfolio loading and E2E interactions",
+      "Prefer user-facing navigation in favorites test"
+    ]
+  },
+  {
+    "version": "1.0.84",
+    "date": "2026-09-07",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.83...v1.0.84",
+    "changes": [
+      "Bound screenshot emulator runtime",
+      "Update publisher name"
+    ]
+  },
+  {
+    "version": "1.0.83",
+    "date": "2026-09-07",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.82...v1.0.83",
+    "changes": [
+      "Restore Microsoft Store submissions",
+      "Match CI Dart formatting",
+      "Fix formatter drift",
+      "Fix Dart formatting in quality checks",
+      "Simplify portfolio flow and tests",
+      "Host privacy policy on GitHub Pages",
+      "Do not exit on back pressed during search"
+    ]
+  },
+  {
+    "version": "1.0.82",
+    "date": "2026-09-05",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.81...v1.0.82",
+    "changes": [
+      "Apply dart formatting",
+      "Cache IBKR chart period data",
+      "Polish empty states",
+      "Apply FitBook Actions learnings"
+    ]
+  },
+  {
+    "version": "1.0.81",
+    "date": "2026-09-03",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.80...v1.0.81",
+    "changes": [
+      "Avoid blank portfolio loading states",
+      "Keep portfolio loader private",
+      "Show friendly portfolio load errors",
+      "Handle empty IBKR API responses"
+    ]
+  },
+  {
+    "version": "1.0.80",
+    "date": "2026-09-03",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.79...v1.0.80",
+    "changes": [
+      "Align IBKR account valuation",
+      "Harden market data failures",
+      "Source charts from IBKR history",
+      "Add native IBKR portfolio bridge",
+      "Add self-hosted IBKR portfolio source",
+      "Add ticker sync progress after imports",
+      "Support multi-file broker CSV imports",
+      "Improve broker CSV import detection",
+      "Apply currency changes immediately",
+      "Target API 36",
+      "Hide Linux integration tests on dwl",
+      "Scope Flutter quality formatting",
+      "Enforce compliant seven-inch screenshots",
+      "Integrate Talker logging",
+      "Tolerate VirusTotal outages",
+      "Harden GitHub Actions (4 commits)",
+      "Add agent completion checks",
+      "Cancel superseded Actions runs"
+    ]
+  },
+  {
+    "version": "1.0.79",
+    "date": "2026-08-27",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.78...v1.0.79",
+    "changes": [
+      "Release on pubspec-only changes",
+      "Bundle What's New changelogs",
+      "Stabilize What's New regression coverage",
+      "Load What's New release notes reliably"
+    ]
+  },
+  {
+    "version": "1.0.78",
+    "date": "2026-08-27",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.77...v1.0.78",
+    "changes": [
+      "Apply Flutter hardening locally"
+    ]
+  },
+  {
+    "version": "1.0.77",
+    "date": "2026-08-24",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.76...v1.0.77",
+    "changes": [
+      "Sync Google Play store metadata automatically (#40)"
+    ]
+  },
+  {
+    "version": "1.0.76",
+    "date": "2026-08-23",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.75...v1.0.76",
+    "changes": [
+      "Cancel superseded release runs",
+      "Re-organize agents config",
+      "Commit release screenshots"
+    ]
+  },
+  {
+    "version": "1.0.75",
+    "date": "2026-08-23",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.74...v1.0.75",
+    "changes": [
+      "Update screenshots for page navigation",
+      "Use published Patrol CLI version",
+      "Gate releases on Android E2E"
+    ]
+  },
+  {
+    "version": "1.0.74",
+    "date": "2026-08-22",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.73...v1.0.74",
+    "changes": [
+      "Fix GitHub Actions failures"
+    ]
+  },
+  {
+    "version": "1.0.73",
+    "date": "2026-08-22",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.72...v1.0.73",
+    "changes": [
+      "Expose Flutter during setup",
+      "Initialize Flutter for Android e2e"
+    ]
+  },
+  {
+    "version": "1.0.72",
+    "date": "2026-08-19",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.71...v1.0.72",
+    "changes": [
+      "Setup automated e2e and screenshotting"
+    ]
+  },
+  {
+    "version": "1.0.71",
+    "date": "2026-08-09",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.70...v1.0.71",
+    "changes": [
+      "Fix bugs",
+      "Remove all these progress indicators",
+      "Increase y axis label width",
+      "Fix padding & height of favorites row",
+      "Use theme colors for chart",
+      "Fill search bar when tapping a favorite",
+      "Rename chart_page -> charts_page",
+      "Update flutter to 3.44.6",
+      "Fix all db streams in unit tests",
+      "Surface favorited stocks as an inline row on the Chart tab"
+    ]
+  },
+  {
+    "version": "1.0.70",
+    "date": "2026-07-31",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.69...v1.0.70",
+    "changes": [
+      "Set retention-days on upload-artifact steps to curb storage usage"
+    ]
+  },
+  {
+    "version": "1.0.69",
+    "date": "2026-07-25",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.68...v1.0.69",
+    "changes": [
+      "Re-measure chart search bar overlay when its size changes",
+      "Add serena config",
+      "Add ISO8601 yyyy-MM-dd date format option"
+    ]
+  },
+  {
+    "version": "1.0.68",
+    "date": "2026-07-22",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.67...v1.0.68",
+    "changes": [
+      "Use Flutter's AGP 9 escape hatch instead of reverting to AGP 8"
+    ]
+  },
+  {
+    "version": "1.0.67",
+    "date": "2026-07-22",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.66...v1.0.67",
+    "changes": [
+      "Revert AGP/Kotlin/Gradle bump, dynamic_color not AGP 9-ready"
+    ]
+  },
+  {
+    "version": "1.0.66",
+    "date": "2026-07-22",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.65...v1.0.66",
+    "changes": [
+      "Opt out of android.newDsl, incompatible with AGP 9 in Flutter 3.44.7"
+    ]
+  },
+  {
+    "version": "1.0.65",
+    "date": "2026-07-22",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.64...v1.0.65",
+    "changes": [
+      "Revert drift to 2.34.0, incompatible with pinned drift_dev",
+      "Upgrade Flutter submodule, Android toolchain, and pub dependencies"
+    ]
+  },
+  {
+    "version": "1.0.64",
+    "date": "2026-07-18",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.63...v1.0.64",
+    "changes": [
+      "Simplify menu of portfolio page",
+      "Match X axis label style to Y axis on charts",
+      "Add Y axis currency labels to stock and portfolio charts",
+      "Fix holdings add button being obscured by bottom nav",
+      "Reduce odd coloring of holdings deletions",
+      "Fix toasts not auto dismissing",
+      "Apply GBX/GBP cent scaling consistently across charts (#30)",
+      "Float pill nav over content instead of Scaffold's nav slot",
+      "Correct pill nav layout, system UI clash, and a11y labels",
+      "Fix running on linux",
+      "Recreate indexes after _migrateTickersToTrades drops candles table",
+      "Explain the imports from other platforms",
+      "Apply cent divisor to trade prices in trade history page",
+      "Update serena config",
+      "Add rule for editing pubspec.lock to CLAUDE.md"
+    ]
+  },
+  {
+    "version": "1.0.63",
+    "date": "2026-07-11",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.62...v1.0.63",
+    "changes": [
+      "Bump flutter submodule to 3.44.6 to match pubspec.lock",
+      "Currency conversion for ZAc/GBp cent-denominated stocks and search bar layout"
+    ]
+  },
+  {
+    "version": "1.0.62",
+    "date": "2026-06-21",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.61...v1.0.62",
+    "changes": [
+      "Disable ART baseline profile generation for reproducible builds"
+    ]
+  },
+  {
+    "version": "1.0.61",
+    "date": "2026-06-21",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.60...v1.0.61",
+    "changes": [
+      "Normalize ANDROID_HOME to /opt/android-sdk and add debug-prefix-map for reproducible libdartjni.so build ID"
+    ]
+  },
+  {
+    "version": "1.0.60",
+    "date": "2026-06-21",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.59...v1.0.60",
+    "changes": [
+      "Use cp -al instead of mv to preserve GITHUB_WORKSPACE"
+    ]
+  },
+  {
+    "version": "1.0.59",
+    "date": "2026-06-21",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.58...v1.0.59",
+    "changes": [
+      "Set PUB_CACHE to match fdroiddata path for reproducible libdartjni.so"
+    ]
+  },
+  {
+    "version": "1.0.58",
+    "date": "2026-06-21",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.57...v1.0.58",
+    "changes": [
+      "Build android release from /home/brandon/market_monk for reproducibility"
+    ]
+  },
+  {
+    "version": "1.0.57",
+    "date": "2026-06-20",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.56...v1.0.57",
+    "changes": [
+      "Remove hardcoded org.gradle.java.home from gradle.properties"
+    ]
+  },
+  {
+    "version": "1.0.56",
+    "date": "2026-06-14",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.55...v1.0.56",
+    "changes": [
+      "Update flutter submodule to 3.44.1",
+      "Regenerate pubspec.lock using submodule Flutter 3.41.6 binary",
+      "Add serena config",
+      "Fix android build warnings, upgrade gradle to 8.14",
+      "Regenerate pubspec.lock against pinned Flutter submodule (3.41.6)"
+    ]
+  },
+  {
+    "version": "1.0.55",
+    "date": "2026-06-11",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.54...v1.0.55",
+    "changes": [
+      "Skip release signing when keystore is absent",
+      "Apply kotlin-android plugin explicitly in app module"
+    ]
+  },
+  {
+    "version": "1.0.54",
+    "date": "2026-06-06",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.53...v1.0.54",
+    "changes": [
+      "Migrate kotlinOptions to top-level kotlin compilerOptions block"
+    ]
+  },
+  {
+    "version": "1.0.53",
+    "date": "2026-06-05",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.52...v1.0.53",
+    "changes": [
+      "Update Android build tools, screenshots, and test formatting",
+      "Use native/display currency instead of hardcoded USD",
+      "Formatting",
+      "Add fitInsideVertically to prevent tooltips being obscured by search bar"
+    ]
+  },
+  {
+    "version": "1.0.52",
+    "date": "2026-06-01",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.51...v1.0.52",
+    "changes": [
+      "Make VirusTotal section collapsible in releases"
+    ]
+  },
+  {
+    "version": "1.0.51",
+    "date": "2026-05-29",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.50...v1.0.51",
+    "changes": [
+      "Fix tooltips being obscured",
+      "Float search bar over chart so tooltips aren't obscured",
+      "Refresh HoldingsPage when active account changes",
+      "Correct currency conversion for non-USD stocks (#25)",
+      "Correct VirusTotal URL extraction in release workflow"
+    ]
+  },
+  {
+    "version": "1.0.50",
+    "date": "2026-05-24",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.49...v1.0.50",
+    "changes": [
+      "Fix virustotal job missing checkout"
+    ]
+  },
+  {
+    "version": "1.0.49",
+    "date": "2026-05-24",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.48...v1.0.49",
+    "changes": [
+      "Improve end of day indicator",
+      "Market closed banner spacing, snackbar duration, legend, tooltip",
+      "Improve market closed indicator, pure black theme, chart layout"
+    ]
+  },
+  {
+    "version": "1.0.48",
+    "date": "2026-05-24",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.47...v1.0.48",
+    "changes": [
+      "Show display currency symbol in price field instead of hardcoded $"
+    ]
+  },
+  {
+    "version": "1.0.47",
+    "date": "2026-05-23",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.46...v1.0.47",
+    "changes": [
+      "Add VirusTotal scanning on release APKs",
+      "Sync portfolio on app resume and account switch"
+    ]
+  },
+  {
+    "version": "1.0.46",
+    "date": "2026-05-20",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.45...v1.0.46",
+    "changes": [
+      "Export/import database uses active account's file",
+      "Market closed indicator, determinate sync progress, fix stuck spinner"
+    ]
+  },
+  {
+    "version": "1.0.45",
+    "date": "2026-05-17",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.44...v1.0.45",
+    "changes": [
+      "Put account name in CSV filename, not as a column",
+      "Include account name in positions CSV export",
+      "Add last purchase date to CSV export",
+      "Persist chart period, refresh portfolio on load, export CSV"
+    ]
+  },
+  {
+    "version": "1.0.44",
+    "date": "2026-05-16",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.43...v1.0.44",
+    "changes": [
+      "Fix multiple db warnings",
+      "Allow renaming any account, including Default",
+      "Replace Wrap layout in account summary rows with structured Rows",
+      "Per-portfolio color-coded returns and tooltip on chart page",
+      "Add What's New log with historical changelogs"
+    ]
+  },
+  {
+    "version": "1.0.43",
+    "date": "2026-05-14",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.42...v1.0.43",
+    "changes": [
+      "Speed up account picker popup animation to 80ms",
+      "Polish settings UX and account switcher animation"
+    ]
+  },
+  {
+    "version": "1.0.42",
+    "date": "2026-05-10",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.41...v1.0.42",
+    "changes": [
+      "Update android kotlin version",
+      "Stop chart spinner on account switch; move filter into scroll; add account toggle to filter row",
+      "Eliminate chart flicker on account switch; add account toggle to portfolio",
+      "Move account switcher to portfolio summary next to currency dropdown",
+      "Four UX improvements across charts, portfolio, and settings",
+      "Add monochrome layer for Android 13+ themed icon support"
+    ]
+  },
+  {
+    "version": "1.0.41",
+    "date": "2026-05-04",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.40...v1.0.41",
+    "changes": [
+      "Fix commit and push version bump",
+      "Remove deploy.sh",
+      "Use local badge images matching flexify style",
+      "Add per-user currency visibility with locale-based defaults",
+      "Make portfolio unrealized P&L period-dependent",
+      "Fix dart format line in CLAUDE.md"
+    ]
+  },
+  {
+    "version": "1.0.40",
+    "date": "2026-04-26",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.39...v1.0.40",
+    "changes": [
+      "Revert \"chore: remove flutter submodule, use global SDK\"",
+      "Revert \"ci: replace flutter submodule setup with subosito/flutter-action\""
+    ]
+  },
+  {
+    "version": "1.0.39",
+    "date": "2026-04-26",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.38...v1.0.39",
+    "changes": [
+      "Replace flutter submodule setup with subosito/flutter-action",
+      "Remove flutter submodule, use global SDK",
+      "Reload portfolio chart after CSV import",
+      "Prevent overlay assertion when adding account",
+      "Dismiss dialog before notifying listeners on account add",
+      "Add Interactive Brokers CSV import",
+      "Remove Interactive Brokers API integration",
+      "Delete clinerules",
+      "Add CLAUDE.md"
+    ]
+  },
+  {
+    "version": "1.0.38",
+    "date": "2026-04-10",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.37...v1.0.38",
+    "changes": [
+      "Update flutter to 3.41.6",
+      "Update screenshots",
+      "Disable interactive brokers for now",
+      "Remove color from delete buttons",
+      "Center date picker",
+      "Prevent layout jump when loading",
+      "Include ETFs/ETNs in search results and add force-ticker fallback",
+      "Merge Returns into Charts, multi-account, IB API, multi-select",
+      "Add documentation cline rules",
+      "Add git rules to cline",
+      "Add clinerules"
+    ]
+  },
+  {
+    "version": "1.0.37",
+    "date": "2026-04-08",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.36...v1.0.37",
+    "changes": [
+      "Remove invalid migration tests",
+      "Formatted settings",
+      "Fix schema drift & move currency selectors",
+      "Add currency picker to settings",
+      "Greatly improve performance",
+      "Add returns page",
+      "Include trade history in screenshots",
+      "Update screenshots",
+      "Fix screenshot tests"
+    ]
+  },
+  {
+    "version": "1.0.36",
+    "date": "2026-04-07",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.35...v1.0.36",
+    "changes": [
+      "Fix pipeline"
+    ]
+  },
+  {
+    "version": "1.0.35",
+    "date": "2026-04-06",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.34...v1.0.35",
+    "changes": [
+      "Fix pipeline"
+    ]
+  },
+  {
+    "version": "1.0.34",
+    "date": "2026-04-06",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.33...v1.0.34",
+    "changes": [
+      "Update pubspec.lock",
+      "Remove macos from build pipeline"
+    ]
+  },
+  {
+    "version": "1.0.33",
+    "date": "2026-04-06",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/1.0.32...v1.0.33",
+    "changes": [
+      "Fix formatting",
+      "Delete invalid migration tests",
+      "Fix some unit tests",
+      "Fix lint & formatting",
+      "Add github workflow",
+      "Convert tickers to trades",
+      "Add delete all data button",
+      "Fix status bar colors",
+      "Fix setState error",
+      "Make sure holdings are deleted",
+      "Fix hover crash in portfolio page",
+      "Rename trades page -> holdings page",
+      "Update existing stocks when you add a new buy order",
+      "Fix Color.toARGB32() build error — use component accessors instead",
+      "Add color theme picker with 10 seed color swatches",
+      "Add BUY/SELL toggle and record trade entry on every save",
+      "Add Select All to holdings menu; improve selection visuals with check circle",
+      "Fix Realized P/L text being cut off — split into separate subtitle lines",
+      "Show stock name on pie chart hover; pin pie chart while scrolling",
+      "Show friendly date format (dd MMM yyyy) for Purchased At field",
+      "Increase portfolio trailing text size from 11 to 13",
+      "Track ongoing trades & add holdings tab",
+      "Format code",
+      "Make warnings non-fatal",
+      "Add tiger brokers csv import",
+      "Allow multiple entries for the same ticker"
+    ]
+  },
+  {
+    "version": "1.0.32",
+    "date": "2025-03-07",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/1.0.31...1.0.32",
+    "changes": [
+      "Fix status bar on android 15",
+      "Update lockfiles",
+      "Setup for xcode deployments",
+      "Add category to ios info.plist"
+    ]
+  },
+  {
+    "version": "1.0.31",
+    "date": "2025-02-21",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/1.0.30...1.0.31",
+    "changes": [
+      "Add missing padding in settings page",
+      "Add sharing of stocks with CSV",
+      "Fix clear button on portfolio page",
+      "Animate selecting portfolio items",
+      "Prevent curve overshooting for curved graphs",
+      "Turn off line curves by default",
+      "Use 1 month as default period",
+      "Center charts page buttons & summary line",
+      "Factor out currency formatting",
+      "Fix chart page",
+      "Say amounts and price in portfolio trailing list",
+      "Add f-droid badge to README",
+      "Reduce amount of loaders on chart page",
+      "Use pull-down to refresh on portfolio",
+      "Use submodule flutter for deployments",
+      "Enable screenshots in deploy.sh"
+    ]
+  },
+  {
+    "version": "1.0.30",
+    "date": "2025-02-11",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/1.0.29...1.0.30",
+    "changes": [
+      "Remove dependency info blocks",
+      "Remove network server permission and add files",
+      "Add photo library usage description"
+    ]
+  },
+  {
+    "version": "1.0.29",
+    "date": "2025-02-11",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/1.0.28...1.0.29",
+    "changes": [
+      "Change version codes for f-droid",
+      "Ignore flutter submodule in vscode",
+      "Move flutter to stable branch",
+      "Add flutter as a submodule",
+      "Show total portfolio $",
+      "Return debug banner",
+      "Fix importing database",
+      "Automate screenshots for android",
+      "Update podfile (2 commits)",
+      "Prevent windows deploy stopping others",
+      "Simplify portfolio sync operation"
+    ]
+  },
+  {
+    "version": "1.0.28",
+    "date": "2025-02-09",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/1.0.27...1.0.28",
+    "changes": [
+      "Improve adding tickers experience",
+      "Remove error throwing from utils.dart",
+      "Fix app nav sometimes overlapping system nav",
+      "Fix missing installs in macos deploy",
+      "Run scripts/macos.sh as zsh",
+      "Add source .zshrc in scripts for macos",
+      "Remove exit if msstore fails"
+    ]
+  },
+  {
+    "version": "1.0.27",
+    "date": "2025-02-08",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/1.0.26...1.0.27",
+    "changes": [
+      "Add more settings",
+      "Remove big accidental space on portfolio page",
+      "Pull instead of rsync in deploy.sh",
+      "Fix code sign identity",
+      "Comment deploy.sh nicey",
+      "Move macos into scripts",
+      "Update generated drift"
+    ]
+  },
+  {
+    "version": "1.0.26",
+    "date": "2025-02-08",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/466c33b44c6ec11445b41da67ea4e5f3742f15d4...1.0.26",
+    "changes": [
+      "Ensure flutter subdirs are included"
+    ]
+  },
+  {
+    "version": "1.0.25",
+    "date": "2025-02-08",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/74c48cce98a930fc483f8a5ce6718097a35c8abf...466c33b44c6ec11445b41da67ea4e5f3742f15d4",
+    "changes": [
+      "Fix mv command in deploy.sh"
+    ]
+  },
+  {
+    "version": "1.0.24",
+    "date": "2025-02-08",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/af1652247310df56de230950d227503b5d6fe019...74c48cce98a930fc483f8a5ce6718097a35c8abf",
+    "changes": []
+  },
+  {
+    "version": "1.0.23",
+    "date": "2025-02-08",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/76611630fd87b84a4dd220071e09c4e673825600...af1652247310df56de230950d227503b5d6fe019",
+    "changes": [
+      "Add windows build script",
+      "Fix naming of build-market-monk.ps1"
+    ]
+  },
+  {
+    "version": "1.0.22",
+    "date": "2025-02-08",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/2eda1ca56c20c9afcd9fa4cb219164526f4885bd...76611630fd87b84a4dd220071e09c4e673825600",
+    "changes": [
+      "Fix references to fitbook in deploy.sh"
+    ]
+  },
+  {
+    "version": "1.0.21",
+    "date": "2025-02-08",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/1.0.16...2eda1ca56c20c9afcd9fa4cb219164526f4885bd",
+    "changes": [
+      "Add donations & contributing guide",
+      "Use yahoo finance ticker search",
+      "Update README.md",
+      "Use theme colors in shields badges",
+      "Update todos on readme",
+      "Add apple & ms store badges",
+      "Add encryption setting to ios + macos",
+      "Bump version (3 commits)",
+      "Add network.server to release entitlements",
+      "Set code sign identity",
+      "Make first ios & macos release",
+      "Fix readme style",
+      "Add get it on MS Store badge",
+      "Add msix config"
+    ]
+  },
+  {
+    "version": "1.0.16",
+    "date": "2025-01-29",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/1.0.15...1.0.16",
+    "changes": [
+      "Update the youtube video",
+      "Update README to include features & download button"
+    ]
+  },
+  {
+    "version": "1.0.15",
+    "date": "2025-01-29",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/8308e3018eeba63be14802ed6ec830c01e92990a...1.0.15",
+    "changes": [
+      "Comment windows out from release"
+    ]
+  },
+  {
+    "version": "1.0.14",
+    "date": "2025-01-29",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.13+14...8308e3018eeba63be14802ed6ec830c01e92990a",
+    "changes": [
+      "Remove deploy.dart",
+      "Remove migrate script from deploy.sh",
+      "Remove flutter test",
+      "Add deploy.sh",
+      "Remove github workflows",
+      "Setup fastlane"
+    ]
+  },
+  {
+    "version": "1.0.13+14",
+    "date": "2025-01-28",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.12+13...v1.0.13+14",
+    "changes": [
+      "Fix aab release path"
+    ]
+  },
+  {
+    "version": "1.0.12+13",
+    "date": "2025-01-28",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.11+12...v1.0.12+13",
+    "changes": [
+      "Use aab for google play release"
+    ]
+  },
+  {
+    "version": "1.0.11+12",
+    "date": "2025-01-28",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.10+11...v1.0.11+12",
+    "changes": [
+      "Fix service account json"
+    ]
+  },
+  {
+    "version": "1.0.10+11",
+    "date": "2025-01-28",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.9+10...v1.0.10+11",
+    "changes": []
+  },
+  {
+    "version": "1.0.9+10",
+    "date": "2025-01-28",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.8+9...v1.0.9+10",
+    "changes": [
+      "Use releaseFiles for upload stage of workflow"
+    ]
+  },
+  {
+    "version": "1.0.8+9",
+    "date": "2025-01-28",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.7+8...v1.0.8+9",
+    "changes": [
+      "Move massive.jks correctly"
+    ]
+  },
+  {
+    "version": "1.0.7+8",
+    "date": "2025-01-28",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.6+7...v1.0.7+8",
+    "changes": [
+      "Create key properties and keystore"
+    ]
+  },
+  {
+    "version": "1.0.6+7",
+    "date": "2025-01-28",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.5+6...v1.0.6+7",
+    "changes": [
+      "Bump java version in github workflow"
+    ]
+  },
+  {
+    "version": "1.0.5+6",
+    "date": "2025-01-28",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.4+5...v1.0.5+6",
+    "changes": [
+      "Bump flutter version on github workflows"
+    ]
+  },
+  {
+    "version": "1.0.4+5",
+    "date": "2025-01-28",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.3+4...v1.0.4+5",
+    "changes": [
+      "Upgrade upload-artifact to v4"
+    ]
+  },
+  {
+    "version": "1.0.3+4",
+    "date": "2025-01-28",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.2+3...v1.0.3+4",
+    "changes": [
+      "Bump checkout action"
+    ]
+  },
+  {
+    "version": "1.0.2+3",
+    "date": "2025-01-28",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/tree/v1.0.2+3",
+    "changes": [
+      "Add new field purchasedAt",
+      "Fix some missing data errors in ticker adding",
+      "Prevent dates in the future",
+      "Show portfolio returns",
+      "Make created ats default now",
+      "Make graph chart independent of purchase date",
+      "Combine add/edit ticker page",
+      "Specify heights for line graphs",
+      "Fix graph heights on tablets",
+      "Add tooltips to porftolio page",
+      "Add tooltips to chart page",
+      "Handle NaN tickers for price %",
+      "Consider zero green",
+      "Make default purchase amount 1",
+      "Add missing import to chart_page",
+      "Add edit snackbar action after adding to portfolio",
+      "Rename \"Created at\" -> \"Purchased at\"",
+      "Update default price after selecting ticker",
+      "Make default stock GME",
+      "Increase search padding",
+      "Update macos",
+      "Make gradient graph colors dynamic",
+      "Update gitignore",
+      "Theme status bar to app",
+      "Add workflow for tagged releases",
+      "Sign releases",
+      "Update README.md (5 commits)",
+      "Add privacy policy",
+      "Convert deployment from shell to dart",
+      "Add deploy.sh",
+      "Run on ios + macos",
+      "Update gradle",
+      "Re-order screenshots",
+      "Update README",
+      "Update screenshots",
+      "Update ticker graph after selecting price",
+      "Select all amount after picking ticker",
+      "Show live % change in edit ticker page",
+      "Select all price after submitting amount",
+      "Sync all tickers on portfolio page load",
+      "Remove + symbol from percent returns",
+      "Remove unused import from chart_page",
+      "Fix ticker name after adding from portfolio",
+      "Fix theme default value",
+      "Turn off curves by default",
+      "Change colors for total return",
+      "Add portfolio summary",
+      "Change default curve smoothness",
+      "Remove divider for system nav",
+      "Fix opening urls on android",
+      "Fix bug with swapping periods quickly",
+      "Add missing ticker from search menu",
+      "Add multi-delete to portfolio page",
+      "Remove trailing last updated from edit ticker page",
+      "Change line graph style",
+      "Fix adding to portfolio",
+      "Change app theme",
+      "Focus next fields editing tickers",
+      "Auto focus search on new portfolio",
+      "Add button to insert to portfolio",
+      "Only sync candles when out-of-date",
+      "Auto find price/date once",
+      "Factor out insertCandles",
+      "Preview returns graph since purchase in portfolio view",
+      "Add price to tickers",
+      "Add selectAll utility",
+      "Strikethrough some things in the README",
+      "Try fixing video in readme",
+      "Add video and more screenshots",
+      "Fix android launch",
+      "Add theme setting & about info",
+      "Change README text",
+      "Add MIT license",
+      "Unify fetching of data in charts",
+      "Remove unwanted unique keys",
+      "Add 5d button and group by day for smaller ranges",
+      "Align buttons left and remove \"Pick a stock\" message",
+      "Get random stocks on startup",
+      "Include the nyse and amex tickers",
+      "Add favorites to stocks & remember most recent folio",
+      "Sort members in chart_page",
+      "Add refresh data button",
+      "Delete unused import in chart_page",
+      "Optimize performance",
+      "Get local db working",
+      "Only have folio gap on android",
+      "Make % change biggest and first",
+      "Add migration docs to README.md",
+      "Add candles to db",
+      "Fix top padding of listview",
+      "Write toasts for adding/removing from portfolio",
+      "Add devtools options",
+      "Make app icon dark theme",
+      "Fix spacing on search bar portfolio page",
+      "Fix app icon on android",
+      "Add icon attribution",
+      "Make name MarketMonk and customize icons",
+      "Add delete button to portfolio",
+      "Add name to tickers",
+      "Add editing of portfolio items",
+      "Use search bar in charts",
+      "Try (and fail) to make migrations tests pass",
+      "Place screenshots side-by-side",
+      "Add a README",
+      "Handle wrong symbol and unknown symbol",
+      "Add search to portfolio page",
+      "Autocomplete symbols",
+      "Search charts of tickers and add symbols to your portfolio",
+      "First commit"
+    ]
+  }
+]

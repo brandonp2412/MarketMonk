@@ -1126,9 +1126,7 @@ class _SettingsPageState extends State<SettingsPage> {
         accountSettings,
       if (_hasMatches('Charts', _desktopSearchOptions['Charts']!)) charts,
       if (_hasMatches('Data', _desktopSearchOptions['Data']!)) data,
-      if ((Platform.isAndroid || Platform.isWindows) &&
-          _hasMatches('About', _desktopSearchOptions['About']!))
-        about,
+      if (_hasMatches('About', _desktopSearchOptions['About']!)) about,
     ];
     return LayoutBuilder(
       builder: (context, constraints) {
