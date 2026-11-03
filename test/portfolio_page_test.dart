@@ -584,6 +584,70 @@ void main() {
     expect(tester.takeException(), null);
   });
 
+  testWidgets('portfolio only offers periods covered by account history',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1000, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({});
+    final accounts = await configuredAccounts();
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day - 100);
+    final week = DateTime(now.year, now.month, now.day - 7);
+    await accounts.cachePortfolio(
+      'Default',
+      [cachedPosition()],
+      const IbkrAccountValue(value: 121, currency: 'USD'),
+    );
+    await accounts.cacheIbkrPerformance(
+      'Default',
+      IbkrPerformanceSeries(
+        period: '1Y',
+        measure: 'TWR',
+        currency: 'USD',
+        startDate: start,
+        startNav: 100,
+        dates: [start, week, now],
+        nav: const [100, 110, 121],
+        returnDates: [start, week, now],
+        returns: const [0, .1, .21],
+      ),
+    );
+    final pending = Completer<IbkrPortfolioSnapshot>();
+    await tester.pumpWidget(
+      app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
+    );
+    await tester.pump();
+    final finder = find.byKey(const Key('portfolio-return-period'));
+    var slider = tester.widget<Slider>(finder);
+    expect(slider.divisions, 4);
+    expect(
+      [
+        for (var i = 0; i <= 4; i++)
+          slider.semanticFormatterCallback!(i.toDouble()),
+      ],
+      ['All time', '3M', '1M', '1W', '1D'],
+    );
+    expect(find.textContaining('Open holdings returns'), findsNothing);
+    expect(
+      find.textContaining('purchase history when available'),
+      findsNothing,
+    );
+    slider.onChanged!(1);
+    await tester.pump();
+    expect(find.text('3M'), findsOneWidget);
+    expect(find.text('+21.00%'), findsOneWidget);
+    slider = tester.widget<Slider>(finder);
+    slider.onChanged!(4);
+    await tester.pump();
+    expect(find.text('1D'), findsOneWidget);
+    expect(find.text('+10.00%'), findsOneWidget);
+    expect(tester.takeException(), null);
+  });
+
   testWidgets('desktop portfolio summary cards keep readable widths', (
     tester,
   ) async {
@@ -610,9 +674,8 @@ void main() {
     final periodSlider =
         tester.widget<Slider>(find.byKey(const Key('portfolio-return-period')));
     expect(periodSlider.value, 0);
-    expect(periodSlider.divisions, 10);
     expect(periodSlider.semanticFormatterCallback!(0), 'All time');
-    expect(periodSlider.semanticFormatterCallback!(10), '1D');
+
     expect(
       (tester.getTopLeft(find.text('Account value')).dy -
               tester.getTopLeft(find.text('Market value')).dy)

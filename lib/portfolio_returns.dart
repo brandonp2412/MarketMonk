@@ -59,3 +59,13 @@ PortfolioReturn? openHoldingPeriodReturn({
   if ((shares - currentShares).abs() > 1e-6 || shares <= 0) return null;
   return PortfolioReturn(currentValue - basis, basis);
 }
+
+DateTime? portfolioReturnCutoff(int period, DateTime now) => switch (period) {
+      0 => null,
+      >= 1 && <= 5 => DateTime(now.year - (6 - period), now.month, now.day),
+      6 => DateTime(now.year, now.month - 6, now.day),
+      7 => DateTime(now.year, now.month - 3, now.day),
+      8 => DateTime(now.year, now.month - 1, now.day),
+      9 => DateTime(now.year, now.month, now.day - 7),
+      _ => DateTime(now.year, now.month, now.day - 1),
+    };

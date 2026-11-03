@@ -24,6 +24,7 @@ import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/profile_picker.dart';
 import 'package:market_monk/portfolio_returns.dart';
+import 'package:market_monk/portfolio_period_picker.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/sqlite_settings.dart';
@@ -121,17 +122,49 @@ class PortfolioPageState extends State<PortfolioPage>
   bool _historyLoading = false;
   bool _historyFailed = false;
 
-  DateTime? get _returnCutoff {
-    final now = DateTime.now();
-    return switch (_period) {
-      0 => null,
-      >= 1 && <= 5 => DateTime(now.year - (6 - _period), now.month, now.day),
-      6 => DateTime(now.year, now.month - 6, now.day),
-      7 => DateTime(now.year, now.month - 3, now.day),
-      8 => DateTime(now.year, now.month - 1, now.day),
-      9 => DateTime(now.year, now.month, now.day - 7),
-      _ => DateTime(now.year, now.month, now.day - 1),
-    };
+  List<int> _availablePeriods = const [0];
+
+  DateTime? get _returnCutoff => portfolioReturnCutoff(_period, DateTime.now());
+
+  List<int> _coveredPeriods(
+    List<Position> positions,
+    IbkrPerformanceSeries? performance,
+    IbkrAccountValue? netLiquidation,
+  ) {
+    if (performance != null &&
+        netLiquidation != null &&
+        performance.dates.isNotEmpty) {
+      return [
+        0,
+        for (var period = 1; period < _periods.length; period++)
+          if (accountPeriodReturn(
+                performance,
+                netLiquidation.value,
+                portfolioReturnCutoff(period, DateTime.now())!,
+              ) !=
+              null)
+            period,
+      ];
+    }
+    if (_historyLoading || _historyFailed) return const [0];
+    final dates = _returnTrades.isNotEmpty
+        ? _returnTrades.map((trade) => trade.tradeDate).toList()
+        : [
+            for (final candles in _returnCandles.values)
+              ...candles.map((candle) => candle.date),
+          ];
+    if (dates.isEmpty) return const [0];
+    dates.sort();
+    return [
+      0,
+      for (var period = 1; period < _periods.length; period++)
+        if (!portfolioReturnCutoff(period, DateTime.now())!
+                .isBefore(dates.first) &&
+            positions.every(
+              (position) => _holdingReturn(position, period: period) != null,
+            ))
+          period,
+    ];
   }
 
   Future<void> _loadReturnHistory(
@@ -145,21 +178,12 @@ class PortfolioPageState extends State<PortfolioPage>
     _returnTrades = [];
     final accounts = context.read<AccountManager>();
     final accountName = accounts.activeAccount;
-    final config = accounts.ibkrConfigFor(accountName);
     try {
       final trades =
           await profileDataRepository.readTradesForAccount(accountName);
+      if (!mounted || _historyAccount != account) return;
       final candles = <String, List<StoredCandle>>{};
       for (final position in positions) {
-        await syncCandles(
-          position.symbol,
-          ibkrConfig: config,
-          requiredFrom: DateTime(
-            DateTime.now().year - 5,
-            DateTime.now().month,
-            DateTime.now().day - 7,
-          ),
-        );
         candles[position.symbol] = await (marketDataDatabase.candles.select()
               ..where(
                 (row) =>
@@ -184,8 +208,8 @@ class PortfolioPageState extends State<PortfolioPage>
     }
   }
 
-  PortfolioReturn? _holdingReturn(Position position) {
-    final cutoff = _returnCutoff;
+  PortfolioReturn? _holdingReturn(Position position, {int? period}) {
+    final cutoff = portfolioReturnCutoff(period ?? _period, DateTime.now());
     if (cutoff == null) {
       return PortfolioReturn(position.unrealizedPL, position.costBasis);
     }
@@ -242,45 +266,12 @@ class PortfolioPageState extends State<PortfolioPage>
     );
   }
 
-  Widget _periodPicker({required bool wholeAccount}) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          '${wholeAccount ? 'Account returns' : 'Open holdings returns'} · ${_periods[_period]}',
-          style: theme.textTheme.labelLarge,
-        ),
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            trackHeight: 0,
-            activeTickMarkColor: theme.colorScheme.primary,
-            inactiveTickMarkColor: theme.colorScheme.outlineVariant,
-            tickMarkShape: const RoundSliderTickMarkShape(tickMarkRadius: 3),
-          ),
-          child: Slider(
-            key: const Key('portfolio-return-period'),
-            value: _period.toDouble(),
-            max: (_periods.length - 1).toDouble(),
-            divisions: _periods.length - 1,
-            label: _periods[_period],
-            semanticFormatterCallback: (value) => _periods[value.round()],
-            onChanged: (value) => setState(() => _period = value.round()),
-          ),
-        ),
-        if (_period > 0)
-          Text(
-            _historyLoading
-                ? 'Loading return history…'
-                : _historyFailed
-                    ? 'Return history unavailable'
-                    : 'Open holdings use purchase history when available; otherwise price change.',
-            style: theme.textTheme.bodySmall,
-          ),
-      ],
-    );
-  }
+  Widget _periodPicker() => PortfolioPeriodPicker(
+        labels: [for (final period in _availablePeriods) _periods[period]],
+        value: _availablePeriods.indexOf(_period),
+        onChanged: (index) =>
+            setState(() => _period = _availablePeriods[index]),
+      );
 
   Object? _loadError;
   int? touchedIndex;
@@ -629,6 +620,7 @@ class PortfolioPageState extends State<PortfolioPage>
       }
       if (!mounted || accounts.activeAccount != accountName) return;
       setState(() {
+        _historyAccount = null;
         _positions = positions;
         _netLiquidation = loaded.netLiquidation;
         _hasCachedPortfolio = true;
@@ -1013,9 +1005,12 @@ class PortfolioPageState extends State<PortfolioPage>
 
     final historyKey =
         '${accounts.activeAccount}:${positions.map((p) => '${p.symbol}:${p.netShares}:${p.costBasis}').join(',')}';
-    if (_period > 0 && _historyAccount != historyKey) {
+    if (_historyAccount != historyKey) {
       unawaited(_loadReturnHistory(historyKey, positions));
     }
+
+    _availablePeriods = _coveredPeriods(positions, performance, netLiquidation);
+    if (!_availablePeriods.contains(_period)) _period = _availablePeriods.first;
 
     final totalValue = positions.fold(
       0.0,
@@ -1133,11 +1128,7 @@ class PortfolioPageState extends State<PortfolioPage>
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(36, 12, 36, 8),
-              child: _periodPicker(
-                wholeAccount: cutoff == null
-                    ? cashOutSummary != null
-                    : accountReturn != null,
-              ),
+              child: _periodPicker(),
             ),
           ),
           SliverPersistentHeader(
@@ -1407,7 +1398,7 @@ class PortfolioPageState extends State<PortfolioPage>
                   _buildRefreshWarning(context),
                 ],
                 const SizedBox(height: 20),
-                _periodPicker(wholeAccount: isCashOut),
+                _periodPicker(),
                 const SizedBox(height: 12),
                 desktopMetricGrid(
                   key: const Key('desktop-portfolio-metrics'),
