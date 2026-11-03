@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/desktop_context_menu.dart';
+import 'package:market_monk/desktop_trade_history.dart';
 import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/edit_ticker_page.dart';
@@ -131,12 +132,14 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
         return Scaffold(
           appBar: AppBar(
             title: Text(
-              context.l10n.text('{symbol} — History', {
-                'symbol': widget.summary.symbol,
-              }),
+              isDesktopLayout(context)
+                  ? context.l10n.text('Trade History')
+                  : context.l10n.text('{symbol} — History', {
+                      'symbol': widget.summary.symbol,
+                    }),
             ),
             actions: [
-              if (!ibkrManaged)
+              if (!ibkrManaged && !isDesktopLayout(context))
                 IconButton(
                   icon: const Icon(Icons.add),
                   tooltip: context.l10n.text('Add trade'),
@@ -152,171 +155,212 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
             ],
           ),
           body: SafeArea(
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 16,
+            child: isDesktopLayout(context)
+                ? DesktopTradeHistory(
+                    symbol: symbol,
+                    name: widget.summary.name,
+                    position: position,
+                    trades: trades,
+                    totalRealizedUsd: totalRealizedUsd,
+                    realizedToday: realizedToday,
+                    totalGain: totalGain,
+                    hasImportedRealized:
+                        trades.any((trade) => trade.realizedPL != 0),
+                    brokerManaged: ibkrManaged,
+                    emptyState: _buildEmptyHistoryState(
+                      context,
+                      snap,
+                      ibkrManaged,
+                      cachedHistory != null,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.summary.name,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 12),
-                        if (position != null) ...[
-                          _SummaryRow(
-                            label: context.l10n.text('Shares held'),
-                            value: position.netShares.toStringAsFixed(4),
-                          ),
-                          _SummaryRow(
-                            label: context.l10n.text('Avg cost'),
-                            // avgCost is in native currency — show without conversion.
-                            value: fmtNativeCurrency(
-                              position.avgCost,
-                              position.nativeCurrency,
-                            ),
-                          ),
-                          _SummaryRow(
-                            label: context.l10n.text('Current value'),
-                            // currentValue is already in USD (Position converts).
-                            value: fmtCurrency(position.currentValue),
-                          ),
-                          _SummaryRow(
-                            label: context.l10n.text('Unrealized P/L'),
-                            value:
-                                '${unrealizedPL >= 0 ? '+' : ''}${fmtCurrency(unrealizedPL)}'
-                                ' (${position.change.toStringAsFixed(2)}%)',
-                            color: unrealizedPL >= 0
-                                ? Colors.green
-                                : Colors.redAccent,
-                          ),
-                        ],
-                        if (realizedToday != null)
-                          _SummaryRow(
-                            label: context.l10n.text('Realized P/L today'),
-                            value:
-                                '${realizedToday >= 0 ? '+' : ''}${fmtCurrency(realizedToday)}',
-                            color: realizedToday >= 0
-                                ? Colors.green
-                                : Colors.redAccent,
-                          ),
-                        if (trades.any((trade) => trade.realizedPL != 0)) ...[
-                          _SummaryRow(
-                            label: context.l10n.text('Imported realized P/L'),
-                            value: totalRealizedUsd == null
-                                ? 'Historical FX unavailable'
-                                : '${totalRealizedUsd >= 0 ? '+' : ''}${fmtCurrency(totalRealizedUsd)}',
-                            color: totalRealizedUsd == null
-                                ? null
-                                : totalRealizedUsd >= 0
-                                    ? Colors.green
-                                    : Colors.redAccent,
-                          ),
-                        ],
-                        if (position != null || trades.isNotEmpty)
-                          _SummaryRow(
-                            label: context.l10n.text('Total gain'),
-                            // totalGain is in USD (both components converted above).
-                            value: totalGain == null
-                                ? 'Historical FX unavailable'
-                                : '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}',
-                            color: totalGain == null
-                                ? null
-                                : totalGain >= 0
-                                    ? Colors.green
-                                    : Colors.redAccent,
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                if (trades.isNotEmpty) ...[
-                  Text(
-                    context.l10n.text('Trade History'),
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  ...trades.map(
-                    (trade) => DesktopContextMenu(
-                      actions: [
-                        if (!ibkrManaged) ...[
-                          DesktopMenuAction(
-                            context.l10n.text('Edit trade'),
-                            () => runDetachedTask(
-                              _editTrade(trade),
-                              'Failed to edit trade',
-                            ),
-                          ),
-                          DesktopMenuAction(
-                            context.l10n.text('Delete trade'),
-                            () => runDetachedTask(
-                              _confirmDeleteTrade(trade),
-                              'Failed to delete trade',
-                            ),
-                          ),
-                        ],
-                      ],
-                      copyText:
-                          '${trade.symbol} ${trade.tradeType == 'open' ? 'BUY' : 'SELL'} ${trade.quantity.abs()} @ ${fmtTradeNative(trade, trade.price)} · ${DateFormat('yyyy-MM-dd').format(trade.tradeDate)}',
-                      copyLabel: context.l10n.text('Copy trade'),
-                      child: _TradeTile(
-                        trade: trade,
-                        onLongPress:
-                            ibkrManaged ? null : () => _showTradeActions(trade),
+                    onAddTrade: () => Navigator.push(
+                      context,
+                      adaptivePageRoute(
+                        context,
+                        builder: (_) => EditTickerPage(symbol: symbol),
                       ),
                     ),
-                  ),
-                ] else
-                  SizedBox(
-                    height: 300,
-                    child: ibkrManaged &&
-                            cachedHistory == null &&
-                            snap.connectionState == ConnectionState.waiting
-                        ? const Center(child: CircularProgressIndicator())
-                        : AppEmptyState(
-                            icon: Icons.history_rounded,
-                            title: context.l10n.text(
-                              snap.hasError
-                                  ? 'IBKR trade history unavailable'
-                                  : 'No trade history yet',
-                            ),
-                            message: snap.hasError
-                                ? context.l10n.text(
-                                    'Could not load IBKR trade history.',
-                                  )
-                                : null,
-                            actionLabel: ibkrManaged
-                                ? (snap.hasError
-                                    ? context.l10n.text('Retry')
-                                    : null)
-                                : context.l10n.text('Add trade'),
-                            actionIcon:
-                                ibkrManaged ? Icons.refresh : Icons.add_rounded,
-                            onAction: ibkrManaged
-                                ? (snap.hasError ? _retryBrokerTrades : null)
-                                : () => Navigator.push(
-                                      context,
-                                      adaptivePageRoute(
-                                        context,
-                                        builder: (_) => EditTickerPage(
-                                          symbol: widget.summary.symbol,
-                                        ),
-                                      ),
-                                    ),
+                    onEditTrade: _editTrade,
+                    onDeleteTrade: _confirmDeleteTrade,
+                  )
+                : ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 16,
                           ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.summary.name,
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 12),
+                              if (position != null) ...[
+                                _SummaryRow(
+                                  label: context.l10n.text('Shares held'),
+                                  value: position.netShares.toStringAsFixed(4),
+                                ),
+                                _SummaryRow(
+                                  label: context.l10n.text('Avg cost'),
+                                  // avgCost is in native currency — show without conversion.
+                                  value: fmtNativeCurrency(
+                                    position.avgCost,
+                                    position.nativeCurrency,
+                                  ),
+                                ),
+                                _SummaryRow(
+                                  label: context.l10n.text('Current value'),
+                                  // currentValue is already in USD (Position converts).
+                                  value: fmtCurrency(position.currentValue),
+                                ),
+                                _SummaryRow(
+                                  label: context.l10n.text('Unrealized P/L'),
+                                  value:
+                                      '${unrealizedPL >= 0 ? '+' : ''}${fmtCurrency(unrealizedPL)}'
+                                      ' (${position.change.toStringAsFixed(2)}%)',
+                                  color: unrealizedPL >= 0
+                                      ? Colors.green
+                                      : Colors.redAccent,
+                                ),
+                              ],
+                              if (realizedToday != null)
+                                _SummaryRow(
+                                  label:
+                                      context.l10n.text('Realized P/L today'),
+                                  value:
+                                      '${realizedToday >= 0 ? '+' : ''}${fmtCurrency(realizedToday)}',
+                                  color: realizedToday >= 0
+                                      ? Colors.green
+                                      : Colors.redAccent,
+                                ),
+                              if (trades
+                                  .any((trade) => trade.realizedPL != 0)) ...[
+                                _SummaryRow(
+                                  label: context.l10n
+                                      .text('Imported realized P/L'),
+                                  value: totalRealizedUsd == null
+                                      ? 'Historical FX unavailable'
+                                      : '${totalRealizedUsd >= 0 ? '+' : ''}${fmtCurrency(totalRealizedUsd)}',
+                                  color: totalRealizedUsd == null
+                                      ? null
+                                      : totalRealizedUsd >= 0
+                                          ? Colors.green
+                                          : Colors.redAccent,
+                                ),
+                              ],
+                              if (position != null || trades.isNotEmpty)
+                                _SummaryRow(
+                                  label: context.l10n.text('Total gain'),
+                                  // totalGain is in USD (both components converted above).
+                                  value: totalGain == null
+                                      ? 'Historical FX unavailable'
+                                      : '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}',
+                                  color: totalGain == null
+                                      ? null
+                                      : totalGain >= 0
+                                          ? Colors.green
+                                          : Colors.redAccent,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      if (trades.isNotEmpty) ...[
+                        Text(
+                          context.l10n.text('Trade History'),
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        ...trades.map(
+                          (trade) => DesktopContextMenu(
+                            actions: [
+                              if (!ibkrManaged) ...[
+                                DesktopMenuAction(
+                                  context.l10n.text('Edit trade'),
+                                  () => runDetachedTask(
+                                    _editTrade(trade),
+                                    'Failed to edit trade',
+                                  ),
+                                ),
+                                DesktopMenuAction(
+                                  context.l10n.text('Delete trade'),
+                                  () => runDetachedTask(
+                                    _confirmDeleteTrade(trade),
+                                    'Failed to delete trade',
+                                  ),
+                                ),
+                              ],
+                            ],
+                            copyText:
+                                '${trade.symbol} ${trade.tradeType == 'open' ? 'BUY' : 'SELL'} ${trade.quantity.abs()} @ ${fmtTradeNative(trade, trade.price)} · ${DateFormat('yyyy-MM-dd').format(trade.tradeDate)}',
+                            copyLabel: context.l10n.text('Copy trade'),
+                            child: _TradeTile(
+                              trade: trade,
+                              onLongPress: ibkrManaged
+                                  ? null
+                                  : () => _showTradeActions(trade),
+                            ),
+                          ),
+                        ),
+                      ] else
+                        SizedBox(
+                          height: 300,
+                          child: _buildEmptyHistoryState(
+                            context,
+                            snap,
+                            ibkrManaged,
+                            cachedHistory != null,
+                          ),
+                        ),
+                    ],
                   ),
-              ],
-            ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildEmptyHistoryState(
+    BuildContext context,
+    AsyncSnapshot<List<Trade>> snapshot,
+    bool brokerManaged,
+    bool hasCachedHistory,
+  ) {
+    if (brokerManaged &&
+        !hasCachedHistory &&
+        snapshot.connectionState == ConnectionState.waiting) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return AppEmptyState(
+      icon: Icons.history_rounded,
+      title: context.l10n.text(
+        snapshot.hasError
+            ? 'IBKR trade history unavailable'
+            : 'No trade history yet',
+      ),
+      message: snapshot.hasError
+          ? context.l10n.text('Could not load IBKR trade history.')
+          : null,
+      actionLabel: brokerManaged
+          ? (snapshot.hasError ? context.l10n.text('Retry') : null)
+          : context.l10n.text('Add trade'),
+      actionIcon: brokerManaged ? Icons.refresh : Icons.add_rounded,
+      onAction: brokerManaged
+          ? (snapshot.hasError ? _retryBrokerTrades : null)
+          : () => Navigator.push(
+                context,
+                adaptivePageRoute(
+                  context,
+                  builder: (_) => EditTickerPage(symbol: widget.summary.symbol),
+                ),
+              ),
     );
   }
 

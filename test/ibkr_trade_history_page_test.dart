@@ -14,6 +14,69 @@ import 'sqlite_test_support.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  testWidgets('stock detail uses the desktop transaction table on wide screens',
+      (tester) async {
+    tester.view.physicalSize = const Size(1320, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.setIbkrConfig(
+      'Default',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'test-token',
+      ),
+    );
+    final brokerTrades = [
+      IbkrTrade(
+        symbol: 'VOO',
+        name: 'Vanguard S&P 500',
+        currency: 'USD',
+        conid: 42,
+        quantity: 10,
+        price: 500,
+        tradeType: 'open',
+        tradeDate: DateTime(2026, 10, 12),
+        realizedPnl: 0,
+        commission: 1,
+      ),
+    ];
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: TradeHistoryPage(
+            summary: SymbolSummary(
+              symbol: 'VOO',
+              name: 'Vanguard S&P 500',
+              position: null,
+              trades: tradesFromIbkr(brokerTrades),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('desktop-trade-history-content')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('desktop-trade-history-data-table')),
+      findsOneWidget,
+    );
+    expect(find.text('BUY'), findsOneWidget);
+  });
+
   testWidgets('IBKR history loads after opening an initially empty detail',
       (tester) async {
     await seedTestSqlite({});
