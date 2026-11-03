@@ -60,6 +60,124 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  static const _desktopSearchOptions = <String, List<String>>{
+    'Appearance': [
+      'Theme',
+      'Language',
+      'Hide dollar amounts',
+      'System color scheme',
+      'Pure black (AMOLED)',
+      'Date format',
+    ],
+    'Charts': ['Curve line graphs', 'Curve smoothness'],
+    'Accounts': ['Manage accounts', 'Currencies', 'Interactive Brokers'],
+    'Data': [
+      'Export database',
+      'Import database',
+      'Import CSV',
+      'Sync',
+      'Delete all data',
+    ],
+    'About': ["What's New", 'Version', 'Author', 'Source code'],
+  };
+  static const _mobileSearchOptions = <String, List<String>>{
+    'Appearance': [
+      'Theme',
+      'Language',
+      'Hide dollar amounts',
+      'System color scheme',
+      'Pure black (AMOLED)',
+      'Date format',
+    ],
+    'Charts': [
+      'Rolling average',
+      'Candles',
+      'Curve line graphs',
+      'Curve smoothness',
+    ],
+    'Accounts': ['Manage accounts', 'Currencies', 'Interactive Brokers'],
+    'Data': [
+      'Export database',
+      'Import database',
+      'Import CSV',
+      'Sync',
+      'Delete all data',
+    ],
+    'About': [
+      "What's New",
+      'Version',
+      'Author',
+      'License',
+      'Source code',
+      'Donate',
+    ],
+  };
+
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  bool _matchesSearch(String section, String option) {
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isEmpty) return true;
+    final aliases = switch (option) {
+      'Interactive Brokers' => 'IBKR broker',
+      'Theme' => 'dark light system appearance',
+      'Currencies' => 'currency exchange',
+      'Export database' || 'Import database' => 'backup',
+      'Curve line graphs' => 'graph lines',
+      _ => '',
+    };
+    final searchable =
+        '${context.l10n.text(section)} ${context.l10n.text(option)} $aliases'
+            .toLowerCase();
+    return query.split(RegExp(r'\s+')).every(searchable.contains);
+  }
+
+  bool _hasMatches(String section, List<String> options) =>
+      options.any((option) => _matchesSearch(section, option));
+
+  bool _hasAnyMatches(Map<String, List<String>> sections) =>
+      sections.entries.any(
+        (entry) =>
+            (entry.key != 'About' ||
+                Platform.isAndroid ||
+                Platform.isWindows) &&
+            _hasMatches(entry.key, entry.value),
+      );
+
+  Widget _searchField() => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        child: TextField(
+          key: const Key('settings-search'),
+          controller: _searchController,
+          onChanged: (value) => setState(() => _searchQuery = value),
+          decoration: InputDecoration(
+            hintText: context.l10n.text('Search settings'),
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: _searchQuery.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: context.l10n.text('Clear search'),
+                    icon: const Icon(Icons.close),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                  ),
+            border: const OutlineInputBorder(),
+          ),
+        ),
+      );
+
+  Widget _noSearchResults() => Center(
+        child: Text(context.l10n.text('No matching settings')),
+      );
   static const _brokerCsvInstructions = {
     'Tiger Brokers': [
       'Log into Tiger Trade (app or web).',
@@ -538,97 +656,105 @@ class _SettingsPageState extends State<SettingsPage> {
       title: context.l10n.text('Appearance'),
       children: [
         const SizedBox(height: 8),
-        SegmentedButton<ThemeMode>(
-          segments: [
-            ButtonSegment(
-              value: ThemeMode.system,
-              label: Text(context.l10n.text('System')),
-              icon: const Icon(Icons.brightness_auto),
-            ),
-            ButtonSegment(
-              value: ThemeMode.dark,
-              label: Text(context.l10n.text('Dark')),
-              icon: const Icon(Icons.dark_mode),
-            ),
-            ButtonSegment(
-              value: ThemeMode.light,
-              label: Text(context.l10n.text('Light')),
-              icon: const Icon(Icons.light_mode),
-            ),
-          ],
-          selected: {settings.theme},
-          onSelectionChanged: (selection) async {
-            final value = selection.first;
-            await settings.setTheme(value);
-          },
-        ),
+        if (_matchesSearch('Appearance', 'Theme'))
+          SegmentedButton<ThemeMode>(
+            segments: [
+              ButtonSegment(
+                value: ThemeMode.system,
+                label: Text(context.l10n.text('System')),
+                icon: const Icon(Icons.brightness_auto),
+              ),
+              ButtonSegment(
+                value: ThemeMode.dark,
+                label: Text(context.l10n.text('Dark')),
+                icon: const Icon(Icons.dark_mode),
+              ),
+              ButtonSegment(
+                value: ThemeMode.light,
+                label: Text(context.l10n.text('Light')),
+                icon: const Icon(Icons.light_mode),
+              ),
+            ],
+            selected: {settings.theme},
+            onSelectionChanged: (selection) async {
+              final value = selection.first;
+              await settings.setTheme(value);
+            },
+          ),
         const SizedBox(height: 16),
-        _languageDropdown(settings, padding: EdgeInsets.zero),
+        if (_matchesSearch('Appearance', 'Language'))
+          _languageDropdown(settings, padding: EdgeInsets.zero),
         const SizedBox(height: 8),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(
-            settings.hideDollarAmounts
-                ? Icons.visibility_off_outlined
-                : Icons.visibility_outlined,
+        if (_matchesSearch('Appearance', 'Hide dollar amounts'))
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(
+              settings.hideDollarAmounts
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+            ),
+            title: Text(context.l10n.text('Hide dollar amounts')),
+            trailing: Switch(
+              value: settings.hideDollarAmounts,
+              onChanged: settings.setHideDollarAmounts,
+            ),
+            onTap: () =>
+                settings.setHideDollarAmounts(!settings.hideDollarAmounts),
           ),
-          title: Text(context.l10n.text('Hide dollar amounts')),
-          trailing: Switch(
-            value: settings.hideDollarAmounts,
-            onChanged: settings.setHideDollarAmounts,
+        if (_matchesSearch('Appearance', 'System color scheme'))
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: settings.systemColors
+                ? const Icon(Icons.color_lens)
+                : const Icon(Icons.color_lens_outlined),
+            title: Text(context.l10n.text('System color scheme')),
+            trailing: Switch(
+              value: settings.systemColors,
+              onChanged: settings.setSystemColors,
+            ),
+            onTap: () => settings.setSystemColors(!settings.systemColors),
           ),
-          onTap: () =>
-              settings.setHideDollarAmounts(!settings.hideDollarAmounts),
-        ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: settings.systemColors
-              ? const Icon(Icons.color_lens)
-              : const Icon(Icons.color_lens_outlined),
-          title: Text(context.l10n.text('System color scheme')),
-          trailing: Switch(
-            value: settings.systemColors,
-            onChanged: settings.setSystemColors,
+        if (_matchesSearch('Appearance', 'Pure black (AMOLED)'))
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.contrast),
+            title: Text(context.l10n.text('Pure black (AMOLED)')),
+            subtitle: Text(
+              context.l10n.text('Use pure black for AMOLED displays'),
+            ),
+            trailing: Switch(
+              value: settings.pureBlack,
+              onChanged: settings.setPureBlack,
+            ),
+            onTap: () => settings.setPureBlack(!settings.pureBlack),
           ),
-          onTap: () => settings.setSystemColors(!settings.systemColors),
-        ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.contrast),
-          title: Text(context.l10n.text('Pure black (AMOLED)')),
-          subtitle: Text(
-            context.l10n.text('Use pure black for AMOLED displays'),
-          ),
-          trailing: Switch(
-            value: settings.pureBlack,
-            onChanged: settings.setPureBlack,
-          ),
-          onTap: () => settings.setPureBlack(!settings.pureBlack),
-        ),
-        if (!settings.systemColors) _ColorPicker(settings: settings),
+        if (!settings.systemColors &&
+            _matchesSearch('Appearance', 'System color scheme'))
+          _ColorPicker(settings: settings),
         const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          initialValue: settings.dateFormat,
-          items: const [
-            DropdownMenuItem(value: 'yyyy-MM-dd', child: Text('yyyy-MM-dd')),
-            DropdownMenuItem(value: 'd/M/yy', child: Text('d/M/yy')),
-            DropdownMenuItem(value: 'M/d/yy', child: Text('M/d/yy')),
-            DropdownMenuItem(value: 'd-M-yy', child: Text('d-M-yy')),
-            DropdownMenuItem(value: 'M-d-yy', child: Text('M-d-yy')),
-            DropdownMenuItem(value: 'd.M.yy', child: Text('d.M.yy')),
-            DropdownMenuItem(value: 'M.d.yy', child: Text('M.d.yy')),
-          ],
-          onChanged: (value) => settings.setDateFormat(value ?? 'd/M/yy'),
-          decoration: InputDecoration(
-            labelText: context.l10n.text(
-              'Date format ({example})',
-              {
-                'example':
-                    DateFormat(settings.dateFormat).format(DateTime.now()),
-              },
+        if (_matchesSearch('Appearance', 'Date format'))
+          DropdownButtonFormField<String>(
+            initialValue: settings.dateFormat,
+            items: const [
+              DropdownMenuItem(value: 'yyyy-MM-dd', child: Text('yyyy-MM-dd')),
+              DropdownMenuItem(value: 'd/M/yy', child: Text('d/M/yy')),
+              DropdownMenuItem(value: 'M/d/yy', child: Text('M/d/yy')),
+              DropdownMenuItem(value: 'd-M-yy', child: Text('d-M-yy')),
+              DropdownMenuItem(value: 'M-d-yy', child: Text('M-d-yy')),
+              DropdownMenuItem(value: 'd.M.yy', child: Text('d.M.yy')),
+              DropdownMenuItem(value: 'M.d.yy', child: Text('M.d.yy')),
+            ],
+            onChanged: (value) => settings.setDateFormat(value ?? 'd/M/yy'),
+            decoration: InputDecoration(
+              labelText: context.l10n.text(
+                'Date format ({example})',
+                {
+                  'example':
+                      DateFormat(settings.dateFormat).format(DateTime.now()),
+                },
+              ),
             ),
           ),
-        ),
       ],
     );
 
@@ -636,51 +762,54 @@ class _SettingsPageState extends State<SettingsPage> {
       icon: Icons.insights_outlined,
       title: context.l10n.text('Charts'),
       children: [
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.insights),
-          title: Text(context.l10n.text('Curve line graphs')),
-          trailing: Switch(
-            value: settings.curveLines,
-            onChanged: settings.setCurveLines,
+        if (_matchesSearch('Charts', 'Curve line graphs'))
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.insights),
+            title: Text(context.l10n.text('Curve line graphs')),
+            trailing: Switch(
+              value: settings.curveLines,
+              onChanged: settings.setCurveLines,
+            ),
+            onTap: () => settings.setCurveLines(!settings.curveLines),
           ),
-          onTap: () => settings.setCurveLines(!settings.curveLines),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-          child: Row(
-            children: [
-              Expanded(child: Text(context.l10n.text('Curve smoothness'))),
-              SizedBox(
-                width: 220,
-                child: Slider(
-                  value: settings.curveSmoothness,
-                  divisions: 20,
-                  onChanged: settings.setCurveSmoothness,
+        if (_matchesSearch('Charts', 'Curve smoothness'))
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+            child: Row(
+              children: [
+                Expanded(child: Text(context.l10n.text('Curve smoothness'))),
+                SizedBox(
+                  width: 220,
+                  child: Slider(
+                    value: settings.curveSmoothness,
+                    divisions: 20,
+                    onChanged: settings.setCurveSmoothness,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        SizedBox(
-          height: 180,
-          child: TickerLine(
-            spots: const [
-              MarketLineChartPoint(0.0, 0.13, column: 0),
-              MarketLineChartPoint(1.0, 5, column: 1),
-              MarketLineChartPoint(2.0, 2, column: 2),
-              MarketLineChartPoint(3.0, 10, column: 3),
-              MarketLineChartPoint(4.0, 5, column: 4),
-            ],
-            dates: [
-              DateTime.now().subtract(const Duration(days: 4)),
-              DateTime.now().subtract(const Duration(days: 3)),
-              DateTime.now().subtract(const Duration(days: 2)),
-              DateTime.now().subtract(const Duration(days: 1)),
-              DateTime.now(),
-            ],
+        if (_matchesSearch('Charts', 'Curve smoothness'))
+          SizedBox(
+            height: 180,
+            child: TickerLine(
+              spots: const [
+                MarketLineChartPoint(0.0, 0.13, column: 0),
+                MarketLineChartPoint(1.0, 5, column: 1),
+                MarketLineChartPoint(2.0, 2, column: 2),
+                MarketLineChartPoint(3.0, 10, column: 3),
+                MarketLineChartPoint(4.0, 5, column: 4),
+              ],
+              dates: [
+                DateTime.now().subtract(const Duration(days: 4)),
+                DateTime.now().subtract(const Duration(days: 3)),
+                DateTime.now().subtract(const Duration(days: 2)),
+                DateTime.now().subtract(const Duration(days: 1)),
+                DateTime.now(),
+              ],
+            ),
           ),
-        ),
       ],
     );
 
@@ -688,40 +817,43 @@ class _SettingsPageState extends State<SettingsPage> {
       icon: Icons.account_balance_wallet_outlined,
       title: context.l10n.text('Accounts'),
       children: [
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.manage_accounts),
-          title: Text(context.l10n.text('Manage accounts')),
-          subtitle: Text(accounts.activeAccount),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.push(
-            context,
-            adaptivePageRoute(context, builder: (_) => const AccountsPage()),
+        if (_matchesSearch('Accounts', 'Manage accounts'))
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.manage_accounts),
+            title: Text(context.l10n.text('Manage accounts')),
+            subtitle: Text(accounts.activeAccount),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              adaptivePageRoute(context, builder: (_) => const AccountsPage()),
+            ),
           ),
-        ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.currency_exchange),
-          title: Text(context.l10n.text('Currencies')),
-          subtitle: Text(settings.visibleCurrencies.join(', ')),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => _showCurrencyPicker(context, settings),
-        ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.account_balance),
-          title: Text(context.l10n.text('Interactive Brokers')),
-          subtitle: Text(
-            ibkrConfig.enabled
-                ? context.l10n.text(
-                    'IBKR portfolio source • {url}',
-                    {'url': ibkrConfig.baseUrl},
-                  )
-                : context.l10n.text('Use a self-hosted IBKR portfolio API'),
+        if (_matchesSearch('Accounts', 'Currencies'))
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.currency_exchange),
+            title: Text(context.l10n.text('Currencies')),
+            subtitle: Text(settings.visibleCurrencies.join(', ')),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _showCurrencyPicker(context, settings),
           ),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => _showIbkrSettings(context),
-        ),
+        if (_matchesSearch('Accounts', 'Interactive Brokers'))
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.account_balance),
+            title: Text(context.l10n.text('Interactive Brokers')),
+            subtitle: Text(
+              ibkrConfig.enabled
+                  ? context.l10n.text(
+                      'IBKR portfolio source • {url}',
+                      {'url': ibkrConfig.baseUrl},
+                    )
+                  : context.l10n.text('Use a self-hosted IBKR portfolio API'),
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _showIbkrSettings(context),
+          ),
       ],
     );
 
@@ -734,109 +866,114 @@ class _SettingsPageState extends State<SettingsPage> {
           spacing: 10,
           runSpacing: 10,
           children: [
-            OutlinedButton.icon(
-              onPressed: () => _exportBackup(context),
-              icon: const Icon(Icons.download),
-              label: Text(context.l10n.text('Export database')),
-            ),
-            OutlinedButton.icon(
-              onPressed: () => _importDatabase(context),
-              icon: const Icon(Icons.upload),
-              label: Text(context.l10n.text('Import database')),
-            ),
-            OutlinedButton.icon(
-              onPressed: () => _importCsv(context),
-              icon: const Icon(Icons.table_chart),
-              label: Text(context.l10n.text('Import CSV')),
-            ),
+            if (_matchesSearch('Data', 'Export database'))
+              OutlinedButton.icon(
+                onPressed: () => _exportBackup(context),
+                icon: const Icon(Icons.download),
+                label: Text(context.l10n.text('Export database')),
+              ),
+            if (_matchesSearch('Data', 'Import database'))
+              OutlinedButton.icon(
+                onPressed: () => _importDatabase(context),
+                icon: const Icon(Icons.upload),
+                label: Text(context.l10n.text('Import database')),
+              ),
+            if (_matchesSearch('Data', 'Import CSV'))
+              OutlinedButton.icon(
+                onPressed: () => _importCsv(context),
+                icon: const Icon(Icons.table_chart),
+                label: Text(context.l10n.text('Import CSV')),
+              ),
           ],
         ),
         const SizedBox(height: 12),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          onTap:
-              settings.syncInProgress ? null : () => _syncAllTickers(context),
-          leading: settings.syncInProgress
-              ? const SizedBox.square(
-                  dimension: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Icon(
-                  settings.syncFailed > 0 ? Icons.sync_problem : Icons.sync,
-                ),
-          title: Text(context.l10n.text('Sync')),
-          subtitle: Text(
-            settings.syncInProgress
-                ? context.l10n.text(
-                    'Syncing {symbol} ({completed}/{total})',
-                    {
-                      'symbol': settings.syncingSymbol ?? '',
-                      'completed': settings.syncCompleted,
-                      'total': settings.syncTotal,
-                    },
+        if (_matchesSearch('Data', 'Sync'))
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            onTap:
+                settings.syncInProgress ? null : () => _syncAllTickers(context),
+            leading: settings.syncInProgress
+                ? const SizedBox.square(
+                    dimension: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : settings.syncTotal == 0
-                    ? context.l10n.text('No sync running')
-                    : settings.syncFailed == 0
-                        ? context.l10n.text(
-                            'Last sync completed {completed}/{total}',
-                            {
-                              'completed': settings.syncCompleted,
-                              'total': settings.syncTotal,
-                            },
-                          )
-                        : context.l10n.text(
-                            'Last sync completed with {failed} failed',
-                            {'failed': settings.syncFailed},
-                          ),
-          ),
-        ),
-        Divider(color: Theme.of(context).colorScheme.outlineVariant),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(
-            Icons.delete_forever,
-            color: Theme.of(context).colorScheme.error,
-          ),
-          title: Text(context.l10n.text('Delete all data')),
-          subtitle: Text(
-            context.l10n.text(
-              'Permanently delete all holdings, trades, and candles',
+                : Icon(
+                    settings.syncFailed > 0 ? Icons.sync_problem : Icons.sync,
+                  ),
+            title: Text(context.l10n.text('Sync')),
+            subtitle: Text(
+              settings.syncInProgress
+                  ? context.l10n.text(
+                      'Syncing {symbol} ({completed}/{total})',
+                      {
+                        'symbol': settings.syncingSymbol ?? '',
+                        'completed': settings.syncCompleted,
+                        'total': settings.syncTotal,
+                      },
+                    )
+                  : settings.syncTotal == 0
+                      ? context.l10n.text('No sync running')
+                      : settings.syncFailed == 0
+                          ? context.l10n.text(
+                              'Last sync completed {completed}/{total}',
+                              {
+                                'completed': settings.syncCompleted,
+                                'total': settings.syncTotal,
+                              },
+                            )
+                          : context.l10n.text(
+                              'Last sync completed with {failed} failed',
+                              {'failed': settings.syncFailed},
+                            ),
             ),
           ),
-          onTap: () async {
-            final confirmed = await showDialog<bool>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: Text(context.l10n.text('Delete all data?')),
-                content: Text(
-                  context.l10n.text(
-                    'This will permanently delete all holdings, trades, and chart data. This cannot be undone.',
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: Text(context.l10n.text('Cancel')),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: Text(context.l10n.text('Delete')),
-                  ),
-                ],
+        Divider(color: Theme.of(context).colorScheme.outlineVariant),
+        if (_matchesSearch('Data', 'Delete all data'))
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(
+              Icons.delete_forever,
+              color: Theme.of(context).colorScheme.error,
+            ),
+            title: Text(context.l10n.text('Delete all data')),
+            subtitle: Text(
+              context.l10n.text(
+                'Permanently delete all holdings, trades, and candles',
               ),
-            );
-            if (confirmed != true || !mounted) return;
-            final accounts = context.read<AccountManager>();
-            final profileId = await profileDataRepository
-                .profileIdForName(accounts.activeAccount);
-            await profileDataRepository.clearTrades(profileId);
-            await marketDataDatabase.delete(marketDataDatabase.candles).go();
-            clearAllSyncCache();
-            if (!mounted) return;
-            toast(context, context.l10n.text('All data deleted'));
-          },
-        ),
+            ),
+            onTap: () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: Text(context.l10n.text('Delete all data?')),
+                  content: Text(
+                    context.l10n.text(
+                      'This will permanently delete all holdings, trades, and chart data. This cannot be undone.',
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: Text(context.l10n.text('Cancel')),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: Text(context.l10n.text('Delete')),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed != true || !mounted) return;
+              final accounts = context.read<AccountManager>();
+              final profileId = await profileDataRepository
+                  .profileIdForName(accounts.activeAccount);
+              await profileDataRepository.clearTrades(profileId);
+              await marketDataDatabase.delete(marketDataDatabase.candles).go();
+              clearAllSyncCache();
+              if (!mounted) return;
+              toast(context, context.l10n.text('All data deleted'));
+            },
+          ),
       ],
     );
 
@@ -844,63 +981,71 @@ class _SettingsPageState extends State<SettingsPage> {
       icon: Icons.info_outline,
       title: context.l10n.text('About'),
       children: [
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.new_releases_outlined),
-          title: Text(context.l10n.text("What's New")),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.push(
-            context,
-            adaptivePageRoute(context, builder: (_) => const WhatsNew()),
+        if (_matchesSearch('About', 'What\'s New'))
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.new_releases_outlined),
+            title: Text(context.l10n.text("What's New")),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              adaptivePageRoute(context, builder: (_) => const WhatsNew()),
+            ),
           ),
-        ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.info_outline),
-          title: Text(context.l10n.text('Version')),
-          subtitle: FutureBuilder(
-            future: packageInfo,
-            builder: (context, snapshot) =>
-                Text(snapshot.data?.version ?? '1.0.0'),
+        if (_matchesSearch('About', 'Version'))
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.info_outline),
+            title: Text(context.l10n.text('Version')),
+            subtitle: FutureBuilder(
+              future: packageInfo,
+              builder: (context, snapshot) =>
+                  Text(snapshot.data?.version ?? '1.0.0'),
+            ),
+            onTap: () async {
+              const url = 'https://github.com/brandonp2412/MarketMonk/releases';
+              await launchUrlString(url);
+            },
           ),
-          onTap: () async {
-            const url = 'https://github.com/brandonp2412/MarketMonk/releases';
-            await launchUrlString(url);
-          },
-        ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.person),
-          title: Text(context.l10n.text('Author')),
-          subtitle: const Text('Brandon Dick'),
-          onTap: () async {
-            const url = 'https://github.com/brandonp2412';
-            await launchUrlString(url);
-          },
-        ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.code),
-          title: Text(context.l10n.text('Source code')),
-          subtitle: Text(context.l10n.text('Check it out on GitHub')),
-          onTap: () async {
-            const url = 'https://github.com/brandonp2412/MarketMonk';
-            await launchUrlString(url);
-          },
-        ),
+        if (_matchesSearch('About', 'Author'))
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.person),
+            title: Text(context.l10n.text('Author')),
+            subtitle: const Text('Brandon Dick'),
+            onTap: () async {
+              const url = 'https://github.com/brandonp2412';
+              await launchUrlString(url);
+            },
+          ),
+        if (_matchesSearch('About', 'Source code'))
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.code),
+            title: Text(context.l10n.text('Source code')),
+            subtitle: Text(context.l10n.text('Check it out on GitHub')),
+            onTap: () async {
+              const url = 'https://github.com/brandonp2412/MarketMonk';
+              await launchUrlString(url);
+            },
+          ),
       ],
     );
 
     final cards = [
-      appearance,
-      accountSettings,
-      charts,
-      data,
-      if (Platform.isAndroid || Platform.isWindows) about,
+      if (_hasMatches('Appearance', _desktopSearchOptions['Appearance']!))
+        appearance,
+      if (_hasMatches('Accounts', _desktopSearchOptions['Accounts']!))
+        accountSettings,
+      if (_hasMatches('Charts', _desktopSearchOptions['Charts']!)) charts,
+      if (_hasMatches('Data', _desktopSearchOptions['Data']!)) data,
+      if ((Platform.isAndroid || Platform.isWindows) &&
+          _hasMatches('About', _desktopSearchOptions['About']!))
+        about,
     ];
     return LayoutBuilder(
       builder: (context, constraints) {
-        final twoColumns = constraints.maxWidth >= 920;
+        final twoColumns = _searchQuery.isEmpty && constraints.maxWidth >= 920;
         final content = twoColumns
             ? Row(
                 key: const Key('desktop-settings-two-column'),
@@ -959,351 +1104,440 @@ class _SettingsPageState extends State<SettingsPage> {
     final packageInfo = PackageInfo.fromPlatform();
     final settings = context.watch<SettingsState>();
 
+    final appBar = AppBar(
+      title: Text(context.l10n.text('Settings')),
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(76),
+        child: _searchField(),
+      ),
+    );
+
     if (isDesktopLayout(context)) {
       return Scaffold(
-        appBar: AppBar(title: Text(context.l10n.text('Settings'))),
-        body: _buildDesktopSettings(settings, packageInfo),
+        appBar: appBar,
+        body: _hasAnyMatches(_desktopSearchOptions)
+            ? _buildDesktopSettings(settings, packageInfo)
+            : _noSearchResults(),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(context.l10n.text('Settings'))),
+      appBar: appBar,
       body: ListView(
         children: [
-          _sectionHeader(context.l10n.text('Appearance')),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-            child: SegmentedButton<ThemeMode>(
-              segments: [
-                ButtonSegment(
-                  value: ThemeMode.system,
-                  label: Text(context.l10n.text('System')),
-                  icon: const Icon(Icons.brightness_auto),
+          if (!_hasAnyMatches(_mobileSearchOptions))
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: _noSearchResults(),
+            ),
+          if (_hasMatches(
+            'Appearance',
+            _mobileSearchOptions['Appearance']!,
+          ))
+            _sectionHeader(context.l10n.text('Appearance')),
+          if (_matchesSearch('Appearance', 'Theme'))
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: SegmentedButton<ThemeMode>(
+                segments: [
+                  ButtonSegment(
+                    value: ThemeMode.system,
+                    label: Text(context.l10n.text('System')),
+                    icon: const Icon(Icons.brightness_auto),
+                  ),
+                  ButtonSegment(
+                    value: ThemeMode.dark,
+                    label: Text(context.l10n.text('Dark')),
+                    icon: const Icon(Icons.dark_mode),
+                  ),
+                  ButtonSegment(
+                    value: ThemeMode.light,
+                    label: Text(context.l10n.text('Light')),
+                    icon: const Icon(Icons.light_mode),
+                  ),
+                ],
+                selected: {settings.theme},
+                onSelectionChanged: (selection) async {
+                  final value = selection.first;
+                  final settings = context.read<SettingsState>();
+                  await settings.setTheme(value);
+                },
+              ),
+            ),
+          if (_matchesSearch('Appearance', 'Language'))
+            _languageDropdown(settings),
+          const SizedBox(height: 8),
+          if (_matchesSearch('Appearance', 'Hide dollar amounts'))
+            ListTile(
+              leading: Icon(
+                settings.hideDollarAmounts
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+              ),
+              title: Text(context.l10n.text('Hide dollar amounts')),
+              trailing: Switch(
+                value: settings.hideDollarAmounts,
+                onChanged: settings.setHideDollarAmounts,
+              ),
+              onTap: () => settings.setHideDollarAmounts(
+                !settings.hideDollarAmounts,
+              ),
+            ),
+          if (_matchesSearch('Appearance', 'System color scheme'))
+            Tooltip(
+              message: context.l10n.text(
+                'Use the primary color of your device for the app',
+              ),
+              child: ListTile(
+                title: Text(context.l10n.text('System color scheme')),
+                leading: settings.systemColors
+                    ? const Icon(Icons.color_lens)
+                    : const Icon(Icons.color_lens_outlined),
+                onTap: () => settings.setSystemColors(!settings.systemColors),
+                trailing: Switch(
+                  value: settings.systemColors,
+                  onChanged: (value) => settings.setSystemColors(value),
                 ),
-                ButtonSegment(
-                  value: ThemeMode.dark,
-                  label: Text(context.l10n.text('Dark')),
-                  icon: const Icon(Icons.dark_mode),
+              ),
+            ),
+          if (_matchesSearch('Appearance', 'Pure black (AMOLED)'))
+            ListTile(
+              title: Text(context.l10n.text('Pure black (AMOLED)')),
+              leading: const Icon(Icons.contrast),
+              subtitle: Text(
+                context.l10n.text('Use pure black for AMOLED displays'),
+              ),
+              trailing: Switch(
+                value: settings.pureBlack,
+                onChanged: (value) => settings.setPureBlack(value),
+              ),
+              onTap: () => settings.setPureBlack(!settings.pureBlack),
+            ),
+          if (!settings.systemColors &&
+              _matchesSearch('Appearance', 'System color scheme'))
+            _ColorPicker(settings: settings),
+          if (_matchesSearch('Appearance', 'Date format'))
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Tooltip(
+                message:
+                    context.l10n.text('How dates are displayed below graphs'),
+                child: DropdownButtonFormField<String>(
+                  initialValue: settings.dateFormat,
+                  items: const [
+                    DropdownMenuItem(
+                      value: "yyyy-MM-dd",
+                      child: Text("yyyy-MM-dd"),
+                    ),
+                    DropdownMenuItem(
+                      value: "d/M/yy",
+                      child: Text("d/M/yy"),
+                    ),
+                    DropdownMenuItem(
+                      value: "M/d/yy",
+                      child: Text("M/d/yy"),
+                    ),
+                    DropdownMenuItem(
+                      value: "d-M-yy",
+                      child: Text("d-M-yy"),
+                    ),
+                    DropdownMenuItem(
+                      value: "M-d-yy",
+                      child: Text("M-d-yy"),
+                    ),
+                    DropdownMenuItem(
+                      value: "d.M.yy",
+                      child: Text("d.M.yy"),
+                    ),
+                    DropdownMenuItem(
+                      value: "M.d.yy",
+                      child: Text("M.d.yy"),
+                    ),
+                  ],
+                  onChanged: (value) =>
+                      settings.setDateFormat(value ?? 'd/M/yy'),
+                  decoration: InputDecoration(
+                    labelText: context.l10n.text(
+                      'Date format ({example})',
+                      {
+                        'example': DateFormat(settings.dateFormat)
+                            .format(DateTime.now()),
+                      },
+                    ),
+                  ),
                 ),
-                ButtonSegment(
-                  value: ThemeMode.light,
-                  label: Text(context.l10n.text('Light')),
-                  icon: const Icon(Icons.light_mode),
+              ),
+            ),
+          if (_hasMatches(
+            'Charts',
+            _mobileSearchOptions['Charts']!,
+          ))
+            _sectionHeader(context.l10n.text('Charts')),
+          if (_matchesSearch('Charts', 'Rolling average'))
+            ListTile(
+              key: const Key('settings-rolling-average'),
+              leading: const Icon(Icons.show_chart),
+              title: Text(context.l10n.text('Rolling average')),
+              trailing: Switch(
+                value: settings.showRollingAverage,
+                onChanged: settings.setShowRollingAverage,
+              ),
+              onTap: () => settings.setShowRollingAverage(
+                !settings.showRollingAverage,
+              ),
+            ),
+          if (_matchesSearch('Charts', 'Candles'))
+            ListTile(
+              key: const Key('settings-candlestick-chart'),
+              leading: const Icon(Icons.candlestick_chart_outlined),
+              title: const Text('Candles'),
+              trailing: Switch(
+                value: settings.showCandlesticks,
+                onChanged: settings.setShowCandlesticks,
+              ),
+              onTap: () =>
+                  settings.setShowCandlesticks(!settings.showCandlesticks),
+            ),
+          if (_matchesSearch('Charts', 'Curve line graphs'))
+            Tooltip(
+              message: context.l10n.text('Use wavy curves in the graphs page'),
+              child: ListTile(
+                title: Text(context.l10n.text('Curve line graphs')),
+                leading: const Icon(Icons.insights),
+                onTap: () => settings.setCurveLines(!settings.curveLines),
+                trailing: Switch(
+                  value: settings.curveLines,
+                  onChanged: (value) => settings.setCurveLines(value),
+                ),
+              ),
+            ),
+          if (_matchesSearch('Charts', 'Curve smoothness'))
+            Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    context.l10n.text('Curve smoothness'),
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                ),
+                Slider(
+                  value: settings.curveSmoothness,
+                  divisions: 20,
+                  inactiveColor: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.24),
+                  onChanged: (value) {
+                    runDetachedTask(
+                      settings.setCurveSmoothness(value),
+                      'Failed to save curve smoothness',
+                    );
+                  },
                 ),
               ],
-              selected: {settings.theme},
-              onSelectionChanged: (selection) async {
-                final value = selection.first;
-                final settings = context.read<SettingsState>();
-                await settings.setTheme(value);
+            ),
+          if (_matchesSearch('Charts', 'Curve smoothness'))
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.3,
+              child: TickerLine(
+                spots: const [
+                  MarketLineChartPoint(0.0, 0.13, column: 0),
+                  MarketLineChartPoint(1.0, 5, column: 1),
+                  MarketLineChartPoint(2.0, 2, column: 2),
+                  MarketLineChartPoint(3.0, 10, column: 3),
+                  MarketLineChartPoint(4.0, 5, column: 4),
+                ],
+                dates: [
+                  DateTime.now().subtract(const Duration(days: 4)),
+                  DateTime.now().subtract(const Duration(days: 3)),
+                  DateTime.now().subtract(const Duration(days: 2)),
+                  DateTime.now().subtract(const Duration(days: 1)),
+                  DateTime.now(),
+                ],
+              ),
+            ),
+          if (_hasMatches(
+            'Accounts',
+            _mobileSearchOptions['Accounts']!,
+          ))
+            _sectionHeader(context.l10n.text('Accounts')),
+          if (_matchesSearch('Accounts', 'Manage accounts'))
+            ListTile(
+              leading: const Icon(Icons.manage_accounts),
+              title: Text(context.l10n.text('Manage accounts')),
+              subtitle: Text(
+                context.watch<AccountManager>().activeAccount,
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(
+                context,
+                adaptivePageRoute(
+                  context,
+                  builder: (_) => const AccountsPage(),
+                ),
+              ),
+            ),
+          if (_matchesSearch('Accounts', 'Currencies'))
+            ListTile(
+              leading: const Icon(Icons.currency_exchange),
+              title: Text(context.l10n.text('Currencies')),
+              subtitle: Text(settings.visibleCurrencies.join(', ')),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _showCurrencyPicker(context, settings),
+            ),
+          if (_matchesSearch('Accounts', 'Interactive Brokers'))
+            Builder(
+              builder: (context) {
+                final accounts = context.watch<AccountManager>();
+                final config = accounts.ibkrConfigFor();
+                return ListTile(
+                  leading: const Icon(Icons.account_balance),
+                  title: Text(
+                    context.l10n.text('Interactive Brokers'),
+                  ),
+                  subtitle: Text(
+                    config.enabled
+                        ? context.l10n.text(
+                            'IBKR portfolio source • {url}',
+                            {'url': config.baseUrl},
+                          )
+                        : context.l10n.text(
+                            'Use a self-hosted IBKR portfolio API',
+                          ),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _showIbkrSettings(context),
+                );
               },
             ),
-          ),
-          _languageDropdown(settings),
-          const SizedBox(height: 8),
-          ListTile(
-            leading: Icon(
-              settings.hideDollarAmounts
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
-            ),
-            title: Text(context.l10n.text('Hide dollar amounts')),
-            trailing: Switch(
-              value: settings.hideDollarAmounts,
-              onChanged: settings.setHideDollarAmounts,
-            ),
-            onTap: () =>
-                settings.setHideDollarAmounts(!settings.hideDollarAmounts),
-          ),
-          Tooltip(
-            message: context.l10n.text(
-              'Use the primary color of your device for the app',
-            ),
-            child: ListTile(
-              title: Text(context.l10n.text('System color scheme')),
-              leading: settings.systemColors
-                  ? const Icon(Icons.color_lens)
-                  : const Icon(Icons.color_lens_outlined),
-              onTap: () => settings.setSystemColors(!settings.systemColors),
-              trailing: Switch(
-                value: settings.systemColors,
-                onChanged: (value) => settings.setSystemColors(value),
-              ),
-            ),
-          ),
-          ListTile(
-            title: Text(context.l10n.text('Pure black (AMOLED)')),
-            leading: const Icon(Icons.contrast),
-            subtitle:
-                Text(context.l10n.text('Use pure black for AMOLED displays')),
-            trailing: Switch(
-              value: settings.pureBlack,
-              onChanged: (value) => settings.setPureBlack(value),
-            ),
-            onTap: () => settings.setPureBlack(!settings.pureBlack),
-          ),
-          if (!settings.systemColors) _ColorPicker(settings: settings),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Tooltip(
+          if (_hasMatches('Data', _mobileSearchOptions['Data']!))
+            _sectionHeader(context.l10n.text('Data')),
+          if (_matchesSearch('Data', 'Export database'))
+            Tooltip(
               message:
-                  context.l10n.text('How dates are displayed below graphs'),
-              child: DropdownButtonFormField<String>(
-                initialValue: settings.dateFormat,
-                items: const [
-                  DropdownMenuItem(
-                    value: "yyyy-MM-dd",
-                    child: Text("yyyy-MM-dd"),
-                  ),
-                  DropdownMenuItem(value: "d/M/yy", child: Text("d/M/yy")),
-                  DropdownMenuItem(value: "M/d/yy", child: Text("M/d/yy")),
-                  DropdownMenuItem(value: "d-M-yy", child: Text("d-M-yy")),
-                  DropdownMenuItem(value: "M-d-yy", child: Text("M-d-yy")),
-                  DropdownMenuItem(value: "d.M.yy", child: Text("d.M.yy")),
-                  DropdownMenuItem(value: "M.d.yy", child: Text("M.d.yy")),
-                ],
-                onChanged: (value) => settings.setDateFormat(value ?? 'd/M/yy'),
-                decoration: InputDecoration(
-                  labelText: context.l10n.text(
-                    'Date format ({example})',
-                    {
-                      'example': DateFormat(settings.dateFormat)
-                          .format(DateTime.now()),
-                    },
-                  ),
-                ),
+                  context.l10n.text('Download a full backup of every profile'),
+              child: ListTile(
+                leading: const Icon(Icons.download),
+                title: Text(context.l10n.text('Export database')),
+                onTap: () => _exportBackup(context),
               ),
             ),
-          ),
-          _sectionHeader(context.l10n.text('Charts')),
-          ListTile(
-            key: const Key('settings-rolling-average'),
-            leading: const Icon(Icons.show_chart),
-            title: Text(context.l10n.text('Rolling average')),
-            trailing: Switch(
-              value: settings.showRollingAverage,
-              onChanged: settings.setShowRollingAverage,
-            ),
-            onTap: () =>
-                settings.setShowRollingAverage(!settings.showRollingAverage),
-          ),
-          ListTile(
-            key: const Key('settings-candlestick-chart'),
-            leading: const Icon(Icons.candlestick_chart_outlined),
-            title: const Text('Candles'),
-            trailing: Switch(
-              value: settings.showCandlesticks,
-              onChanged: settings.setShowCandlesticks,
-            ),
-            onTap: () =>
-                settings.setShowCandlesticks(!settings.showCandlesticks),
-          ),
-          Tooltip(
-            message: context.l10n.text('Use wavy curves in the graphs page'),
-            child: ListTile(
-              title: Text(context.l10n.text('Curve line graphs')),
-              leading: const Icon(Icons.insights),
-              onTap: () => settings.setCurveLines(!settings.curveLines),
-              trailing: Switch(
-                value: settings.curveLines,
-                onChanged: (value) => settings.setCurveLines(value),
+          if (_matchesSearch('Data', 'Import database'))
+            Tooltip(
+              message: context.l10n.text('Import a .sqlite database'),
+              child: ListTile(
+                leading: const Icon(Icons.upload),
+                title: Text(context.l10n.text('Import database')),
+                onTap: () => _importDatabase(context),
               ),
             ),
-          ),
-          Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(
-                  context.l10n.text('Curve smoothness'),
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
+          if (_matchesSearch('Data', 'Import CSV'))
+            Tooltip(
+              message:
+                  context.l10n.text('Import holdings from a broker CSV export'),
+              child: ListTile(
+                leading: const Icon(Icons.table_chart),
+                title: Text(context.l10n.text('Import CSV')),
+                onTap: () => _importCsv(context),
               ),
-              Slider(
-                value: settings.curveSmoothness,
-                divisions: 20,
-                inactiveColor: Theme.of(
-                  context,
-                ).colorScheme.primary.withValues(alpha: 0.24),
-                onChanged: (value) {
-                  runDetachedTask(
-                    settings.setCurveSmoothness(value),
-                    'Failed to save curve smoothness',
+            ),
+          if (_matchesSearch('Data', 'Sync'))
+            ListTile(
+              onTap: settings.syncInProgress
+                  ? null
+                  : () => _syncAllTickers(context),
+              leading: settings.syncInProgress
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      settings.syncFailed > 0 ? Icons.sync_problem : Icons.sync,
+                    ),
+              title: Text(context.l10n.text('Sync')),
+              subtitle: settings.syncInProgress
+                  ? Text(
+                      context.l10n.text(
+                        'Syncing {symbol} ({completed}/{total})',
+                        {
+                          'symbol': settings.syncingSymbol ?? '',
+                          'completed': settings.syncCompleted,
+                          'total': settings.syncTotal,
+                        },
+                      ),
+                    )
+                  : Text(
+                      settings.syncTotal == 0
+                          ? context.l10n.text('No sync running')
+                          : settings.syncFailed == 0
+                              ? context.l10n.text(
+                                  'Last sync completed {completed}/{total}',
+                                  {
+                                    'completed': settings.syncCompleted,
+                                    'total': settings.syncTotal,
+                                  },
+                                )
+                              : context.l10n.text(
+                                  'Last sync completed with {failed} failed',
+                                  {'failed': settings.syncFailed},
+                                ),
+                    ),
+            ),
+          if (_matchesSearch('Data', 'Delete all data'))
+            Tooltip(
+              message: context.l10n.text(
+                'Permanently delete all holdings, trades, and candles',
+              ),
+              child: ListTile(
+                leading: const Icon(Icons.delete_forever),
+                title: Text(context.l10n.text('Delete all data')),
+                onTap: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: Text(
+                        context.l10n.text('Delete all data?'),
+                      ),
+                      content: Text(
+                        context.l10n.text(
+                          'This will permanently delete all holdings, trades, and chart data. This cannot be undone.',
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: Text(context.l10n.text('Cancel')),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: Text(context.l10n.text('Delete')),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed != true || !context.mounted) return;
+                  final accounts = context.read<AccountManager>();
+                  final profileId = await profileDataRepository
+                      .profileIdForName(accounts.activeAccount);
+                  await profileDataRepository.clearTrades(profileId);
+                  await marketDataDatabase
+                      .delete(marketDataDatabase.candles)
+                      .go();
+                  clearAllSyncCache();
+                  if (!context.mounted) return;
+                  toast(
+                    context,
+                    context.l10n.text('All data deleted'),
                   );
                 },
               ),
-            ],
-          ),
-          SizedBox(
-            height: MediaQuery.of(context).size.height * 0.3,
-            child: TickerLine(
-              spots: const [
-                MarketLineChartPoint(0.0, 0.13, column: 0),
-                MarketLineChartPoint(1.0, 5, column: 1),
-                MarketLineChartPoint(2.0, 2, column: 2),
-                MarketLineChartPoint(3.0, 10, column: 3),
-                MarketLineChartPoint(4.0, 5, column: 4),
-              ],
-              dates: [
-                DateTime.now().subtract(const Duration(days: 4)),
-                DateTime.now().subtract(const Duration(days: 3)),
-                DateTime.now().subtract(const Duration(days: 2)),
-                DateTime.now().subtract(const Duration(days: 1)),
-                DateTime.now(),
-              ],
             ),
-          ),
-          _sectionHeader(context.l10n.text('Accounts')),
-          ListTile(
-            leading: const Icon(Icons.manage_accounts),
-            title: Text(context.l10n.text('Manage accounts')),
-            subtitle: Text(context.watch<AccountManager>().activeAccount),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(
-              context,
-              adaptivePageRoute(context, builder: (_) => const AccountsPage()),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.currency_exchange),
-            title: Text(context.l10n.text('Currencies')),
-            subtitle: Text(settings.visibleCurrencies.join(', ')),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showCurrencyPicker(context, settings),
-          ),
-          Builder(
-            builder: (context) {
-              final accounts = context.watch<AccountManager>();
-              final config = accounts.ibkrConfigFor();
-              return ListTile(
-                leading: const Icon(Icons.account_balance),
-                title: Text(context.l10n.text('Interactive Brokers')),
-                subtitle: Text(
-                  config.enabled
-                      ? context.l10n.text(
-                          'IBKR portfolio source • {url}',
-                          {'url': config.baseUrl},
-                        )
-                      : context.l10n
-                          .text('Use a self-hosted IBKR portfolio API'),
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => _showIbkrSettings(context),
-              );
-            },
-          ),
-          _sectionHeader(context.l10n.text('Data')),
-          Tooltip(
-            message:
-                context.l10n.text('Download a full backup of every profile'),
-            child: ListTile(
-              leading: const Icon(Icons.download),
-              title: Text(context.l10n.text('Export database')),
-              onTap: () => _exportBackup(context),
-            ),
-          ),
-          Tooltip(
-            message: context.l10n.text('Import a .sqlite database'),
-            child: ListTile(
-              leading: const Icon(Icons.upload),
-              title: Text(context.l10n.text('Import database')),
-              onTap: () => _importDatabase(context),
-            ),
-          ),
-          Tooltip(
-            message:
-                context.l10n.text('Import holdings from a broker CSV export'),
-            child: ListTile(
-              leading: const Icon(Icons.table_chart),
-              title: Text(context.l10n.text('Import CSV')),
-              onTap: () => _importCsv(context),
-            ),
-          ),
-          ListTile(
-            onTap:
-                settings.syncInProgress ? null : () => _syncAllTickers(context),
-            leading: settings.syncInProgress
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Icon(
-                    settings.syncFailed > 0 ? Icons.sync_problem : Icons.sync,
-                  ),
-            title: Text(context.l10n.text('Sync')),
-            subtitle: settings.syncInProgress
-                ? Text(
-                    context.l10n.text(
-                      'Syncing {symbol} ({completed}/{total})',
-                      {
-                        'symbol': settings.syncingSymbol ?? '',
-                        'completed': settings.syncCompleted,
-                        'total': settings.syncTotal,
-                      },
-                    ),
-                  )
-                : Text(
-                    settings.syncTotal == 0
-                        ? context.l10n.text('No sync running')
-                        : settings.syncFailed == 0
-                            ? context.l10n.text(
-                                'Last sync completed {completed}/{total}',
-                                {
-                                  'completed': settings.syncCompleted,
-                                  'total': settings.syncTotal,
-                                },
-                              )
-                            : context.l10n.text(
-                                'Last sync completed with {failed} failed',
-                                {'failed': settings.syncFailed},
-                              ),
-                  ),
-          ),
-          Tooltip(
-            message: context.l10n.text(
-              'Permanently delete all holdings, trades, and candles',
-            ),
-            child: ListTile(
-              leading: const Icon(Icons.delete_forever),
-              title: Text(context.l10n.text('Delete all data')),
-              onTap: () async {
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: Text(context.l10n.text('Delete all data?')),
-                    content: Text(
-                      context.l10n.text(
-                        'This will permanently delete all holdings, trades, and chart data. This cannot be undone.',
-                      ),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, false),
-                        child: Text(context.l10n.text('Cancel')),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, true),
-                        child: Text(context.l10n.text('Delete')),
-                      ),
-                    ],
-                  ),
-                );
-                if (confirmed != true || !context.mounted) return;
-                final accounts = context.read<AccountManager>();
-                final profileId = await profileDataRepository
-                    .profileIdForName(accounts.activeAccount);
-                await profileDataRepository.clearTrades(profileId);
-                await marketDataDatabase
-                    .delete(marketDataDatabase.candles)
-                    .go();
-                clearAllSyncCache();
-                if (!context.mounted) return;
-                toast(context, context.l10n.text('All data deleted'));
-              },
-            ),
-          ),
-          if (Platform.isAndroid || Platform.isWindows) ...[
+          if ((Platform.isAndroid || Platform.isWindows) &&
+              _hasMatches(
+                'About',
+                _mobileSearchOptions['About']!,
+              )) ...[
             const SizedBox(height: 16),
             const Divider(),
             Padding(
@@ -1313,85 +1547,96 @@ class _SettingsPageState extends State<SettingsPage> {
                 style: Theme.of(context).textTheme.headlineLarge,
               ),
             ),
-            ListTile(
-              leading: const Icon(Icons.new_releases_outlined),
-              title: Text(context.l10n.text("What's New")),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
-                context,
-                adaptivePageRoute(context, builder: (_) => const WhatsNew()),
+            if (_matchesSearch('About', 'What\'s New'))
+              ListTile(
+                leading: const Icon(Icons.new_releases_outlined),
+                title: Text(context.l10n.text("What's New")),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push(
+                  context,
+                  adaptivePageRoute(
+                    context,
+                    builder: (_) => const WhatsNew(),
+                  ),
+                ),
               ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.info_outline),
-              title: Text(context.l10n.text('Version')),
-              subtitle: FutureBuilder(
-                future: packageInfo,
-                builder: (context, snapshot) =>
-                    Text(snapshot.data?.version ?? "1.0.0"),
+            if (_matchesSearch('About', 'Version'))
+              ListTile(
+                leading: const Icon(Icons.info_outline),
+                title: Text(context.l10n.text('Version')),
+                subtitle: FutureBuilder(
+                  future: packageInfo,
+                  builder: (context, snapshot) =>
+                      Text(snapshot.data?.version ?? "1.0.0"),
+                ),
+                onTap: () async {
+                  if (Platform.isIOS || Platform.isMacOS) return;
+                  const url =
+                      'https://github.com/brandonp2412/MarketMonk/releases';
+                  await launchUrlString(url);
+                },
               ),
-              onTap: () async {
-                if (Platform.isIOS || Platform.isMacOS) return;
-                const url =
-                    'https://github.com/brandonp2412/MarketMonk/releases';
-                await launchUrlString(url);
-              },
-            ),
-            ListTile(
-              title: Text(context.l10n.text('Author')),
-              leading: const Icon(Icons.person),
-              subtitle: FutureBuilder(
-                future: packageInfo,
-                builder: (context, snapshot) => const Text("Brandon Dick"),
+            if (_matchesSearch('About', 'Author'))
+              ListTile(
+                title: Text(context.l10n.text('Author')),
+                leading: const Icon(Icons.person),
+                subtitle: FutureBuilder(
+                  future: packageInfo,
+                  builder: (context, snapshot) => const Text("Brandon Dick"),
+                ),
+                onTap: () async {
+                  if (Platform.isIOS || Platform.isMacOS) return;
+                  const url = 'https://github.com/brandonp2412';
+                  await launchUrlString(url);
+                },
               ),
-              onTap: () async {
-                if (Platform.isIOS || Platform.isMacOS) return;
-                const url = 'https://github.com/brandonp2412';
-                await launchUrlString(url);
-              },
-            ),
-            ListTile(
-              title: Text(context.l10n.text('License')),
-              leading: const Icon(Icons.balance),
-              subtitle: FutureBuilder(
-                future: packageInfo,
-                builder: (context, snapshot) => const Text("MIT"),
+            if (_matchesSearch('About', 'License'))
+              ListTile(
+                title: Text(context.l10n.text('License')),
+                leading: const Icon(Icons.balance),
+                subtitle: FutureBuilder(
+                  future: packageInfo,
+                  builder: (context, snapshot) => const Text("MIT"),
+                ),
+                onTap: () async {
+                  if (Platform.isIOS || Platform.isMacOS) return;
+                  const url =
+                      'https://github.com/brandonp2412/MarketMonk?tab=MIT-1-ov-file#readme';
+                  await launchUrlString(url);
+                },
               ),
-              onTap: () async {
-                if (Platform.isIOS || Platform.isMacOS) return;
-                const url =
-                    'https://github.com/brandonp2412/MarketMonk?tab=MIT-1-ov-file#readme';
-                await launchUrlString(url);
-              },
-            ),
-            ListTile(
-              title: Text(context.l10n.text('Source code')),
-              leading: const Icon(Icons.code),
-              subtitle: FutureBuilder(
-                future: packageInfo,
-                builder: (context, snapshot) =>
-                    Text(context.l10n.text('Check it out on GitHub')),
+            if (_matchesSearch('About', 'Source code'))
+              ListTile(
+                title: Text(context.l10n.text('Source code')),
+                leading: const Icon(Icons.code),
+                subtitle: FutureBuilder(
+                  future: packageInfo,
+                  builder: (context, snapshot) => Text(
+                    context.l10n.text('Check it out on GitHub'),
+                  ),
+                ),
+                onTap: () async {
+                  if (Platform.isIOS || Platform.isMacOS) return;
+                  const url = 'https://github.com/brandonp2412/MarketMonk';
+                  await launchUrlString(url);
+                },
               ),
-              onTap: () async {
-                if (Platform.isIOS || Platform.isMacOS) return;
-                const url = 'https://github.com/brandonp2412/MarketMonk';
-                await launchUrlString(url);
-              },
-            ),
-            ListTile(
-              title: Text(context.l10n.text('Donate')),
-              leading: const Icon(Icons.favorite_outline),
-              subtitle: FutureBuilder(
-                future: packageInfo,
-                builder: (context, snapshot) =>
-                    Text(context.l10n.text('Help support this project')),
+            if (_matchesSearch('About', 'Donate'))
+              ListTile(
+                title: Text(context.l10n.text('Donate')),
+                leading: const Icon(Icons.favorite_outline),
+                subtitle: FutureBuilder(
+                  future: packageInfo,
+                  builder: (context, snapshot) => Text(
+                    context.l10n.text('Help support this project'),
+                  ),
+                ),
+                onTap: () async {
+                  if (Platform.isIOS || Platform.isMacOS) return;
+                  const url = 'https://github.com/sponsors/brandonp2412';
+                  await launchUrlString(url);
+                },
               ),
-              onTap: () async {
-                if (Platform.isIOS || Platform.isMacOS) return;
-                const url = 'https://github.com/sponsors/brandonp2412';
-                await launchUrlString(url);
-              },
-            ),
           ],
         ],
       ),

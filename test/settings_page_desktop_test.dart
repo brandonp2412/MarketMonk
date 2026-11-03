@@ -139,6 +139,60 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('desktop search filters settings and restores them on clear',
+      (tester) async {
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await pumpSettings(tester, const Size(1200, 900));
+
+    await tester.enterText(find.byKey(const Key('settings-search')), 'IBKR');
+    await tester.pumpAndSettle();
+    expect(find.text('Interactive Brokers'), findsOneWidget);
+    expect(find.text('Accounts'), findsOneWidget);
+    expect(find.text('Currencies'), findsNothing);
+    expect(find.text('Appearance'), findsNothing);
+
+    await tester.tap(find.byTooltip('Clear search'));
+    await tester.pumpAndSettle();
+    expect(find.text('Appearance'), findsOneWidget);
+    expect(find.text('Currencies'), findsOneWidget);
+    expect(find.text('Charts'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'mobile search filters individual controls and handles no results',
+      (tester) async {
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await pumpSettings(tester, const Size(430, 940));
+
+    await tester.enterText(find.byKey(const Key('settings-search')), 'candles');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('settings-candlestick-chart')), findsOneWidget);
+    expect(find.byKey(const Key('settings-rolling-average')), findsNothing);
+    expect(find.text('Charts'), findsOneWidget);
+    expect(find.text('Appearance'), findsNothing);
+
+    await tester.enterText(
+      find.byKey(const Key('settings-search')),
+      'no such setting',
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('No matching settings'), findsOneWidget);
+    expect(find.text('Charts'), findsNothing);
+
+    await tester.tap(find.byTooltip('Clear search'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('settings-rolling-average')), findsOneWidget);
+    expect(find.text('Appearance'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('desktop settings omit the mobile-only chart switches',
       (tester) async {
     addTearDown(() {
