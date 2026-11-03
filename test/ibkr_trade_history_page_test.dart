@@ -6,6 +6,7 @@ import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/utils.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/settings_state.dart';
+import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/trade_history_page.dart';
 import 'package:provider/provider.dart';
 
@@ -359,5 +360,65 @@ void main() {
     final restarted = testAccountManager();
     await restarted.init();
     expect(restarted.ibkrTradeHistoryCacheFor('Default')?.trades.length, 1);
+  });
+  testWidgets('local holdings history exposes edit and delete actions',
+      (tester) async {
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    final profileId = await profileDataRepository.profileIdForName('Default');
+    final tradeId = await profileDataRepository.addTrade(
+      profileId,
+      ProfileTradeWrite(
+        symbol: 'VOO',
+        name: 'Vanguard S&P 500',
+        quantity: 2,
+        price: 100,
+        tradeType: 'open',
+        tradeDate: DateTime(2026, 10, 12),
+        rawCurrency: 'USD',
+        usdRateAtTrade: 1,
+      ),
+    );
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: TradeHistoryPage(
+            summary: SymbolSummary(
+              symbol: 'VOO',
+              name: 'Vanguard S&P 500',
+              position: null,
+              trades: [],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(Key('trade-actions-$tradeId')), findsOneWidget);
+
+    await tester.tap(find.text('BUY'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.text('Edit trade'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(Key('trade-actions-$tradeId')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete trade'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Delete this trade? This cannot be undone.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Delete').last);
+    await tester.pumpAndSettle();
+    expect(find.text('No trade history yet'), findsOneWidget);
   });
 }

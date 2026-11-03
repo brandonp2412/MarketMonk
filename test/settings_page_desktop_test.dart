@@ -284,4 +284,58 @@ void main() {
     expect(find.byKey(const Key('settings-candlestick-chart')), findsOneWidget);
     expect(find.byKey(const Key('settings-rolling-average')), findsNothing);
   });
+  testWidgets('desktop settings search stays compact', (tester) async {
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await pumpSettings(tester, const Size(1400, 900));
+    expect(
+      tester.getSize(find.byKey(const Key('settings-search'))).width,
+      lessThanOrEqualTo(560),
+    );
+  });
+
+  testWidgets('date formats include long formats and hex colors persist',
+      (tester) async {
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await pumpSettings(tester, const Size(1200, 900));
+    final settings =
+        tester.element(find.byType(SettingsPage)).read<SettingsState>();
+    await settings.setSystemColors(false);
+    await tester.pumpAndSettle();
+
+    final hexField = find.byKey(const Key('settings-custom-color-hex'));
+    expect(hexField, findsOneWidget);
+    await tester.enterText(hexField, '#123ABC');
+    await tester.tap(find.byKey(const Key('settings-apply-custom-color')));
+    await tester.pumpAndSettle();
+    expect(settings.seedColor, const Color(0xFF123ABC));
+    expect(
+      find.byKey(const Key('settings-custom-color-preview')),
+      findsOneWidget,
+    );
+
+    await tester.enterText(hexField, 'invalid');
+    await tester.tap(find.byKey(const Key('settings-apply-custom-color')));
+    await tester.pumpAndSettle();
+    expect(settings.seedColor, const Color(0xFF123ABC));
+    expect(find.text('Enter a 6-digit hex color'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const Key('settings-search')),
+      'date format',
+    );
+    await tester.pumpAndSettle();
+    final selector = tester.widget<DropdownButton<String>>(
+      find.byType(DropdownButton<String>),
+    );
+    expect(
+      selector.items!.map((item) => item.value),
+      containsAll(['d MMM yyyy', 'MMM d, yyyy', 'yyyy/MM/dd', 'dd.MM.yyyy']),
+    );
+  });
 }

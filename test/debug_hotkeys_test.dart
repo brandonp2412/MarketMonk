@@ -101,4 +101,8 @@ void main() {
       isFalse,
     );
   });
+  test('hotkey feedback identifies the requested action', () {
+    expect(debugHotkeyToastLabel(DebugHotkeyAction.reload), 'Hot reloading…');
+    expect(debugHotkeyToastLabel(DebugHotkeyAction.restart), 'Hot restarting…');
+  });
 }

@@ -52,6 +52,27 @@ const _languageNames = <String, String>{
   'zh-Hant': '繁體中文',
 };
 
+const _dateFormatOptions = <String>[
+  'yyyy-MM-dd',
+  'yyyy/MM/dd',
+  'yyyy.MM.dd',
+  'd/M/yy',
+  'M/d/yy',
+  'dd/MM/yyyy',
+  'MM/dd/yyyy',
+  'd-M-yy',
+  'M-d-yy',
+  'dd-MM-yyyy',
+  'MM-dd-yyyy',
+  'd.M.yy',
+  'M.d.yy',
+  'dd.MM.yyyy',
+  'd MMM yyyy',
+  'MMM d, yyyy',
+  'd MMM yy',
+  'MMM d, yy',
+];
+
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
@@ -170,31 +191,37 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _searchField() => Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-        child: TextField(
-          key: const Key('settings-search'),
-          controller: _searchController,
-          onChanged: (value) => setState(() => _searchQuery = value),
-          decoration: InputDecoration(
-            hintText: context.l10n.text('Search settings'),
-            prefixIcon: const Icon(Icons.search),
-            suffixIcon: _searchQuery.isEmpty
-                ? null
-                : IconButton(
-                    tooltip: context.l10n.text('Clear search'),
-                    icon: const Icon(Icons.close),
-                    onPressed: () {
-                      _searchController.clear();
-                      setState(() => _searchQuery = '');
-                    },
-                  ),
-            border: const OutlineInputBorder(),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isDesktopLayout(context) ? 560 : double.infinity,
+            ),
+            child: TextField(
+              key: const Key('settings-search'),
+              controller: _searchController,
+              onChanged: (value) => setState(() => _searchQuery = value),
+              decoration: InputDecoration(
+                hintText: context.l10n.text('Search settings'),
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchQuery.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: context.l10n.text('Clear search'),
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      ),
+                border: const OutlineInputBorder(),
+              ),
+            ),
           ),
         ),
       );
 
-  Widget _noSearchResults() => Center(
-        child: Text(context.l10n.text('No matching settings')),
-      );
+  Widget _noSearchResults() =>
+      Center(child: Text(context.l10n.text('No matching settings')));
   static const _brokerCsvInstructions = {
     'Tiger Brokers': [
       'Log into Tiger Trade (app or web).',
@@ -244,10 +271,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  context.l10n.text(
-                    'How to get this CSV from {broker}:',
-                    {'broker': currentSelection.name},
-                  ),
+                  context.l10n.text('How to get this CSV from {broker}:', {
+                    'broker': currentSelection.name,
+                  }),
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: 4),
@@ -337,8 +363,9 @@ class _SettingsPageState extends State<SettingsPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(
-          context.l10n
-              .text('Import {count} trades', {'count': parsed.trades.length}),
+          context.l10n.text('Import {count} trades', {
+            'count': parsed.trades.length,
+          }),
         ),
         content: SizedBox(
           width: double.maxFinite,
@@ -389,12 +416,10 @@ class _SettingsPageState extends State<SettingsPage> {
     if (!confirmed || !context.mounted) return;
 
     final accounts = context.read<AccountManager>();
-    final profileId =
-        await profileDataRepository.profileIdForName(accounts.activeAccount);
-    final tradesCount = await importTrades(
-      parsed.trades,
-      profileId: profileId,
+    final profileId = await profileDataRepository.profileIdForName(
+      accounts.activeAccount,
     );
+    final tradesCount = await importTrades(parsed.trades, profileId: profileId);
     if (!context.mounted) return;
     final settings = context.read<SettingsState>();
     settings.notifyTradesImported();
@@ -422,10 +447,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
     final selectedPath = result.single.path;
     if (selectedPath == null) {
-      toast(
-        context,
-        context.l10n.text('Could not access the selected backup'),
-      );
+      toast(context, context.l10n.text('Could not access the selected backup'));
       return;
     }
 
@@ -466,8 +488,9 @@ class _SettingsPageState extends State<SettingsPage> {
     final accounts = context.read<AccountManager>();
     Navigator.pop(context);
     final tempDirectory = await getTemporaryDirectory();
-    final workingDirectory =
-        await tempDirectory.createTemp('market-monk-backup-');
+    final workingDirectory = await tempDirectory.createTemp(
+      'market-monk-backup-',
+    );
     try {
       final archive = await accounts.exportBackup(workingDirectory);
       final result = await FilePicker.saveFile(
@@ -566,8 +589,9 @@ class _SettingsPageState extends State<SettingsPage> {
 
     final accounts = context.read<AccountManager>();
     final config = accounts.ibkrConfigFor();
-    final profileId =
-        await profileDataRepository.profileIdForName(accounts.activeAccount);
+    final profileId = await profileDataRepository.profileIdForName(
+      accounts.activeAccount,
+    );
     final trades = await profileDataRepository.readTrades(profileId);
     final symbols = config.enabled
         ? (await IbkrApiClient(config).fetchPortfolio())
@@ -587,9 +611,10 @@ class _SettingsPageState extends State<SettingsPage> {
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
         child: Text(
           text,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
-              ),
+          style: Theme.of(context)
+              .textTheme
+              .titleSmall
+              ?.copyWith(color: Theme.of(context).colorScheme.primary),
         ),
       );
 
@@ -620,9 +645,8 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
         ],
-        onChanged: (value) => settings.setLanguageCode(
-          value == 'system' ? null : value,
-        ),
+        onChanged: (value) =>
+            settings.setLanguageCode(value == 'system' ? null : value),
       ),
     );
   }
@@ -697,10 +721,7 @@ class _SettingsPageState extends State<SettingsPage> {
               children: [
                 Icon(icon, color: theme.colorScheme.primary),
                 const SizedBox(width: 10),
-                Text(
-                  title,
-                  style: theme.textTheme.titleLarge,
-                ),
+                Text(title, style: theme.textTheme.titleLarge),
               ],
             ),
             const SizedBox(height: 12),
@@ -806,24 +827,18 @@ class _SettingsPageState extends State<SettingsPage> {
         if (_matchesSearch('Appearance', 'Date format'))
           DropdownButtonFormField<String>(
             initialValue: settings.dateFormat,
-            items: const [
-              DropdownMenuItem(value: 'yyyy-MM-dd', child: Text('yyyy-MM-dd')),
-              DropdownMenuItem(value: 'd/M/yy', child: Text('d/M/yy')),
-              DropdownMenuItem(value: 'M/d/yy', child: Text('M/d/yy')),
-              DropdownMenuItem(value: 'd-M-yy', child: Text('d-M-yy')),
-              DropdownMenuItem(value: 'M-d-yy', child: Text('M-d-yy')),
-              DropdownMenuItem(value: 'd.M.yy', child: Text('d.M.yy')),
-              DropdownMenuItem(value: 'M.d.yy', child: Text('M.d.yy')),
-            ],
+            items: _dateFormatOptions
+                .map(
+                  (format) =>
+                      DropdownMenuItem(value: format, child: Text(format)),
+                )
+                .toList(),
             onChanged: (value) => settings.setDateFormat(value ?? 'd/M/yy'),
             decoration: InputDecoration(
-              labelText: context.l10n.text(
-                'Date format ({example})',
-                {
-                  'example':
-                      DateFormat(settings.dateFormat).format(DateTime.now()),
-                },
-              ),
+              labelText: context.l10n.text('Date format ({example})', {
+                'example':
+                    DateFormat(settings.dateFormat).format(DateTime.now()),
+              }),
             ),
           ),
       ],
@@ -932,10 +947,9 @@ class _SettingsPageState extends State<SettingsPage> {
             title: Text(context.l10n.text('Interactive Brokers')),
             subtitle: Text(
               ibkrConfig.enabled
-                  ? context.l10n.text(
-                      'IBKR portfolio source • {url}',
-                      {'url': ibkrConfig.baseUrl},
-                    )
+                  ? context.l10n.text('IBKR portfolio source • {url}', {
+                      'url': ibkrConfig.baseUrl,
+                    })
                   : context.l10n.text('Use a self-hosted IBKR portfolio API'),
             ),
             trailing: const Icon(Icons.chevron_right),
@@ -1052,8 +1066,9 @@ class _SettingsPageState extends State<SettingsPage> {
               );
               if (confirmed != true || !mounted) return;
               final accounts = context.read<AccountManager>();
-              final profileId = await profileDataRepository
-                  .profileIdForName(accounts.activeAccount);
+              final profileId = await profileDataRepository.profileIdForName(
+                accounts.activeAccount,
+              );
               await profileDataRepository.clearTrades(profileId);
               await marketDataDatabase.delete(marketDataDatabase.candles).go();
               clearAllSyncCache();
@@ -1217,10 +1232,7 @@ class _SettingsPageState extends State<SettingsPage> {
               padding: const EdgeInsets.all(24),
               child: _noSearchResults(),
             ),
-          if (_hasMatches(
-            'Appearance',
-            _mobileSearchOptions['Appearance']!,
-          ))
+          if (_hasMatches('Appearance', _mobileSearchOptions['Appearance']!))
             _sectionHeader(context.l10n.text('Appearance')),
           if (_matchesSearch('Appearance', 'Theme'))
             Padding(
@@ -1269,9 +1281,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 value: settings.hideDollarAmounts,
                 onChanged: settings.setHideDollarAmounts,
               ),
-              onTap: () => settings.setHideDollarAmounts(
-                !settings.hideDollarAmounts,
-              ),
+              onTap: () =>
+                  settings.setHideDollarAmounts(!settings.hideDollarAmounts),
             ),
           if (_matchesSearch('Appearance', 'System color scheme'))
             Tooltip(
@@ -1310,58 +1321,31 @@ class _SettingsPageState extends State<SettingsPage> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Tooltip(
-                message:
-                    context.l10n.text('How dates are displayed below graphs'),
+                message: context.l10n.text(
+                  'How dates are displayed below graphs',
+                ),
                 child: DropdownButtonFormField<String>(
                   initialValue: settings.dateFormat,
-                  items: const [
-                    DropdownMenuItem(
-                      value: "yyyy-MM-dd",
-                      child: Text("yyyy-MM-dd"),
-                    ),
-                    DropdownMenuItem(
-                      value: "d/M/yy",
-                      child: Text("d/M/yy"),
-                    ),
-                    DropdownMenuItem(
-                      value: "M/d/yy",
-                      child: Text("M/d/yy"),
-                    ),
-                    DropdownMenuItem(
-                      value: "d-M-yy",
-                      child: Text("d-M-yy"),
-                    ),
-                    DropdownMenuItem(
-                      value: "M-d-yy",
-                      child: Text("M-d-yy"),
-                    ),
-                    DropdownMenuItem(
-                      value: "d.M.yy",
-                      child: Text("d.M.yy"),
-                    ),
-                    DropdownMenuItem(
-                      value: "M.d.yy",
-                      child: Text("M.d.yy"),
-                    ),
-                  ],
+                  items: _dateFormatOptions
+                      .map(
+                        (format) => DropdownMenuItem(
+                          value: format,
+                          child: Text(format),
+                        ),
+                      )
+                      .toList(),
                   onChanged: (value) =>
                       settings.setDateFormat(value ?? 'd/M/yy'),
                   decoration: InputDecoration(
-                    labelText: context.l10n.text(
-                      'Date format ({example})',
-                      {
-                        'example': DateFormat(settings.dateFormat)
-                            .format(DateTime.now()),
-                      },
-                    ),
+                    labelText: context.l10n.text('Date format ({example})', {
+                      'example': DateFormat(settings.dateFormat)
+                          .format(DateTime.now()),
+                    }),
                   ),
                 ),
               ),
             ),
-          if (_hasMatches(
-            'Charts',
-            _mobileSearchOptions['Charts']!,
-          ))
+          if (_hasMatches('Charts', _mobileSearchOptions['Charts']!))
             _sectionHeader(context.l10n.text('Charts')),
           if (_matchesSearch('Charts', 'Rolling average'))
             ListTile(
@@ -1372,9 +1356,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 value: settings.showRollingAverage,
                 onChanged: settings.setShowRollingAverage,
               ),
-              onTap: () => settings.setShowRollingAverage(
-                !settings.showRollingAverage,
-              ),
+              onTap: () =>
+                  settings.setShowRollingAverage(!settings.showRollingAverage),
             ),
           if (_matchesSearch('Charts', 'Candles'))
             ListTile(
@@ -1428,9 +1411,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 Slider(
                   value: settings.curveSmoothness,
                   divisions: 20,
-                  inactiveColor: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.24),
+                  inactiveColor: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withValues(alpha: 0.24),
                   onChanged: (value) {
                     runDetachedTask(
                       settings.setCurveSmoothness(value),
@@ -1460,18 +1444,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 ],
               ),
             ),
-          if (_hasMatches(
-            'Accounts',
-            _mobileSearchOptions['Accounts']!,
-          ))
+          if (_hasMatches('Accounts', _mobileSearchOptions['Accounts']!))
             _sectionHeader(context.l10n.text('Accounts')),
           if (_matchesSearch('Accounts', 'Manage accounts'))
             ListTile(
               leading: const Icon(Icons.manage_accounts),
               title: Text(context.l10n.text('Manage accounts')),
-              subtitle: Text(
-                context.watch<AccountManager>().activeAccount,
-              ),
+              subtitle: Text(context.watch<AccountManager>().activeAccount),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.push(
                 context,
@@ -1496,15 +1475,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 final config = accounts.ibkrConfigFor();
                 return ListTile(
                   leading: const Icon(Icons.account_balance),
-                  title: Text(
-                    context.l10n.text('Interactive Brokers'),
-                  ),
+                  title: Text(context.l10n.text('Interactive Brokers')),
                   subtitle: Text(
                     config.enabled
-                        ? context.l10n.text(
-                            'IBKR portfolio source • {url}',
-                            {'url': config.baseUrl},
-                          )
+                        ? context.l10n.text('IBKR portfolio source • {url}', {
+                            'url': config.baseUrl,
+                          })
                         : context.l10n.text(
                             'Use a self-hosted IBKR portfolio API',
                           ),
@@ -1518,8 +1494,9 @@ class _SettingsPageState extends State<SettingsPage> {
             _sectionHeader(context.l10n.text('Data')),
           if (_matchesSearch('Data', 'Export database'))
             Tooltip(
-              message:
-                  context.l10n.text('Download a full backup of every profile'),
+              message: context.l10n.text(
+                'Download a full backup of every profile',
+              ),
               child: ListTile(
                 leading: const Icon(Icons.download),
                 title: Text(context.l10n.text('Export database')),
@@ -1537,8 +1514,9 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           if (_matchesSearch('Data', 'Import CSV'))
             Tooltip(
-              message:
-                  context.l10n.text('Import holdings from a broker CSV export'),
+              message: context.l10n.text(
+                'Import holdings from a broker CSV export',
+              ),
               child: ListTile(
                 leading: const Icon(Icons.table_chart),
                 title: Text(context.l10n.text('Import CSV')),
@@ -1600,9 +1578,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   final confirmed = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
-                      title: Text(
-                        context.l10n.text('Delete all data?'),
-                      ),
+                      title: Text(context.l10n.text('Delete all data?')),
                       content: Text(
                         context.l10n.text(
                           'This will permanently delete all holdings, trades, and chart data. This cannot be undone.',
@@ -1630,18 +1606,12 @@ class _SettingsPageState extends State<SettingsPage> {
                       .go();
                   clearAllSyncCache();
                   if (!context.mounted) return;
-                  toast(
-                    context,
-                    context.l10n.text('All data deleted'),
-                  );
+                  toast(context, context.l10n.text('All data deleted'));
                 },
               ),
             ),
           if ((Platform.isAndroid || Platform.isWindows) &&
-              _hasMatches(
-                'About',
-                _mobileSearchOptions['About']!,
-              )) ...[
+              _hasMatches('About', _mobileSearchOptions['About']!)) ...[
             const SizedBox(height: 16),
             const Divider(),
             Padding(
@@ -1658,10 +1628,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.push(
                   context,
-                  adaptivePageRoute(
-                    context,
-                    builder: (_) => const WhatsNew(),
-                  ),
+                  adaptivePageRoute(context, builder: (_) => const WhatsNew()),
                 ),
               ),
             if (_matchesSearch('About', 'Version'))
@@ -1715,9 +1682,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 leading: const Icon(Icons.code),
                 subtitle: FutureBuilder(
                   future: packageInfo,
-                  builder: (context, snapshot) => Text(
-                    context.l10n.text('Check it out on GitHub'),
-                  ),
+                  builder: (context, snapshot) =>
+                      Text(context.l10n.text('Check it out on GitHub')),
                 ),
                 onTap: () async {
                   if (Platform.isIOS || Platform.isMacOS) return;
@@ -1731,9 +1697,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 leading: const Icon(Icons.favorite_outline),
                 subtitle: FutureBuilder(
                   future: packageInfo,
-                  builder: (context, snapshot) => Text(
-                    context.l10n.text('Help support this project'),
-                  ),
+                  builder: (context, snapshot) =>
+                      Text(context.l10n.text('Help support this project')),
                 ),
                 onTap: () async {
                   if (Platform.isIOS || Platform.isMacOS) return;
@@ -1827,10 +1792,9 @@ class _IbkrSettingsDialogState extends State<_IbkrSettingsDialog> {
   @override
   Widget build(BuildContext context) => AlertDialog(
         title: Text(
-          context.l10n.text(
-            'Interactive Brokers — {account}',
-            {'account': widget.account},
-          ),
+          context.l10n.text('Interactive Brokers — {account}', {
+            'account': widget.account,
+          }),
         ),
         content: SizedBox(
           width: 440,
@@ -1906,19 +1870,25 @@ class _IbkrSettingsDialogState extends State<_IbkrSettingsDialog> {
       );
 }
 
-class _ColorPicker extends StatelessWidget {
+Color? parseHexThemeColor(String input) {
+  final hex = input.trim().replaceFirst(RegExp(r'^#'), '');
+  if (!RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(hex)) return null;
+  return Color(int.parse('FF$hex', radix: 16));
+}
+
+class _ColorPicker extends StatefulWidget {
   static const _colors = [
     defaultSeedColor,
-    Color(0xFF2B7A78), // teal
-    Color(0xFF6750A4), // purple
-    Color(0xFF1976D2), // blue
-    Color(0xFF388E3C), // green
-    Color(0xFFD32F2F), // red
-    Color(0xFFF57C00), // orange
-    Color(0xFF7B1FA2), // violet
-    Color(0xFF0097A7), // cyan
-    Color(0xFF5D4037), // brown
-    Color(0xFF455A64), // blue-grey
+    Color(0xFF2B7A78),
+    Color(0xFF6750A4),
+    Color(0xFF1976D2),
+    Color(0xFF388E3C),
+    Color(0xFFD32F2F),
+    Color(0xFFF57C00),
+    Color(0xFF7B1FA2),
+    Color(0xFF0097A7),
+    Color(0xFF5D4037),
+    Color(0xFF455A64),
   ];
 
   final SettingsState settings;
@@ -1926,7 +1896,62 @@ class _ColorPicker extends StatelessWidget {
   const _ColorPicker({required this.settings});
 
   @override
+  State<_ColorPicker> createState() => _ColorPickerState();
+}
+
+class _ColorPickerState extends State<_ColorPicker> {
+  late final TextEditingController _hexController;
+  late Color _lastSeedColor;
+  String? _hexError;
+
+  static String _hexFor(Color color) => color
+      .toARGB32()
+      .toRadixString(16)
+      .padLeft(8, '0')
+      .substring(2)
+      .toUpperCase();
+
+  @override
+  void initState() {
+    super.initState();
+    _lastSeedColor = widget.settings.seedColor;
+    _hexController = TextEditingController(
+      text: _hexFor(_lastSeedColor),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _ColorPicker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_lastSeedColor != widget.settings.seedColor) {
+      _lastSeedColor = widget.settings.seedColor;
+      _hexController.text = _hexFor(_lastSeedColor);
+      _hexError = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _hexController.dispose();
+    super.dispose();
+  }
+
+  void _applyHex() {
+    final selected = parseHexThemeColor(_hexController.text);
+    if (selected == null) {
+      setState(() => _hexError = 'Enter a 6-digit hex color');
+      return;
+    }
+    setState(() => _hexError = null);
+    runDetachedTask(
+      widget.settings.setSeedColor(selected),
+      'Failed to save custom theme color',
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final selectedColor = widget.settings.seedColor;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       child: Column(
@@ -1940,36 +1965,81 @@ class _ColorPicker extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _colors.map((color) {
-              final isSelected = settings.seedColor == color;
-              return GestureDetector(
-                onTap: () => settings.setSeedColor(color),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
+            children: [
+              for (final color in _ColorPicker._colors)
+                InkWell(
+                  onTap: () => widget.settings.setSeedColor(color),
+                  customBorder: const CircleBorder(),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: selectedColor == color
+                            ? Theme.of(context).colorScheme.onSurface
+                            : Colors.transparent,
+                        width: 3,
+                      ),
+                    ),
+                    child: selectedColor == color
+                        ? Icon(
+                            Icons.check,
+                            color: color.computeLuminance() > 0.5
+                                ? Colors.black
+                                : Colors.white,
+                            size: 20,
+                          )
+                        : null,
+                  ),
+                ),
+              if (!_ColorPicker._colors.contains(selectedColor))
+                Container(
+                  key: const Key('settings-custom-color-preview'),
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: color,
+                    color: selectedColor,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: isSelected
-                          ? Theme.of(context).colorScheme.onSurface
-                          : Colors.transparent,
+                      color: Theme.of(context).colorScheme.onSurface,
                       width: 3,
                     ),
                   ),
-                  child: isSelected
-                      ? Icon(
-                          Icons.check,
-                          color: color.computeLuminance() > 0.5
-                              ? Colors.black
-                              : Colors.white,
-                          size: 20,
-                        )
-                      : null,
+                  child: Icon(
+                    Icons.check,
+                    color: selectedColor.computeLuminance() > 0.5
+                        ? Colors.black
+                        : Colors.white,
+                    size: 20,
+                  ),
                 ),
-              );
-            }).toList(),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: 220,
+            child: TextField(
+              key: const Key('settings-custom-color-hex'),
+              controller: _hexController,
+              textCapitalization: TextCapitalization.characters,
+              maxLength: 7,
+              onSubmitted: (_) => _applyHex(),
+              decoration: InputDecoration(
+                labelText: 'Hex color',
+                hintText: '#RRGGBB',
+                errorText: _hexError,
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  key: const Key('settings-apply-custom-color'),
+                  tooltip: 'Apply color',
+                  onPressed: _applyHex,
+                  icon: const Icon(Icons.check_rounded),
+                ),
+              ),
+            ),
           ),
         ],
       ),

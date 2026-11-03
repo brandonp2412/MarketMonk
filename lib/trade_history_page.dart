@@ -104,6 +104,13 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                 nativeCurrencies: {
                   if (cachedPosition != null)
                     symbol: cachedPosition.nativeCurrency,
+                  if (cachedPosition == null &&
+                      trades.any((trade) => trade.rawCurrency != null))
+                    symbol: normalizedQuoteCurrency(
+                      trades
+                          .firstWhere((trade) => trade.rawCurrency != null)
+                          .rawCurrency!,
+                    ),
                 },
               ).firstOrNull;
         final liveSummary = SymbolSummary(
@@ -268,7 +275,15 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                       copyLabel: context.l10n.text('Copy trade'),
                       child: _TradeTile(
                         trade: trade,
+                        onTap: ibkrManaged
+                            ? null
+                            : () => runDetachedTask(
+                                  _editTrade(trade),
+                                  'Failed to edit trade',
+                                ),
                         onLongPress:
+                            ibkrManaged ? null : () => _showTradeActions(trade),
+                        onMore:
                             ibkrManaged ? null : () => _showTradeActions(trade),
                       ),
                     ),
@@ -333,10 +348,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                 title: Text(context.l10n.text('Edit trade')),
                 onTap: () {
                   Navigator.pop(ctx);
-                  runDetachedTask(
-                    _editTrade(trade),
-                    'Failed to edit trade',
-                  );
+                  runDetachedTask(_editTrade(trade), 'Failed to edit trade');
                 },
               ),
               ListTile(
@@ -386,8 +398,9 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
       ),
     );
     if (confirmed != true) return;
-    final profileId =
-        await profileDataRepository.profileIdForName(_accountName);
+    final profileId = await profileDataRepository.profileIdForName(
+      _accountName,
+    );
     await profileDataRepository.deleteTrade(profileId, trade.id);
   }
 }
@@ -407,10 +420,7 @@ class _SummaryRow extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: Theme.of(context).textTheme.bodyMedium),
-          Text(
-            value,
-            style: TextStyle(color: color),
-          ),
+          Text(value, style: TextStyle(color: color)),
         ],
       ),
     );
@@ -419,11 +429,15 @@ class _SummaryRow extends StatelessWidget {
 
 class _TradeTile extends StatelessWidget {
   final Trade trade;
+  final VoidCallback? onTap;
   final VoidCallback? onLongPress;
+  final VoidCallback? onMore;
 
   const _TradeTile({
     required this.trade,
+    this.onTap,
     this.onLongPress,
+    this.onMore,
   });
 
   @override
@@ -436,6 +450,7 @@ class _TradeTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
+        onTap: onTap,
         onLongPress: onLongPress,
         leading: CircleAvatar(
           backgroundColor: isBuy
@@ -457,19 +472,32 @@ class _TradeTile extends StatelessWidget {
         subtitle: Text(
           '${qty.toStringAsFixed(4)} @ ${fmtTradeNative(trade, trade.price)}  ·  $dateStr',
         ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(fmtTradeNative(trade, total)),
-            if (!isBuy && trade.realizedPL != 0)
-              Text(
-                '${trade.realizedPL >= 0 ? '+' : ''}${fmtTradeNative(trade, trade.realizedPL)}',
-                style: TextStyle(
-                  fontSize: 11,
-                  color:
-                      trade.realizedPL >= 0 ? Colors.green : Colors.redAccent,
-                ),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(fmtTradeNative(trade, total)),
+                if (!isBuy && trade.realizedPL != 0)
+                  Text(
+                    '${trade.realizedPL >= 0 ? '+' : ''}${fmtTradeNative(trade, trade.realizedPL)}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: trade.realizedPL >= 0
+                          ? Colors.green
+                          : Colors.redAccent,
+                    ),
+                  ),
+              ],
+            ),
+            if (onMore != null)
+              IconButton(
+                key: Key('trade-actions-${trade.id}'),
+                tooltip: context.l10n.text('Edit trade'),
+                onPressed: onMore,
+                icon: const Icon(Icons.more_vert_rounded),
               ),
           ],
         ),
@@ -482,10 +510,7 @@ class _EditTradeDialog extends StatefulWidget {
   final Trade trade;
   final String accountName;
 
-  const _EditTradeDialog({
-    required this.trade,
-    required this.accountName,
-  });
+  const _EditTradeDialog({required this.trade, required this.accountName});
 
   @override
   State<_EditTradeDialog> createState() => _EditTradeDialogState();
@@ -557,8 +582,9 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
       }
       return;
     }
-    final profileId =
-        await profileDataRepository.profileIdForName(widget.accountName);
+    final profileId = await profileDataRepository.profileIdForName(
+      widget.accountName,
+    );
     await profileDataRepository.updateTrade(
       profileId: profileId,
       tradeId: widget.trade.id,

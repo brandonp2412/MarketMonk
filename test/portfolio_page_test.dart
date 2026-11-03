@@ -584,6 +584,10 @@ void main() {
     final pieTop = tester.getTopLeft(pieFinder).dy;
     expect(pieTop - subtitleBottom, greaterThanOrEqualTo(28));
     expect(tester.takeException(), null);
+
+    await tester.tap(find.byKey(const Key('desktop-return-VOO')));
+    await tester.pump();
+    expect(find.text('VOO — History'), findsOneWidget);
   });
 
   for (final width in [700.0, 1000.0]) {
