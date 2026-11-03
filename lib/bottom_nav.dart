@@ -235,8 +235,10 @@ class DesktopNav extends StatelessWidget {
               const Divider(),
               const SizedBox(height: 8),
               _DesktopNavItem(
+                key: const Key('desktop-SettingsPage'),
                 icon: Icons.settings_rounded,
                 label: context.l10n.text('Settings'),
+                selected: currentIndex == tabs.length,
                 compact: compact,
                 onTap: onSettings,
               ),

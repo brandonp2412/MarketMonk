@@ -9,6 +9,7 @@ import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/portfolio_page.dart';
+import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:provider/provider.dart';
 
@@ -200,6 +201,58 @@ void main() {
 
     expect(find.byType(DesktopNav), findsNothing);
     expect(find.byType(BottomNav), findsOneWidget);
+  });
+
+  testWidgets('desktop settings occupies the content pane, not a new route',
+      (tester) async {
+    await seedTestSqlite({});
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final accounts = testAccountManager();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: const MyApp(),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('desktop-SettingsPage')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DesktopNav), findsOneWidget);
+    expect(find.byType(SettingsPage), findsOneWidget);
+    expect(find.byKey(const Key('settings-search')), findsOneWidget);
+    expect(find.byType(PageView, skipOffstage: false), findsOneWidget);
+    expect(tester.widget<DesktopNav>(find.byType(DesktopNav)).currentIndex, 3);
+    expect(
+      Navigator.of(tester.element(find.byType(MyHomePage))).canPop(),
+      isFalse,
+    );
+
+    await tester.tap(find.byKey(const Key('desktop-HoldingsPage')));
+    await tester.pumpAndSettle();
+    expect(find.byType(SettingsPage), findsNothing);
+    expect(find.byType(SettingsPage, skipOffstage: false), findsOneWidget);
+    expect(tester.widget<DesktopNav>(find.byType(DesktopNav)).currentIndex, 2);
+    expect(tester.widget<PageView>(find.byType(PageView)).controller!.page, 2);
+
+    await tester.tap(find.byKey(const Key('desktop-SettingsPage')));
+    await tester.pumpAndSettle();
+    expect(find.byType(SettingsPage), findsOneWidget);
+
+    await tester.binding.setSurfaceSize(const Size(760, 900));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(DesktopNav), findsNothing);
+    expect(find.byType(BottomNav), findsOneWidget);
+    expect(find.byType(SettingsPage), findsNothing);
+    expect(find.byType(PageView), findsOneWidget);
+    expect(tester.widget<BottomNav>(find.byType(BottomNav)).currentIndex, 2);
+    await _disposeTestApp(tester);
   });
 
   testWidgets('desktop tab changes immediately without animation',

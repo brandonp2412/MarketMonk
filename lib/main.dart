@@ -950,6 +950,8 @@ class _MyHomePageState extends State<MyHomePage> {
   late final PageController _pageController;
   late final ValueNotifier<int> _selectedPage;
   late int _currentIndex;
+  bool _desktopSettingsSelected = false;
+  bool _hasOpenedDesktopSettings = false;
 
   static const _tabs = ['ChartPage', 'PortfolioPage', 'HoldingsPage'];
 
@@ -1025,12 +1027,23 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _selectDesktopPage(int index) {
-    if (index == _currentIndex) return;
+    if (index == _currentIndex && !_desktopSettingsSelected) return;
     if (_pageController.hasClients) {
       _pageController.jumpToPage(index);
     }
     _selectedPage.value = index;
-    setState(() => _currentIndex = index);
+    setState(() {
+      _currentIndex = index;
+      _desktopSettingsSelected = false;
+    });
+  }
+
+  void _selectDesktopSettings() {
+    if (_desktopSettingsSelected) return;
+    setState(() {
+      _desktopSettingsSelected = true;
+      _hasOpenedDesktopSettings = true;
+    });
   }
 
   bool _onPageScrollEnd(ScrollEndNotification notification) {
@@ -1061,6 +1074,7 @@ class _MyHomePageState extends State<MyHomePage> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final desktop = constraints.maxWidth >= desktopLayoutBreakpoint;
+            final settingsVisible = desktop && _desktopSettingsSelected;
             final pages = NotificationListener<ScrollEndNotification>(
               onNotification: _onPageScrollEnd,
               child: PageView(
@@ -1070,9 +1084,13 @@ class _MyHomePageState extends State<MyHomePage> {
                     : const PageScrollPhysics(),
                 onPageChanged: (index) => _selectedPage.value = index,
                 children: [
-                  ChartsPage(isActive: _currentIndex == 0),
-                  PortfolioPage(isActive: _currentIndex == 1),
-                  HoldingsPage(isActive: _currentIndex == 2),
+                  ChartsPage(isActive: !settingsVisible && _currentIndex == 0),
+                  PortfolioPage(
+                    isActive: !settingsVisible && _currentIndex == 1,
+                  ),
+                  HoldingsPage(
+                    isActive: !settingsVisible && _currentIndex == 2,
+                  ),
                 ],
               ),
             );
@@ -1104,18 +1122,23 @@ class _MyHomePageState extends State<MyHomePage> {
                 DesktopNav(
                   tabs: _tabs,
                   compact: false,
-                  currentIndex: _currentIndex,
+                  currentIndex: settingsVisible ? _tabs.length : _currentIndex,
                   onTap: _selectDesktopPage,
-                  onSettings: () => Navigator.push(
-                    context,
-                    adaptivePageRoute(
-                      context,
-                      builder: (_) => const SettingsPage(),
-                    ),
-                  ),
+                  onSettings: _selectDesktopSettings,
                 ),
                 const VerticalDivider(width: 1, thickness: 1),
-                Expanded(child: content),
+                Expanded(
+                  child: IndexedStack(
+                    index: settingsVisible ? 1 : 0,
+                    children: [
+                      content,
+                      if (_hasOpenedDesktopSettings)
+                        const SettingsPage()
+                      else
+                        const SizedBox.shrink(),
+                    ],
+                  ),
+                ),
               ],
             );
           },

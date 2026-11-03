@@ -430,7 +430,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _exportBackup(BuildContext context) async {
     final accounts = context.read<AccountManager>();
-    Navigator.pop(context);
+    if (!isDesktopLayout(context)) Navigator.pop(context);
     final tempDirectory = await getTemporaryDirectory();
     final workingDirectory = await tempDirectory.createTemp(
       'market-monk-backup-',
