@@ -911,10 +911,7 @@ class ChartsPageState extends State<ChartsPage>
     });
     await prefs.setStringList('favoriteStocks', _favoriteStocks);
     if (!ctx.mounted) return;
-    if (isFavorite) {
-      toast(ctx, ctx.l10n.text('Removed as favorite'));
-      return;
-    }
+    if (isFavorite) return;
     runDetachedTask(
       _syncFavoriteCandle(symbol),
       'Failed to sync favorite ticker candle',
