@@ -57,10 +57,6 @@ void main() {
     expect(find.text('Appearance'), findsOneWidget);
     expect(find.text('Hide dollar amounts'), findsOneWidget);
     expect(
-      tester.getSize(find.byKey(const Key('settings-search'))).width,
-      lessThanOrEqualTo(520),
-    );
-    expect(
       find.ancestor(
         of: find.text('Language'),
         matching: find.byType(ListTile),
@@ -95,8 +91,41 @@ void main() {
     expect(tester.takeException(), null);
   });
 
-  testWidgets('mobile chart settings persist average and candle modes',
-      (tester) async {
+  testWidgets('desktop search matches the settings content width', (
+    tester,
+  ) async {
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await pumpSettings(tester, const Size(1800, 900));
+
+    final search = tester.getRect(find.byKey(const Key('settings-search')));
+    final cards = tester.getRect(
+      find.byKey(const Key('desktop-settings-two-column')),
+    );
+    expect(search.width, 1240);
+    expect(search.left, closeTo(cards.left, 0.1));
+    expect(search.right, closeTo(cards.right, 0.1));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('mobile search retains its page padding', (tester) async {
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await pumpSettings(tester, const Size(430, 940));
+
+    final search = tester.getRect(find.byKey(const Key('settings-search')));
+    expect(search.left, 16);
+    expect(search.right, 414);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('mobile chart settings persist average and candle modes', (
+    tester,
+  ) async {
     addTearDown(() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
