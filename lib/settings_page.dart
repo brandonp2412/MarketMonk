@@ -150,7 +150,9 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: _desktopContentMaxWidth),
+            constraints: const BoxConstraints(
+              maxWidth: _desktopContentMaxWidth,
+            ),
             child: TextField(
               key: const Key('settings-search'),
               controller: _searchController,
