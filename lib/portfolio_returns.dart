@@ -33,7 +33,7 @@ PortfolioReturn? accountPeriodReturn(
   return PortfolioReturn(currentValue - basis, basis);
 }
 
-double? accountNetAssetValueAt(
+int? accountNetAssetValueIndexAt(
   IbkrPerformanceSeries history,
   DateTime cutoff,
 ) {
@@ -53,7 +53,15 @@ double? accountNetAssetValueAt(
     return null;
   }
   final value = history.nav[selectedIndex];
-  return value.isFinite && value >= 0 ? value : null;
+  return value.isFinite && value >= 0 ? selectedIndex : null;
+}
+
+double? accountNetAssetValueAt(
+  IbkrPerformanceSeries history,
+  DateTime cutoff,
+) {
+  final index = accountNetAssetValueIndexAt(history, cutoff);
+  return index == null ? null : history.nav[index];
 }
 
 PortfolioReturn? openHoldingPeriodReturn({

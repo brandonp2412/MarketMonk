@@ -1,4 +1,5 @@
 import 'package:market_monk/ibkr_api.dart';
+import 'package:market_monk/portfolio_returns.dart';
 
 class IbkrCashOutPnl {
   final double currentValue;
@@ -87,5 +88,33 @@ IbkrCashOutPnl calculateIbkrCashOutPnl(
     currentValue: currentValue.value,
     netContributions: netContributions,
     profitLoss: profitLoss,
+  );
+}
+
+IbkrCashOutPnl? calculateIbkrCashOutPnlAt(
+  IbkrPerformanceSeries performance,
+  DateTime cutoff,
+) {
+  final index = accountNetAssetValueIndexAt(performance, cutoff);
+  if (index == null || performance.returns.length != performance.nav.length) {
+    return null;
+  }
+  final historical = IbkrPerformanceSeries(
+    period: performance.period,
+    measure: performance.measure,
+    currency: performance.currency,
+    startDate: performance.startDate,
+    startNav: performance.startNav,
+    dates: performance.dates.sublist(0, index + 1),
+    nav: performance.nav.sublist(0, index + 1),
+    returnDates: performance.returnDates,
+    returns: performance.returns.sublist(0, index + 1),
+  );
+  return calculateIbkrCashOutPnl(
+    historical,
+    IbkrAccountValue(
+      value: performance.nav[index],
+      currency: performance.currency,
+    ),
   );
 }

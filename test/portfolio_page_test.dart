@@ -624,7 +624,7 @@ void main() {
           measure: 'TWR',
           currency: 'USD',
           startDate: start,
-          startNav: 100,
+          startNav: 0,
           dates: [start, week, now],
           nav: const [100, 110, 121],
           returnDates: [start, week, now],
@@ -708,7 +708,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      if (width >= 840) expect(find.text('+21.00%'), findsOneWidget);
+      expect(find.text('+21.00%'), findsNothing);
       expect(pieValues(), {'VOO': 1000, 'MSFT': 3000, 'OLD': 4000});
       if (width >= 840) {
         expect(find.text(fmtCurrency(8000)), findsWidgets);
@@ -733,7 +733,12 @@ void main() {
         ),
         findsOneWidget,
       );
-      if (width >= 840) expect(find.text('+10.00%'), findsOneWidget);
+      if (width >= 840) {
+        expect(find.text('+10.00%'), findsOneWidget);
+        expect(find.text('+${fmtCurrency(10)}'), findsOneWidget);
+      } else {
+        expect(find.textContaining('+${fmtCurrency(10)}'), findsOneWidget);
+      }
       expect(pieValues(), {'VOO': 2000, 'MSFT': 1000, 'OLD': 1000});
       if (width >= 840) {
         expect(find.text(fmtNativeCurrency(110, 'USD')), findsOneWidget);

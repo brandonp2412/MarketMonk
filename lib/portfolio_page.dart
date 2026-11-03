@@ -983,6 +983,22 @@ class PortfolioPageState extends State<PortfolioPage>
     }
   }
 
+  ({double gainUsd, double gainPct})? _ibkrCashOutSummaryAt(
+    IbkrPerformanceSeries? performance,
+    DateTime cutoff,
+  ) {
+    if (performance == null) return null;
+    try {
+      final pnl = calculateIbkrCashOutPnlAt(performance, cutoff);
+      if (pnl == null) return null;
+      final basePerUsd = requireUsdRate(performance.currency);
+      if (!basePerUsd.isFinite || basePerUsd <= 0) return null;
+      return (gainUsd: pnl.profitLoss / basePerUsd, gainPct: pnl.percent ?? 0);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Widget _buildBody(
     BuildContext context,
     AsyncSnapshot<_LoadedPortfolio> snap,
@@ -1071,34 +1087,15 @@ class PortfolioPageState extends State<PortfolioPage>
     final costBasisGain = totalValue - totalCost;
     final cashOutSummary = _ibkrCashOutSummary(performance, netLiquidation);
     final cutoff = _returnCutoff;
-    final accountReturn =
-        cutoff != null && performance != null && netLiquidation != null
-            ? accountPeriodReturn(performance, netLiquidation.value, cutoff)
-            : null;
-    final holdingReturns = positions.map(_holdingReturn).toList();
-    final holdingsAvailable = holdingReturns.every((value) => value != null);
-    final periodGain = holdingReturns.fold<double>(
-      0,
-      (sum, value) => sum + (value?.gain ?? 0),
-    );
-    final periodBasis = holdingReturns.fold<double>(
-      0,
-      (sum, value) => sum + (value?.basis ?? 0),
-    );
+    final historicalCashOut =
+        cutoff == null ? null : _ibkrCashOutSummaryAt(performance, cutoff);
     final totalGain = cutoff == null
         ? cashOutSummary?.gainUsd ?? costBasisGain
-        : accountReturn != null
-            ? accountReturn.gain / requireUsdRate(performance!.currency)
-            : holdingsAvailable
-                ? periodGain
-                : double.nan;
+        : historicalCashOut?.gainUsd ?? double.nan;
     final totalGainPct = cutoff == null
         ? cashOutSummary?.gainPct ??
             (totalCost > 0 ? (costBasisGain / totalCost) * 100 : 0.0)
-        : accountReturn?.percent ??
-            (holdingsAvailable
-                ? (periodBasis > 0 ? periodGain / periodBasis * 100 : 0.0)
-                : double.nan);
+        : historicalCashOut?.gainPct ?? double.nan;
 
     final allocation = _allocationAt(positions, _period) ?? [];
     final allocationTotal =
@@ -1153,8 +1150,7 @@ class PortfolioPageState extends State<PortfolioPage>
         totalLabel: totalLabel,
         totalGain: totalGain,
         totalGainPct: totalGainPct,
-        isCashOut:
-            cutoff == null ? cashOutSummary != null : accountReturn != null,
+        isCashOut: cutoff == null ? cashOutSummary != null : true,
         hasRefreshWarning: hasLoadError,
       );
     }

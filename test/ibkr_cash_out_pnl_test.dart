@@ -35,6 +35,39 @@ void main() {
     expect(pnl.percent, closeTo(4.0249, 0.001));
   });
 
+  test('historical profit is cumulative as of the selected date', () {
+    const contributions = 23338.84;
+    final performance = IbkrPerformanceSeries(
+      period: '1Y',
+      measure: 'TWR',
+      currency: 'USD',
+      startDate: DateTime(2026, 8, 1),
+      startNav: 0,
+      dates: [
+        DateTime(2026, 8, 1),
+        DateTime(2026, 9, 1),
+        DateTime(2026, 11, 3),
+      ],
+      nav: const [contributions, 23908.04, 24039.24],
+      returnDates: [
+        DateTime(2026, 8, 1),
+        DateTime(2026, 9, 1),
+        DateTime(2026, 11, 3),
+      ],
+      returns: const [0, 569.20 / contributions, 700.40 / contributions],
+    );
+    final then = calculateIbkrCashOutPnlAt(performance, DateTime(2026, 9, 1))!;
+    final now = calculateIbkrCashOutPnlAt(performance, DateTime(2026, 11, 3))!;
+    expect(then.netContributions, closeTo(contributions, 0.01));
+    expect(then.profitLoss, closeTo(569.20, 0.01));
+    expect(now.profitLoss, closeTo(700.40, 0.01));
+    expect(now.currentValue - then.currentValue, closeTo(131.20, 0.01));
+    expect(
+      calculateIbkrCashOutPnlAt(performance, DateTime(2026, 10, 1)),
+      isNull,
+    );
+  });
+
   test('withdrawals reduce net contributions', () {
     final performance = IbkrPerformanceSeries(
       period: '1Y',
@@ -64,6 +97,12 @@ void main() {
 
     expect(pnl.netContributions, closeTo(800, 0.000001));
     expect(pnl.profitLoss, closeTo(150, 0.000001));
+    final beforeWithdrawal = calculateIbkrCashOutPnlAt(
+      performance,
+      DateTime(2026, 1, 3),
+    )!;
+    expect(beforeWithdrawal.netContributions, closeTo(1000, 0.000001));
+    expect(beforeWithdrawal.profitLoss, closeTo(100, 0.000001));
   });
 
   test('requires history from account inception', () {
