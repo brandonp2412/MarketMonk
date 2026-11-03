@@ -15,6 +15,115 @@ import 'sqlite_test_support.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  testWidgets('switching back to a profile reuses its holdings immediately', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1400, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.addAccount('Second');
+
+    Position position(String symbol) => Position(
+      symbol: symbol,
+      name: symbol,
+      nativeCurrency: 'USD',
+      netShares: 1,
+      avgCost: 100,
+      currentPrice: 110,
+      firstBuyDate: DateTime(2025),
+      lastBuyDate: DateTime(2026),
+    );
+    final delayedDefault = Completer<List<Position>>();
+    var delayDefault = false;
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: HoldingsPage(
+            positionsLoader: (_) {
+              if (accounts.activeAccount == 'Second') {
+                return Future.value([position('SECOND')]);
+              }
+              return delayDefault
+                  ? delayedDefault.future
+                  : Future.value([position('DEFAULT')]);
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('DEFAULT'), findsWidgets);
+
+    await accounts.switchAccount('Second');
+    await tester.pumpAndSettle();
+    expect(find.text('SECOND'), findsWidgets);
+    expect(find.text('DEFAULT'), findsNothing);
+
+    delayDefault = true;
+    await accounts.switchAccount('Default');
+    await tester.pump();
+    expect(find.text('Default · Holdings'), findsOneWidget);
+    expect(find.text('DEFAULT'), findsWidgets);
+    expect(find.text('SECOND'), findsNothing);
+
+    delayedDefault.complete([position('DEFAULT')]);
+    await tester.pumpAndSettle();
+    expect(find.text('DEFAULT'), findsWidgets);
+  });
+
+  testWidgets('first visit shows cached local holdings before prices load',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1400, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.addAccount('Cached');
+    final position = Position(
+      symbol: 'CACHED',
+      name: 'Cached position',
+      nativeCurrency: 'USD',
+      netShares: 2,
+      avgCost: 100,
+      currentPrice: 110,
+      firstBuyDate: DateTime(2025),
+      lastBuyDate: DateTime(2026),
+    );
+    await accounts.cachePortfolio('Cached', [position], null);
+    final delayed = Completer<List<Position>>();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: HoldingsPage(positionsLoader: (_) => delayed.future),
+        ),
+      ),
+    );
+    await accounts.switchAccount('Cached');
+    await tester.pump();
+    expect(find.text('Cached · Holdings'), findsOneWidget);
+    expect(find.text('CACHED'), findsWidgets);
+    delayed.complete([position]);
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('local holdings navigation does not show a spinner',
       (tester) async {
     await seedTestSqlite({});

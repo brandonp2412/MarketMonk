@@ -119,6 +119,8 @@ class HoldingsPageState extends State<HoldingsPage>
   final _desktopTableScrollController = ScrollController();
   final _desktopTableHorizontalScrollController = ScrollController();
   List<SymbolSummary> _summaries = [];
+  // Keep the last complete view for each profile while its stream refreshes.
+  final Map<String, List<SymbolSummary>> _profileSummaries = {};
   List<Trade> _ibkrTrades = [];
   Future<List<Trade>>? _ibkrTradesLoad;
   String? _ibkrTradesLoadingAccount;
@@ -126,6 +128,7 @@ class HoldingsPageState extends State<HoldingsPage>
   bool _ibkrTradeHistoryAvailable = true;
   late Stream<List<SymbolSummary>> _stream;
   String _lastAccount = '';
+  String _lastProfileId = '';
   int _lastIbkrRefreshVersion = -1;
   IbkrAccountConfig _lastIbkrConfig = const IbkrAccountConfig();
   final Map<(String, bool, bool), Future<void>> _preloadLoads = {};
@@ -168,6 +171,8 @@ class HoldingsPageState extends State<HoldingsPage>
     super.didChangeDependencies();
     final accounts = context.watch<AccountManager>();
     final account = accounts.activeAccount;
+    final profileId = accounts.activeProfileId;
+    final previousProfileId = _lastProfileId;
     final ibkrConfig = accounts.ibkrConfigFor(account);
     final refreshVersion = accounts.ibkrRefreshVersion;
     final accountChanged = _lastAccount.isNotEmpty && account != _lastAccount;
@@ -194,19 +199,31 @@ class HoldingsPageState extends State<HoldingsPage>
       _ibkrTradeHistoryAvailable = cachedHistory?.available ?? true;
     }
     _lastAccount = account;
+    _lastProfileId = profileId;
     _lastIbkrConfig = ibkrConfig;
     _lastIbkrRefreshVersion = refreshVersion;
     if (accountChanged) {
+      if (_search.text.isEmpty) {
+        _profileSummaries[previousProfileId] = _summaries;
+      }
       _search.clear();
       _selectedSymbols.clear();
       _selecting = false;
     }
+    if (configChanged) _profileSummaries.remove(profileId);
     final cachedPositions = accounts.portfolioCacheFor(account)?.positions;
+    final retained = accountChanged && !configChanged
+        ? _profileSummaries[profileId]
+        : null;
     setState(() {
       _stream = _buildStream();
-      _summaries = ibkrConfig.enabled && cachedPositions != null
-          ? _summariesFromPositions(_ibkrTrades, cachedPositions)
-          : [];
+      _summaries = retained ??
+          (cachedPositions == null
+              ? <SymbolSummary>[]
+              : _summariesFromPositions(
+                  ibkrConfig.enabled ? _ibkrTrades : const <Trade>[],
+                  cachedPositions,
+                ));
       _ibkrPreloadCompleted = cachedPositions != null;
       _preloadError = null;
     });
