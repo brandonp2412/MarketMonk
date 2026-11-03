@@ -24,6 +24,7 @@ import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/profile_picker.dart';
 import 'package:market_monk/portfolio_returns.dart';
+import 'package:market_monk/portfolio_allocation.dart';
 import 'package:market_monk/portfolio_period_picker.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
@@ -131,6 +132,7 @@ class PortfolioPageState extends State<PortfolioPage>
     IbkrPerformanceSeries? performance,
     IbkrAccountValue? netLiquidation,
   ) {
+    if (_historyLoading || _historyFailed) return const [0];
     if (performance != null &&
         netLiquidation != null &&
         performance.dates.isNotEmpty) {
@@ -138,15 +140,15 @@ class PortfolioPageState extends State<PortfolioPage>
         0,
         for (var period = 1; period < _periods.length; period++)
           if (accountPeriodReturn(
-                performance,
-                netLiquidation.value,
-                portfolioReturnCutoff(period, DateTime.now())!,
-              ) !=
-              null)
+                    performance,
+                    netLiquidation.value,
+                    portfolioReturnCutoff(period, DateTime.now())!,
+                  ) !=
+                  null &&
+              _allocationAt(positions, period) != null)
             period,
       ];
     }
-    if (_historyLoading || _historyFailed) return const [0];
     final dates = _returnTrades.isNotEmpty
         ? _returnTrades.map((trade) => trade.tradeDate).toList()
         : [
@@ -162,10 +164,22 @@ class PortfolioPageState extends State<PortfolioPage>
                 .isBefore(dates.first) &&
             positions.every(
               (position) => _holdingReturn(position, period: period) != null,
-            ))
+            ) &&
+            _allocationAt(positions, period) != null)
           period,
     ];
   }
+
+  List<PortfolioAllocation>? _allocationAt(
+    List<Position> positions,
+    int period,
+  ) =>
+      portfolioAllocationAt(
+        positions: positions,
+        trades: _returnTrades,
+        candles: _returnCandles,
+        date: portfolioReturnCutoff(period, DateTime.now()),
+      );
 
   Future<void> _loadReturnHistory(
     String account,
@@ -183,14 +197,17 @@ class PortfolioPageState extends State<PortfolioPage>
           await profileDataRepository.readTradesForAccount(accountName);
       if (!mounted || _historyAccount != account) return;
       final candles = <String, List<StoredCandle>>{};
-      for (final position in positions) {
-        candles[position.symbol] = await (marketDataDatabase.candles.select()
+      final symbols = {
+        for (final position in positions) position.symbol,
+        for (final trade in trades) trade.symbol,
+      };
+      for (final symbol in symbols) {
+        candles[symbol] = await (marketDataDatabase.candles.select()
               ..where(
-                (row) =>
-                    row.symbol.equals(canonicalMarketSymbol(position.symbol)),
+                (row) => row.symbol.equals(canonicalMarketSymbol(symbol)),
               ))
             .get();
-        candles[position.symbol]!.sort((a, b) => a.date.compareTo(b.date));
+        candles[symbol]!.sort((a, b) => a.date.compareTo(b.date));
       }
       if (!mounted || _historyAccount != account) return;
       setState(() {
@@ -269,8 +286,10 @@ class PortfolioPageState extends State<PortfolioPage>
   Widget _periodPicker() => PortfolioPeriodPicker(
         labels: [for (final period in _availablePeriods) _periods[period]],
         value: _availablePeriods.indexOf(_period),
-        onChanged: (index) =>
-            setState(() => _period = _availablePeriods[index]),
+        onChanged: (index) => setState(() {
+          _period = _availablePeriods[index];
+          touchedIndex = null;
+        }),
       );
 
   Object? _loadError;
@@ -1052,10 +1071,13 @@ class PortfolioPageState extends State<PortfolioPage>
                 ? (periodBasis > 0 ? periodGain / periodBasis * 100 : 0.0)
                 : double.nan);
 
-    final sorted = [...positions]..sort(
-        (firstPosition, secondPosition) =>
-            secondPosition.currentValue.compareTo(firstPosition.currentValue),
-      );
+    final allocation = _allocationAt(positions, _period) ?? [];
+    final allocationTotal =
+        allocation.fold<double>(0, (sum, holding) => sum + holding.value);
+    final sorted = [...allocation]..sort((a, b) => b.value.compareTo(a.value));
+    final currentBySymbol = {
+      for (final position in positions) position.symbol: position,
+    };
 
     final colors =
         _buildColors(context, [for (final position in sorted) position.symbol]);
@@ -1070,7 +1092,7 @@ class PortfolioPageState extends State<PortfolioPage>
     final slices = List.generate(
       sorted.length,
       (index) => MarketDonutSlice(
-        value: sorted[index].currentValue,
+        value: sorted[index].value,
         color: colors[index],
         label: sorted[index].symbol,
       ),
@@ -1139,17 +1161,20 @@ class PortfolioPageState extends State<PortfolioPage>
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  MarketDonutChart(
-                    slices: slices,
-                    selectedIndex: selectedIndex,
-                    onSelectionChanged: (index) {
-                      if (index == touchedIndex) return;
-                      setState(() => touchedIndex = index);
-                    },
-                    centerSpaceRadius: 55,
-                    radius: 60,
-                    selectedRadius: 75,
-                  ),
+                  if (slices.isEmpty)
+                    Text('No holdings on this date')
+                  else
+                    MarketDonutChart(
+                      slices: slices,
+                      selectedIndex: selectedIndex,
+                      onSelectionChanged: (index) {
+                        if (index == touchedIndex) return;
+                        setState(() => touchedIndex = index);
+                      },
+                      centerSpaceRadius: 55,
+                      radius: 60,
+                      selectedRadius: 75,
+                    ),
                   if (selectedIndex != null)
                     IgnorePointer(
                       child: SizedBox(
@@ -1185,15 +1210,20 @@ class PortfolioPageState extends State<PortfolioPage>
               itemCount: sorted.length,
               itemBuilder: (context, index) {
                 final position = sorted[index];
-                final val = position.currentValue;
-                final pct = totalValue > 0 ? val / totalValue * 100 : 0.0;
+                final val = position.value;
+                final pct =
+                    allocationTotal > 0 ? val / allocationTotal * 100 : 0.0;
                 return _LegendTile(
                   color: colors[index],
                   symbol: position.symbol,
                   name: position.name,
                   value: val,
                   allocationPct: pct,
-                  changePct: _holdingReturn(position)?.percent ?? double.nan,
+                  changePct: currentBySymbol[position.symbol] == null
+                      ? double.nan
+                      : _holdingReturn(currentBySymbol[position.symbol]!)
+                              ?.percent ??
+                          double.nan,
                   isHighlighted: index == selectedIndex,
                   onTap: () => setState(
                     () => touchedIndex = touchedIndex == index ? null : index,
@@ -1212,7 +1242,7 @@ class PortfolioPageState extends State<PortfolioPage>
 
   Widget _buildDesktopAllocationChart({
     required List<MarketDonutSlice> slices,
-    required List<Position> sorted,
+    required List<PortfolioAllocation> sorted,
     required int? selectedIndex,
     required bool compact,
   }) {
@@ -1222,53 +1252,57 @@ class PortfolioPageState extends State<PortfolioPage>
     return Stack(
       alignment: Alignment.center,
       children: [
-        MarketDonutChart(
-          slices: slices,
-          selectedIndex: selectedIndex,
-          onSelectionChanged: (index) {
-            if (index == touchedIndex) return;
-            setState(() => touchedIndex = index);
-          },
-          centerSpaceRadius: compact ? 48 : 72,
-          radius: compact ? 54 : 75,
-          selectedRadius: compact ? 60 : 90,
-        ),
-        IgnorePointer(
-          child: SizedBox(
-            width: compact ? 108 : 132,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  selectedIndex == null
-                      ? context.l10n.text('Holdings')
-                      : sorted[selectedIndex].symbol,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.titleMedium?.copyWith(),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  selectedIndex == null
-                      ? '${sorted.length} ${context.l10n.text('positions')}'
-                      : fmtCurrency(sorted[selectedIndex].currentValue),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
+        if (slices.isEmpty)
+          Text('No holdings on this date')
+        else
+          MarketDonutChart(
+            slices: slices,
+            selectedIndex: selectedIndex,
+            onSelectionChanged: (index) {
+              if (index == touchedIndex) return;
+              setState(() => touchedIndex = index);
+            },
+            centerSpaceRadius: compact ? 48 : 72,
+            radius: compact ? 54 : 75,
+            selectedRadius: compact ? 60 : 90,
+          ),
+        if (slices.isNotEmpty)
+          IgnorePointer(
+            child: SizedBox(
+              width: compact ? 108 : 132,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    selectedIndex == null
+                        ? context.l10n.text('Holdings')
+                        : sorted[selectedIndex].symbol,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleMedium?.copyWith(),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 3),
+                  Text(
+                    selectedIndex == null
+                        ? '${sorted.length} ${context.l10n.text('positions')}'
+                        : fmtCurrency(sorted[selectedIndex].value),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
       ],
     );
   }
 
   Widget _buildDesktopPortfolio({
     required List<Position> positions,
-    required List<Position> sorted,
+    required List<PortfolioAllocation> sorted,
     required List<Color> colors,
     required List<MarketDonutSlice> slices,
     required int? selectedIndex,
@@ -1283,6 +1317,8 @@ class PortfolioPageState extends State<PortfolioPage>
     final colorScheme = theme.colorScheme;
     final settings = context.watch<SettingsState>();
     final accounts = context.watch<AccountManager>();
+    final allocationTotal =
+        sorted.fold<double>(0, (sum, holding) => sum + holding.value);
     final byReturn = [...positions]..sort(
         (firstPosition, secondPosition) =>
             (_holdingReturn(secondPosition)?.percent ?? double.negativeInfinity)
@@ -1464,9 +1500,12 @@ class PortfolioPageState extends State<PortfolioPage>
                                 ),
                                 const SizedBox(height: 3),
                                 Text(
-                                  context.l10n.text(
-                                    'How your stock portfolio is distributed',
-                                  ),
+                                  _returnCutoff == null
+                                      ? context.l10n.text(
+                                          'How your stock portfolio is distributed',
+                                        )
+                                      : DateFormat.yMMMd()
+                                          .format(_returnCutoff!),
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
                                   ),
@@ -1490,16 +1529,17 @@ class PortfolioPageState extends State<PortfolioPage>
                                               const SizedBox(height: 14),
                                           itemBuilder: (context, index) {
                                             final position = sorted[index];
-                                            final allocationPct = totalValue > 0
-                                                ? position.currentValue /
-                                                    totalValue *
-                                                    100
-                                                : 0.0;
+                                            final allocationPct =
+                                                allocationTotal > 0
+                                                    ? position.value /
+                                                        allocationTotal *
+                                                        100
+                                                    : 0.0;
                                             return _DesktopAllocationRow(
                                               color: colors[index],
                                               symbol: position.symbol,
                                               name: position.name,
-                                              value: position.currentValue,
+                                              value: position.value,
                                               allocationPct: allocationPct,
                                               selected: selectedIndex == index,
                                               onTap: () => setState(

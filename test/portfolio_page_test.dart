@@ -13,6 +13,7 @@ import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/market_donut_chart.dart';
 import 'package:market_monk/portfolio_page.dart';
+import 'package:market_monk/portfolio_returns.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
@@ -584,69 +585,129 @@ void main() {
     expect(tester.takeException(), null);
   });
 
-  testWidgets('portfolio only offers periods covered by account history',
-      (tester) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(1000, 900);
-    addTearDown(() {
-      tester.view.resetPhysicalSize();
-      tester.view.resetDevicePixelRatio();
+  for (final width in [700.0, 1000.0]) {
+    testWidgets('portfolio period updates pie and allocation at width $width',
+        (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = Size(width, 900);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      await seedTestSqlite({});
+      final accounts = await configuredAccounts();
+      final now = DateTime.now();
+      final start = DateTime(now.year, now.month, now.day - 100);
+      final week = DateTime(now.year, now.month, now.day - 7);
+      await accounts.cachePortfolio(
+        'Default',
+        [
+          cachedPosition(),
+          Position(
+            symbol: 'MSFT',
+            name: 'Microsoft',
+            nativeCurrency: 'USD',
+            netShares: 10,
+            avgCost: 100,
+            currentPrice: 100,
+            firstBuyDate: DateTime(2025),
+            lastBuyDate: DateTime(2026),
+          ),
+        ],
+        const IbkrAccountValue(value: 121, currency: 'USD'),
+      );
+      await accounts.cacheIbkrPerformance(
+        'Default',
+        IbkrPerformanceSeries(
+          period: '1Y',
+          measure: 'TWR',
+          currency: 'USD',
+          startDate: start,
+          startNav: 100,
+          dates: [start, week, now],
+          nav: const [100, 110, 121],
+          returnDates: [start, week, now],
+          returns: const [0, .1, .21],
+        ),
+      );
+      await testDatabase.addTrade(
+        profileId: (await testDatabase.readProfileByName('Default'))!.id,
+        symbol: 'OLD',
+        name: 'Old holding',
+        quantity: -10,
+        price: 100,
+        tradeType: 'sell',
+        tradeDate: now,
+        realizedPL: 0,
+        commission: 0,
+        rawCurrency: 'USD',
+      );
+      for (final period in [7, 8, 9, 10]) {
+        final date = portfolioReturnCutoff(period, now)!;
+        for (final symbol in ['VOO', 'MSFT', 'OLD']) {
+          await testDatabase.into(testDatabase.candles).insert(
+                CandlesCompanion.insert(
+                  symbol: symbol,
+                  date: date,
+                  rawCurrency: const Value('USD'),
+                  close: Value(
+                    symbol == 'VOO'
+                        ? (period == 10 ? 200.0 : 100.0)
+                        : symbol == 'MSFT'
+                            ? (period == 10 ? 100.0 : 300.0)
+                            : (period == 10 ? 100.0 : 400.0),
+                  ),
+                ),
+              );
+        }
+      }
+      final pending = Completer<IbkrPortfolioSnapshot>();
+      await tester.pumpWidget(
+        app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
+      );
+      await tester.pumpAndSettle();
+      final finder = find.byKey(const Key('portfolio-return-period'));
+      var slider = tester.widget<Slider>(finder);
+      expect(slider.divisions, 4);
+      expect(
+        [
+          for (var i = 0; i <= 4; i++)
+            slider.semanticFormatterCallback!(i.toDouble()),
+        ],
+        ['All time', '3M', '1M', '1W', '1D'],
+      );
+      expect(find.textContaining('Open holdings returns'), findsNothing);
+      expect(
+        find.textContaining('purchase history when available'),
+        findsNothing,
+      );
+      Map<String, double> pieValues() => {
+            for (final slice in tester
+                .widget<MarketDonutChart>(find.byType(MarketDonutChart))
+                .slices)
+              slice.label: slice.value,
+          };
+      expect(pieValues(), {'VOO': 5500, 'MSFT': 1000});
+      slider.onChanged!(1);
+      await tester.pump();
+      expect(find.text('3M'), findsOneWidget);
+      if (width >= 840) expect(find.text('+21.00%'), findsOneWidget);
+      expect(pieValues(), {'VOO': 1000, 'MSFT': 3000, 'OLD': 4000});
+      expect(find.text('50.0%'), findsOneWidget);
+      expect(find.text(fmtCurrency(4000)), findsOneWidget);
+      slider = tester.widget<Slider>(finder);
+      slider.onChanged!(4);
+      await tester.pump();
+      expect(find.text('1D'), findsOneWidget);
+      if (width >= 840) expect(find.text('+10.00%'), findsOneWidget);
+      expect(pieValues(), {'VOO': 2000, 'MSFT': 1000, 'OLD': 1000});
+      expect(find.text('50.0%'), findsOneWidget);
+      tester.widget<Slider>(finder).onChanged!(0);
+      await tester.pump();
+      expect(pieValues(), {'VOO': 5500, 'MSFT': 1000});
+      expect(tester.takeException(), null);
     });
-    await seedTestSqlite({});
-    final accounts = await configuredAccounts();
-    final now = DateTime.now();
-    final start = DateTime(now.year, now.month, now.day - 100);
-    final week = DateTime(now.year, now.month, now.day - 7);
-    await accounts.cachePortfolio(
-      'Default',
-      [cachedPosition()],
-      const IbkrAccountValue(value: 121, currency: 'USD'),
-    );
-    await accounts.cacheIbkrPerformance(
-      'Default',
-      IbkrPerformanceSeries(
-        period: '1Y',
-        measure: 'TWR',
-        currency: 'USD',
-        startDate: start,
-        startNav: 100,
-        dates: [start, week, now],
-        nav: const [100, 110, 121],
-        returnDates: [start, week, now],
-        returns: const [0, .1, .21],
-      ),
-    );
-    final pending = Completer<IbkrPortfolioSnapshot>();
-    await tester.pumpWidget(
-      app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
-    );
-    await tester.pump();
-    final finder = find.byKey(const Key('portfolio-return-period'));
-    var slider = tester.widget<Slider>(finder);
-    expect(slider.divisions, 4);
-    expect(
-      [
-        for (var i = 0; i <= 4; i++)
-          slider.semanticFormatterCallback!(i.toDouble()),
-      ],
-      ['All time', '3M', '1M', '1W', '1D'],
-    );
-    expect(find.textContaining('Open holdings returns'), findsNothing);
-    expect(
-      find.textContaining('purchase history when available'),
-      findsNothing,
-    );
-    slider.onChanged!(1);
-    await tester.pump();
-    expect(find.text('3M'), findsOneWidget);
-    expect(find.text('+21.00%'), findsOneWidget);
-    slider = tester.widget<Slider>(finder);
-    slider.onChanged!(4);
-    await tester.pump();
-    expect(find.text('1D'), findsOneWidget);
-    expect(find.text('+10.00%'), findsOneWidget);
-    expect(tester.takeException(), null);
-  });
+  }
 
   testWidgets('desktop portfolio summary cards keep readable widths', (
     tester,
