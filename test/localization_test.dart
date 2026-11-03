@@ -32,7 +32,7 @@ void main() {
       );
 
       final completeKeys = appTranslations['es']!.keys.toSet();
-      expect(completeKeys, hasLength(181));
+      expect(completeKeys, hasLength(183));
       expect(
         appTranslations['hi']!.keys.toSet(),
         completeKeys,

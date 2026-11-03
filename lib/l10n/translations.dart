@@ -1,6 +1,8 @@
 /// Translation overrides keyed by canonical English UI copy.
 const appTranslations = <String, Map<String, String>>{
   "de": {
+    "General": "Allgemein",
+    "Danger zone": "Gefahrenbereich",
     "Charts": "Diagramme",
     "Portfolio": "Portfolio",
     "Holdings": "Bestände",
@@ -226,6 +228,8 @@ const appTranslations = <String, Map<String, String>>{
         "Setze Format auf CSV, führe dann die Abfrage aus und lade die Datei herunter.",
   },
   "th": {
+    "General": "ทั่วไป",
+    "Danger zone": "ส่วนที่ต้องระวัง",
     "Charts": "กราฟ",
     "Portfolio": "พอร์ตโฟลิโอ",
     "Holdings": "การถือครอง",
@@ -442,6 +446,8 @@ const appTranslations = <String, Map<String, String>>{
         "ตั้ง Format เป็น CSV จากนั้น Run คิวรีและดาวน์โหลดไฟล์",
   },
   "vi": {
+    "General": "Chung",
+    "Danger zone": "Khu vực nguy hiểm",
     "Charts": "Biểu đồ",
     "Portfolio": "Danh mục",
     "Holdings": "Khoản nắm giữ",
@@ -660,6 +666,8 @@ const appTranslations = <String, Map<String, String>>{
         "Đặt Format thành CSV, chạy truy vấn rồi tải tệp xuống.",
   },
   "es": {
+    "General": "General",
+    "Danger zone": "Zona de peligro",
     "Charts": "Gráficos",
     "Portfolio": "Cartera",
     "Holdings": "Posiciones",
@@ -884,6 +892,8 @@ const appTranslations = <String, Map<String, String>>{
         "Establece Format en CSV, ejecuta la consulta y descarga el archivo.",
   },
   "fr": {
+    "General": "Général",
+    "Danger zone": "Zone de danger",
     "Charts": "Graphiques",
     "Portfolio": "Portefeuille",
     "Holdings": "Positions",
@@ -1109,6 +1119,8 @@ const appTranslations = <String, Map<String, String>>{
         "Définissez Format sur CSV, puis exécutez la requête avec Run et téléchargez le fichier.",
   },
   "pl": {
+    "General": "Ogólne",
+    "Danger zone": "Strefa zagrożenia",
     "Charts": "Wykresy",
     "Portfolio": "Portfel",
     "Holdings": "Pozycje",
@@ -1334,6 +1346,8 @@ const appTranslations = <String, Map<String, String>>{
         "Ustaw Format na CSV, uruchom zapytanie przyciskiem Run i pobierz plik.",
   },
   "it": {
+    "General": "Generale",
+    "Danger zone": "Zona pericolosa",
     "Charts": "Grafici",
     "Portfolio": "Portafoglio",
     "Holdings": "Posizioni",
@@ -1558,6 +1572,8 @@ const appTranslations = <String, Map<String, String>>{
         "Imposta Format su CSV, quindi fai clic su Run e scarica il file.",
   },
   "nl": {
+    "General": "Algemeen",
+    "Danger zone": "Gevarenzone",
     "Charts": "Grafieken",
     "Portfolio": "Portefeuille",
     "Holdings": "Posities",
@@ -1782,6 +1798,8 @@ const appTranslations = <String, Map<String, String>>{
         "Stel Format in op CSV, voer de query uit met Run en download het bestand.",
   },
   "pt-BR": {
+    "General": "Geral",
+    "Danger zone": "Zona de perigo",
     "Charts": "Gráficos",
     "Portfolio": "Carteira",
     "Holdings": "Posições",
@@ -2003,6 +2021,8 @@ const appTranslations = <String, Map<String, String>>{
         "Defina Format como CSV, execute a consulta e baixe o arquivo.",
   },
   "pt-PT": {
+    "General": "Geral",
+    "Danger zone": "Zona de perigo",
     "Charts": "Gráficos",
     "Portfolio": "Portefólio",
     "Holdings": "Posições",
@@ -2226,6 +2246,8 @@ const appTranslations = <String, Map<String, String>>{
         "Defina Format como CSV, execute a consulta e transfira o ficheiro.",
   },
   "hi": {
+    "General": "सामान्य",
+    "Danger zone": "जोखिम क्षेत्र",
     "Charts": "चार्ट",
     "Portfolio": "पोर्टफोलियो",
     "Holdings": "होल्डिंग्स",
@@ -2448,6 +2470,8 @@ const appTranslations = <String, Map<String, String>>{
         "Format को CSV पर सेट करें, फिर क्वेरी Run करें और फ़ाइल डाउनलोड करें।",
   },
   "ja": {
+    "General": "一般",
+    "Danger zone": "危険な操作",
     "Charts": "チャート",
     "Portfolio": "ポートフォリオ",
     "Holdings": "保有銘柄",
@@ -2649,6 +2673,8 @@ const appTranslations = <String, Map<String, String>>{
         "FormatをCSVに設定し、クエリをRunしてファイルをダウンロードします。",
   },
   "ko": {
+    "General": "일반",
+    "Danger zone": "위험 구역",
     "Charts": "차트",
     "Portfolio": "포트폴리오",
     "Holdings": "보유 종목",
@@ -2851,6 +2877,8 @@ const appTranslations = <String, Map<String, String>>{
         "Format을 CSV로 설정한 다음 쿼리를 실행하고 파일을 다운로드합니다.",
   },
   "ms": {
+    "General": "Umum",
+    "Danger zone": "Zon bahaya",
     "Charts": "Carta",
     "Portfolio": "Portfolio",
     "Holdings": "Pegangan",
@@ -3074,6 +3102,8 @@ const appTranslations = <String, Map<String, String>>{
         "Tetapkan Format kepada CSV, kemudian jalankan pertanyaan dan muat turun fail.",
   },
   "tr": {
+    "General": "Genel",
+    "Danger zone": "Tehlikeli işlemler",
     "Charts": "Grafikler",
     "Portfolio": "Portföy",
     "Holdings": "Varlıklar",
@@ -3298,6 +3328,8 @@ const appTranslations = <String, Map<String, String>>{
         "Format değerini CSV olarak ayarlayın, ardından sorguyu Run ile çalıştırıp dosyayı indirin.",
   },
   "zh-Hans": {
+    "General": "常规",
+    "Danger zone": "危险操作",
     "Charts": "图表",
     "Portfolio": "投资组合",
     "Holdings": "持仓",
@@ -3495,6 +3527,8 @@ const appTranslations = <String, Map<String, String>>{
         "将 Format 设为 CSV，然后运行查询并下载文件。",
   },
   "zh-Hant": {
+    "General": "一般",
+    "Danger zone": "危險操作",
     "Charts": "圖表",
     "Portfolio": "投資組合",
     "Holdings": "持倉",
@@ -3692,6 +3726,8 @@ const appTranslations = <String, Map<String, String>>{
         "將 Format 設為 CSV，然後執行查詢並下載檔案。",
   },
   "ar": {
+    "General": "عام",
+    "Danger zone": "منطقة الخطر",
     "Charts": "الرسوم البيانية",
     "Portfolio": "المحفظة",
     "Holdings": "المقتنيات",
@@ -3910,6 +3946,8 @@ const appTranslations = <String, Map<String, String>>{
         "اضبط Format على CSV، ثم شغّل الاستعلام ونزّل الملف.",
   },
   "ru": {
+    "General": "Общие",
+    "Danger zone": "Опасная зона",
     "Charts": "Графики",
     "Portfolio": "Портфель",
     "Holdings": "Позиции",
@@ -4134,6 +4172,8 @@ const appTranslations = <String, Map<String, String>>{
         "Установите Format в CSV, затем запустите запрос и скачайте файл.",
   },
   "id": {
+    "General": "Umum",
+    "Danger zone": "Zona berbahaya",
     "Charts": "Grafik",
     "Portfolio": "Portofolio",
     "Holdings": "Kepemilikan",
@@ -4357,6 +4397,8 @@ const appTranslations = <String, Map<String, String>>{
         "Atur Format ke CSV, lalu jalankan kueri dan unduh file.",
   },
   "bn": {
+    "General": "সাধারণ",
+    "Danger zone": "ঝুঁকিপূর্ণ এলাকা",
     "Charts": "চার্ট",
     "Portfolio": "পোর্টফোলিও",
     "Holdings": "হোল্ডিংস",
@@ -4575,6 +4617,8 @@ const appTranslations = <String, Map<String, String>>{
         "Format-এ CSV সেট করুন, তারপর কোয়েরি Run করে ফাইলটি ডাউনলোড করুন।",
   },
   "ur": {
+    "General": "عمومی",
+    "Danger zone": "خطرناک علاقہ",
     "Charts": "چارٹس",
     "Portfolio": "پورٹ فولیو",
     "Holdings": "ہولڈنگز",
@@ -4795,6 +4839,8 @@ const appTranslations = <String, Map<String, String>>{
         "Format کو CSV پر مقرر کریں، پھر کوئری Run کریں اور فائل ڈاؤن لوڈ کریں۔",
   },
   "fa": {
+    "General": "عمومی",
+    "Danger zone": "بخش خطرناک",
     "Charts": "نمودارها",
     "Portfolio": "سبد سهام",
     "Holdings": "دارایی‌ها",
@@ -5017,6 +5063,8 @@ const appTranslations = <String, Map<String, String>>{
         "Format را روی CSV بگذارید، سپس کوئری را Run کنید و فایل را دانلود کنید.",
   },
   "uk": {
+    "General": "Загальні",
+    "Danger zone": "Небезпечна зона",
     "Charts": "Графіки",
     "Portfolio": "Портфель",
     "Holdings": "Позиції",

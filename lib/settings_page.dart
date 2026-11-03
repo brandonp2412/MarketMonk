@@ -61,15 +61,8 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   static const _desktopSearchOptions = <String, List<String>>{
-    'Appearance': [
-      'Theme',
-      'Language',
-      'Start page',
-      'Hide dollar amounts',
-      'System color scheme',
-      'Pure black (AMOLED)',
-      'Date format',
-    ],
+    'General': ['Language', 'Start page', 'Date format', 'Hide dollar amounts'],
+    'Appearance': ['Theme', 'System color scheme', 'Pure black (AMOLED)'],
     'Charts': [
       'Curve line graphs',
       'Curve smoothness',
@@ -77,25 +70,13 @@ class _SettingsPageState extends State<SettingsPage> {
       'Chart shading',
     ],
     'Accounts': ['Manage accounts', 'Currencies', 'Interactive Brokers'],
-    'Data': [
-      'Export database',
-      'Import database',
-      'Import CSV',
-      'Sync',
-      'Delete all data',
-    ],
+    'Data': ['Export database', 'Import database', 'Import CSV', 'Sync'],
+    'Danger zone': ['Delete all data'],
     'About': ["What's New", 'Version', 'Author', 'Source code'],
   };
   static const _mobileSearchOptions = <String, List<String>>{
-    'Appearance': [
-      'Theme',
-      'Language',
-      'Start page',
-      'Hide dollar amounts',
-      'System color scheme',
-      'Pure black (AMOLED)',
-      'Date format',
-    ],
+    'General': ['Language', 'Start page', 'Date format', 'Hide dollar amounts'],
+    'Appearance': ['Theme', 'System color scheme', 'Pure black (AMOLED)'],
     'Charts': [
       'Rolling average',
       'Candles',
@@ -105,13 +86,8 @@ class _SettingsPageState extends State<SettingsPage> {
       'Chart shading',
     ],
     'Accounts': ['Manage accounts', 'Currencies', 'Interactive Brokers'],
-    'Data': [
-      'Export database',
-      'Import database',
-      'Import CSV',
-      'Sync',
-      'Delete all data',
-    ],
+    'Data': ['Export database', 'Import database', 'Import CSV', 'Sync'],
+    'Danger zone': ['Delete all data'],
     'About': [
       "What's New",
       'Version',
@@ -161,11 +137,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   bool _hasAnyMatches(Map<String, List<String>> sections) =>
       sections.entries.any(
-        (entry) =>
-            (entry.key != 'About' ||
-                Platform.isAndroid ||
-                Platform.isWindows) &&
-            _hasMatches(entry.key, entry.value),
+        (entry) => _hasMatches(entry.key, entry.value),
       );
 
   Widget _searchField() => Padding(
@@ -192,9 +164,8 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       );
 
-  Widget _noSearchResults() => Center(
-        child: Text(context.l10n.text('No matching settings')),
-      );
+  Widget _noSearchResults() =>
+      Center(child: Text(context.l10n.text('No matching settings')));
   static const _brokerCsvInstructions = {
     'Tiger Brokers': [
       'Log into Tiger Trade (app or web).',
@@ -244,10 +215,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  context.l10n.text(
-                    'How to get this CSV from {broker}:',
-                    {'broker': currentSelection.name},
-                  ),
+                  context.l10n.text('How to get this CSV from {broker}:', {
+                    'broker': currentSelection.name,
+                  }),
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: 4),
@@ -337,8 +307,9 @@ class _SettingsPageState extends State<SettingsPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(
-          context.l10n
-              .text('Import {count} trades', {'count': parsed.trades.length}),
+          context.l10n.text('Import {count} trades', {
+            'count': parsed.trades.length,
+          }),
         ),
         content: SizedBox(
           width: double.maxFinite,
@@ -389,12 +360,10 @@ class _SettingsPageState extends State<SettingsPage> {
     if (!confirmed || !context.mounted) return;
 
     final accounts = context.read<AccountManager>();
-    final profileId =
-        await profileDataRepository.profileIdForName(accounts.activeAccount);
-    final tradesCount = await importTrades(
-      parsed.trades,
-      profileId: profileId,
+    final profileId = await profileDataRepository.profileIdForName(
+      accounts.activeAccount,
     );
+    final tradesCount = await importTrades(parsed.trades, profileId: profileId);
     if (!context.mounted) return;
     final settings = context.read<SettingsState>();
     settings.notifyTradesImported();
@@ -422,10 +391,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
     final selectedPath = result.single.path;
     if (selectedPath == null) {
-      toast(
-        context,
-        context.l10n.text('Could not access the selected backup'),
-      );
+      toast(context, context.l10n.text('Could not access the selected backup'));
       return;
     }
 
@@ -466,8 +432,9 @@ class _SettingsPageState extends State<SettingsPage> {
     final accounts = context.read<AccountManager>();
     Navigator.pop(context);
     final tempDirectory = await getTemporaryDirectory();
-    final workingDirectory =
-        await tempDirectory.createTemp('market-monk-backup-');
+    final workingDirectory = await tempDirectory.createTemp(
+      'market-monk-backup-',
+    );
     try {
       final archive = await accounts.exportBackup(workingDirectory);
       final result = await FilePicker.saveFile(
@@ -566,8 +533,9 @@ class _SettingsPageState extends State<SettingsPage> {
 
     final accounts = context.read<AccountManager>();
     final config = accounts.ibkrConfigFor();
-    final profileId =
-        await profileDataRepository.profileIdForName(accounts.activeAccount);
+    final profileId = await profileDataRepository.profileIdForName(
+      accounts.activeAccount,
+    );
     final trades = await profileDataRepository.readTrades(profileId);
     final symbols = config.enabled
         ? (await IbkrApiClient(config).fetchPortfolio())
@@ -587,9 +555,10 @@ class _SettingsPageState extends State<SettingsPage> {
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
         child: Text(
           text,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
-              ),
+          style: Theme.of(context)
+              .textTheme
+              .titleSmall
+              ?.copyWith(color: Theme.of(context).colorScheme.primary),
         ),
       );
 
@@ -620,9 +589,8 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
         ],
-        onChanged: (value) => settings.setLanguageCode(
-          value == 'system' ? null : value,
-        ),
+        onChanged: (value) =>
+            settings.setLanguageCode(value == 'system' ? null : value),
       ),
     );
   }
@@ -697,10 +665,7 @@ class _SettingsPageState extends State<SettingsPage> {
               children: [
                 Icon(icon, color: theme.colorScheme.primary),
                 const SizedBox(width: 10),
-                Text(
-                  title,
-                  style: theme.textTheme.titleLarge,
-                ),
+                Text(title, style: theme.textTheme.titleLarge),
               ],
             ),
             const SizedBox(height: 12),
@@ -718,6 +683,58 @@ class _SettingsPageState extends State<SettingsPage> {
   ) {
     final accounts = context.watch<AccountManager>();
     final ibkrConfig = accounts.ibkrConfigFor();
+
+    final general = _desktopSettingsCard(
+      icon: Icons.tune_outlined,
+      title: context.l10n.text('General'),
+      children: [
+        const SizedBox(height: 8),
+        if (_matchesSearch('General', 'Language')) ...[
+          _languageDropdown(settings, padding: EdgeInsets.zero),
+          const SizedBox(height: 8),
+        ],
+        if (_matchesSearch('General', 'Start page')) ...[
+          _startPageDropdown(settings, padding: EdgeInsets.zero),
+          const SizedBox(height: 8),
+        ],
+        if (_matchesSearch('General', 'Date format'))
+          DropdownButtonFormField<String>(
+            initialValue: settings.dateFormat,
+            items: const [
+              DropdownMenuItem(value: 'yyyy-MM-dd', child: Text('yyyy-MM-dd')),
+              DropdownMenuItem(value: 'd/M/yy', child: Text('d/M/yy')),
+              DropdownMenuItem(value: 'M/d/yy', child: Text('M/d/yy')),
+              DropdownMenuItem(value: 'd-M-yy', child: Text('d-M-yy')),
+              DropdownMenuItem(value: 'M-d-yy', child: Text('M-d-yy')),
+              DropdownMenuItem(value: 'd.M.yy', child: Text('d.M.yy')),
+              DropdownMenuItem(value: 'M.d.yy', child: Text('M.d.yy')),
+            ],
+            onChanged: (value) => settings.setDateFormat(value ?? 'd/M/yy'),
+            decoration: InputDecoration(
+              labelText: context.l10n.text('Date format ({example})', {
+                'example':
+                    DateFormat(settings.dateFormat).format(DateTime.now()),
+              }),
+            ),
+          ),
+        if (_matchesSearch('General', 'Hide dollar amounts'))
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(
+              settings.hideDollarAmounts
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+            ),
+            title: Text(context.l10n.text('Hide dollar amounts')),
+            trailing: Switch(
+              value: settings.hideDollarAmounts,
+              onChanged: settings.setHideDollarAmounts,
+            ),
+            onTap: () =>
+                settings.setHideDollarAmounts(!settings.hideDollarAmounts),
+          ),
+      ],
+    );
 
     final appearance = _desktopSettingsCard(
       icon: Icons.palette_outlined,
@@ -750,28 +767,6 @@ class _SettingsPageState extends State<SettingsPage> {
             },
           ),
         const SizedBox(height: 16),
-        if (_matchesSearch('Appearance', 'Language'))
-          _languageDropdown(settings, padding: EdgeInsets.zero),
-        const SizedBox(height: 8),
-        if (_matchesSearch('Appearance', 'Start page'))
-          _startPageDropdown(settings, padding: EdgeInsets.zero),
-        const SizedBox(height: 8),
-        if (_matchesSearch('Appearance', 'Hide dollar amounts'))
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(
-              settings.hideDollarAmounts
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
-            ),
-            title: Text(context.l10n.text('Hide dollar amounts')),
-            trailing: Switch(
-              value: settings.hideDollarAmounts,
-              onChanged: settings.setHideDollarAmounts,
-            ),
-            onTap: () =>
-                settings.setHideDollarAmounts(!settings.hideDollarAmounts),
-          ),
         if (_matchesSearch('Appearance', 'System color scheme'))
           ListTile(
             contentPadding: EdgeInsets.zero,
@@ -803,29 +798,6 @@ class _SettingsPageState extends State<SettingsPage> {
             _matchesSearch('Appearance', 'System color scheme'))
           _ColorPicker(settings: settings),
         const SizedBox(height: 8),
-        if (_matchesSearch('Appearance', 'Date format'))
-          DropdownButtonFormField<String>(
-            initialValue: settings.dateFormat,
-            items: const [
-              DropdownMenuItem(value: 'yyyy-MM-dd', child: Text('yyyy-MM-dd')),
-              DropdownMenuItem(value: 'd/M/yy', child: Text('d/M/yy')),
-              DropdownMenuItem(value: 'M/d/yy', child: Text('M/d/yy')),
-              DropdownMenuItem(value: 'd-M-yy', child: Text('d-M-yy')),
-              DropdownMenuItem(value: 'M-d-yy', child: Text('M-d-yy')),
-              DropdownMenuItem(value: 'd.M.yy', child: Text('d.M.yy')),
-              DropdownMenuItem(value: 'M.d.yy', child: Text('M.d.yy')),
-            ],
-            onChanged: (value) => settings.setDateFormat(value ?? 'd/M/yy'),
-            decoration: InputDecoration(
-              labelText: context.l10n.text(
-                'Date format ({example})',
-                {
-                  'example':
-                      DateFormat(settings.dateFormat).format(DateTime.now()),
-                },
-              ),
-            ),
-          ),
       ],
     );
 
@@ -932,10 +904,9 @@ class _SettingsPageState extends State<SettingsPage> {
             title: Text(context.l10n.text('Interactive Brokers')),
             subtitle: Text(
               ibkrConfig.enabled
-                  ? context.l10n.text(
-                      'IBKR portfolio source • {url}',
-                      {'url': ibkrConfig.baseUrl},
-                    )
+                  ? context.l10n.text('IBKR portfolio source • {url}', {
+                      'url': ibkrConfig.baseUrl,
+                    })
                   : context.l10n.text('Use a self-hosted IBKR portfolio API'),
             ),
             trailing: const Icon(Icons.chevron_right),
@@ -1014,8 +985,14 @@ class _SettingsPageState extends State<SettingsPage> {
                             ),
             ),
           ),
-        Divider(color: Theme.of(context).colorScheme.outlineVariant),
-        if (_matchesSearch('Data', 'Delete all data'))
+      ],
+    );
+
+    final danger = _desktopSettingsCard(
+      icon: Icons.warning_amber_outlined,
+      title: context.l10n.text('Danger zone'),
+      children: [
+        if (_matchesSearch('Danger zone', 'Delete all data'))
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Icon(
@@ -1052,8 +1029,9 @@ class _SettingsPageState extends State<SettingsPage> {
               );
               if (confirmed != true || !mounted) return;
               final accounts = context.read<AccountManager>();
-              final profileId = await profileDataRepository
-                  .profileIdForName(accounts.activeAccount);
+              final profileId = await profileDataRepository.profileIdForName(
+                accounts.activeAccount,
+              );
               await profileDataRepository.clearTrades(profileId);
               await marketDataDatabase.delete(marketDataDatabase.candles).go();
               clearAllSyncCache();
@@ -1120,12 +1098,15 @@ class _SettingsPageState extends State<SettingsPage> {
     );
 
     final cards = [
+      if (_hasMatches('General', _desktopSearchOptions['General']!)) general,
       if (_hasMatches('Appearance', _desktopSearchOptions['Appearance']!))
         appearance,
       if (_hasMatches('Accounts', _desktopSearchOptions['Accounts']!))
         accountSettings,
       if (_hasMatches('Charts', _desktopSearchOptions['Charts']!)) charts,
       if (_hasMatches('Data', _desktopSearchOptions['Data']!)) data,
+      if (_hasMatches('Danger zone', _desktopSearchOptions['Danger zone']!))
+        danger,
       if (_hasMatches('About', _desktopSearchOptions['About']!)) about,
     ];
     return LayoutBuilder(
@@ -1139,9 +1120,12 @@ class _SettingsPageState extends State<SettingsPage> {
                   Expanded(
                     child: Column(
                       children: [
-                        cards[0],
-                        const SizedBox(height: 16),
-                        cards[2],
+                        for (var index = 0;
+                            index < cards.length;
+                            index += 2) ...[
+                          if (index > 0) const SizedBox(height: 16),
+                          cards[index],
+                        ],
                       ],
                     ),
                   ),
@@ -1149,12 +1133,11 @@ class _SettingsPageState extends State<SettingsPage> {
                   Expanded(
                     child: Column(
                       children: [
-                        cards[1],
-                        const SizedBox(height: 16),
-                        cards[3],
-                        if (cards.length > 4) ...[
-                          const SizedBox(height: 16),
-                          cards[4],
+                        for (var index = 1;
+                            index < cards.length;
+                            index += 2) ...[
+                          if (index > 1) const SizedBox(height: 16),
+                          cards[index],
                         ],
                       ],
                     ),
@@ -1215,10 +1198,64 @@ class _SettingsPageState extends State<SettingsPage> {
               padding: const EdgeInsets.all(24),
               child: _noSearchResults(),
             ),
-          if (_hasMatches(
-            'Appearance',
-            _mobileSearchOptions['Appearance']!,
-          ))
+          if (_hasMatches('General', _mobileSearchOptions['General']!))
+            _sectionHeader(context.l10n.text('General')),
+          if (_matchesSearch('General', 'Language')) ...[
+            _languageDropdown(settings),
+            const SizedBox(height: 8),
+          ],
+          if (_matchesSearch('General', 'Start page')) ...[
+            _startPageDropdown(settings),
+            const SizedBox(height: 8),
+          ],
+          if (_matchesSearch('General', 'Date format'))
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Tooltip(
+                message: context.l10n.text(
+                  'How dates are displayed below graphs',
+                ),
+                child: DropdownButtonFormField<String>(
+                  initialValue: settings.dateFormat,
+                  items: const [
+                    DropdownMenuItem(
+                      value: "yyyy-MM-dd",
+                      child: Text("yyyy-MM-dd"),
+                    ),
+                    DropdownMenuItem(value: "d/M/yy", child: Text("d/M/yy")),
+                    DropdownMenuItem(value: "M/d/yy", child: Text("M/d/yy")),
+                    DropdownMenuItem(value: "d-M-yy", child: Text("d-M-yy")),
+                    DropdownMenuItem(value: "M-d-yy", child: Text("M-d-yy")),
+                    DropdownMenuItem(value: "d.M.yy", child: Text("d.M.yy")),
+                    DropdownMenuItem(value: "M.d.yy", child: Text("M.d.yy")),
+                  ],
+                  onChanged: (value) =>
+                      settings.setDateFormat(value ?? 'd/M/yy'),
+                  decoration: InputDecoration(
+                    labelText: context.l10n.text('Date format ({example})', {
+                      'example': DateFormat(settings.dateFormat)
+                          .format(DateTime.now()),
+                    }),
+                  ),
+                ),
+              ),
+            ),
+          if (_matchesSearch('General', 'Hide dollar amounts'))
+            ListTile(
+              leading: Icon(
+                settings.hideDollarAmounts
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+              ),
+              title: Text(context.l10n.text('Hide dollar amounts')),
+              trailing: Switch(
+                value: settings.hideDollarAmounts,
+                onChanged: settings.setHideDollarAmounts,
+              ),
+              onTap: () =>
+                  settings.setHideDollarAmounts(!settings.hideDollarAmounts),
+            ),
+          if (_hasMatches('Appearance', _mobileSearchOptions['Appearance']!))
             _sectionHeader(context.l10n.text('Appearance')),
           if (_matchesSearch('Appearance', 'Theme'))
             Padding(
@@ -1247,28 +1284,6 @@ class _SettingsPageState extends State<SettingsPage> {
                   final settings = context.read<SettingsState>();
                   await settings.setTheme(value);
                 },
-              ),
-            ),
-          if (_matchesSearch('Appearance', 'Language'))
-            _languageDropdown(settings),
-          const SizedBox(height: 8),
-          if (_matchesSearch('Appearance', 'Start page'))
-            _startPageDropdown(settings),
-          const SizedBox(height: 8),
-          if (_matchesSearch('Appearance', 'Hide dollar amounts'))
-            ListTile(
-              leading: Icon(
-                settings.hideDollarAmounts
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
-              ),
-              title: Text(context.l10n.text('Hide dollar amounts')),
-              trailing: Switch(
-                value: settings.hideDollarAmounts,
-                onChanged: settings.setHideDollarAmounts,
-              ),
-              onTap: () => settings.setHideDollarAmounts(
-                !settings.hideDollarAmounts,
               ),
             ),
           if (_matchesSearch('Appearance', 'System color scheme'))
@@ -1304,62 +1319,7 @@ class _SettingsPageState extends State<SettingsPage> {
           if (!settings.systemColors &&
               _matchesSearch('Appearance', 'System color scheme'))
             _ColorPicker(settings: settings),
-          if (_matchesSearch('Appearance', 'Date format'))
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Tooltip(
-                message:
-                    context.l10n.text('How dates are displayed below graphs'),
-                child: DropdownButtonFormField<String>(
-                  initialValue: settings.dateFormat,
-                  items: const [
-                    DropdownMenuItem(
-                      value: "yyyy-MM-dd",
-                      child: Text("yyyy-MM-dd"),
-                    ),
-                    DropdownMenuItem(
-                      value: "d/M/yy",
-                      child: Text("d/M/yy"),
-                    ),
-                    DropdownMenuItem(
-                      value: "M/d/yy",
-                      child: Text("M/d/yy"),
-                    ),
-                    DropdownMenuItem(
-                      value: "d-M-yy",
-                      child: Text("d-M-yy"),
-                    ),
-                    DropdownMenuItem(
-                      value: "M-d-yy",
-                      child: Text("M-d-yy"),
-                    ),
-                    DropdownMenuItem(
-                      value: "d.M.yy",
-                      child: Text("d.M.yy"),
-                    ),
-                    DropdownMenuItem(
-                      value: "M.d.yy",
-                      child: Text("M.d.yy"),
-                    ),
-                  ],
-                  onChanged: (value) =>
-                      settings.setDateFormat(value ?? 'd/M/yy'),
-                  decoration: InputDecoration(
-                    labelText: context.l10n.text(
-                      'Date format ({example})',
-                      {
-                        'example': DateFormat(settings.dateFormat)
-                            .format(DateTime.now()),
-                      },
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          if (_hasMatches(
-            'Charts',
-            _mobileSearchOptions['Charts']!,
-          ))
+          if (_hasMatches('Charts', _mobileSearchOptions['Charts']!))
             _sectionHeader(context.l10n.text('Charts')),
           if (_matchesSearch('Charts', 'Rolling average'))
             ListTile(
@@ -1370,9 +1330,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 value: settings.showRollingAverage,
                 onChanged: settings.setShowRollingAverage,
               ),
-              onTap: () => settings.setShowRollingAverage(
-                !settings.showRollingAverage,
-              ),
+              onTap: () =>
+                  settings.setShowRollingAverage(!settings.showRollingAverage),
             ),
           if (_matchesSearch('Charts', 'Candles'))
             ListTile(
@@ -1426,9 +1385,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 Slider(
                   value: settings.curveSmoothness,
                   divisions: 20,
-                  inactiveColor: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.24),
+                  inactiveColor: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withValues(alpha: 0.24),
                   onChanged: (value) {
                     runDetachedTask(
                       settings.setCurveSmoothness(value),
@@ -1458,18 +1418,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 ],
               ),
             ),
-          if (_hasMatches(
-            'Accounts',
-            _mobileSearchOptions['Accounts']!,
-          ))
+          if (_hasMatches('Accounts', _mobileSearchOptions['Accounts']!))
             _sectionHeader(context.l10n.text('Accounts')),
           if (_matchesSearch('Accounts', 'Manage accounts'))
             ListTile(
               leading: const Icon(Icons.manage_accounts),
               title: Text(context.l10n.text('Manage accounts')),
-              subtitle: Text(
-                context.watch<AccountManager>().activeAccount,
-              ),
+              subtitle: Text(context.watch<AccountManager>().activeAccount),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.push(
                 context,
@@ -1494,15 +1449,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 final config = accounts.ibkrConfigFor();
                 return ListTile(
                   leading: const Icon(Icons.account_balance),
-                  title: Text(
-                    context.l10n.text('Interactive Brokers'),
-                  ),
+                  title: Text(context.l10n.text('Interactive Brokers')),
                   subtitle: Text(
                     config.enabled
-                        ? context.l10n.text(
-                            'IBKR portfolio source • {url}',
-                            {'url': config.baseUrl},
-                          )
+                        ? context.l10n.text('IBKR portfolio source • {url}', {
+                            'url': config.baseUrl,
+                          })
                         : context.l10n.text(
                             'Use a self-hosted IBKR portfolio API',
                           ),
@@ -1516,8 +1468,9 @@ class _SettingsPageState extends State<SettingsPage> {
             _sectionHeader(context.l10n.text('Data')),
           if (_matchesSearch('Data', 'Export database'))
             Tooltip(
-              message:
-                  context.l10n.text('Download a full backup of every profile'),
+              message: context.l10n.text(
+                'Download a full backup of every profile',
+              ),
               child: ListTile(
                 leading: const Icon(Icons.download),
                 title: Text(context.l10n.text('Export database')),
@@ -1535,8 +1488,9 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           if (_matchesSearch('Data', 'Import CSV'))
             Tooltip(
-              message:
-                  context.l10n.text('Import holdings from a broker CSV export'),
+              message: context.l10n.text(
+                'Import holdings from a broker CSV export',
+              ),
               child: ListTile(
                 leading: const Icon(Icons.table_chart),
                 title: Text(context.l10n.text('Import CSV')),
@@ -1586,7 +1540,15 @@ class _SettingsPageState extends State<SettingsPage> {
                                 ),
                     ),
             ),
-          if (_matchesSearch('Data', 'Delete all data'))
+          if (_hasMatches(
+            'Danger zone',
+            _mobileSearchOptions['Danger zone']!,
+          )) ...[
+            const SizedBox(height: 8),
+            const Divider(),
+            _sectionHeader(context.l10n.text('Danger zone')),
+          ],
+          if (_matchesSearch('Danger zone', 'Delete all data'))
             Tooltip(
               message: context.l10n.text(
                 'Permanently delete all holdings, trades, and candles',
@@ -1598,9 +1560,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   final confirmed = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
-                      title: Text(
-                        context.l10n.text('Delete all data?'),
-                      ),
+                      title: Text(context.l10n.text('Delete all data?')),
                       content: Text(
                         context.l10n.text(
                           'This will permanently delete all holdings, trades, and chart data. This cannot be undone.',
@@ -1628,18 +1588,12 @@ class _SettingsPageState extends State<SettingsPage> {
                       .go();
                   clearAllSyncCache();
                   if (!context.mounted) return;
-                  toast(
-                    context,
-                    context.l10n.text('All data deleted'),
-                  );
+                  toast(context, context.l10n.text('All data deleted'));
                 },
               ),
             ),
           if ((Platform.isAndroid || Platform.isWindows) &&
-              _hasMatches(
-                'About',
-                _mobileSearchOptions['About']!,
-              )) ...[
+              _hasMatches('About', _mobileSearchOptions['About']!)) ...[
             const SizedBox(height: 16),
             const Divider(),
             Padding(
@@ -1656,10 +1610,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.push(
                   context,
-                  adaptivePageRoute(
-                    context,
-                    builder: (_) => const WhatsNew(),
-                  ),
+                  adaptivePageRoute(context, builder: (_) => const WhatsNew()),
                 ),
               ),
             if (_matchesSearch('About', 'Version'))
@@ -1713,9 +1664,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 leading: const Icon(Icons.code),
                 subtitle: FutureBuilder(
                   future: packageInfo,
-                  builder: (context, snapshot) => Text(
-                    context.l10n.text('Check it out on GitHub'),
-                  ),
+                  builder: (context, snapshot) =>
+                      Text(context.l10n.text('Check it out on GitHub')),
                 ),
                 onTap: () async {
                   if (Platform.isIOS || Platform.isMacOS) return;
@@ -1729,9 +1679,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 leading: const Icon(Icons.favorite_outline),
                 subtitle: FutureBuilder(
                   future: packageInfo,
-                  builder: (context, snapshot) => Text(
-                    context.l10n.text('Help support this project'),
-                  ),
+                  builder: (context, snapshot) =>
+                      Text(context.l10n.text('Help support this project')),
                 ),
                 onTap: () async {
                   if (Platform.isIOS || Platform.isMacOS) return;
@@ -1825,10 +1774,9 @@ class _IbkrSettingsDialogState extends State<_IbkrSettingsDialog> {
   @override
   Widget build(BuildContext context) => AlertDialog(
         title: Text(
-          context.l10n.text(
-            'Interactive Brokers — {account}',
-            {'account': widget.account},
-          ),
+          context.l10n.text('Interactive Brokers — {account}', {
+            'account': widget.account,
+          }),
         ),
         content: SizedBox(
           width: 440,
