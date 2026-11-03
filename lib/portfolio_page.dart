@@ -777,8 +777,6 @@ class PortfolioPageState extends State<PortfolioPage>
     final path = await FilePicker.saveFile(
       fileName: csv.fileName,
       bytes: csv.bytes,
-      type: FileType.custom,
-      allowedExtensions: ['csv'],
     );
     if (path == null) return;
     if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {

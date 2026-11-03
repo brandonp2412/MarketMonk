@@ -28,15 +28,15 @@ void main() {
       final accounts = testAccountManager();
       await accounts.init();
       Position position(String symbol) => Position(
-        symbol: symbol,
-        name: symbol,
-        nativeCurrency: 'USD',
-        netShares: 1,
-        avgCost: 10,
-        currentPrice: 12,
-        firstBuyDate: DateTime(2025),
-        lastBuyDate: DateTime(2026),
-      );
+            symbol: symbol,
+            name: symbol,
+            nativeCurrency: 'USD',
+            netShares: 1,
+            avgCost: 10,
+            currentPrice: 12,
+            firstBuyDate: DateTime(2025),
+            lastBuyDate: DateTime(2026),
+          );
       await tester.pumpWidget(
         MultiProvider(
           providers: [
@@ -57,8 +57,11 @@ void main() {
       await tester.pumpAndSettle();
 
       ListTile tile(String symbol) => tester.widget<ListTile>(
-        find.ancestor(of: find.text(symbol), matching: find.byType(ListTile)),
-      );
+            find.ancestor(
+              of: find.text(symbol),
+              matching: find.byType(ListTile),
+            ),
+          );
 
       await tester.tap(find.byKey(const Key('holdings-menu-button')));
       await tester.pumpAndSettle();
@@ -115,15 +118,15 @@ void main() {
     final accounts = testAccountManager();
     await accounts.init();
     Position position(String symbol) => Position(
-      symbol: symbol,
-      name: symbol,
-      nativeCurrency: 'USD',
-      netShares: 1,
-      avgCost: 10,
-      currentPrice: 12,
-      firstBuyDate: DateTime(2025),
-      lastBuyDate: DateTime(2026),
-    );
+          symbol: symbol,
+          name: symbol,
+          nativeCurrency: 'USD',
+          netShares: 1,
+          avgCost: 10,
+          currentPrice: 12,
+          firstBuyDate: DateTime(2025),
+          lastBuyDate: DateTime(2026),
+        );
     await tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -163,9 +166,6 @@ void main() {
     expect(table().showCheckboxColumn, isTrue);
   });
 
-
-
-
   testWidgets('switching back to a profile reuses its holdings immediately', (
     tester,
   ) async {
@@ -181,15 +181,15 @@ void main() {
     await accounts.addAccount('Second');
 
     Position position(String symbol) => Position(
-      symbol: symbol,
-      name: symbol,
-      nativeCurrency: 'USD',
-      netShares: 1,
-      avgCost: 100,
-      currentPrice: 110,
-      firstBuyDate: DateTime(2025),
-      lastBuyDate: DateTime(2026),
-    );
+          symbol: symbol,
+          name: symbol,
+          nativeCurrency: 'USD',
+          netShares: 1,
+          avgCost: 100,
+          currentPrice: 110,
+          firstBuyDate: DateTime(2025),
+          lastBuyDate: DateTime(2026),
+        );
     final delayedDefault = Completer<List<Position>>();
     var delayDefault = false;
     await tester.pumpWidget(

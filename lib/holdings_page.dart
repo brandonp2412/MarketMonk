@@ -214,9 +214,8 @@ class HoldingsPageState extends State<HoldingsPage>
     }
     if (configChanged) _profileSummaries.remove(profileId);
     final cachedPositions = accounts.portfolioCacheFor(account)?.positions;
-    final retained = accountChanged && !configChanged
-        ? _profileSummaries[profileId]
-        : null;
+    final retained =
+        accountChanged && !configChanged ? _profileSummaries[profileId] : null;
     setState(() {
       _stream = _buildStream();
       _summaries = retained ??
@@ -680,7 +679,8 @@ class HoldingsPageState extends State<HoldingsPage>
     Set<String>? symbols,
   }) async {
     final targets = Set<String>.of(symbols ?? _selectedSymbols);
-    if (targets.isEmpty || context.read<AccountManager>().ibkrConfigFor().enabled) {
+    if (targets.isEmpty ||
+        context.read<AccountManager>().ibkrConfigFor().enabled) {
       return;
     }
 
@@ -1230,7 +1230,7 @@ class HoldingsPageState extends State<HoldingsPage>
     final winners = open.where((position) => position.change >= 0).length;
     final sorted = _sortDesktopSummaries(summaries);
 
-     DataCell textCell(
+    DataCell textCell(
       String text, {
       required SymbolSummary summary,
       bool numeric = true,
@@ -1462,7 +1462,9 @@ class HoldingsPageState extends State<HoldingsPage>
                                           summary.symbol,
                                         ),
                                         onSelectChanged: (_) =>
-                                            _toggleHoldingSelection(summary.symbol),
+                                            _toggleHoldingSelection(
+                                          summary.symbol,
+                                        ),
                                         cells: [
                                           DataCell(
                                             DesktopContextMenu(
@@ -1874,8 +1876,10 @@ class _SymbolTile extends StatelessWidget {
 
     return ListTile(
       selected: isSelected,
-      selectedTileColor:
-          Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.18),
+      selectedTileColor: Theme.of(context)
+          .colorScheme
+          .primaryContainer
+          .withValues(alpha: 0.18),
       leading: leadingWidget,
       title: Text(summary.symbol),
       subtitle: position != null

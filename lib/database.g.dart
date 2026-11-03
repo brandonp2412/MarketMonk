@@ -3653,55 +3653,57 @@ class $$ProfilesTableTableManager extends RootTableManager<
               getPrefetchedDataCallback: (items) async {
                 return [
                   if (appStateRefs)
-                    await $_getPrefetchedData<StoredProfile, $ProfilesTable,
-                            StoredAppState>(
+                    await $_getPrefetchedDataByColumns<StoredProfile,
+                            $ProfilesTable, StoredAppState, $AppStateTable>(
                         currentTable: table,
                         referencedTable:
                             $$ProfilesTableReferences._appStateRefsTable(db),
                         managerFromTypedResult: (p0) =>
                             $$ProfilesTableReferences(db, table, p0)
                                 .appStateRefs,
-                        referencedItemsForCurrentItem:
-                            (item, referencedItems) => referencedItems
-                                .where((e) => e.activeProfileId == item.id),
+                        currentColumn: 'id',
+                        referencedColumn: 'active_profile_id',
                         typedResults: items),
                   if (tradesRefs)
-                    await $_getPrefetchedData<StoredProfile, $ProfilesTable,
-                            StoredTrade>(
+                    await $_getPrefetchedDataByColumns<StoredProfile,
+                            $ProfilesTable, StoredTrade, $TradesTable>(
                         currentTable: table,
                         referencedTable:
                             $$ProfilesTableReferences._tradesRefsTable(db),
                         managerFromTypedResult: (p0) =>
                             $$ProfilesTableReferences(db, table, p0).tradesRefs,
-                        referencedItemsForCurrentItem:
-                            (item, referencedItems) => referencedItems
-                                .where((e) => e.profileId == item.id),
+                        currentColumn: 'id',
+                        referencedColumn: 'profile_id',
                         typedResults: items),
                   if (ibkrSettingsRefs)
-                    await $_getPrefetchedData<StoredProfile, $ProfilesTable,
-                            StoredIbkrSetting>(
+                    await $_getPrefetchedDataByColumns<
+                            StoredProfile,
+                            $ProfilesTable,
+                            StoredIbkrSetting,
+                            $IbkrSettingsTable>(
                         currentTable: table,
                         referencedTable: $$ProfilesTableReferences
                             ._ibkrSettingsRefsTable(db),
                         managerFromTypedResult: (p0) =>
                             $$ProfilesTableReferences(db, table, p0)
                                 .ibkrSettingsRefs,
-                        referencedItemsForCurrentItem:
-                            (item, referencedItems) => referencedItems
-                                .where((e) => e.profileId == item.id),
+                        currentColumn: 'id',
+                        referencedColumn: 'profile_id',
                         typedResults: items),
                   if (ibkrCacheEntriesRefs)
-                    await $_getPrefetchedData<StoredProfile, $ProfilesTable,
-                            StoredIbkrCacheEntry>(
+                    await $_getPrefetchedDataByColumns<
+                            StoredProfile,
+                            $ProfilesTable,
+                            StoredIbkrCacheEntry,
+                            $IbkrCacheEntriesTable>(
                         currentTable: table,
                         referencedTable: $$ProfilesTableReferences
                             ._ibkrCacheEntriesRefsTable(db),
                         managerFromTypedResult: (p0) =>
                             $$ProfilesTableReferences(db, table, p0)
                                 .ibkrCacheEntriesRefs,
-                        referencedItemsForCurrentItem:
-                            (item, referencedItems) => referencedItems
-                                .where((e) => e.profileId == item.id),
+                        currentColumn: 'id',
+                        referencedColumn: 'profile_id',
                         typedResults: items)
                 ];
               },
