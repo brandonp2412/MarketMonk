@@ -89,6 +89,7 @@ class CachedPortfolioData {
   final List<Position> positions;
   final IbkrAccountValue? netLiquidation;
   final double? netLiquidationUsd;
+  final IbkrAccountValue? cashBalance;
   final DateTime? asOfDate;
   final DateTime cachedAt;
 
@@ -96,6 +97,7 @@ class CachedPortfolioData {
     required this.positions,
     required this.netLiquidation,
     this.netLiquidationUsd,
+    this.cashBalance,
     this.asOfDate,
     required this.cachedAt,
   });
@@ -125,12 +127,16 @@ class CachedPortfolioData {
                 'currency': netLiquidation!.currency,
               },
         'netLiquidationUsd': netLiquidationUsd,
+        'cashBalance': cashBalance == null
+            ? null
+            : {'value': cashBalance!.value, 'currency': cashBalance!.currency},
         'asOfDate': asOfDate?.toIso8601String(),
         'cachedAt': cachedAt.toIso8601String(),
       };
 
   factory CachedPortfolioData.fromJson(Map<String, dynamic> json) {
     final rawNetLiquidation = json['netLiquidation'];
+    final rawCashBalance = json['cashBalance'];
     return CachedPortfolioData(
       positions: (json['positions'] as List<dynamic>? ?? const [])
           .whereType<Map<String, dynamic>>()
@@ -166,6 +172,13 @@ class CachedPortfolioData {
             )
           : null,
       netLiquidationUsd: (json['netLiquidationUsd'] as num?)?.toDouble(),
+      cashBalance: rawCashBalance is Map<String, dynamic> &&
+              rawCashBalance['value'] is num
+          ? IbkrAccountValue(
+              value: (rawCashBalance['value'] as num).toDouble(),
+              currency: rawCashBalance['currency'] as String? ?? '',
+            )
+          : null,
       asOfDate: DateTime.tryParse(json['asOfDate'] as String? ?? ''),
       cachedAt: DateTime.tryParse(json['cachedAt'] as String? ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),
@@ -472,6 +485,7 @@ class AccountManager extends ChangeNotifier {
     List<Position> positions,
     IbkrAccountValue? netLiquidation, {
     double? netLiquidationUsd,
+    IbkrAccountValue? cashBalance,
     DateTime? asOfDate,
   }) =>
       _serializeStorage(
@@ -480,6 +494,7 @@ class AccountManager extends ChangeNotifier {
           positions,
           netLiquidation,
           netLiquidationUsd: netLiquidationUsd,
+          cashBalance: cashBalance,
           asOfDate: asOfDate,
         ),
       );
@@ -489,6 +504,7 @@ class AccountManager extends ChangeNotifier {
     List<Position> positions,
     IbkrAccountValue? netLiquidation, {
     double? netLiquidationUsd,
+    IbkrAccountValue? cashBalance,
     DateTime? asOfDate,
   }) async {
     final profileId = _profileIdsByName[name];
@@ -497,6 +513,7 @@ class AccountManager extends ChangeNotifier {
       positions: List.unmodifiable(positions),
       netLiquidation: netLiquidation,
       netLiquidationUsd: netLiquidationUsd,
+      cashBalance: cashBalance,
       asOfDate: asOfDate,
       cachedAt: DateTime.now(),
     );

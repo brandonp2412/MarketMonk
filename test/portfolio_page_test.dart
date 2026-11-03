@@ -220,6 +220,35 @@ void main() {
     },
   );
 
+  testWidgets('portfolio shows cached IBKR cash as an allocation slice',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(700, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({});
+    final accounts = await configuredAccounts();
+    await accounts.cachePortfolio(
+      'Default',
+      [cachedPosition()],
+      const IbkrAccountValue(value: 11000, currency: 'USD'),
+      netLiquidationUsd: 11000,
+      cashBalance: const IbkrAccountValue(value: 5500, currency: 'USD'),
+    );
+    final pending = Completer<IbkrPortfolioSnapshot>();
+    await tester.pumpWidget(
+      app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
+    );
+    await tester.pump();
+    expect(find.text('CASH'), findsOneWidget);
+    expect(find.text('50.0%'), findsNWidgets(2));
+    final chart =
+        tester.widget<MarketDonutChart>(find.byType(MarketDonutChart));
+    expect(chart.slices.map((slice) => slice.value), [5500, 5500]);
+  });
+
   testWidgets('mobile portfolio lists positions without a filter field', (
     tester,
   ) async {
@@ -396,6 +425,7 @@ void main() {
       [cachedPosition()],
       const IbkrAccountValue(value: 5500, currency: 'USD'),
       netLiquidationUsd: 5500,
+      cashBalance: const IbkrAccountValue(value: 700, currency: 'USD'),
     );
 
     final reloaded = testAccountManager();
@@ -407,6 +437,10 @@ void main() {
     expect(cached.positions.single.currentPrice, 550);
     expect(cached.netLiquidation?.value, 5500);
     expect(cached.netLiquidationUsd, 5500);
+    expect(
+      cached.cashBalance,
+      const IbkrAccountValue(value: 700, currency: 'USD'),
+    );
   });
 
   testWidgets(
@@ -578,9 +612,8 @@ void main() {
     final pieFinder = find.byType(MarketDonutChart).first;
     final pie = tester.widget<MarketDonutChart>(pieFinder);
     expect(pie.radius, 75);
-    final subtitleBottom = tester
-        .getBottomLeft(find.text('How your stock portfolio is distributed'))
-        .dy;
+    final subtitleBottom =
+        tester.getBottomLeft(find.text('How your portfolio is distributed')).dy;
     final pieTop = tester.getTopLeft(pieFinder).dy;
     expect(pieTop - subtitleBottom, greaterThanOrEqualTo(28));
     expect(tester.takeException(), null);
@@ -857,9 +890,8 @@ void main() {
       find.byKey(const Key('desktop-allocation-compact')),
       findsOneWidget,
     );
-    final subtitleBottom = tester
-        .getBottomLeft(find.text('How your stock portfolio is distributed'))
-        .dy;
+    final subtitleBottom =
+        tester.getBottomLeft(find.text('How your portfolio is distributed')).dy;
     final compactPieFinder = find.byType(MarketDonutChart).first;
     final pieTop = tester.getTopLeft(compactPieFinder).dy;
     expect(pieTop - subtitleBottom, greaterThanOrEqualTo(28));

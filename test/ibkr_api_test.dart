@@ -78,6 +78,44 @@ void main() {
     expect(brokerDated.asOfDate, DateTime(2026, 10, 9));
   });
 
+  test('IBKR cash uses account summary before base ledger', () {
+    final summary = IbkrPortfolioSnapshot.fromJson(const {
+      'account': 'TEST',
+      'summary': {
+        'netliquidation': {'value': 1000, 'currency': 'NZD'},
+        'totalcashvalue': {'amount': 270, 'currency': 'NZD'},
+      },
+      'ledger': {
+        'BASE': {'cashbalance': 100},
+      },
+    });
+    expect(
+      summary.cashBalance,
+      const IbkrAccountValue(value: 270, currency: 'NZD'),
+    );
+    final ledgerOnly = IbkrPortfolioSnapshot.fromJson(const {
+      'account': 'TEST',
+      'summary': {
+        'netliquidation': {'value': 1000, 'currency': 'NZD'},
+      },
+      'ledger': {
+        'BASE': {'cashbalance': 100},
+      },
+    });
+    expect(
+      ledgerOnly.cashBalance,
+      const IbkrAccountValue(value: 100, currency: 'NZD'),
+    );
+    expect(
+      IbkrPortfolioSnapshot.fromJson(const {
+        'account': 'TEST',
+        'summary': {},
+        'ledger': {},
+      }).cashBalance,
+      isNull,
+    );
+  });
+
   test('IBKR client authenticates and parses portfolio snapshots', () async {
     Uri? requestedUri;
     Map<String, String>? requestedHeaders;

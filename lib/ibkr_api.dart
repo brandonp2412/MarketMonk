@@ -370,7 +370,7 @@ class IbkrPortfolioSnapshot {
   /// Returns an account-summary monetary value by its IBKR tag.
   IbkrAccountValue? summaryValue(String tag) {
     final raw = summary[tag.toLowerCase()] ?? summary[tag];
-    if (raw is! Map<String, dynamic>) return null;
+    if (raw is! Map) return null;
     final amount = raw['value'] ?? raw['amount'];
     if (amount is! num) return null;
     return IbkrAccountValue(
@@ -381,6 +381,22 @@ class IbkrPortfolioSnapshot {
 
   /// Account net liquidation in the broker-reported base currency.
   IbkrAccountValue? get netLiquidation => summaryValue('netliquidation');
+
+  IbkrAccountValue? get cashBalance {
+    final reported = summaryValue('totalcashvalue');
+    final currency = reported?.currency.isNotEmpty == true
+        ? reported!.currency
+        : netLiquidation?.currency;
+    if (reported != null && currency != null && reported.value.isFinite) {
+      return IbkrAccountValue(value: reported.value, currency: currency);
+    }
+    if (currency == null || currency.isEmpty) return null;
+    final base = ledger['BASE'] ?? ledger['base'] ?? ledger[currency];
+    if (base is! Map) return null;
+    final amount = base['cashbalance'] ?? base['cashBalance'];
+    if (amount is! num || !amount.toDouble().isFinite) return null;
+    return IbkrAccountValue(value: amount.toDouble(), currency: currency);
+  }
 
   /// Account net liquidation expressed in USD when the broker reports it.
   IbkrAccountValue? get netLiquidationUsd {
@@ -406,8 +422,12 @@ class IbkrPortfolioSnapshot {
         (json['as_of_date'] ?? json['snapshot_date']) as String? ?? '',
       ),
       positions: positions,
-      summary: (json['summary'] as Map<String, dynamic>?) ?? const {},
-      ledger: (json['ledger'] as Map<String, dynamic>?) ?? const {},
+      summary: json['summary'] is Map
+          ? Map<String, dynamic>.from(json['summary'] as Map)
+          : const {},
+      ledger: json['ledger'] is Map
+          ? Map<String, dynamic>.from(json['ledger'] as Map)
+          : const {},
     );
   }
 }

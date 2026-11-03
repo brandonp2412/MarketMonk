@@ -15,6 +15,111 @@ import 'sqlite_test_support.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  testWidgets('cash-only IBKR account appears in mobile holdings',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(400, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.setIbkrConfig(
+      'Default',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'secret-token',
+      ),
+    );
+    await accounts.cachePortfolio(
+      'Default',
+      [],
+      const IbkrAccountValue(value: 100, currency: 'USD'),
+      netLiquidationUsd: 100,
+      cashBalance: const IbkrAccountValue(value: 100, currency: 'USD'),
+    );
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: HoldingsPage(
+            ibkrTradeHistoryLoader: (_) async =>
+                const IbkrTradeHistory(available: false, trades: []),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('ibkr-cash-holding')), findsOneWidget);
+    expect(find.text('100.0% allocation'), findsOneWidget);
+    expect(find.text('No IBKR stocks found'), findsNothing);
+  });
+
+  testWidgets('desktop IBKR holdings show cash separately from stocks',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1400, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.setIbkrConfig(
+      'Default',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'secret-token',
+      ),
+    );
+    await accounts.cachePortfolio(
+      'Default',
+      [
+        Position(
+          symbol: 'AAPL',
+          name: 'Apple',
+          nativeCurrency: 'USD',
+          netShares: 1,
+          avgCost: 65,
+          currentPrice: 75,
+          firstBuyDate: DateTime(2025),
+          lastBuyDate: DateTime(2026),
+        ),
+      ],
+      const IbkrAccountValue(value: 100, currency: 'USD'),
+      netLiquidationUsd: 100,
+      cashBalance: const IbkrAccountValue(value: 25, currency: 'USD'),
+    );
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: HoldingsPage(
+            ibkrTradeHistoryLoader: (_) async =>
+                const IbkrTradeHistory(available: false, trades: []),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('25.0% allocation'), findsOneWidget);
+    final table = tester.widget<DataTable>(find.byType(DataTable));
+    expect(table.rows, hasLength(2));
+    expect(table.rows.first.onSelectChanged, isNull);
+    expect(find.text('Cash · 25.0%'), findsOneWidget);
+  });
+
   testWidgets(
     'mobile long press and search-menu select all retain hidden picks',
     (tester) async {

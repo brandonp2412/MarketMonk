@@ -1,12 +1,41 @@
 import 'package:market_monk/database.dart';
+import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/utils.dart';
+
+double? ibkrCashValueUsd({
+  required IbkrAccountValue? cashBalance,
+  required IbkrAccountValue? netLiquidation,
+  required double? netLiquidationUsd,
+}) {
+  if (cashBalance == null ||
+      cashBalance.currency.isEmpty ||
+      !cashBalance.value.isFinite) return null;
+  if (cashBalance.currency == 'USD') return cashBalance.value;
+  if (netLiquidation?.currency == cashBalance.currency &&
+      netLiquidation!.value.isFinite &&
+      netLiquidation.value > 0 &&
+      netLiquidationUsd != null &&
+      netLiquidationUsd.isFinite &&
+      netLiquidationUsd > 0) {
+    return cashBalance.value * netLiquidationUsd / netLiquidation.value;
+  }
+  final rate = allRatesFromUsd[cashBalance.currency];
+  if (rate == null || !rate.isFinite || rate <= 0) return null;
+  return cashBalance.value / rate;
+}
 
 class PortfolioAllocation {
   final String symbol;
   final String name;
   final double value;
+  final bool isCash;
 
-  const PortfolioAllocation(this.symbol, this.name, this.value);
+  const PortfolioAllocation(
+    this.symbol,
+    this.name,
+    this.value, {
+    this.isCash = false,
+  });
 }
 
 List<PortfolioAllocation>? portfolioAllocationAt({
@@ -14,6 +43,7 @@ List<PortfolioAllocation>? portfolioAllocationAt({
   required List<Trade> trades,
   required Map<String, List<StoredCandle>> candles,
   required DateTime? date,
+  double? cashValueUsd,
 }) {
   if (date == null) {
     return [
@@ -23,6 +53,8 @@ List<PortfolioAllocation>? portfolioAllocationAt({
           position.name,
           position.currentValue,
         ),
+      if (cashValueUsd != null && cashValueUsd.isFinite && cashValueUsd > 0)
+        PortfolioAllocation('CASH', 'Cash', cashValueUsd, isCash: true),
     ];
   }
   final shares = {

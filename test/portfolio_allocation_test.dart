@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/database.dart';
+import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/portfolio_allocation.dart';
 import 'package:market_monk/utils.dart';
 
@@ -45,6 +46,46 @@ Trade trade(String symbol, double quantity, DateTime date) => Trade(
     );
 
 void main() {
+  test(
+      'cash converts from IBKR base currency and never enters historical allocation',
+      () {
+    final usd = ibkrCashValueUsd(
+      cashBalance: const IbkrAccountValue(value: 250, currency: 'NZD'),
+      netLiquidation: const IbkrAccountValue(value: 2000, currency: 'NZD'),
+      netLiquidationUsd: 1000,
+    );
+    expect(usd, 125);
+    final now = portfolioAllocationAt(
+      positions: [holding('A', 5, 25)],
+      trades: const [],
+      candles: const {},
+      date: null,
+      cashValueUsd: usd,
+    )!;
+    expect(now.map((item) => item.value), [125, 125]);
+    expect(now.last.isCash, isTrue);
+    final past = portfolioAllocationAt(
+      positions: [holding('A', 5, 25)],
+      trades: const [],
+      candles: {
+        'A': [candle('A', DateTime(2026, 6, 1), 25)],
+      },
+      date: DateTime(2026, 6, 1),
+      cashValueUsd: usd,
+    )!;
+    expect(past, hasLength(1));
+    expect(past.single.isCash, isFalse);
+    allRatesFromUsd.remove('NZD');
+    expect(
+      ibkrCashValueUsd(
+        cashBalance: const IbkrAccountValue(value: 50, currency: 'NZD'),
+        netLiquidation: null,
+        netLiquidationUsd: null,
+      ),
+      isNull,
+    );
+  });
+
   final date = DateTime(2026, 6, 1);
   final later = DateTime(2026, 6, 2);
 
