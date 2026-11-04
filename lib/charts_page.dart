@@ -165,6 +165,7 @@ class ChartsPageState extends State<ChartsPage>
   int months = 0;
   int days = 0;
   (DateTime, DateTime)? _customChartRange;
+  bool _pickingChartRange = false;
 
   Stream<List<CandleTicker>>? _stockStream;
   late final _intradayData = widget._intradayData ?? IntradayMarketData();
@@ -1929,6 +1930,7 @@ class ChartsPageState extends State<ChartsPage>
     _searchFocus.unfocus();
     setState(() {
       _customChartRange = null;
+      _pickingChartRange = false;
       _mode = _ChartMode.stock;
       _selectedSymbol = symbol;
       _networkLoading = widget.isActive;
@@ -2151,9 +2153,22 @@ class ChartsPageState extends State<ChartsPage>
 
   void _setChartRange(List<DateTime> dates, (int, int)? range) {
     setState(() {
+      _pickingChartRange = false;
       _customChartRange =
           range == null ? null : (dates[range.$1], dates[range.$2]);
     });
+  }
+
+  void _startChartRangePicker() {
+    setState(() {
+      _customChartRange = null;
+      _pickingChartRange = true;
+    });
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.hideCurrentSnackBar();
+    messenger?.showSnackBar(
+      const SnackBar(content: Text('Pick start and end dots')),
+    );
   }
 
   String get _chartPeriodCacheKey {
@@ -2173,6 +2188,7 @@ class ChartsPageState extends State<ChartsPage>
     setState(() {
       _periodTransition = true;
       _customChartRange = null;
+      _pickingChartRange = false;
       _portfolioLoadGeneration++;
       _portfolioLoads.clear();
       _backgroundSyncs.clear();
@@ -2249,6 +2265,7 @@ class ChartsPageState extends State<ChartsPage>
     _yahooApi.cancelPendingSearch();
     setState(() {
       _customChartRange = null;
+      _pickingChartRange = false;
       _mode = _ChartMode.portfolio;
       _searchResults = [];
       _selectedSymbol = null;
@@ -2432,7 +2449,14 @@ class ChartsPageState extends State<ChartsPage>
               icon: const Icon(Icons.more_vert),
               tooltip: context.l10n.text('Show menu'),
               onSelected: (value) {
-                if (value == '__rolling_average__') {
+                if (value == '__filter_range__') {
+                  if (_pickingChartRange) {
+                    setState(() => _pickingChartRange = false);
+                    ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+                  } else {
+                    _startChartRangePicker();
+                  }
+                } else if (value == '__rolling_average__') {
                   runDetachedTask(
                     settings
                         .setShowRollingAverage(!settings.showRollingAverage),
@@ -2462,6 +2486,26 @@ class ChartsPageState extends State<ChartsPage>
                   if (!desktop) const PopupMenuDivider(),
                 ],
                 if (!desktop) ...[
+                  PopupMenuItem<String>(
+                    key: const Key('chart-menu-filter-range'),
+                    value: '__filter_range__',
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _pickingChartRange
+                              ? Icons.close
+                              : Icons.filter_alt_outlined,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          _pickingChartRange
+                              ? 'Cancel picking'
+                              : 'Filter range',
+                        ),
+                      ],
+                    ),
+                  ),
                   PopupMenuItem<String>(
                     key: const Key('chart-menu-rolling-average'),
                     value: '__rolling_average__',
@@ -2834,6 +2878,7 @@ class ChartsPageState extends State<ChartsPage>
           range: _chartRangeFor([
             for (final candle in candles) candle.date.value,
           ]),
+          pickRange: _pickingChartRange,
           onRangeChanged: (range) => _setChartRange(
             [
               for (final candle in candles) candle.date.value,
@@ -3600,6 +3645,7 @@ class ChartsPageState extends State<ChartsPage>
               key: ValueKey('portfolio|$years|$months|$days'),
               range: _chartRangeFor(sortedDates),
               onRangeChanged: (range) => _setChartRange(sortedDates, range),
+              pickRange: _pickingChartRange,
               series: chartSeries,
               candles: chartCandles,
               showCandlesticks: _showCandlesticks,

@@ -19,6 +19,7 @@ void main() {
     List<MarketLineChartSeries>? series,
     ValueChanged<int>? onTooltipIndex,
     TargetPlatform platform = TargetPlatform.linux,
+    bool pickRange = false,
   }) =>
       MaterialApp(
         theme: ThemeData(platform: platform),
@@ -53,6 +54,7 @@ void main() {
                     return 'Column ${mark.index}';
                   },
                   showRollingAverage: showRollingAverage,
+                  pickRange: pickRange,
                   curveLines: false,
                   curveSmoothness: 0,
                 ),
@@ -673,33 +675,61 @@ void main() {
     expect(find.byTooltip('Reset zoom'), findsNothing);
   });
 
-  testWidgets('mobile range filter needs a long press and a second finger',
+  testWidgets('mobile range picker requires arming and two released taps',
       (tester) async {
     await tester.pumpWidget(chart(platform: TargetPlatform.android));
     final first = scene(tester).marks[2].center;
     final last = scene(tester).marks[7].center;
 
-    final early = await tester.startGesture(first);
-    final earlySecond = await tester.startGesture(last);
-    await earlySecond.up();
-    await early.up();
+    await tester.tapAt(first);
+    await tester.tapAt(last);
+    await tester.pump();
+    expect(scene(tester).marks, hasLength(10));
+    expect(find.byKey(const Key('chart-range-start-dot')), findsNothing);
+
+    await tester.pumpWidget(
+      chart(platform: TargetPlatform.android, pickRange: true),
+    );
+    await drag(tester, 2, 7, kind: PointerDeviceKind.touch);
+    expect(find.byKey(const Key('chart-range-start-dot')), findsNothing);
+
+    await tester.tapAt(first);
+    await tester.pump();
+    expect(find.byKey(const Key('chart-range-start-dot')), findsOneWidget);
+    expect(scene(tester).marks, hasLength(10));
+
+    await tester.tapAt(first);
     await tester.pump();
     expect(scene(tester).marks, hasLength(10));
 
-    final primary = await tester.startGesture(first);
-    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 20));
-    final secondary = await tester.startGesture(last);
-    await tester.pump();
-    await secondary.up();
+    await tester.tapAt(last);
     await tester.pump();
     expect(scene(tester).marks.map((mark) => mark.index), [2, 3, 4, 5, 6, 7]);
     expect(find.text('Filtered'), findsOneWidget);
     expect(find.text('Undo'), findsOneWidget);
-    await primary.up();
+    expect(find.byKey(const Key('chart-range-start-dot')), findsNothing);
+
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('Undo'));
     await tester.pump();
     expect(scene(tester).marks, hasLength(10));
+  });
+
+  testWidgets('canceling range mode clears the first selection',
+      (tester) async {
+    await tester.pumpWidget(
+      chart(platform: TargetPlatform.android, pickRange: true),
+    );
+    final first = scene(tester).marks[2].center;
+    await tester.tapAt(first);
+    await tester.pump();
+    expect(find.byKey(const Key('chart-range-start-dot')), findsOneWidget);
+    await tester.pumpWidget(chart(platform: TargetPlatform.android));
+    expect(find.byKey(const Key('chart-range-start-dot')), findsNothing);
+    await tester.pumpWidget(
+      chart(platform: TargetPlatform.android, pickRange: true),
+    );
+    expect(find.byKey(const Key('chart-range-start-dot')), findsNothing);
   });
 
   testWidgets('zoom survives rebuilds and resets when chart data changes',
