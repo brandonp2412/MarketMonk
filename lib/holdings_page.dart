@@ -798,21 +798,6 @@ class HoldingsPageState extends State<HoldingsPage>
           ),
           const PopupMenuDivider(),
         ],
-        PopupMenuItem<String>(
-          onTap: () async {
-            await Navigator.push(
-              context,
-              adaptivePageRoute(
-                context,
-                builder: (_) => const SettingsPage(),
-              ),
-            );
-          },
-          child: ListTile(
-            leading: const Icon(Icons.settings),
-            title: Text(context.l10n.text('Settings')),
-          ),
-        ),
       ],
     );
 
@@ -1040,7 +1025,21 @@ class HoldingsPageState extends State<HoldingsPage>
                     extentOffset: _search.text.length,
                   ),
                   onChanged: (_) => _onSearchChanged(),
-                  trailing: [menuButton],
+                  trailing: [
+                    IconButton(
+                      key: const Key('holdings-settings-button'),
+                      icon: const Icon(Icons.settings_outlined),
+                      tooltip: context.l10n.text('Settings'),
+                      onPressed: () => Navigator.push(
+                        context,
+                        adaptivePageRoute(
+                          context,
+                          builder: (_) => const SettingsPage(),
+                        ),
+                      ),
+                    ),
+                    menuButton,
+                  ],
                 ),
               ),
               Expanded(

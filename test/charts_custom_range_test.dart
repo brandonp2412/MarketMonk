@@ -131,6 +131,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Start from this date'));
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chart-clear-filter')), findsOneWidget);
     expect(periodBorderWidth(), 1);
     expect(scene().marks.map((mark) => mark.index).toSet(), {3, 4, 5});
     for (final line in [0, 1]) {
@@ -163,6 +164,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(scene().marks.map((mark) => mark.index).toSet(), {3, 4, 5});
     expect(periodBorderWidth(), 1);
+    await tester.tap(find.byKey(const Key('chart-clear-filter')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chart-clear-filter')), findsNothing);
+    expect(scene().marks.map((mark) => mark.index).toSet(), {0, 1, 2, 3, 4, 5});
     await tester.tap(find.byKey(const Key('chart-period-2m')));
     await tester.pumpAndSettle();
     expect(periodBorderWidth(), 2);

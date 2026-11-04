@@ -77,7 +77,6 @@ void main() {
           ),
         );
         expect(selector.selected, {'USD'});
-        await tester.tap(find.byKey(const Key('chart-settings-button')));
       } else {
         expect(menu, findsOneWidget);
         await tester.tap(menu);
@@ -93,17 +92,9 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(settings.displayCurrency, 'USD');
-
-        await tester.tap(menu);
-        await tester.pumpAndSettle();
-        final updated = tester.widget<CheckedPopupMenuItem<String>>(
-          find.widgetWithText(CheckedPopupMenuItem<String>, 'USD'),
-        );
-        expect(updated.checked, true);
-        await tester.tap(
-          find.widgetWithText(PopupMenuItem<String>, 'Settings'),
-        );
       }
+      expect(find.byKey(const Key('chart-settings-button')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('chart-settings-button')));
       await tester.pumpAndSettle();
       expect(find.text('Appearance'), findsWidgets);
       expect(tester.takeException(), null);

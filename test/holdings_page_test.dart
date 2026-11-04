@@ -350,9 +350,7 @@ void main() {
 
       for (final hidden in [false, true]) {
         if (width < 1000) {
-          await tester.tap(find.byKey(const Key('holdings-menu-button')));
-          await tester.pumpAndSettle();
-          await tester.tap(find.text('Settings'));
+          await tester.tap(find.byKey(const Key('holdings-settings-button')));
         } else {
           Navigator.of(tester.element(find.byType(HoldingsPage))).push(
             MaterialPageRoute<void>(builder: (_) => const SettingsPage()),
