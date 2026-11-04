@@ -546,6 +546,14 @@ class Database extends _$Database {
         ))
       .go();
 
+  Future<int> deleteTrades(String profileId, Iterable<int> tradeIds) {
+    final ids = tradeIds.toSet();
+    if (ids.isEmpty) return Future.value(0);
+    return (delete(trades)
+          ..where((row) => row.profileId.equals(profileId) & row.id.isIn(ids)))
+        .go();
+  }
+
   Future<int> deleteTradesForSymbols(
     String profileId,
     Iterable<String> symbols,
