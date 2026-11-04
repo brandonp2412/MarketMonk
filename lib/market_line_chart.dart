@@ -267,6 +267,7 @@ class MarketLineChart extends StatelessWidget {
 
   /// Updates the caller-owned [range]; null restores the full period.
   final ValueChanged<(int, int)?>? onRangeChanged;
+  final bool pickRange;
 
   const MarketLineChart({
     super.key,
@@ -292,6 +293,7 @@ class MarketLineChart extends StatelessWidget {
     this.accessibilityValue,
     this.range,
     this.onRangeChanged,
+    this.pickRange = false,
   });
 
   @visibleForTesting
@@ -447,6 +449,7 @@ class MarketLineChart extends StatelessWidget {
       externalSelection: candleSelection,
       range: range,
       onRangeChanged: onRangeChanged,
+      pickRange: pickRange,
     );
   }
 }
@@ -460,6 +463,7 @@ class _MarketLineChartInteraction extends StatefulWidget {
   final ValueNotifier<int?>? externalSelection;
   final (int, int)? range;
   final ValueChanged<(int, int)?>? onRangeChanged;
+  final bool pickRange;
   const _MarketLineChartInteraction({
     required this.renderer,
     required this.rowLabel,
@@ -469,6 +473,7 @@ class _MarketLineChartInteraction extends StatefulWidget {
     this.externalSelection,
     this.range,
     this.onRangeChanged,
+    this.pickRange = false,
   });
 
   @override
@@ -486,10 +491,7 @@ class _MarketLineChartInteractionState
   Offset? _dragStart;
   double? _dragX;
   int? _dragPointer;
-  int? _firstTouchPointer;
-  Offset? _touchRangeStart;
-  int? _secondTouchPointer;
-  double? _touchRangeEndX;
+  int? _tapRangeStart;
   bool _scrubFrameScheduled = false;
   int? _pendingScrubIndex;
 
@@ -502,6 +504,7 @@ class _MarketLineChartInteractionState
   void _setRange((int, int)? range) {
     setState(() {
       _zoom = widget.onRangeChanged == null ? range : null;
+      _tapRangeStart = null;
       _clear();
     });
     widget.onRangeChanged?.call(range);
@@ -514,20 +517,21 @@ class _MarketLineChartInteractionState
         _ => false,
       };
 
-  void _clearTouchRange() {
-    _touchRangeStart = null;
-    _secondTouchPointer = null;
-    _touchRangeEndX = null;
-  }
-
-  void _finishTouchRange(ChartScene scene, double endX) {
-    final start = _touchRangeStart;
-    setState(_clearTouchRange);
-    if (start == null) return;
-    final first = ChartHitTest.nearestIndexAtX(scene, start.dx);
-    final last = ChartHitTest.nearestIndexAtX(scene, endX);
-    if (first == null || last == null || first == last) return;
-    _setRange((min(first, last), max(first, last)));
+  void _pickRangeDot(ChartScene scene, Offset position) {
+    if (!widget.pickRange || !_isMobileChart) return;
+    final bounds = scene.bounds;
+    if (bounds == null ||
+        !Rect.fromLTRB(bounds.left, bounds.top, bounds.right, bounds.bottom)
+            .contains(position)) return;
+    final index = ChartHitTest.nearestIndexAtX(scene, position.dx);
+    if (index == null) return;
+    final start = _tapRangeStart;
+    if (start == null) {
+      setState(() => _tapRangeStart = index);
+      return;
+    }
+    if (start == index) return;
+    _setRange((min(start, index), max(start, index)));
     final messenger = ScaffoldMessenger.maybeOf(context);
     messenger?.hideCurrentSnackBar();
     messenger?.showSnackBar(
@@ -632,10 +636,10 @@ class _MarketLineChartInteractionState
       _dragStart = null;
       _dragX = null;
       _dragPointer = null;
-      _firstTouchPointer = null;
-      _clearTouchRange();
+      _tapRangeStart = null;
       _clear();
     }
+    if (oldWidget.pickRange != widget.pickRange) _tapRangeStart = null;
     if (oldWidget.stickyTooltip != widget.stickyTooltip) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _clear();
@@ -678,8 +682,14 @@ class _MarketLineChartInteractionState
             final renderer = _renderer;
             final scene = renderer.buildScene(size);
             final bounds = scene.bounds;
-            final rangeStartX = _dragStart?.dx ?? _touchRangeStart?.dx;
-            final rangeEndX = _dragX ?? _touchRangeEndX;
+            final startDot = _tapRangeStart == null
+                ? null
+                : scene.marks
+                    .where((mark) => mark.index == _tapRangeStart)
+                    .firstOrNull
+                    ?.center;
+            final rangeStartX = _dragStart?.dx;
+            final rangeEndX = _dragX;
             final rangeLeft =
                 rangeStartX != null && rangeEndX != null && bounds != null
                     ? min(rangeStartX, rangeEndX)
@@ -702,24 +712,6 @@ class _MarketLineChartInteractionState
                 behavior: HitTestBehavior.opaque,
                 onPointerDown: (event) {
                   _activate(event.localPosition, scene);
-                  if (_isMobileChart && event.kind == PointerDeviceKind.touch) {
-                    if (_firstTouchPointer == null) {
-                      _firstTouchPointer = event.pointer;
-                    } else if (_touchRangeStart != null &&
-                        _secondTouchPointer == null &&
-                        bounds != null &&
-                        Rect.fromLTRB(
-                          bounds.left,
-                          bounds.top,
-                          bounds.right,
-                          bounds.bottom,
-                        ).contains(event.localPosition)) {
-                      setState(() {
-                        _secondTouchPointer = event.pointer;
-                        _touchRangeEndX = event.localPosition.dx;
-                      });
-                    }
-                  }
                   if (event.kind == PointerDeviceKind.mouse &&
                       event.buttons == kPrimaryMouseButton &&
                       bounds != null &&
@@ -734,13 +726,6 @@ class _MarketLineChartInteractionState
                   }
                 },
                 onPointerMove: (event) {
-                  if (event.pointer == _secondTouchPointer) {
-                    setState(() {
-                      _touchRangeEndX = event.localPosition.dx;
-                    });
-                    _activate(event.localPosition, scene);
-                    return;
-                  }
                   if (event.pointer != _dragPointer || _dragStart == null)
                     return;
                   setState(() {
@@ -749,13 +734,6 @@ class _MarketLineChartInteractionState
                   _activate(event.localPosition, scene);
                 },
                 onPointerUp: (event) {
-                  if (event.pointer == _secondTouchPointer) {
-                    _finishTouchRange(scene, event.localPosition.dx);
-                  }
-                  if (event.pointer == _firstTouchPointer) {
-                    _firstTouchPointer = null;
-                    setState(_clearTouchRange);
-                  }
                   if (event.pointer == _dragPointer) {
                     final start = _dragStart;
                     if (start != null &&
@@ -785,15 +763,12 @@ class _MarketLineChartInteractionState
                   _dragStart = null;
                   _dragX = null;
                   _dragPointer = null;
-                  if (event.pointer == _firstTouchPointer ||
-                      event.pointer == _secondTouchPointer) {
-                    _firstTouchPointer = null;
-                    _clearTouchRange();
-                  }
                   _clear();
                 }),
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
+                  onTapUp: (details) =>
+                      _pickRangeDot(scene, details.localPosition),
                   onSecondaryTapUp: (details) {
                     final bounds = scene.bounds;
                     if (bounds == null ||
@@ -814,20 +789,8 @@ class _MarketLineChartInteractionState
                       _showStartDateMenu(details.globalPosition, start, end),
                     );
                   },
-                  onLongPressStart: (details) {
-                    _activate(details.localPosition, scene);
-                    if (_isMobileChart &&
-                        _firstTouchPointer != null &&
-                        bounds != null &&
-                        Rect.fromLTRB(
-                          bounds.left,
-                          bounds.top,
-                          bounds.right,
-                          bounds.bottom,
-                        ).contains(details.localPosition)) {
-                      setState(() => _touchRangeStart = details.localPosition);
-                    }
-                  },
+                  onLongPressStart: (details) =>
+                      _activate(details.localPosition, scene),
                   onLongPressMoveUpdate: (details) =>
                       _activateScrub(details.localPosition, scene),
                   onLongPressEnd: (_) {
@@ -863,6 +826,34 @@ class _MarketLineChartInteractionState
                             ),
                           ),
                         ),
+                      if (startDot != null && widget.pickRange) ...[
+                        Positioned(
+                          left: startDot.dx - 1,
+                          top: bounds?.top ?? 0,
+                          width: 2,
+                          height: bounds?.height ?? size.height,
+                          child: IgnorePointer(
+                            child: ColoredBox(
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          left: startDot.dx - 7,
+                          top: startDot.dy - 7,
+                          width: 14,
+                          height: 14,
+                          child: IgnorePointer(
+                            child: DecoratedBox(
+                              key: const Key('chart-range-start-dot'),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primary,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                       if (_range != null)
                         Positioned(
                           top: 0,
