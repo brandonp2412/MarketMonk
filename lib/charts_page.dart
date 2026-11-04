@@ -18,6 +18,7 @@ import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/exchange_rate_service.dart';
 import 'package:market_monk/ibkr_api.dart';
+import 'package:market_monk/ibkr_cash.dart';
 import 'package:market_monk/intraday_market_data.dart';
 import 'package:market_monk/intraday_portfolio.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
@@ -446,11 +447,14 @@ class ChartsPageState extends State<ChartsPage>
             );
             final currentValue = snapshot.netLiquidation;
             final currentValueUsd = snapshot.netLiquidationUsd?.value;
+            final cash = resolveIbkrCash(snapshot);
             await accountManager.cachePortfolio(
               accountName,
               positions,
               snapshot.netLiquidation,
               netLiquidationUsd: currentValueUsd,
+              cashBalance: cash?.reported,
+              cashUsd: cash?.usd,
               asOfDate: snapshot.asOfDate,
             );
             return _LoadedChartPortfolio(

@@ -89,6 +89,9 @@ class CachedPortfolioData {
   final List<Position> positions;
   final IbkrAccountValue? netLiquidation;
   final double? netLiquidationUsd;
+  final IbkrAccountValue? cashBalance;
+  final double? cashUsd;
+  final bool cashChecked;
   final DateTime? asOfDate;
   final DateTime cachedAt;
 
@@ -96,6 +99,9 @@ class CachedPortfolioData {
     required this.positions,
     required this.netLiquidation,
     this.netLiquidationUsd,
+    this.cashBalance,
+    this.cashUsd,
+    this.cashChecked = true,
     this.asOfDate,
     required this.cachedAt,
   });
@@ -125,12 +131,21 @@ class CachedPortfolioData {
                 'currency': netLiquidation!.currency,
               },
         'netLiquidationUsd': netLiquidationUsd,
+        'cashBalance': cashBalance == null
+            ? null
+            : {
+                'value': cashBalance!.value,
+                'currency': cashBalance!.currency,
+              },
+        'cashUsd': cashUsd,
+        'cashChecked': cashChecked,
         'asOfDate': asOfDate?.toIso8601String(),
         'cachedAt': cachedAt.toIso8601String(),
       };
 
   factory CachedPortfolioData.fromJson(Map<String, dynamic> json) {
     final rawNetLiquidation = json['netLiquidation'];
+    final rawCash = json['cashBalance'];
     return CachedPortfolioData(
       positions: (json['positions'] as List<dynamic>? ?? const [])
           .whereType<Map<String, dynamic>>()
@@ -166,6 +181,14 @@ class CachedPortfolioData {
             )
           : null,
       netLiquidationUsd: (json['netLiquidationUsd'] as num?)?.toDouble(),
+      cashBalance: rawCash is Map<String, dynamic>
+          ? IbkrAccountValue(
+              value: (rawCash['value'] as num?)?.toDouble() ?? 0,
+              currency: rawCash['currency'] as String? ?? '',
+            )
+          : null,
+      cashUsd: (json['cashUsd'] as num?)?.toDouble(),
+      cashChecked: json['cashChecked'] == true,
       asOfDate: DateTime.tryParse(json['asOfDate'] as String? ?? ''),
       cachedAt: DateTime.tryParse(json['cachedAt'] as String? ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),
@@ -472,6 +495,8 @@ class AccountManager extends ChangeNotifier {
     List<Position> positions,
     IbkrAccountValue? netLiquidation, {
     double? netLiquidationUsd,
+    IbkrAccountValue? cashBalance,
+    double? cashUsd,
     DateTime? asOfDate,
   }) =>
       _serializeStorage(
@@ -480,6 +505,8 @@ class AccountManager extends ChangeNotifier {
           positions,
           netLiquidation,
           netLiquidationUsd: netLiquidationUsd,
+          cashBalance: cashBalance,
+          cashUsd: cashUsd,
           asOfDate: asOfDate,
         ),
       );
@@ -489,6 +516,8 @@ class AccountManager extends ChangeNotifier {
     List<Position> positions,
     IbkrAccountValue? netLiquidation, {
     double? netLiquidationUsd,
+    IbkrAccountValue? cashBalance,
+    double? cashUsd,
     DateTime? asOfDate,
   }) async {
     final profileId = _profileIdsByName[name];
@@ -497,6 +526,8 @@ class AccountManager extends ChangeNotifier {
       positions: List.unmodifiable(positions),
       netLiquidation: netLiquidation,
       netLiquidationUsd: netLiquidationUsd,
+      cashBalance: cashBalance,
+      cashUsd: cashUsd,
       asOfDate: asOfDate,
       cachedAt: DateTime.now(),
     );

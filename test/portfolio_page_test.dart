@@ -146,6 +146,32 @@ void main() {
         child: MaterialApp(home: page),
       );
 
+  testWidgets('IBKR cash appears in mobile portfolio and donut',
+      (tester) async {
+    await seedTestSqlite({});
+    final accounts = await configuredAccounts();
+    allRatesFromUsd['NZD'] = 1.7;
+    await accounts.cachePortfolio(
+      'Default',
+      [cachedPosition()],
+      const IbkrAccountValue(value: 9400, currency: 'NZD'),
+      cashBalance: const IbkrAccountValue(value: 17, currency: 'NZD'),
+      cashUsd: 10,
+    );
+    final pending = Completer<IbkrPortfolioSnapshot>();
+    await tester.pumpWidget(
+      app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
+    );
+    await tester.pump();
+    expect(find.byKey(const Key('portfolio-ibkr-cash')), findsOneWidget);
+    expect(find.text('Cash'), findsOneWidget);
+    final donut = tester.widget<MarketDonutChart>(
+      find.byType(MarketDonutChart),
+    );
+    expect(donut.slices.length, 2);
+    expect(donut.slices.any((slice) => slice.label == 'CASH'), isTrue);
+  });
+
   testWidgets('portfolio shows a spinner while uncached remote data loads', (
     tester,
   ) async {

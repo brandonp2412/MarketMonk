@@ -16,6 +16,7 @@ import 'package:market_monk/database.dart';
 import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
+import 'package:market_monk/ibkr_cash.dart';
 import 'package:market_monk/ibkr_cash_out_pnl.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
@@ -49,12 +50,16 @@ class _LoadedPortfolio {
   final List<Position> positions;
   final IbkrAccountValue? netLiquidation;
   final double? netLiquidationUsd;
+  final IbkrAccountValue? cashBalance;
+  final double? cashUsd;
   final DateTime? asOfDate;
 
   const _LoadedPortfolio({
     required this.positions,
     required this.netLiquidation,
     required this.netLiquidationUsd,
+    this.cashBalance,
+    this.cashUsd,
     this.asOfDate,
   });
 }
@@ -457,7 +462,8 @@ class PortfolioPageState extends State<PortfolioPage>
     final cacheFresh = accounts.isPortfolioCacheFresh(accountName);
     final shouldUseCache = cached != null &&
         !forceRefresh &&
-        (!refreshIfStale || cacheFresh || !config.isConfigured);
+        (!refreshIfStale || cacheFresh || !config.isConfigured) &&
+        cached.cashChecked;
     if (shouldUseCache) {
       return _LoadedPortfolio(
         positions: cached.positions,
@@ -499,10 +505,13 @@ class PortfolioPageState extends State<PortfolioPage>
       }
     });
     cacheIbkrAccountExchangeRate(snapshot);
+    final cash = resolveIbkrCash(snapshot);
     return _LoadedPortfolio(
       positions: await computeIbkrPositions(snapshot.positions, trades),
       netLiquidation: snapshot.netLiquidation,
       netLiquidationUsd: snapshot.netLiquidationUsd?.value,
+      cashBalance: cash?.reported,
+      cashUsd: cash?.usd,
       asOfDate: snapshot.asOfDate,
     );
   }
@@ -581,7 +590,10 @@ class PortfolioPageState extends State<PortfolioPage>
     final cacheWasFresh = accounts.isPortfolioCacheFresh(accountName);
     final willFetchIbkr = config.enabled &&
         config.isConfigured &&
-        (forceRefresh || cachedBefore == null || !cacheWasFresh);
+        (forceRefresh ||
+            cachedBefore == null ||
+            !cacheWasFresh ||
+            !cachedBefore.cashChecked);
     if (_loadError != null && mounted) {
       setState(() => _loadError = null);
     }
@@ -606,6 +618,8 @@ class PortfolioPageState extends State<PortfolioPage>
           loaded.positions,
           loaded.netLiquidation,
           netLiquidationUsd: loaded.netLiquidationUsd,
+          cashBalance: loaded.cashBalance,
+          cashUsd: loaded.cashUsd,
           asOfDate: loaded.asOfDate,
         );
       }
@@ -1005,13 +1019,16 @@ class PortfolioPageState extends State<PortfolioPage>
     final positions = snap.data?.positions ?? _positions;
     final netLiquidation = snap.data?.netLiquidation ?? _netLiquidation;
     final accounts = context.watch<AccountManager>();
+    final cashBalance =
+        snap.data?.cashBalance ?? accounts.portfolioCacheFor()?.cashBalance;
+    final cashUsd = snap.data?.cashUsd ?? accounts.portfolioCacheFor()?.cashUsd;
     final performance = accounts.ibkrPerformanceCacheFor(
       accounts.activeAccount,
       '1Y',
     );
     final hasLoadError = snap.hasError || _loadError != null;
 
-    if (hasLoadError && positions.isEmpty) {
+    if (hasLoadError && positions.isEmpty && cashBalance == null) {
       return _refreshableState(_buildLoadError(context));
     }
 
@@ -1035,7 +1052,7 @@ class PortfolioPageState extends State<PortfolioPage>
         });
       });
     }
-    if (positions.isEmpty) {
+    if (positions.isEmpty && cashBalance == null) {
       final ibkrEnabled =
           context.watch<AccountManager>().ibkrConfigFor().enabled;
       return _refreshableState(
@@ -1096,7 +1113,11 @@ class PortfolioPageState extends State<PortfolioPage>
             (totalCost > 0 ? (costBasisGain / totalCost) * 100 : 0.0)
         : historicalCashOut?.gainPct ?? double.nan;
 
-    final allocation = _allocationAt(positions, _period) ?? [];
+    final allocation = [
+      ...?_allocationAt(positions, _period),
+      if (_returnCutoff == null && cashUsd != null && cashUsd > 0)
+        PortfolioAllocation('CASH', 'IBKR cash', cashUsd),
+    ];
     final allocationTotal =
         allocation.fold<double>(0, (sum, holding) => sum + holding.value);
     final historicalNav = cutoff == null || performance == null
@@ -1147,6 +1168,7 @@ class PortfolioPageState extends State<PortfolioPage>
         selectedIndex: selectedIndex,
         displayTotal: displayTotal,
         totalLabel: totalLabel,
+        cashBalance: _returnCutoff == null ? cashBalance : null,
         totalGain: totalGain,
         totalGainPct: totalGainPct,
         isCashOut: cutoff == null ? cashOutSummary != null : true,
@@ -1186,6 +1208,22 @@ class PortfolioPageState extends State<PortfolioPage>
               ),
             ),
           ),
+          if (_returnCutoff == null && cashBalance != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: ListTile(
+                  key: const Key('portfolio-ibkr-cash'),
+                  leading: const Icon(Icons.account_balance_wallet_outlined),
+                  title: const Text('Cash'),
+                  subtitle: const Text('Interactive Brokers'),
+                  trailing: Text(
+                    formatIbkrReportedCash(cashBalance),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ),
+            ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(36, 12, 36, 8),
@@ -1347,6 +1385,7 @@ class PortfolioPageState extends State<PortfolioPage>
     required int? selectedIndex,
     required String displayTotal,
     required String totalLabel,
+    IbkrAccountValue? cashBalance,
     required double totalGain,
     required double totalGainPct,
     required bool isCashOut,
@@ -1518,7 +1557,9 @@ class PortfolioPageState extends State<PortfolioPage>
                     _DesktopPortfolioMetric(
                       label: context.l10n.text('Market value'),
                       value: fmtCurrency(allocationTotal),
-                      detail: context.l10n.text('Open stock positions'),
+                      detail: cashBalance == null
+                          ? context.l10n.text('Open stock positions')
+                          : 'Cash · ${formatIbkrReportedCash(cashBalance)}',
                       icon: Icons.show_chart_rounded,
                     ),
                     _DesktopPortfolioMetric(
@@ -1871,7 +1912,9 @@ class _DesktopAllocationRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return DesktopContextMenu(
-      actionsBuilder: () => tickerContextActions(context, symbol),
+      actionsBuilder: () => symbol == 'CASH'
+          ? Future.value(<DesktopMenuAction>[])
+          : tickerContextActions(context, symbol),
       copyText:
           '$symbol $name ${fmtCurrency(value)} (${allocationPct.toStringAsFixed(2)}%)',
       copyLabel: context.l10n.text('Copy allocation'),
@@ -2144,7 +2187,9 @@ class _LegendTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DesktopContextMenu(
-      actionsBuilder: () => tickerContextActions(context, symbol),
+      actionsBuilder: () => symbol == 'CASH'
+          ? Future.value(<DesktopMenuAction>[])
+          : tickerContextActions(context, symbol),
       copyText:
           '$symbol $name ${fmtCurrency(value)} (${allocationPct.toStringAsFixed(2)}%)',
       copyLabel: context.l10n.text('Copy allocation'),
@@ -2166,7 +2211,11 @@ class _LegendTile extends StatelessWidget {
             Text(
               fmtCurrency(value),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: changePct >= 0 ? Colors.green : Colors.redAccent,
+                    color: !changePct.isFinite
+                        ? Theme.of(context).colorScheme.onSurfaceVariant
+                        : changePct >= 0
+                            ? Colors.green
+                            : Colors.redAccent,
                   ),
             ),
             Text(
@@ -2175,7 +2224,11 @@ class _LegendTile extends StatelessWidget {
                   : '—',
               style: TextStyle(
                 fontSize: 13,
-                color: changePct >= 0 ? Colors.green : Colors.redAccent,
+                color: !changePct.isFinite
+                    ? Theme.of(context).colorScheme.onSurfaceVariant
+                    : changePct >= 0
+                        ? Colors.green
+                        : Colors.redAccent,
               ),
             ),
           ],
