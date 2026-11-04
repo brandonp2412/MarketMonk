@@ -146,8 +146,7 @@ void main() {
         child: MaterialApp(home: page),
       );
 
-  testWidgets('IBKR cash stays in the mobile legend and donut',
-      (tester) async {
+  testWidgets('IBKR cash stays in the mobile legend and donut', (tester) async {
     await seedTestSqlite({});
     final accounts = await configuredAccounts();
     allRatesFromUsd['NZD'] = 1.7;
