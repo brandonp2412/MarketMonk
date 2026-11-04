@@ -463,6 +463,7 @@ class PortfolioPageState extends State<PortfolioPage>
     final cached = accounts.portfolioCacheFor(accountName);
     final cacheFresh = accounts.isPortfolioCacheFresh(accountName);
     final shouldUseCache = cached != null &&
+        cached.hasCashSnapshot &&
         !forceRefresh &&
         (!refreshIfStale || cacheFresh || !config.isConfigured);
     if (shouldUseCache) {
@@ -513,7 +514,7 @@ class PortfolioPageState extends State<PortfolioPage>
       positions: await computeIbkrPositions(snapshot.positions, trades),
       netLiquidation: snapshot.netLiquidation,
       netLiquidationUsd: snapshot.netLiquidationUsd?.value,
-      cashBalance: snapshot.cashBalance,
+      cashBalance: ibkrCashBalanceForCache(snapshot),
       asOfDate: snapshot.asOfDate,
     );
   }
@@ -592,7 +593,10 @@ class PortfolioPageState extends State<PortfolioPage>
     final cacheWasFresh = accounts.isPortfolioCacheFresh(accountName);
     final willFetchIbkr = config.enabled &&
         config.isConfigured &&
-        (forceRefresh || cachedBefore == null || !cacheWasFresh);
+        (forceRefresh ||
+            cachedBefore == null ||
+            !cachedBefore.hasCashSnapshot ||
+            !cacheWasFresh);
     if (_loadError != null && mounted) {
       setState(() => _loadError = null);
     }
@@ -1030,7 +1034,7 @@ class PortfolioPageState extends State<PortfolioPage>
                 accounts.portfolioCacheFor()?.netLiquidationUsd,
           )
         : null;
-    final hasCash = cashValueUsd != null && cashValueUsd > 0;
+    final hasCash = cashValueUsd != null;
     final performance = accounts.ibkrPerformanceCacheFor(
       accounts.activeAccount,
       '1Y',
@@ -1143,18 +1147,33 @@ class PortfolioPageState extends State<PortfolioPage>
         : cutoff != null && historicalNav == null
             ? 'Holdings value'
             : 'Account value';
-    final sorted = [...allocation]..sort((a, b) => b.value.compareTo(a.value));
+    final cashPercent = cashValueUsd == null
+        ? null
+        : totalValue + cashValueUsd > 0
+            ? cashValueUsd / (totalValue + cashValueUsd) * 100
+            : 0.0;
+    final sorted = [...allocation]..sort((a, b) {
+        if (a.isCash != b.isCash) return a.isCash ? -1 : 1;
+        return b.value.compareTo(a.value);
+      });
     final currentBySymbol = {
       for (final position in positions) position.symbol: position,
     };
 
-    final stockColors =
-        _buildColors(context, [for (final position in sorted) position.symbol]);
+    final stockSymbols = [
+      for (final position in sorted)
+        if (!position.isCash) position.symbol,
+    ];
+    final stockColors = _buildColors(context, stockSymbols);
+    final stockColorsBySymbol = {
+      for (var index = 0; index < stockSymbols.length; index++)
+        stockSymbols[index]: stockColors[index],
+    };
     final colors = [
-      for (var index = 0; index < sorted.length; index++)
-        sorted[index].isCash
-            ? Theme.of(context).colorScheme.outline
-            : stockColors[index],
+      for (final position in sorted)
+        position.isCash
+            ? Theme.of(context).colorScheme.tertiary
+            : stockColorsBySymbol[position.symbol]!,
     ];
     // Holdings can change while this page is kept alive (for example, after
     // switching accounts). Do not use a selection from the previous list.
@@ -1184,6 +1203,8 @@ class PortfolioPageState extends State<PortfolioPage>
         totalLabel: totalLabel,
         totalGain: totalGain,
         totalGainPct: totalGainPct,
+        cashValueUsd: cutoff == null ? cashValueUsd : null,
+        cashPercent: cutoff == null ? cashPercent : null,
         isCashOut: cutoff == null ? cashOutSummary != null : true,
         hasRefreshWarning: hasLoadError,
       );
@@ -1221,6 +1242,26 @@ class PortfolioPageState extends State<PortfolioPage>
               ),
             ),
           ),
+          if (cutoff == null && cashValueUsd != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: Card(
+                  child: ListTile(
+                    key: const Key('portfolio-cash-summary'),
+                    dense: true,
+                    leading: const Icon(Icons.account_balance_wallet_outlined),
+                    title: Text(context.l10n.text('Cash')),
+                    subtitle:
+                        Text('${cashPercent!.toStringAsFixed(2)}% allocation'),
+                    trailing: Text(
+                      fmtCurrency(cashValueUsd),
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(36, 12, 36, 8),
@@ -1385,6 +1426,8 @@ class PortfolioPageState extends State<PortfolioPage>
     required String totalLabel,
     required double totalGain,
     required double totalGainPct,
+    required double? cashValueUsd,
+    required double? cashPercent,
     required bool isCashOut,
     required bool hasRefreshWarning,
   }) {
@@ -1554,7 +1597,11 @@ class PortfolioPageState extends State<PortfolioPage>
                     _DesktopPortfolioMetric(
                       label: context.l10n.text('Market value'),
                       value: fmtCurrency(allocationTotal),
-                      detail: context.l10n.text('Open stock positions'),
+                      detail: context.l10n.text(
+                        cashValueUsd == null
+                            ? 'Open stock positions'
+                            : 'Stocks + cash',
+                      ),
                       icon: Icons.show_chart_rounded,
                     ),
                     _DesktopPortfolioMetric(
@@ -1577,12 +1624,21 @@ class PortfolioPageState extends State<PortfolioPage>
                           ? Icons.trending_up_rounded
                           : Icons.trending_down_rounded,
                     ),
-                    _DesktopPortfolioMetric(
-                      label: context.l10n.text('Positions'),
-                      value: positions.length.toString(),
-                      detail: context.l10n.text('Currently open'),
-                      icon: Icons.view_list_outlined,
-                    ),
+                    if (cashValueUsd != null)
+                      _DesktopPortfolioMetric(
+                        label: context.l10n.text('Cash'),
+                        value: fmtCurrency(cashValueUsd),
+                        detail:
+                            '${cashPercent!.toStringAsFixed(2)}% allocation',
+                        icon: Icons.account_balance_wallet_outlined,
+                      )
+                    else
+                      _DesktopPortfolioMetric(
+                        label: context.l10n.text('Positions'),
+                        value: positions.length.toString(),
+                        detail: context.l10n.text('Currently open'),
+                        icon: Icons.view_list_outlined,
+                      ),
                   ],
                 ),
                 const SizedBox(height: 16),

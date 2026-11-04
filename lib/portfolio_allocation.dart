@@ -2,6 +2,18 @@ import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/utils.dart';
 
+IbkrAccountValue? ibkrCashBalanceForCache(IbkrPortfolioSnapshot snapshot) {
+  final cash = snapshot.cashBalance;
+  if (cash == null || cash.currency == 'USD') return cash;
+  if (snapshot.netLiquidation?.currency != cash.currency) return cash;
+  final rate = snapshot.usdExchangeRateInBase;
+  if (rate == null) return cash;
+  return IbkrAccountValue(value: cash.value / rate, currency: 'USD');
+}
+
+String formatCashAllocationPercent(double percent) =>
+    percent.abs() < 1 ? percent.toStringAsFixed(2) : percent.toStringAsFixed(1);
+
 double? ibkrCashValueUsd({
   required IbkrAccountValue? cashBalance,
   required IbkrAccountValue? netLiquidation,

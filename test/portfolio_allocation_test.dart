@@ -46,6 +46,67 @@ Trade trade(String symbol, double quantity, DateTime date) => Trade(
     );
 
 void main() {
+  test('tiny allocation percentages remain readable', () {
+    expect(formatCashAllocationPercent(0.02), '0.02');
+    expect(formatCashAllocationPercent(25), '25.0');
+    expect(formatCashAllocationPercent(100), '100.0');
+  });
+
+  test('broker USD exchange rate preserves tiny cash balances', () {
+    final savedRates = Map<String, double>.from(allRatesFromUsd);
+    addTearDown(() => allRatesFromUsd = savedRates);
+    for (final summary in [
+      const {
+        'netliquidation': {'value': 100000.0, 'currency': 'NZD'},
+        'totalcashvalue': {'value': 20.0, 'currency': 'NZD'},
+        'netliquidationbycurrency:usd': {'value': 1.0, 'currency': 'USD'},
+      },
+      const {
+        'netliquidation': {'amount': 100000.0, 'currency': 'NZD'},
+        'totalcashvalue': {'amount': 20.0, 'currency': 'NZD'},
+        'netliquidationbycurrency:usd': {'amount': 1.0, 'currency': 'USD'},
+      },
+    ]) {
+      final snapshot = IbkrPortfolioSnapshot(
+        account: 'test',
+        positions: const [],
+        summary: summary,
+        ledger: const {
+          'BASE': {'cashbalance': 20.0},
+          'USD': {'exchangerate': 1.8},
+        },
+      );
+      cacheIbkrAccountExchangeRate(snapshot);
+      expect(allRatesFromUsd['NZD'], 1.8);
+      final cachedCash = ibkrCashBalanceForCache(snapshot)!;
+      expect(cachedCash.currency, 'USD');
+      expect(cachedCash.value, closeTo(20 / 1.8, 0.0001));
+      expect(
+        ibkrCashValueUsd(
+          cashBalance: cachedCash,
+          netLiquidation: snapshot.netLiquidation,
+          netLiquidationUsd: null,
+        ),
+        closeTo(20 / 1.8, 0.0001),
+      );
+    }
+  });
+
+  test('missing broker FX keeps native cash for later conversion', () {
+    final snapshot = IbkrPortfolioSnapshot(
+      account: 'test',
+      positions: const [],
+      summary: const {
+        'totalcashvalue': {'value': 25.0, 'currency': 'NZD'},
+        'netliquidation': {'value': 1000.0, 'currency': 'NZD'},
+      },
+      ledger: const {},
+    );
+    final cash = ibkrCashBalanceForCache(snapshot)!;
+    expect(cash.currency, 'NZD');
+    expect(cash.value, 25);
+  });
+
   test(
       'cash converts from IBKR base currency and never enters historical allocation',
       () {

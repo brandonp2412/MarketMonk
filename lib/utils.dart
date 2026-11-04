@@ -203,13 +203,15 @@ double candleCentDivisor(StoredCandle candle) {
 void cacheIbkrAccountExchangeRate(IbkrPortfolioSnapshot snapshot) {
   final base = snapshot.netLiquidation;
   final usd = snapshot.netLiquidationUsd;
-  if (base == null ||
-      usd == null ||
-      base.currency.isEmpty ||
-      base.currency == 'USD' ||
-      usd.value == 0) {
+  if (base == null || base.currency.isEmpty || base.currency == 'USD') {
     return;
   }
+  final brokerRate = snapshot.usdExchangeRateInBase;
+  if (brokerRate != null) {
+    allRatesFromUsd[base.currency] = brokerRate;
+    return;
+  }
+  if (usd == null || usd.value == 0) return;
   allRatesFromUsd[base.currency] = base.value / usd.value;
 }
 

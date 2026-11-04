@@ -113,6 +113,20 @@ PortfolioPage _portfolioPage({
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('legacy cached IBKR portfolios get a one-time cash refresh', () {
+    final cached = CachedPortfolioData(
+      positions: const [],
+      netLiquidation: null,
+      cachedAt: DateTime.now(),
+    );
+    final oldJson = cached.toJson()..remove('hasCashSnapshot');
+    expect(CachedPortfolioData.fromJson(oldJson).hasCashSnapshot, isFalse);
+    expect(
+      CachedPortfolioData.fromJson(cached.toJson()).hasCashSnapshot,
+      isTrue,
+    );
+  });
+
   Position cachedPosition({String name = 'VANGUARD S&P 500 ETF'}) => Position(
         symbol: 'VOO',
         name: name,
@@ -243,10 +257,42 @@ void main() {
     );
     await tester.pump();
     expect(find.text('CASH'), findsOneWidget);
+    expect(find.byKey(const Key('portfolio-cash-summary')), findsOneWidget);
+    expect(find.text('50.00% allocation'), findsOneWidget);
     expect(find.text('50.0%'), findsNWidgets(2));
     final chart =
         tester.widget<MarketDonutChart>(find.byType(MarketDonutChart));
     expect(chart.slices.map((slice) => slice.value), [5500, 5500]);
+  });
+
+  testWidgets('tiny cash balance is explicit above the allocation chart', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(700, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({});
+    final accounts = await configuredAccounts();
+    await accounts.cachePortfolio(
+      'Default',
+      [cachedPosition()],
+      const IbkrAccountValue(value: 5501.1, currency: 'USD'),
+      netLiquidationUsd: 5501.1,
+      cashBalance: const IbkrAccountValue(value: 1.1, currency: 'USD'),
+    );
+    final pending = Completer<IbkrPortfolioSnapshot>();
+    await tester.pumpWidget(
+      app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
+    );
+    await tester.pump();
+    expect(find.byKey(const Key('portfolio-cash-summary')), findsOneWidget);
+    expect(find.text('0.02% allocation'), findsOneWidget);
+    final chart =
+        tester.widget<MarketDonutChart>(find.byType(MarketDonutChart));
+    expect(chart.slices.first.value, 1.1);
   });
 
   testWidgets('mobile portfolio lists positions without a filter field', (

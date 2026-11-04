@@ -398,6 +398,20 @@ class IbkrPortfolioSnapshot {
     return IbkrAccountValue(value: amount.toDouble(), currency: currency);
   }
 
+  double? get usdExchangeRateInBase {
+    final baseCurrency = netLiquidation?.currency;
+    if (baseCurrency == null || baseCurrency.isEmpty) return null;
+    if (baseCurrency == 'USD') return 1;
+    final usdLedger = ledger['USD'] ?? ledger['usd'];
+    final rawRate = usdLedger is Map
+        ? usdLedger['exchangerate'] ?? usdLedger['exchangeRate']
+        : null;
+    final rate = rawRate is num
+        ? rawRate.toDouble()
+        : double.tryParse(rawRate?.toString() ?? '');
+    return rate != null && rate.isFinite && rate > 0 ? rate : null;
+  }
+
   /// Account net liquidation expressed in USD when the broker reports it.
   IbkrAccountValue? get netLiquidationUsd {
     final explicitUsd = summaryValue('netliquidationbycurrency:usd');

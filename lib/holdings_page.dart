@@ -465,7 +465,7 @@ class HoldingsPageState extends State<HoldingsPage>
         positions,
         snapshot.netLiquidation,
         netLiquidationUsd: snapshot.netLiquidationUsd?.value,
-        cashBalance: snapshot.cashBalance,
+        cashBalance: ibkrCashBalanceForCache(snapshot),
         asOfDate: snapshot.asOfDate,
       );
       return positions;
@@ -1302,7 +1302,7 @@ class HoldingsPageState extends State<HoldingsPage>
                 value: fmtCurrency(totalValue),
                 detail: cash == null
                     ? null
-                    : 'Cash ${fmtCurrency(cash.valueUsd)} · ${cash.percent.toStringAsFixed(1)}% allocation',
+                    : 'Cash ${fmtCurrency(cash.valueUsd)} · ${formatCashAllocationPercent(cash.percent)}% allocation',
               ),
               _desktopMetric(
                 context,
@@ -1473,7 +1473,7 @@ class HoldingsPageState extends State<HoldingsPage>
                                               ),
                                               const SizedBox(width: 8),
                                               Text(
-                                                'Cash · ${cash.percent.toStringAsFixed(1)}%',
+                                                'Cash · ${formatCashAllocationPercent(cash.percent)}%',
                                               ),
                                             ],
                                           ),
@@ -1808,7 +1808,9 @@ class HoldingsPageState extends State<HoldingsPage>
               key: const Key('ibkr-cash-holding'),
               leading: const Icon(Icons.account_balance_wallet_outlined),
               title: Text(context.l10n.text('Cash')),
-              subtitle: Text('${cash.percent.toStringAsFixed(1)}% allocation'),
+              subtitle: Text(
+                '${formatCashAllocationPercent(cash.percent)}% allocation',
+              ),
               trailing: Text(fmtCurrency(cash.valueUsd)),
             );
           }

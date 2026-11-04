@@ -90,6 +90,7 @@ class CachedPortfolioData {
   final IbkrAccountValue? netLiquidation;
   final double? netLiquidationUsd;
   final IbkrAccountValue? cashBalance;
+  final bool hasCashSnapshot;
   final DateTime? asOfDate;
   final DateTime cachedAt;
 
@@ -98,6 +99,7 @@ class CachedPortfolioData {
     required this.netLiquidation,
     this.netLiquidationUsd,
     this.cashBalance,
+    this.hasCashSnapshot = true,
     this.asOfDate,
     required this.cachedAt,
   });
@@ -130,6 +132,7 @@ class CachedPortfolioData {
         'cashBalance': cashBalance == null
             ? null
             : {'value': cashBalance!.value, 'currency': cashBalance!.currency},
+        'hasCashSnapshot': hasCashSnapshot,
         'asOfDate': asOfDate?.toIso8601String(),
         'cachedAt': cachedAt.toIso8601String(),
       };
@@ -172,6 +175,7 @@ class CachedPortfolioData {
             )
           : null,
       netLiquidationUsd: (json['netLiquidationUsd'] as num?)?.toDouble(),
+      hasCashSnapshot: json['hasCashSnapshot'] == true,
       cashBalance: rawCashBalance is Map<String, dynamic> &&
               rawCashBalance['value'] is num
           ? IbkrAccountValue(
