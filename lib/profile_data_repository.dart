@@ -106,6 +106,9 @@ class ProfileDataRepository {
   Future<int> deleteTrade(String profileId, int tradeId) =>
       database.deleteTrade(profileId, tradeId);
 
+  Future<int> deleteTrades(String profileId, Iterable<int> tradeIds) =>
+      database.deleteTrades(profileId, tradeIds);
+
   Future<int> deleteTradesForSymbols(
     String profileId,
     Iterable<String> symbols,
