@@ -146,7 +146,7 @@ void main() {
         child: MaterialApp(home: page),
       );
 
-  testWidgets('IBKR cash appears in mobile portfolio and donut',
+  testWidgets('IBKR cash stays in the mobile legend and donut',
       (tester) async {
     await seedTestSqlite({});
     final accounts = await configuredAccounts();
@@ -163,13 +163,19 @@ void main() {
       app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
     );
     await tester.pump();
-    expect(find.byKey(const Key('portfolio-ibkr-cash')), findsOneWidget);
-    expect(find.text('Cash'), findsOneWidget);
+    expect(find.byKey(const Key('portfolio-ibkr-cash')), findsNothing);
+    expect(find.text('Cash'), findsNothing);
     final donut = tester.widget<MarketDonutChart>(
       find.byType(MarketDonutChart),
     );
     expect(donut.slices.length, 2);
     expect(donut.slices.any((slice) => slice.label == 'CASH'), isTrue);
+    await tester.scrollUntilVisible(
+      find.text('CASH'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('CASH'), findsOneWidget);
   });
 
   testWidgets('portfolio shows a spinner while uncached remote data loads', (

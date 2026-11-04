@@ -1208,22 +1208,6 @@ class PortfolioPageState extends State<PortfolioPage>
               ),
             ),
           ),
-          if (_returnCutoff == null && cashBalance != null)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                child: ListTile(
-                  key: const Key('portfolio-ibkr-cash'),
-                  leading: const Icon(Icons.account_balance_wallet_outlined),
-                  title: const Text('Cash'),
-                  subtitle: const Text('Interactive Brokers'),
-                  trailing: Text(
-                    formatIbkrReportedCash(cashBalance),
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-              ),
-            ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(36, 12, 36, 8),
