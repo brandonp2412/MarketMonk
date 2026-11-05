@@ -125,6 +125,31 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('mobile section headings share styling and label spacing', (
+    tester,
+  ) async {
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await pumpSettings(tester, const Size(430, 940));
+
+    final general = tester.widget<Text>(find.text('General'));
+    final appearance = tester.widget<Text>(find.text('Appearance'));
+    expect(general.style, appearance.style);
+
+    final sectionPadding = tester
+        .widgetList<Padding>(
+          find.ancestor(
+            of: find.text('General'),
+            matching: find.byType(Padding),
+          ),
+        )
+        .firstWhere((padding) => padding.child is Text);
+    expect(sectionPadding.padding, const EdgeInsets.fromLTRB(16, 20, 16, 12));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('mobile chart settings persist average and candle modes', (
     tester,
   ) async {
@@ -189,11 +214,11 @@ void main() {
     final search = find.byKey(const Key('settings-search'));
     final preview = find.byKey(const Key('settings-chart-preview'));
     TickerLine ticker() => tester.widget<TickerLine>(
-          find.descendant(of: preview, matching: find.byType(TickerLine)),
-        );
+      find.descendant(of: preview, matching: find.byType(TickerLine)),
+    );
     MarketLineChart chart() => tester.widget<MarketLineChart>(
-          find.descendant(of: preview, matching: find.byType(MarketLineChart)),
-        );
+      find.descendant(of: preview, matching: find.byType(MarketLineChart)),
+    );
 
     await tester.enterText(search, 'moving average');
     await tester.pumpAndSettle();

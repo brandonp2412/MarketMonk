@@ -585,7 +585,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _sectionHeader(String text) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+    padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
     child: Text(
       text,
       style: Theme.of(context).textTheme.titleSmall
@@ -1630,15 +1630,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           if ((Platform.isAndroid || Platform.isWindows) &&
               _hasMatches('About', _mobileSearchOptions['About']!)) ...[
-            const SizedBox(height: 16),
-            const Divider(),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text(
-                context.l10n.text('About'),
-                style: Theme.of(context).textTheme.headlineLarge,
-              ),
-            ),
+            _sectionHeader(context.l10n.text('About')),
             if (_matchesSearch('About', 'What\'s New'))
               ListTile(
                 leading: const Icon(Icons.new_releases_outlined),
