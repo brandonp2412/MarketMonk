@@ -52,6 +52,27 @@ const _languageNames = <String, String>{
   'zh-Hant': '繁體中文',
 };
 
+const _dateFormatOptions = <String>[
+  'yyyy-MM-dd',
+  'yyyy/MM/dd',
+  'yyyy.MM.dd',
+  'd/M/yy',
+  'M/d/yy',
+  'dd/MM/yyyy',
+  'MM/dd/yyyy',
+  'd-M-yy',
+  'M-d-yy',
+  'dd-MM-yyyy',
+  'MM-dd-yyyy',
+  'd.M.yy',
+  'M.d.yy',
+  'dd.MM.yyyy',
+  'd MMM yyyy',
+  'MMM d, yyyy',
+  'd MMM yy',
+  'MMM d, yy',
+];
+
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
@@ -137,45 +158,41 @@ class _SettingsPageState extends State<SettingsPage> {
       options.any((option) => _matchesSearch(section, option));
 
   bool _hasAnyMatches(Map<String, List<String>> sections) =>
-      sections.entries.any(
-        (entry) => _hasMatches(entry.key, entry.value),
-      );
+      sections.entries.any((entry) => _hasMatches(entry.key, entry.value));
 
   Widget _searchField() => Padding(
-        padding: EdgeInsets.fromLTRB(
-          isDesktopLayout(context) ? 24 : 16,
-          12,
-          isDesktopLayout(context) ? 24 : 16,
-          8,
-        ),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: _desktopContentMaxWidth,
-            ),
-            child: TextField(
-              key: const Key('settings-search'),
-              controller: _searchController,
-              onChanged: (value) => setState(() => _searchQuery = value),
-              decoration: InputDecoration(
-                hintText: context.l10n.text('Search settings'),
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isEmpty
-                    ? null
-                    : IconButton(
-                        tooltip: context.l10n.text('Clear search'),
-                        icon: const Icon(Icons.close),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      ),
-                border: const OutlineInputBorder(),
-              ),
-            ),
+    padding: EdgeInsets.fromLTRB(
+      isDesktopLayout(context) ? 24 : 16,
+      12,
+      isDesktopLayout(context) ? 24 : 16,
+      8,
+    ),
+    child: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: _desktopContentMaxWidth),
+        child: TextField(
+          key: const Key('settings-search'),
+          controller: _searchController,
+          onChanged: (value) => setState(() => _searchQuery = value),
+          decoration: InputDecoration(
+            hintText: context.l10n.text('Search settings'),
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: _searchQuery.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: context.l10n.text('Clear search'),
+                    icon: const Icon(Icons.close),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                  ),
+            border: const OutlineInputBorder(),
           ),
         ),
-      );
+      ),
+    ),
+  );
 
   Widget _noSearchResults() =>
       Center(child: Text(context.l10n.text('No matching settings')));
@@ -329,7 +346,9 @@ class _SettingsPageState extends State<SettingsPage> {
           child: ListView(
             shrinkWrap: true,
             children: [
-              ...parsed.trades.take(10).map(
+              ...parsed.trades
+                  .take(10)
+                  .map(
                     (trade) => ListTile(
                       dense: true,
                       title: Text(
@@ -490,7 +509,8 @@ class _SettingsPageState extends State<SettingsPage> {
                       dense: true,
                       title: Text(currencyCode),
                       value: selected.contains(currencyCode),
-                      onChanged: selected.length == 1 &&
+                      onChanged:
+                          selected.length == 1 &&
                               selected.contains(currencyCode)
                           ? null
                           : (checked) {
@@ -551,11 +571,10 @@ class _SettingsPageState extends State<SettingsPage> {
     );
     final trades = await profileDataRepository.readTrades(profileId);
     final symbols = config.enabled
-        ? (await IbkrApiClient(config).fetchPortfolio())
-            .positions
-            .where((position) => position.securityType == 'STK')
-            .map((position) => position.symbol)
-            .toSet()
+        ? (await IbkrApiClient(config).fetchPortfolio()).positions
+              .where((position) => position.securityType == 'STK')
+              .map((position) => position.symbol)
+              .toSet()
         : trades.map((trade) => trade.symbol).toSet();
     for (final symbol in symbols) {
       clearSyncCache(symbol);
@@ -565,15 +584,13 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _sectionHeader(String text) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
-        child: Text(
-          text,
-          style: Theme.of(context)
-              .textTheme
-              .titleSmall
-              ?.copyWith(color: Theme.of(context).colorScheme.primary),
-        ),
-      );
+    padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+    child: Text(
+      text,
+      style: Theme.of(context).textTheme.titleSmall
+          ?.copyWith(color: Theme.of(context).colorScheme.primary),
+    ),
+  );
 
   Widget _languageDropdown(
     SettingsState settings, {
@@ -611,37 +628,27 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget _startPageDropdown(
     SettingsState settings, {
     EdgeInsetsGeometry padding = const EdgeInsets.symmetric(horizontal: 16),
-  }) =>
-      Padding(
-        padding: padding,
-        child: DropdownButtonFormField<int>(
-          key: const Key('settings-start-page'),
-          initialValue: settings.startPage,
-          isExpanded: true,
-          decoration: InputDecoration(
-            labelText: context.l10n.text('Start page'),
-            prefixIcon: const Icon(Icons.home_outlined),
-            border: const OutlineInputBorder(),
-          ),
-          items: [
-            DropdownMenuItem(
-              value: 0,
-              child: Text(context.l10n.text('Charts')),
-            ),
-            DropdownMenuItem(
-              value: 1,
-              child: Text(context.l10n.text('Portfolio')),
-            ),
-            DropdownMenuItem(
-              value: 2,
-              child: Text(context.l10n.text('Holdings')),
-            ),
-          ],
-          onChanged: (value) async {
-            if (value != null) await settings.setStartPage(value);
-          },
-        ),
-      );
+  }) => Padding(
+    padding: padding,
+    child: DropdownButtonFormField<int>(
+      key: const Key('settings-start-page'),
+      initialValue: settings.startPage,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: context.l10n.text('Start page'),
+        prefixIcon: const Icon(Icons.home_outlined),
+        border: const OutlineInputBorder(),
+      ),
+      items: [
+        DropdownMenuItem(value: 0, child: Text(context.l10n.text('Charts'))),
+        DropdownMenuItem(value: 1, child: Text(context.l10n.text('Portfolio'))),
+        DropdownMenuItem(value: 2, child: Text(context.l10n.text('Holdings'))),
+      ],
+      onChanged: (value) async {
+        if (value != null) await settings.setStartPage(value);
+      },
+    ),
+  );
 
   Widget _chartSwitch({
     required String label,
@@ -649,15 +656,14 @@ class _SettingsPageState extends State<SettingsPage> {
     required bool value,
     required ValueChanged<bool> onChanged,
     EdgeInsetsGeometry? padding,
-  }) =>
-      ListTile(
-        key: Key('settings-${label.toLowerCase().replaceAll(' ', '-')}'),
-        contentPadding: padding,
-        leading: Icon(icon),
-        title: Text(context.l10n.text(label)),
-        trailing: Switch(value: value, onChanged: onChanged),
-        onTap: () => onChanged(!value),
-      );
+  }) => ListTile(
+    key: Key('settings-${label.toLowerCase().replaceAll(' ', '-')}'),
+    contentPadding: padding,
+    leading: Icon(icon),
+    title: Text(context.l10n.text(label)),
+    trailing: Switch(value: value, onChanged: onChanged),
+    onTap: () => onChanged(!value),
+  );
 
   Widget _desktopSettingsCard({
     required IconData icon,
@@ -725,8 +731,8 @@ class _SettingsPageState extends State<SettingsPage> {
             onChanged: (value) => settings.setDateFormat(value ?? 'd/M/yy'),
             decoration: InputDecoration(
               labelText: context.l10n.text('Date format ({example})', {
-                'example':
-                    DateFormat(settings.dateFormat).format(DateTime.now()),
+                'example': DateFormat(settings.dateFormat)
+                    .format(DateTime.now()),
               }),
             ),
           ),
@@ -961,8 +967,9 @@ class _SettingsPageState extends State<SettingsPage> {
         if (_matchesSearch('Data', 'Sync'))
           ListTile(
             contentPadding: EdgeInsets.zero,
-            onTap:
-                settings.syncInProgress ? null : () => _syncAllTickers(context),
+            onTap: settings.syncInProgress
+                ? null
+                : () => _syncAllTickers(context),
             leading: settings.syncInProgress
                 ? const SizedBox.square(
                     dimension: 24,
@@ -983,19 +990,19 @@ class _SettingsPageState extends State<SettingsPage> {
                       },
                     )
                   : settings.syncTotal == 0
-                      ? context.l10n.text('No sync running')
-                      : settings.syncFailed == 0
-                          ? context.l10n.text(
-                              'Last sync completed {completed}/{total}',
-                              {
-                                'completed': settings.syncCompleted,
-                                'total': settings.syncTotal,
-                              },
-                            )
-                          : context.l10n.text(
-                              'Last sync completed with {failed} failed',
-                              {'failed': settings.syncFailed},
-                            ),
+                  ? context.l10n.text('No sync running')
+                  : settings.syncFailed == 0
+                  ? context.l10n.text(
+                      'Last sync completed {completed}/{total}',
+                      {
+                        'completed': settings.syncCompleted,
+                        'total': settings.syncTotal,
+                      },
+                    )
+                  : context.l10n.text(
+                      'Last sync completed with {failed} failed',
+                      {'failed': settings.syncFailed},
+                    ),
             ),
           ),
       ],
@@ -1133,9 +1140,11 @@ class _SettingsPageState extends State<SettingsPage> {
                   Expanded(
                     child: Column(
                       children: [
-                        for (var index = 0;
-                            index < cards.length;
-                            index += 2) ...[
+                        for (
+                          var index = 0;
+                          index < cards.length;
+                          index += 2
+                        ) ...[
                           if (index > 0) const SizedBox(height: 16),
                           cards[index],
                         ],
@@ -1146,9 +1155,11 @@ class _SettingsPageState extends State<SettingsPage> {
                   Expanded(
                     child: Column(
                       children: [
-                        for (var index = 1;
-                            index < cards.length;
-                            index += 2) ...[
+                        for (
+                          var index = 1;
+                          index < cards.length;
+                          index += 2
+                        ) ...[
                           if (index > 1) const SizedBox(height: 16),
                           cards[index],
                         ],
@@ -1171,8 +1182,9 @@ class _SettingsPageState extends State<SettingsPage> {
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
           child: Center(
             child: ConstrainedBox(
-              constraints:
-                  const BoxConstraints(maxWidth: _desktopContentMaxWidth),
+              constraints: const BoxConstraints(
+                maxWidth: _desktopContentMaxWidth,
+              ),
               child: content,
             ),
           ),
@@ -1399,9 +1411,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 Slider(
                   value: settings.curveSmoothness,
                   divisions: 20,
-                  inactiveColor: Theme.of(context)
-                      .colorScheme
-                      .primary
+                  inactiveColor: Theme.of(context).colorScheme.primary
                       .withValues(alpha: 0.24),
                   onChanged: (value) {
                     runDetachedTask(
@@ -1541,17 +1551,17 @@ class _SettingsPageState extends State<SettingsPage> {
                       settings.syncTotal == 0
                           ? context.l10n.text('No sync running')
                           : settings.syncFailed == 0
-                              ? context.l10n.text(
-                                  'Last sync completed {completed}/{total}',
-                                  {
-                                    'completed': settings.syncCompleted,
-                                    'total': settings.syncTotal,
-                                  },
-                                )
-                              : context.l10n.text(
-                                  'Last sync completed with {failed} failed',
-                                  {'failed': settings.syncFailed},
-                                ),
+                          ? context.l10n.text(
+                              'Last sync completed {completed}/{total}',
+                              {
+                                'completed': settings.syncCompleted,
+                                'total': settings.syncTotal,
+                              },
+                            )
+                          : context.l10n.text(
+                              'Last sync completed with {failed} failed',
+                              {'failed': settings.syncFailed},
+                            ),
                     ),
             ),
           if (_hasMatches(
@@ -1748,10 +1758,10 @@ class _IbkrSettingsDialogState extends State<_IbkrSettingsDialog> {
   }
 
   IbkrAccountConfig _config({required bool enabled}) => IbkrAccountConfig(
-        enabled: enabled,
-        baseUrl: _urlController.text.trim(),
-        token: _tokenController.text.trim(),
-      );
+    enabled: enabled,
+    baseUrl: _urlController.text.trim(),
+    token: _tokenController.text.trim(),
+  );
 
   Future<bool> _checkConnection() async {
     setState(() {
@@ -1787,98 +1797,104 @@ class _IbkrSettingsDialogState extends State<_IbkrSettingsDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: Text(
-          context.l10n.text('Interactive Brokers — {account}', {
-            'account': widget.account,
-          }),
-        ),
-        content: SizedBox(
-          width: 440,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(context.l10n.text('Use IBKR portfolio data')),
-                  value: _enabled,
-                  onChanged: _checking
-                      ? null
-                      : (value) => setState(() => _enabled = value),
-                ),
-                TextField(
-                  controller: _urlController,
-                  enabled: !_checking,
-                  keyboardType: TextInputType.url,
-                  decoration: InputDecoration(
-                    labelText: context.l10n.text('API URL'),
-                    hintText: 'https://ibkr.example.com',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _tokenController,
-                  enabled: !_checking,
-                  obscureText: true,
-                  decoration: InputDecoration(
-                    labelText: context.l10n.text('Bearer token'),
-                  ),
-                ),
-                if (_status != null) ...[
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Icon(
-                        _statusOk ? Icons.check_circle : Icons.error_outline,
-                        color: _statusOk
-                            ? Colors.green
-                            : Theme.of(context).colorScheme.error,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(_status!)),
-                    ],
-                  ),
-                ],
-              ],
+    title: Text(
+      context.l10n.text('Interactive Brokers — {account}', {
+        'account': widget.account,
+      }),
+    ),
+    content: SizedBox(
+      width: 440,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(context.l10n.text('Use IBKR portfolio data')),
+              value: _enabled,
+              onChanged: _checking
+                  ? null
+                  : (value) => setState(() => _enabled = value),
             ),
-          ),
+            TextField(
+              controller: _urlController,
+              enabled: !_checking,
+              keyboardType: TextInputType.url,
+              decoration: InputDecoration(
+                labelText: context.l10n.text('API URL'),
+                hintText: 'https://ibkr.example.com',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _tokenController,
+              enabled: !_checking,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: context.l10n.text('Bearer token'),
+              ),
+            ),
+            if (_status != null) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(
+                    _statusOk ? Icons.check_circle : Icons.error_outline,
+                    color: _statusOk
+                        ? Colors.green
+                        : Theme.of(context).colorScheme.error,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(_status!)),
+                ],
+              ),
+            ],
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: _checking ? null : () => Navigator.pop(context),
-            child: Text(context.l10n.text('Cancel')),
-          ),
-          TextButton(
-            onPressed: _checking ? null : _checkConnection,
-            child: _checking
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(context.l10n.text('Test')),
-          ),
-          FilledButton(
-            onPressed: _checking ? null : _save,
-            child: Text(context.l10n.text('Save')),
-          ),
-        ],
-      );
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: _checking ? null : () => Navigator.pop(context),
+        child: Text(context.l10n.text('Cancel')),
+      ),
+      TextButton(
+        onPressed: _checking ? null : _checkConnection,
+        child: _checking
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Text(context.l10n.text('Test')),
+      ),
+      FilledButton(
+        onPressed: _checking ? null : _save,
+        child: Text(context.l10n.text('Save')),
+      ),
+    ],
+  );
 }
 
-class _ColorPicker extends StatelessWidget {
+Color? parseHexThemeColor(String input) {
+  final hex = input.trim().replaceFirst(RegExp(r'^#'), '');
+  if (!RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(hex)) return null;
+  return Color(int.parse('FF$hex', radix: 16));
+}
+
+class _ColorPicker extends StatefulWidget {
   static const _colors = [
     defaultSeedColor,
-    Color(0xFF2B7A78), // teal
-    Color(0xFF6750A4), // purple
-    Color(0xFF1976D2), // blue
-    Color(0xFF388E3C), // green
-    Color(0xFFD32F2F), // red
-    Color(0xFFF57C00), // orange
-    Color(0xFF7B1FA2), // violet
-    Color(0xFF0097A7), // cyan
-    Color(0xFF5D4037), // brown
-    Color(0xFF455A64), // blue-grey
+    Color(0xFF2B7A78),
+    Color(0xFF6750A4),
+    Color(0xFF1976D2),
+    Color(0xFF388E3C),
+    Color(0xFFD32F2F),
+    Color(0xFFF57C00),
+    Color(0xFF7B1FA2),
+    Color(0xFF0097A7),
+    Color(0xFF5D4037),
+    Color(0xFF455A64),
   ];
 
   final SettingsState settings;
@@ -1886,7 +1902,60 @@ class _ColorPicker extends StatelessWidget {
   const _ColorPicker({required this.settings});
 
   @override
+  State<_ColorPicker> createState() => _ColorPickerState();
+}
+
+class _ColorPickerState extends State<_ColorPicker> {
+  late final TextEditingController _hexController;
+  late Color _lastSeedColor;
+  String? _hexError;
+
+  static String _hexFor(Color color) => color
+      .toARGB32()
+      .toRadixString(16)
+      .padLeft(8, '0')
+      .substring(2)
+      .toUpperCase();
+
+  @override
+  void initState() {
+    super.initState();
+    _lastSeedColor = widget.settings.seedColor;
+    _hexController = TextEditingController(text: _hexFor(_lastSeedColor));
+  }
+
+  @override
+  void didUpdateWidget(covariant _ColorPicker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_lastSeedColor != widget.settings.seedColor) {
+      _lastSeedColor = widget.settings.seedColor;
+      _hexController.text = _hexFor(_lastSeedColor);
+      _hexError = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _hexController.dispose();
+    super.dispose();
+  }
+
+  void _applyHex() {
+    final selected = parseHexThemeColor(_hexController.text);
+    if (selected == null) {
+      setState(() => _hexError = 'Enter a 6-digit hex color');
+      return;
+    }
+    setState(() => _hexError = null);
+    runDetachedTask(
+      widget.settings.setSeedColor(selected),
+      'Failed to save custom theme color',
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final selectedColor = widget.settings.seedColor;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       child: Column(
@@ -1900,36 +1969,81 @@ class _ColorPicker extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _colors.map((color) {
-              final isSelected = settings.seedColor == color;
-              return GestureDetector(
-                onTap: () => settings.setSeedColor(color),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
+            children: [
+              for (final color in _ColorPicker._colors)
+                InkWell(
+                  onTap: () => widget.settings.setSeedColor(color),
+                  customBorder: const CircleBorder(),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: selectedColor == color
+                            ? Theme.of(context).colorScheme.onSurface
+                            : Colors.transparent,
+                        width: 3,
+                      ),
+                    ),
+                    child: selectedColor == color
+                        ? Icon(
+                            Icons.check,
+                            color: color.computeLuminance() > 0.5
+                                ? Colors.black
+                                : Colors.white,
+                            size: 20,
+                          )
+                        : null,
+                  ),
+                ),
+              if (!_ColorPicker._colors.contains(selectedColor))
+                Container(
+                  key: const Key('settings-custom-color-preview'),
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: color,
+                    color: selectedColor,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: isSelected
-                          ? Theme.of(context).colorScheme.onSurface
-                          : Colors.transparent,
+                      color: Theme.of(context).colorScheme.onSurface,
                       width: 3,
                     ),
                   ),
-                  child: isSelected
-                      ? Icon(
-                          Icons.check,
-                          color: color.computeLuminance() > 0.5
-                              ? Colors.black
-                              : Colors.white,
-                          size: 20,
-                        )
-                      : null,
+                  child: Icon(
+                    Icons.check,
+                    color: selectedColor.computeLuminance() > 0.5
+                        ? Colors.black
+                        : Colors.white,
+                    size: 20,
+                  ),
                 ),
-              );
-            }).toList(),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: 220,
+            child: TextField(
+              key: const Key('settings-custom-color-hex'),
+              controller: _hexController,
+              textCapitalization: TextCapitalization.characters,
+              maxLength: 7,
+              onSubmitted: (_) => _applyHex(),
+              decoration: InputDecoration(
+                labelText: 'Hex color',
+                hintText: '#RRGGBB',
+                errorText: _hexError,
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  key: const Key('settings-apply-custom-color'),
+                  tooltip: 'Apply color',
+                  onPressed: _applyHex,
+                  icon: const Icon(Icons.check_rounded),
+                ),
+              ),
+            ),
           ),
         ],
       ),

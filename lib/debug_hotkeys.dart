@@ -3,9 +3,30 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 
 enum DebugHotkeyAction { reload, restart }
+
+final debugHotkeyMessengerKey = GlobalKey<ScaffoldMessengerState>();
+
+String debugHotkeyToastLabel(DebugHotkeyAction action) => switch (action) {
+      DebugHotkeyAction.reload => 'Hot reloading…',
+      DebugHotkeyAction.restart => 'Hot restarting…',
+    };
+
+void _showDebugHotkeyToast(DebugHotkeyAction action) {
+  final messenger = debugHotkeyMessengerKey.currentState;
+  if (messenger == null) return;
+  messenger.removeCurrentSnackBar();
+  messenger.showSnackBar(
+    SnackBar(
+      content: Text(debugHotkeyToastLabel(action)),
+      duration: const Duration(milliseconds: 1400),
+      behavior: SnackBarBehavior.floating,
+      width: 240,
+    ),
+  );
+}
 
 DebugHotkeyAction? debugHotkeyAction(
   KeyEvent event, {
@@ -75,8 +96,9 @@ void installDesktopDebugHotkeys() {
 Future<void> _requestFlutterTool(DebugHotkeyAction action) async {
   _requestPending = true;
   try {
-    final parentPid =
-        linuxParentPid(await File('/proc/self/stat').readAsString());
+    final parentPid = linuxParentPid(
+      await File('/proc/self/stat').readAsString(),
+    );
     if (parentPid == null || parentPid <= 1) return;
     final commandLine = await File('/proc/$parentPid/cmdline').readAsString();
     if (!isFlutterToolRunner(commandLine)) {
@@ -87,6 +109,8 @@ Future<void> _requestFlutterTool(DebugHotkeyAction action) async {
     final signal = action == DebugHotkeyAction.reload
         ? ProcessSignal.sigusr1
         : ProcessSignal.sigusr2;
+    _showDebugHotkeyToast(action);
+    await Future<void>.delayed(const Duration(milliseconds: 250));
     if (!Process.killPid(parentPid, signal)) {
       debugPrint('Flutter ${action.name} signal failed');
     }

@@ -4,6 +4,7 @@ import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
+
 import 'sqlite_test_support.dart';
 
 void main() {
@@ -42,8 +43,9 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('settings use a two-column desktop layout on wide windows',
-      (tester) async {
+  testWidgets('settings use a two-column desktop layout on wide windows', (
+    tester,
+  ) async {
     addTearDown(() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
@@ -57,10 +59,7 @@ void main() {
     expect(find.text('Appearance'), findsOneWidget);
     expect(find.text('Hide dollar amounts'), findsOneWidget);
     expect(
-      find.ancestor(
-        of: find.text('Language'),
-        matching: find.byType(ListTile),
-      ),
+      find.ancestor(of: find.text('Language'), matching: find.byType(ListTile)),
       findsNothing,
     );
     expect(find.text('Charts'), findsWidgets);
@@ -74,8 +73,9 @@ void main() {
     expect(tester.takeException(), null);
   });
 
-  testWidgets('settings keep desktop cards at compact desktop width',
-      (tester) async {
+  testWidgets('settings keep desktop cards at compact desktop width', (
+    tester,
+  ) async {
     addTearDown(() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
@@ -176,8 +176,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('new chart controls update persisted settings on mobile',
-      (tester) async {
+  testWidgets('new chart controls update persisted settings on mobile', (
+    tester,
+  ) async {
     addTearDown(() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
@@ -192,16 +193,14 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(control);
       await tester.pumpAndSettle();
-      expect(
-        (await SqliteSettings.getInstance()).getBool(setting),
-        value,
-      );
+      expect((await SqliteSettings.getInstance()).getBool(setting), value);
     }
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('start page choice saves from desktop settings search',
-      (tester) async {
+  testWidgets('start page choice saves from desktop settings search', (
+    tester,
+  ) async {
     addTearDown(() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
@@ -219,8 +218,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('desktop search filters settings and restores them on clear',
-      (tester) async {
+  testWidgets('desktop search filters settings and restores them on clear', (
+    tester,
+  ) async {
     addTearDown(() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
@@ -243,38 +243,46 @@ void main() {
   });
 
   testWidgets(
-      'mobile search filters individual controls and handles no results',
-      (tester) async {
-    addTearDown(() {
-      tester.view.resetPhysicalSize();
-      tester.view.resetDevicePixelRatio();
-    });
-    await pumpSettings(tester, const Size(430, 940));
+    'mobile search filters individual controls and handles no results',
+    (tester) async {
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      await pumpSettings(tester, const Size(430, 940));
 
-    await tester.enterText(find.byKey(const Key('settings-search')), 'candles');
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('settings-candlestick-chart')), findsOneWidget);
-    expect(find.byKey(const Key('settings-rolling-average')), findsNothing);
-    expect(find.text('Charts'), findsOneWidget);
-    expect(find.text('Appearance'), findsNothing);
+      await tester.enterText(
+        find.byKey(const Key('settings-search')),
+        'candles',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('settings-candlestick-chart')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('settings-rolling-average')), findsNothing);
+      expect(find.text('Charts'), findsOneWidget);
+      expect(find.text('Appearance'), findsNothing);
 
-    await tester.enterText(
-      find.byKey(const Key('settings-search')),
-      'no such setting',
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('No matching settings'), findsOneWidget);
-    expect(find.text('Charts'), findsNothing);
+      await tester.enterText(
+        find.byKey(const Key('settings-search')),
+        'no such setting',
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('No matching settings'), findsOneWidget);
+      expect(find.text('Charts'), findsNothing);
 
-    await tester.tap(find.byTooltip('Clear search'));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('settings-rolling-average')), findsOneWidget);
-    expect(find.text('Appearance'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+      await tester.tap(find.byTooltip('Clear search'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('settings-rolling-average')), findsOneWidget);
+      expect(find.text('Appearance'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
-  testWidgets('desktop settings omit the mobile-only chart switches',
-      (tester) async {
+  testWidgets('desktop settings omit the mobile-only chart switches', (
+    tester,
+  ) async {
     addTearDown(() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
@@ -284,8 +292,9 @@ void main() {
     expect(find.byKey(const Key('settings-candlestick-chart')), findsNothing);
     expect(find.text('Market closed indicator'), findsNothing);
   });
-  testWidgets('desktop search finds common alternative settings terms',
-      (tester) async {
+  testWidgets('desktop search finds common alternative settings terms', (
+    tester,
+  ) async {
     addTearDown(() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
@@ -303,8 +312,9 @@ void main() {
     }
   });
 
-  testWidgets('mobile chart search understands common chart terminology',
-      (tester) async {
+  testWidgets('mobile chart search understands common chart terminology', (
+    tester,
+  ) async {
     addTearDown(() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
@@ -320,5 +330,61 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('settings-candlestick-chart')), findsOneWidget);
     expect(find.byKey(const Key('settings-rolling-average')), findsNothing);
+  });
+  testWidgets('desktop settings search stays compact', (tester) async {
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await pumpSettings(tester, const Size(1400, 900));
+    expect(
+      tester.getSize(find.byKey(const Key('settings-search'))).width,
+      lessThanOrEqualTo(560),
+    );
+  });
+
+  testWidgets('date formats include long formats and hex colors persist', (
+    tester,
+  ) async {
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await pumpSettings(tester, const Size(1200, 900));
+    final settings = tester
+        .element(find.byType(SettingsPage))
+        .read<SettingsState>();
+    await settings.setSystemColors(false);
+    await tester.pumpAndSettle();
+
+    final hexField = find.byKey(const Key('settings-custom-color-hex'));
+    expect(hexField, findsOneWidget);
+    await tester.enterText(hexField, '#123ABC');
+    await tester.tap(find.byKey(const Key('settings-apply-custom-color')));
+    await tester.pumpAndSettle();
+    expect(settings.seedColor, const Color(0xFF123ABC));
+    expect(
+      find.byKey(const Key('settings-custom-color-preview')),
+      findsOneWidget,
+    );
+
+    await tester.enterText(hexField, 'invalid');
+    await tester.tap(find.byKey(const Key('settings-apply-custom-color')));
+    await tester.pumpAndSettle();
+    expect(settings.seedColor, const Color(0xFF123ABC));
+    expect(find.text('Enter a 6-digit hex color'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const Key('settings-search')),
+      'date format',
+    );
+    await tester.pumpAndSettle();
+    final selector = tester.widget<DropdownButton<String>>(
+      find.byType(DropdownButton<String>),
+    );
+    expect(
+      selector.items!.map((item) => item.value),
+      containsAll(['d MMM yyyy', 'MMM d, yyyy', 'yyyy/MM/dd', 'dd.MM.yyyy']),
+    );
   });
 }

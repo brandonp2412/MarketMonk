@@ -6,6 +6,7 @@ import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/utils.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/settings_state.dart';
+import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/trade_history_page.dart';
 import 'package:provider/provider.dart';
 
@@ -14,71 +15,74 @@ import 'sqlite_test_support.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('stock detail uses the desktop transaction table on wide screens',
-      (tester) async {
-    tester.view.physicalSize = const Size(1320, 900);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    await seedTestSqlite({});
-    final accounts = testAccountManager();
-    await accounts.init();
-    await accounts.setIbkrConfig(
-      'Default',
-      const IbkrAccountConfig(
-        enabled: true,
-        baseUrl: 'https://ibkr.example.test',
-        token: 'test-token',
-      ),
-    );
-    final brokerTrades = [
-      IbkrTrade(
-        symbol: 'VOO',
-        name: 'Vanguard S&P 500',
-        currency: 'USD',
-        conid: 42,
-        quantity: 10,
-        price: 500,
-        tradeType: 'open',
-        tradeDate: DateTime(2026, 10, 12),
-        realizedPnl: 0,
-        commission: 1,
-      ),
-    ];
+  testWidgets(
+    'stock detail uses the desktop transaction table on wide screens',
+    (tester) async {
+      tester.view.physicalSize = const Size(1320, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await seedTestSqlite({});
+      final accounts = testAccountManager();
+      await accounts.init();
+      await accounts.setIbkrConfig(
+        'Default',
+        const IbkrAccountConfig(
+          enabled: true,
+          baseUrl: 'https://ibkr.example.test',
+          token: 'test-token',
+        ),
+      );
+      final brokerTrades = [
+        IbkrTrade(
+          symbol: 'VOO',
+          name: 'Vanguard S&P 500',
+          currency: 'USD',
+          conid: 42,
+          quantity: 10,
+          price: 500,
+          tradeType: 'open',
+          tradeDate: DateTime(2026, 10, 12),
+          realizedPnl: 0,
+          commission: 1,
+        ),
+      ];
 
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider(create: (_) => SettingsState()),
-          ChangeNotifierProvider.value(value: accounts),
-        ],
-        child: MaterialApp(
-          home: TradeHistoryPage(
-            summary: SymbolSummary(
-              symbol: 'VOO',
-              name: 'Vanguard S&P 500',
-              position: null,
-              trades: tradesFromIbkr(brokerTrades),
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => SettingsState()),
+            ChangeNotifierProvider.value(value: accounts),
+          ],
+          child: MaterialApp(
+            home: TradeHistoryPage(
+              summary: SymbolSummary(
+                symbol: 'VOO',
+                name: 'Vanguard S&P 500',
+                position: null,
+                trades: tradesFromIbkr(brokerTrades),
+              ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(const Key('desktop-trade-history-content')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const Key('desktop-trade-history-data-table')),
-      findsOneWidget,
-    );
-    expect(find.text('BUY'), findsOneWidget);
-  });
+      expect(
+        find.byKey(const Key('desktop-trade-history-content')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('desktop-trade-history-data-table')),
+        findsOneWidget,
+      );
+      expect(find.text('BUY'), findsOneWidget);
+    },
+  );
 
-  testWidgets('IBKR history loads after opening an initially empty detail',
-      (tester) async {
+  testWidgets('IBKR history loads after opening an initially empty detail', (
+    tester,
+  ) async {
     await seedTestSqlite({});
     final accounts = testAccountManager();
     await accounts.init();
@@ -139,8 +143,9 @@ void main() {
     expect(find.textContaining('12 Oct 2026'), findsOneWidget);
   });
 
-  testWidgets('cached empty IBKR history does not spin on navigation',
-      (tester) async {
+  testWidgets('cached empty IBKR history does not spin on navigation', (
+    tester,
+  ) async {
     await seedTestSqlite({});
     final accounts = testAccountManager();
     await accounts.init();
@@ -225,8 +230,9 @@ void main() {
     expect(calls, 2);
     expect(find.text('No trade history yet'), findsOneWidget);
   });
-  testWidgets('unavailable holdings history is retried on reactivation',
-      (tester) async {
+  testWidgets('unavailable holdings history is retried on reactivation', (
+    tester,
+  ) async {
     await seedTestSqlite({});
     final accounts = testAccountManager();
     await accounts.init();
@@ -238,22 +244,18 @@ void main() {
         token: 'test-token',
       ),
     );
-    await accounts.cachePortfolio(
-      'Default',
-      [
-        Position(
-          symbol: 'VOO',
-          name: 'Vanguard S&P 500',
-          nativeCurrency: 'USD',
-          netShares: 10,
-          avgCost: 500,
-          currentPrice: 550,
-          firstBuyDate: DateTime(2025),
-          lastBuyDate: DateTime(2026),
-        ),
-      ],
-      const IbkrAccountValue(value: 5500, currency: 'USD'),
-    );
+    await accounts.cachePortfolio('Default', [
+      Position(
+        symbol: 'VOO',
+        name: 'Vanguard S&P 500',
+        nativeCurrency: 'USD',
+        netShares: 10,
+        avgCost: 500,
+        currentPrice: 550,
+        firstBuyDate: DateTime(2025),
+        lastBuyDate: DateTime(2026),
+      ),
+    ], const IbkrAccountValue(value: 5500, currency: 'USD'));
     final active = ValueNotifier(true);
     addTearDown(active.dispose);
     var calls = 0;
@@ -308,8 +310,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('BUY'), findsOneWidget);
   });
-  testWidgets('saved IBKR trades render immediately after app restart',
-      (tester) async {
+  testWidgets('saved IBKR trades render immediately after app restart', (
+    tester,
+  ) async {
     await seedTestSqlite({});
     final firstSession = testAccountManager();
     await firstSession.init();
@@ -321,22 +324,18 @@ void main() {
         token: 'test-token',
       ),
     );
-    await firstSession.cachePortfolio(
-      'Default',
-      [
-        Position(
-          symbol: 'COHR',
-          name: 'Coherent',
-          nativeCurrency: 'USD',
-          netShares: 2,
-          avgCost: 100,
-          currentPrice: 120,
-          firstBuyDate: DateTime(2026, 1, 1),
-          lastBuyDate: DateTime(2026, 1, 1),
-        ),
-      ],
-      const IbkrAccountValue(value: 240, currency: 'USD'),
-    );
+    await firstSession.cachePortfolio('Default', [
+      Position(
+        symbol: 'COHR',
+        name: 'Coherent',
+        nativeCurrency: 'USD',
+        netShares: 2,
+        avgCost: 100,
+        currentPrice: 120,
+        firstBuyDate: DateTime(2026, 1, 1),
+        lastBuyDate: DateTime(2026, 1, 1),
+      ),
+    ], const IbkrAccountValue(value: 240, currency: 'USD'));
     await firstSession.cacheIbkrTradeHistory(
       'Default',
       IbkrTradeHistory(
@@ -390,37 +389,100 @@ void main() {
     expect(find.text('No trade history yet'), findsNothing);
   });
 
-  test('failed responses never replace previously cached broker history',
-      () async {
+  test(
+    'failed responses never replace previously cached broker history',
+    () async {
+      await seedTestSqlite({});
+      final accounts = testAccountManager();
+      await accounts.init();
+      await accounts.cacheIbkrTradeHistory(
+        'Default',
+        IbkrTradeHistory(
+          available: true,
+          trades: [
+            IbkrTrade(
+              symbol: 'COHR',
+              name: 'Coherent',
+              currency: 'USD',
+              conid: 42,
+              quantity: 2,
+              price: 100,
+              tradeType: 'open',
+              tradeDate: DateTime(2026, 1, 1),
+              realizedPnl: 0,
+              commission: 0,
+            ),
+          ],
+        ),
+      );
+      await accounts.cacheIbkrTradeHistory(
+        'Default',
+        const IbkrTradeHistory(available: false, trades: []),
+      );
+      final restarted = testAccountManager();
+      await restarted.init();
+      expect(restarted.ibkrTradeHistoryCacheFor('Default')?.trades.length, 1);
+    },
+  );
+  testWidgets('local holdings history exposes edit and delete actions', (
+    tester,
+  ) async {
     await seedTestSqlite({});
     final accounts = testAccountManager();
     await accounts.init();
-    await accounts.cacheIbkrTradeHistory(
-      'Default',
-      IbkrTradeHistory(
-        available: true,
-        trades: [
-          IbkrTrade(
-            symbol: 'COHR',
-            name: 'Coherent',
-            currency: 'USD',
-            conid: 42,
-            quantity: 2,
-            price: 100,
-            tradeType: 'open',
-            tradeDate: DateTime(2026, 1, 1),
-            realizedPnl: 0,
-            commission: 0,
-          ),
-        ],
+    final profileId = await profileDataRepository.profileIdForName('Default');
+    final tradeId = await profileDataRepository.addTrade(
+      profileId,
+      ProfileTradeWrite(
+        symbol: 'VOO',
+        name: 'Vanguard S&P 500',
+        quantity: 2,
+        price: 100,
+        tradeType: 'open',
+        tradeDate: DateTime(2026, 10, 12),
+        rawCurrency: 'USD',
+        usdRateAtTrade: 1,
       ),
     );
-    await accounts.cacheIbkrTradeHistory(
-      'Default',
-      const IbkrTradeHistory(available: false, trades: []),
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: TradeHistoryPage(
+            summary: SymbolSummary(
+              symbol: 'VOO',
+              name: 'Vanguard S&P 500',
+              position: null,
+              trades: [],
+            ),
+          ),
+        ),
+      ),
     );
-    final restarted = testAccountManager();
-    await restarted.init();
-    expect(restarted.ibkrTradeHistoryCacheFor('Default')?.trades.length, 1);
+    await tester.pumpAndSettle();
+    expect(find.byKey(Key('trade-actions-$tradeId')), findsOneWidget);
+
+    await tester.tap(find.text('BUY'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.text('Edit trade'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(Key('trade-actions-$tradeId')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete trade'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Delete this trade? This cannot be undone.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Delete').last);
+    await tester.pumpAndSettle();
+    expect(find.text('No trade history yet'), findsOneWidget);
   });
 }

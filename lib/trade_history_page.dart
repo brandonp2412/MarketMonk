@@ -18,7 +18,7 @@ import 'package:provider/provider.dart';
 class TradeHistoryPage extends StatefulWidget {
   final SymbolSummary summary;
   final Future<IbkrTradeHistory> Function(IbkrAccountConfig)?
-      ibkrTradeHistoryLoader;
+  ibkrTradeHistoryLoader;
 
   const TradeHistoryPage({
     super.key,
@@ -44,14 +44,16 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
     _ibkrTradesStream = config.enabled && widget.summary.trades.isEmpty
         ? _loadBrokerTrades(config).asStream()
         : Stream.value(widget.summary.trades);
-    _tradesStream =
-        profileDataRepository.watchTradesForAccount(_accountName).map((trades) {
-      final filtered = trades
-          .where((trade) => trade.symbol == widget.summary.symbol)
-          .toList()
-        ..sort((a, b) => b.tradeDate.compareTo(a.tradeDate));
-      return filtered;
-    });
+    _tradesStream = profileDataRepository
+        .watchTradesForAccount(_accountName)
+        .map((trades) {
+          final filtered =
+              trades
+                  .where((trade) => trade.symbol == widget.summary.symbol)
+                  .toList()
+                ..sort((a, b) => b.tradeDate.compareTo(a.tradeDate));
+          return filtered;
+        });
     runDetachedTask(
       fetchSymbolCurrencyAndRate(widget.summary.symbol).then((_) {
         if (mounted) setState(() {});
@@ -61,8 +63,9 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
   }
 
   Future<List<Trade>> _loadBrokerTrades(IbkrAccountConfig config) async {
-    final history = await (widget.ibkrTradeHistoryLoader?.call(config) ??
-        IbkrApiClient(config).fetchTradeHistory());
+    final history =
+        await (widget.ibkrTradeHistoryLoader?.call(config) ??
+            IbkrApiClient(config).fetchTradeHistory());
     if (!history.available) {
       throw StateError('IBKR transaction history is currently unavailable');
     }
@@ -135,8 +138,9 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
       ),
     );
     if (confirmed != true || !mounted) return;
-    final profileId =
-        await profileDataRepository.profileIdForName(_accountName);
+    final profileId = await profileDataRepository.profileIdForName(
+      _accountName,
+    );
     await profileDataRepository.deleteTrades(profileId, ids);
     if (!mounted) return;
     setState(() => _selectedTradeIds.removeAll(ids));
@@ -157,9 +161,9 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
     final cachedTrades = cachedHistory == null
         ? widget.summary.trades
         : (tradesFromIbkr(cachedHistory.trades)
-            .where((trade) => trade.symbol == widget.summary.symbol)
-            .toList()
-          ..sort((a, b) => b.tradeDate.compareTo(a.tradeDate)));
+              .where((trade) => trade.symbol == widget.summary.symbol)
+              .toList()
+            ..sort((a, b) => b.tradeDate.compareTo(a.tradeDate)));
 
     return StreamBuilder<List<Trade>>(
       stream: ibkrManaged ? _ibkrTradesStream : _tradesStream,
@@ -179,6 +183,13 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                 nativeCurrencies: {
                   if (cachedPosition != null)
                     symbol: cachedPosition.nativeCurrency,
+                  if (cachedPosition == null &&
+                      trades.any((trade) => trade.rawCurrency != null))
+                    symbol: normalizedQuoteCurrency(
+                      trades
+                          .firstWhere((trade) => trade.rawCurrency != null)
+                          .rawCurrency!,
+                    ),
                 },
               ).firstOrNull;
         final liveSummary = SymbolSummary(
@@ -200,22 +211,22 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
         }
         final unrealizedPL = position?.unrealizedPL ?? 0.0;
         final realizedToday = liveSummary.realizedTodayUsd();
-        final totalGain =
-            totalRealizedUsd == null ? null : totalRealizedUsd + unrealizedPL;
+        final totalGain = totalRealizedUsd == null
+            ? null
+            : totalRealizedUsd + unrealizedPL;
 
         return Scaffold(
           appBar: AppBar(
             title: Text(
               _selectedTradeIds.isNotEmpty && !isDesktopLayout(context)
-                  ? context.l10n.text(
-                      '{count} selected',
-                      {'count': _selectedTradeIds.length},
-                    )
+                  ? context.l10n.text('{count} selected', {
+                      'count': _selectedTradeIds.length,
+                    })
                   : isDesktopLayout(context)
-                      ? context.l10n.text('Trade History')
-                      : context.l10n.text('{symbol} — History', {
-                          'symbol': widget.summary.symbol,
-                        }),
+                  ? context.l10n.text('Trade History')
+                  : context.l10n.text('{symbol} — History', {
+                      'symbol': widget.summary.symbol,
+                    }),
             ),
             actions: [
               if (_selectedTradeIds.isNotEmpty &&
@@ -240,8 +251,9 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                   tooltip: context.l10n.text('Copy selected trades'),
                   icon: const Icon(Icons.copy_outlined),
                   onPressed: () => _copyTrades(
-                    trades
-                        .where((trade) => _selectedTradeIds.contains(trade.id)),
+                    trades.where(
+                      (trade) => _selectedTradeIds.contains(trade.id),
+                    ),
                   ),
                 ),
                 if (!ibkrManaged)
@@ -286,8 +298,9 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                     totalRealizedUsd: totalRealizedUsd,
                     realizedToday: realizedToday,
                     totalGain: totalGain,
-                    hasImportedRealized:
-                        trades.any((trade) => trade.realizedPL != 0),
+                    hasImportedRealized: trades.any(
+                      (trade) => trade.realizedPL != 0,
+                    ),
                     brokerManaged: ibkrManaged,
                     emptyState: _buildEmptyHistoryState(
                       context,
@@ -353,27 +366,30 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                               ],
                               if (realizedToday != null)
                                 _SummaryRow(
-                                  label:
-                                      context.l10n.text('Realized P/L today'),
+                                  label: context.l10n.text(
+                                    'Realized P/L today',
+                                  ),
                                   value:
                                       '${realizedToday >= 0 ? '+' : ''}${fmtCurrency(realizedToday)}',
                                   color: realizedToday >= 0
                                       ? Colors.green
                                       : Colors.redAccent,
                                 ),
-                              if (trades
-                                  .any((trade) => trade.realizedPL != 0)) ...[
+                              if (trades.any(
+                                (trade) => trade.realizedPL != 0,
+                              )) ...[
                                 _SummaryRow(
-                                  label: context.l10n
-                                      .text('Imported realized P/L'),
+                                  label: context.l10n.text(
+                                    'Imported realized P/L',
+                                  ),
                                   value: totalRealizedUsd == null
                                       ? 'Historical FX unavailable'
                                       : '${totalRealizedUsd >= 0 ? '+' : ''}${fmtCurrency(totalRealizedUsd)}',
                                   color: totalRealizedUsd == null
                                       ? null
                                       : totalRealizedUsd >= 0
-                                          ? Colors.green
-                                          : Colors.redAccent,
+                                      ? Colors.green
+                                      : Colors.redAccent,
                                 ),
                               ],
                               if (position != null || trades.isNotEmpty)
@@ -386,8 +402,8 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                                   color: totalGain == null
                                       ? null
                                       : totalGain >= 0
-                                          ? Colors.green
-                                          : Colors.redAccent,
+                                      ? Colors.green
+                                      : Colors.redAccent,
                                 ),
                             ],
                           ),
@@ -482,12 +498,12 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
       onAction: brokerManaged
           ? (snapshot.hasError ? _retryBrokerTrades : null)
           : () => Navigator.push(
+              context,
+              adaptivePageRoute(
                 context,
-                adaptivePageRoute(
-                  context,
-                  builder: (_) => EditTickerPage(symbol: widget.summary.symbol),
-                ),
+                builder: (_) => EditTickerPage(symbol: widget.summary.symbol),
               ),
+            ),
     );
   }
 
@@ -501,8 +517,9 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
             children: [
               ListTile(
                 title: Text(_tradeCopyText(trade)),
-                subtitle:
-                    Text(DateFormat('dd MMM yyyy').format(trade.tradeDate)),
+                subtitle: Text(
+                  DateFormat('dd MMM yyyy').format(trade.tradeDate),
+                ),
               ),
               ListTile(
                 leading: const Icon(Icons.copy_outlined),
@@ -567,10 +584,7 @@ class _SummaryRow extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Flexible(
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
           ),
           const SizedBox(width: 8),
           Flexible(
@@ -613,9 +627,7 @@ class _TradeTile extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
         selected: selected,
-        selectedTileColor: Theme.of(context)
-            .colorScheme
-            .primaryContainer
+        selectedTileColor: Theme.of(context).colorScheme.primaryContainer
             .withValues(alpha: 0.18),
         onTap: onTap,
         onLongPress: onLongPress,
@@ -652,19 +664,32 @@ class _TradeTile extends StatelessWidget {
         subtitle: Text(
           '${qty.toStringAsFixed(4)} @ ${fmtTradeNative(trade, trade.price)}  ·  $dateStr',
         ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(fmtTradeNative(trade, total)),
-            if (!isBuy && trade.realizedPL != 0)
-              Text(
-                '${trade.realizedPL >= 0 ? '+' : ''}${fmtTradeNative(trade, trade.realizedPL)}',
-                style: TextStyle(
-                  fontSize: 11,
-                  color:
-                      trade.realizedPL >= 0 ? Colors.green : Colors.redAccent,
-                ),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(fmtTradeNative(trade, total)),
+                if (!isBuy && trade.realizedPL != 0)
+                  Text(
+                    '${trade.realizedPL >= 0 ? '+' : ''}${fmtTradeNative(trade, trade.realizedPL)}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: trade.realizedPL >= 0
+                          ? Colors.green
+                          : Colors.redAccent,
+                    ),
+                  ),
+              ],
+            ),
+            if (onMore != null)
+              IconButton(
+                key: Key('trade-actions-${trade.id}'),
+                tooltip: context.l10n.text('Edit trade'),
+                onPressed: onMore,
+                icon: const Icon(Icons.more_vert_rounded),
               ),
           ],
         ),
@@ -677,10 +702,7 @@ class _EditTradeDialog extends StatefulWidget {
   final Trade trade;
   final String accountName;
 
-  const _EditTradeDialog({
-    required this.trade,
-    required this.accountName,
-  });
+  const _EditTradeDialog({required this.trade, required this.accountName});
 
   @override
   State<_EditTradeDialog> createState() => _EditTradeDialogState();
@@ -752,8 +774,9 @@ class _EditTradeDialogState extends State<_EditTradeDialog> {
       }
       return;
     }
-    final profileId =
-        await profileDataRepository.profileIdForName(widget.accountName);
+    final profileId = await profileDataRepository.profileIdForName(
+      widget.accountName,
+    );
     await profileDataRepository.updateTrade(
       profileId: profileId,
       tradeId: widget.trade.id,
