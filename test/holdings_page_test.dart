@@ -56,7 +56,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('ibkr-cash-holding')), findsOneWidget);
+    expect(find.byKey(const Key('holdings-ibkr-cash')), findsOneWidget);
     expect(find.text('100.0% allocation'), findsOneWidget);
     expect(find.text('No IBKR stocks found'), findsNothing);
   });

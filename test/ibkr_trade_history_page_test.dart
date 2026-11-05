@@ -244,18 +244,22 @@ void main() {
         token: 'test-token',
       ),
     );
-    await accounts.cachePortfolio('Default', [
-      Position(
-        symbol: 'VOO',
-        name: 'Vanguard S&P 500',
-        nativeCurrency: 'USD',
-        netShares: 10,
-        avgCost: 500,
-        currentPrice: 550,
-        firstBuyDate: DateTime(2025),
-        lastBuyDate: DateTime(2026),
-      ),
-    ], const IbkrAccountValue(value: 5500, currency: 'USD'));
+    await accounts.cachePortfolio(
+      'Default',
+      [
+        Position(
+          symbol: 'VOO',
+          name: 'Vanguard S&P 500',
+          nativeCurrency: 'USD',
+          netShares: 10,
+          avgCost: 500,
+          currentPrice: 550,
+          firstBuyDate: DateTime(2025),
+          lastBuyDate: DateTime(2026),
+        ),
+      ],
+      const IbkrAccountValue(value: 5500, currency: 'USD'),
+    );
     final active = ValueNotifier(true);
     addTearDown(active.dispose);
     var calls = 0;
@@ -324,18 +328,22 @@ void main() {
         token: 'test-token',
       ),
     );
-    await firstSession.cachePortfolio('Default', [
-      Position(
-        symbol: 'COHR',
-        name: 'Coherent',
-        nativeCurrency: 'USD',
-        netShares: 2,
-        avgCost: 100,
-        currentPrice: 120,
-        firstBuyDate: DateTime(2026, 1, 1),
-        lastBuyDate: DateTime(2026, 1, 1),
-      ),
-    ], const IbkrAccountValue(value: 240, currency: 'USD'));
+    await firstSession.cachePortfolio(
+      'Default',
+      [
+        Position(
+          symbol: 'COHR',
+          name: 'Coherent',
+          nativeCurrency: 'USD',
+          netShares: 2,
+          avgCost: 100,
+          currentPrice: 120,
+          firstBuyDate: DateTime(2026, 1, 1),
+          lastBuyDate: DateTime(2026, 1, 1),
+        ),
+      ],
+      const IbkrAccountValue(value: 240, currency: 'USD'),
+    );
     await firstSession.cacheIbkrTradeHistory(
       'Default',
       IbkrTradeHistory(
@@ -466,7 +474,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(Key('trade-actions-$tradeId')), findsOneWidget);
 
-    await tester.tap(find.text('BUY'));
+    await tester.tap(find.byKey(Key('trade-actions-$tradeId')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit trade'));
     await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.text('Edit trade'), findsOneWidget);

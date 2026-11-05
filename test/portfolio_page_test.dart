@@ -72,9 +72,7 @@ Future<AccountManager> configuredTwoAccounts() async {
 
 Future<void> seedCurrentCandle(String symbol) async {
   final now = DateTime.now();
-  await testDatabase
-      .into(testDatabase.candles)
-      .insert(
+  await testDatabase.into(testDatabase.candles).insert(
         CandlesCompanion.insert(
           symbol: symbol,
           date: DateTime(now.year, now.month, now.day),
@@ -86,30 +84,32 @@ Future<void> seedCurrentCandle(String symbol) async {
 Future<IbkrPerformanceSeries> _performanceLoader(
   IbkrAccountConfig _,
   String period,
-) async => IbkrPerformanceSeries(
-  period: period,
-  measure: 'TWR',
-  currency: 'USD',
-  startDate: DateTime(2026, 1, 1),
-  startNav: 100,
-  dates: [DateTime(2026, 1, 1), DateTime(2026, 10, 1)],
-  nav: const [100, 100],
-  returnDates: [DateTime(2026, 1, 1), DateTime(2026, 10, 1)],
-  returns: const [0, 0],
-);
+) async =>
+    IbkrPerformanceSeries(
+      period: period,
+      measure: 'TWR',
+      currency: 'USD',
+      startDate: DateTime(2026, 1, 1),
+      startNav: 100,
+      dates: [DateTime(2026, 1, 1), DateTime(2026, 10, 1)],
+      nav: const [100, 100],
+      returnDates: [DateTime(2026, 1, 1), DateTime(2026, 10, 1)],
+      returns: const [0, 0],
+    );
 
 PortfolioPage _portfolioPage({
   Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? ibkrLoader,
   Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
-  ibkrPerformanceLoader,
+      ibkrPerformanceLoader,
   Future<ShareResult> Function(ShareParams)? shareFile,
   Future<void> Function(File, List<int>)? writeShareFile,
-}) => PortfolioPage(
-  ibkrLoader: ibkrLoader,
-  ibkrPerformanceLoader: ibkrPerformanceLoader ?? _performanceLoader,
-  shareFile: shareFile,
-  writeShareFile: writeShareFile,
-);
+}) =>
+    PortfolioPage(
+      ibkrLoader: ibkrLoader,
+      ibkrPerformanceLoader: ibkrPerformanceLoader ?? _performanceLoader,
+      shareFile: shareFile,
+      writeShareFile: writeShareFile,
+    );
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -126,15 +126,15 @@ void main() {
   });
 
   Position cachedPosition({String name = 'VANGUARD S&P 500 ETF'}) => Position(
-    symbol: 'VOO',
-    name: name,
-    nativeCurrency: 'USD',
-    netShares: 10,
-    avgCost: 500,
-    currentPrice: 550,
-    firstBuyDate: DateTime(2025),
-    lastBuyDate: DateTime(2026),
-  );
+        symbol: 'VOO',
+        name: name,
+        nativeCurrency: 'USD',
+        netShares: 10,
+        avgCost: 500,
+        currentPrice: 550,
+        firstBuyDate: DateTime(2025),
+        lastBuyDate: DateTime(2026),
+      );
 
   Future<AccountManager> configuredAccounts() async {
     final accounts = testAccountManager();
@@ -151,12 +151,12 @@ void main() {
   }
 
   Widget app(AccountManager accounts, Widget page) => MultiProvider(
-    providers: [
-      ChangeNotifierProvider(create: (_) => SettingsState()),
-      ChangeNotifierProvider.value(value: accounts),
-    ],
-    child: MaterialApp(home: page),
-  );
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(home: page),
+      );
 
   testWidgets('IBKR cash stays in the mobile legend and donut', (tester) async {
     await seedTestSqlite({});
@@ -175,7 +175,7 @@ void main() {
     );
     await tester.pump();
     expect(find.byKey(const Key('portfolio-ibkr-cash')), findsNothing);
-    expect(find.text('Cash'), findsNothing);
+    expect(find.byKey(const Key('portfolio-cash-summary')), findsOneWidget);
     final donut = tester.widget<MarketDonutChart>(
       find.byType(MarketDonutChart),
     );
@@ -224,9 +224,13 @@ void main() {
     (tester) async {
       await seedTestSqlite({});
       final accounts = await configuredAccounts();
-      await accounts.cachePortfolio('Default', [
-        cachedPosition(),
-      ], const IbkrAccountValue(value: 5500, currency: 'USD'));
+      await accounts.cachePortfolio(
+        'Default',
+        [
+          cachedPosition(),
+        ],
+        const IbkrAccountValue(value: 5500, currency: 'USD'),
+      );
       final pending = Completer<IbkrPortfolioSnapshot>();
 
       await tester.pumpWidget(
@@ -320,7 +324,8 @@ void main() {
     final chart = tester.widget<MarketDonutChart>(
       find.byType(MarketDonutChart),
     );
-    expect(chart.slices.first.value, 1.1);
+    expect(
+        chart.slices.singleWhere((slice) => slice.label == 'CASH').value, 1.1,);
   });
 
   testWidgets('mobile portfolio lists positions without a filter field', (
@@ -334,19 +339,23 @@ void main() {
     });
     await seedTestSqlite({});
     final accounts = await configuredAccounts();
-    await accounts.cachePortfolio('Default', [
-      cachedPosition(),
-      Position(
-        symbol: 'AAPL',
-        name: 'Apple',
-        nativeCurrency: 'USD',
-        netShares: 2,
-        avgCost: 100,
-        currentPrice: 150,
-        firstBuyDate: DateTime(2025),
-        lastBuyDate: DateTime(2026),
-      ),
-    ], const IbkrAccountValue(value: 5800, currency: 'USD'));
+    await accounts.cachePortfolio(
+      'Default',
+      [
+        cachedPosition(),
+        Position(
+          symbol: 'AAPL',
+          name: 'Apple',
+          nativeCurrency: 'USD',
+          netShares: 2,
+          avgCost: 100,
+          currentPrice: 150,
+          firstBuyDate: DateTime(2025),
+          lastBuyDate: DateTime(2026),
+        ),
+      ],
+      const IbkrAccountValue(value: 5800, currency: 'USD'),
+    );
     final pending = Completer<IbkrPortfolioSnapshot>();
     await tester.pumpWidget(
       app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
@@ -387,9 +396,13 @@ void main() {
       await seedTestSqlite({});
       final accounts = await configuredTwoAccounts();
       for (final profile in accounts.accounts) {
-        await accounts.cachePortfolio(profile, [
-          cachedPosition(),
-        ], const IbkrAccountValue(value: 5500, currency: 'USD'));
+        await accounts.cachePortfolio(
+          profile,
+          [
+            cachedPosition(),
+          ],
+          const IbkrAccountValue(value: 5500, currency: 'USD'),
+        );
       }
 
       final pending = Completer<IbkrPortfolioSnapshot>();
@@ -620,9 +633,13 @@ void main() {
     await seedTestSqlite({});
 
     final accounts = await configuredAccounts();
-    await accounts.cachePortfolio('Default', [
-      cachedPosition(),
-    ], const IbkrAccountValue(value: 5500, currency: 'USD'));
+    await accounts.cachePortfolio(
+      'Default',
+      [
+        cachedPosition(),
+      ],
+      const IbkrAccountValue(value: 5500, currency: 'USD'),
+    );
     final pending = Completer<IbkrPortfolioSnapshot>();
 
     await tester.pumpWidget(
@@ -671,16 +688,14 @@ void main() {
     final pieFinder = find.byType(MarketDonutChart).first;
     final pie = tester.widget<MarketDonutChart>(pieFinder);
     expect(pie.radius, 75);
-    final subtitleBottom = tester
-        .getBottomLeft(find.text('How your portfolio is distributed'))
-        .dy;
+    final subtitleBottom = tester.getBottomLeft(find.text('Allocation')).dy;
     final pieTop = tester.getTopLeft(pieFinder).dy;
     expect(pieTop - subtitleBottom, greaterThanOrEqualTo(28));
     expect(tester.takeException(), null);
 
     await tester.tap(find.byKey(const Key('desktop-return-VOO')));
     await tester.pump();
-    expect(find.text('VOO — History'), findsOneWidget);
+    expect(find.text('Trade History'), findsWidgets);
   });
 
   for (final width in [700.0, 1000.0]) {
@@ -698,19 +713,23 @@ void main() {
       final now = DateTime.now();
       final start = DateTime(now.year, now.month, now.day - 100);
       final week = DateTime(now.year, now.month, now.day - 7);
-      await accounts.cachePortfolio('Default', [
-        cachedPosition(),
-        Position(
-          symbol: 'MSFT',
-          name: 'Microsoft',
-          nativeCurrency: 'USD',
-          netShares: 10,
-          avgCost: 100,
-          currentPrice: 100,
-          firstBuyDate: DateTime(2025),
-          lastBuyDate: DateTime(2026),
-        ),
-      ], const IbkrAccountValue(value: 121, currency: 'USD'));
+      await accounts.cachePortfolio(
+        'Default',
+        [
+          cachedPosition(),
+          Position(
+            symbol: 'MSFT',
+            name: 'Microsoft',
+            nativeCurrency: 'USD',
+            netShares: 10,
+            avgCost: 100,
+            currentPrice: 100,
+            firstBuyDate: DateTime(2025),
+            lastBuyDate: DateTime(2026),
+          ),
+        ],
+        const IbkrAccountValue(value: 121, currency: 'USD'),
+      );
       await accounts.cacheIbkrPerformance(
         'Default',
         IbkrPerformanceSeries(
@@ -740,9 +759,7 @@ void main() {
       for (final period in [7, 8, 9, 10, 11, 12]) {
         final date = portfolioReturnCutoff(period, now)!;
         for (final symbol in ['VOO', 'MSFT', 'OLD']) {
-          await testDatabase
-              .into(testDatabase.candles)
-              .insert(
+          await testDatabase.into(testDatabase.candles).insert(
                 CandlesCompanion.insert(
                   symbol: symbol,
                   date: date,
@@ -751,8 +768,8 @@ void main() {
                     symbol == 'VOO'
                         ? (period == 10 ? 200.0 : 100.0)
                         : symbol == 'MSFT'
-                        ? (period == 10 ? 100.0 : 300.0)
-                        : (period == 10 ? 100.0 : 400.0),
+                            ? (period == 10 ? 100.0 : 300.0)
+                            : (period == 10 ? 100.0 : 400.0),
                   ),
                 ),
               );
@@ -780,12 +797,11 @@ void main() {
         findsNothing,
       );
       Map<String, double> pieValues() => {
-        for (final slice
-            in tester
+            for (final slice in tester
                 .widget<MarketDonutChart>(find.byType(MarketDonutChart))
                 .slices)
-          slice.label: slice.value,
-      };
+              slice.label: slice.value,
+          };
       expect(pieValues(), {'VOO': 5500, 'MSFT': 1000});
       if (width >= 840) {
         expect(find.text(fmtNativeCurrency(121, 'USD')), findsOneWidget);
@@ -807,16 +823,14 @@ void main() {
       );
       expect(find.text('+21.00%'), findsNothing);
       expect(pieValues(), {'VOO': 1000, 'MSFT': 3000, 'OLD': 4000});
-      final chartAnimation =
-          tester
-                  .widget<AnimatedBuilder>(
-                    find.descendant(
-                      of: find.byType(MarketDonutChart),
-                      matching: find.byType(AnimatedBuilder),
-                    ),
-                  )
-                  .animation
-              as Animation<double>;
+      final chartAnimation = tester
+          .widget<AnimatedBuilder>(
+            find.descendant(
+              of: find.byType(MarketDonutChart),
+              matching: find.byType(AnimatedBuilder),
+            ),
+          )
+          .animation as Animation<double>;
       expect(chartAnimation.value, 0);
       await tester.pump(const Duration(milliseconds: 90));
       expect(chartAnimation.value, greaterThan(0));
@@ -888,9 +902,13 @@ void main() {
     });
     await seedTestSqlite({});
     final accounts = await configuredAccounts();
-    await accounts.cachePortfolio('Default', [
-      cachedPosition(),
-    ], const IbkrAccountValue(value: 5500, currency: 'USD'));
+    await accounts.cachePortfolio(
+      'Default',
+      [
+        cachedPosition(),
+      ],
+      const IbkrAccountValue(value: 5500, currency: 'USD'),
+    );
     final pending = Completer<IbkrPortfolioSnapshot>();
     await tester.pumpWidget(
       app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
@@ -938,9 +956,13 @@ void main() {
     await seedTestSqlite({});
 
     final accounts = await configuredAccounts();
-    await accounts.cachePortfolio('Default', [
-      cachedPosition(),
-    ], const IbkrAccountValue(value: 5500, currency: 'USD'));
+    await accounts.cachePortfolio(
+      'Default',
+      [
+        cachedPosition(),
+      ],
+      const IbkrAccountValue(value: 5500, currency: 'USD'),
+    );
     final pending = Completer<IbkrPortfolioSnapshot>();
 
     await tester.pumpWidget(
@@ -949,9 +971,7 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const Key('desktop-allocation-compact')), findsOneWidget);
-    final subtitleBottom = tester
-        .getBottomLeft(find.text('How your portfolio is distributed'))
-        .dy;
+    final subtitleBottom = tester.getBottomLeft(find.text('Allocation')).dy;
     final compactPieFinder = find.byType(MarketDonutChart).first;
     final pieTop = tester.getTopLeft(compactPieFinder).dy;
     expect(pieTop - subtitleBottom, greaterThanOrEqualTo(28));
@@ -974,9 +994,13 @@ void main() {
     await seedTestSqlite({});
 
     final accounts = await configuredAccounts();
-    await accounts.cachePortfolio('Default', [
-      cachedPosition(),
-    ], const IbkrAccountValue(value: 5500, currency: 'USD'));
+    await accounts.cachePortfolio(
+      'Default',
+      [
+        cachedPosition(),
+      ],
+      const IbkrAccountValue(value: 5500, currency: 'USD'),
+    );
     final pending = Completer<IbkrPortfolioSnapshot>();
 
     await tester.pumpWidget(
@@ -1006,9 +1030,13 @@ void main() {
       'displayCurrency': 'NZD',
     });
     final accounts = await configuredAccounts();
-    await accounts.cachePortfolio('Default', [
-      cachedPosition(),
-    ], const IbkrAccountValue(value: 5500, currency: 'USD'));
+    await accounts.cachePortfolio(
+      'Default',
+      [
+        cachedPosition(),
+      ],
+      const IbkrAccountValue(value: 5500, currency: 'USD'),
+    );
     final pending = Completer<IbkrPortfolioSnapshot>();
     await tester.pumpWidget(
       app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
@@ -1062,9 +1090,13 @@ void main() {
 
         await seedTestSqlite({});
         final accounts = await configuredAccounts();
-        await accounts.cachePortfolio('Default', [
-          cachedPosition(name: 'Vanguard, "Special"\nETF'),
-        ], const IbkrAccountValue(value: 5500, currency: 'USD'));
+        await accounts.cachePortfolio(
+          'Default',
+          [
+            cachedPosition(name: 'Vanguard, "Special"\nETF'),
+          ],
+          const IbkrAccountValue(value: 5500, currency: 'USD'),
+        );
         final pending = Completer<IbkrPortfolioSnapshot>();
         await tester.pumpWidget(
           app(
@@ -1135,9 +1167,13 @@ void main() {
       });
       await seedTestSqlite({});
       final accounts = await configuredAccounts();
-      await accounts.cachePortfolio('Default', [
-        cachedPosition(),
-      ], const IbkrAccountValue(value: 5500, currency: 'USD'));
+      await accounts.cachePortfolio(
+        'Default',
+        [
+          cachedPosition(),
+        ],
+        const IbkrAccountValue(value: 5500, currency: 'USD'),
+      );
       final pending = Completer<IbkrPortfolioSnapshot>();
       await tester.pumpWidget(
         app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),

@@ -40,12 +40,13 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 bool get _supportsFileSharing => switch (defaultTargetPlatform) {
-  TargetPlatform.android ||
-  TargetPlatform.iOS ||
-  TargetPlatform.macOS ||
-  TargetPlatform.windows => true,
-  _ => false,
-};
+      TargetPlatform.android ||
+      TargetPlatform.iOS ||
+      TargetPlatform.macOS ||
+      TargetPlatform.windows =>
+        true,
+      _ => false,
+    };
 
 class _LoadedPortfolio {
   final List<Position> positions;
@@ -69,7 +70,7 @@ class PortfolioPage extends StatefulWidget {
   final bool isActive;
   final Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? _ibkrLoader;
   final Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
-  _ibkrPerformanceLoader;
+      _ibkrPerformanceLoader;
   final Future<ShareResult> Function(ShareParams)? _shareFile;
   final Future<void> Function(File, List<int>)? _writeShareFile;
 
@@ -78,13 +79,13 @@ class PortfolioPage extends StatefulWidget {
     this.isActive = true,
     Future<IbkrPortfolioSnapshot> Function(IbkrAccountConfig)? ibkrLoader,
     Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
-    ibkrPerformanceLoader,
+        ibkrPerformanceLoader,
     Future<ShareResult> Function(ShareParams)? shareFile,
     Future<void> Function(File, List<int>)? writeShareFile,
-  }) : _ibkrLoader = ibkrLoader,
-       _ibkrPerformanceLoader = ibkrPerformanceLoader,
-       _shareFile = shareFile,
-       _writeShareFile = writeShareFile;
+  })  : _ibkrLoader = ibkrLoader,
+        _ibkrPerformanceLoader = ibkrPerformanceLoader,
+        _shareFile = shareFile,
+        _writeShareFile = writeShareFile;
 
   @override
   State<PortfolioPage> createState() => PortfolioPageState();
@@ -158,7 +159,8 @@ class PortfolioPageState extends State<PortfolioPage>
           if (!portfolioReturnCutoff(
                 period,
                 DateTime.now(),
-              )!.isBefore(firstKnownDate) &&
+              )!
+                  .isBefore(firstKnownDate) &&
               (accountPeriodReturn(
                         performance,
                         netLiquidation.value,
@@ -187,7 +189,8 @@ class PortfolioPageState extends State<PortfolioPage>
         if (!portfolioReturnCutoff(
               period,
               DateTime.now(),
-            )!.isBefore(dates.first) &&
+            )!
+                .isBefore(dates.first) &&
             positions.every(
               (position) => _holdingReturn(position, period: period) != null,
             ) &&
@@ -198,13 +201,16 @@ class PortfolioPageState extends State<PortfolioPage>
 
   List<PortfolioAllocation>? _allocationAt(
     List<Position> positions,
-    int period,
-  ) => portfolioAllocationAt(
-    positions: positions,
-    trades: _returnTrades,
-    candles: _returnCandles,
-    date: portfolioReturnCutoff(period, DateTime.now()),
-  );
+    int period, {
+    double? cashValueUsd,
+  }) =>
+      portfolioAllocationAt(
+        positions: positions,
+        trades: _returnTrades,
+        candles: _returnCandles,
+        date: portfolioReturnCutoff(period, DateTime.now()),
+        cashValueUsd: cashValueUsd,
+      );
 
   Future<void> _loadReturnHistory(
     String account,
@@ -228,11 +234,11 @@ class PortfolioPageState extends State<PortfolioPage>
         for (final trade in trades) trade.symbol,
       };
       for (final symbol in symbols) {
-        candles[symbol] =
-            await (marketDataDatabase.candles.select()..where(
-                  (row) => row.symbol.equals(canonicalMarketSymbol(symbol)),
-                ))
-                .get();
+        candles[symbol] = await (marketDataDatabase.candles.select()
+              ..where(
+                (row) => row.symbol.equals(canonicalMarketSymbol(symbol)),
+              ))
+            .get();
         candles[symbol]!.sort((a, b) => a.date.compareTo(b.date));
       }
       if (!mounted || _historyAccount != account) return;
@@ -257,9 +263,10 @@ class PortfolioPageState extends State<PortfolioPage>
       return PortfolioReturn(position.unrealizedPL, position.costBasis);
     }
     if (_historyLoading || _historyFailed) return null;
-    final trades =
-        _returnTrades.where((trade) => trade.symbol == position.symbol).toList()
-          ..sort((a, b) => a.tradeDate.compareTo(b.tradeDate));
+    final trades = _returnTrades
+        .where((trade) => trade.symbol == position.symbol)
+        .toList()
+      ..sort((a, b) => a.tradeDate.compareTo(b.tradeDate));
     if (trades.isNotEmpty &&
         trades.every(
           (trade) => DateTime(
@@ -283,15 +290,13 @@ class PortfolioPageState extends State<PortfolioPage>
     final currency = normalizedQuoteCurrency(
       baseline.rawCurrency ?? symbolCurrency(position.symbol),
     );
-    final basis =
-        position.netShares *
+    final basis = position.netShares *
         baseline.close /
         candleCentDivisor(baseline) /
         requireUsdRate(currency);
     if (trades.any(
       (trade) => verifiedTradeAmountUsd(trade, trade.price) == null,
-    ))
-      return null;
+    )) return null;
     if (trades.isEmpty)
       return PortfolioReturn(position.currentValue - basis, basis);
     return openHoldingPeriodReturn(
@@ -317,7 +322,8 @@ class PortfolioPageState extends State<PortfolioPage>
         (a, b) => portfolioReturnCutoff(
           b,
           now,
-        )!.compareTo(portfolioReturnCutoff(a, now)!),
+        )!
+            .compareTo(portfolioReturnCutoff(a, now)!),
       );
     final ordered = [0, ...past];
     return PortfolioPeriodPicker(
@@ -342,9 +348,9 @@ class PortfolioPageState extends State<PortfolioPage>
   int _lastIbkrRefreshVersion = -1;
   IbkrAccountConfig _lastIbkrConfig = const IbkrAccountConfig();
   final Map<(String, IbkrAccountConfig), Future<IbkrPortfolioSnapshot>>
-  _ibkrSnapshotLoads = {};
+      _ibkrSnapshotLoads = {};
   final Map<(String, IbkrAccountConfig), Future<IbkrPerformanceSeries>>
-  _ibkrPerformanceLoads = {};
+      _ibkrPerformanceLoads = {};
   final Map<(String, bool), Future<void>> _preloadLoads = {};
 
   @override
@@ -439,12 +445,14 @@ class PortfolioPageState extends State<PortfolioPage>
   }) async {
     if (!widget.isActive) {
       final cached = context.read<AccountManager>().portfolioCacheFor(
-        accountName,
-      );
+            accountName,
+          );
       return _LoadedPortfolio(
         positions: cached?.positions ?? _positions,
         netLiquidation: cached?.netLiquidation ?? _netLiquidation,
         netLiquidationUsd: cached?.netLiquidationUsd,
+        cashBalance: cached?.cashBalance,
+        cashUsd: cached?.cashUsd,
         asOfDate: cached?.asOfDate,
       );
     }
@@ -468,8 +476,7 @@ class PortfolioPageState extends State<PortfolioPage>
     final accounts = context.read<AccountManager>();
     final cached = accounts.portfolioCacheFor(accountName);
     final cacheFresh = accounts.isPortfolioCacheFresh(accountName);
-    final shouldUseCache =
-        cached != null &&
+    final shouldUseCache = cached != null &&
         !forceRefresh &&
         (!refreshIfStale || cacheFresh || !config.isConfigured) &&
         cached.cashChecked;
@@ -478,6 +485,8 @@ class PortfolioPageState extends State<PortfolioPage>
         positions: cached.positions,
         netLiquidation: cached.netLiquidation,
         netLiquidationUsd: cached.netLiquidationUsd,
+        cashBalance: cached.cashBalance,
+        cashUsd: cached.cashUsd,
         asOfDate: cached.asOfDate,
       );
     }
@@ -488,6 +497,8 @@ class PortfolioPageState extends State<PortfolioPage>
           positions: cached.positions,
           netLiquidation: cached.netLiquidation,
           netLiquidationUsd: cached.netLiquidationUsd,
+          cashBalance: cached.cashBalance,
+          cashUsd: cached.cashUsd,
         );
       }
       throw StateError('IBKR portfolio source is not fully configured');
@@ -498,6 +509,8 @@ class PortfolioPageState extends State<PortfolioPage>
         positions: cached?.positions ?? _positions,
         netLiquidation: cached?.netLiquidation ?? _netLiquidation,
         netLiquidationUsd: cached?.netLiquidationUsd,
+        cashBalance: cached?.cashBalance,
+        cashUsd: cached?.cashUsd,
         asOfDate: cached?.asOfDate,
       );
     }
@@ -597,8 +610,7 @@ class PortfolioPageState extends State<PortfolioPage>
     final config = accounts.ibkrConfigFor(accountName);
     final cachedBefore = accounts.portfolioCacheFor(accountName);
     final cacheWasFresh = accounts.isPortfolioCacheFresh(accountName);
-    final willFetchIbkr =
-        config.enabled &&
+    final willFetchIbkr = config.enabled &&
         config.isConfigured &&
         (forceRefresh ||
             cachedBefore == null ||
@@ -889,9 +901,9 @@ class PortfolioPageState extends State<PortfolioPage>
         : 'Couldn’t load portfolio';
     final message = ibkrEnabled
         ? 'MarketMonk couldn’t load your portfolio from your IBKR server. '
-              'Check the server connection, then try again.'
+            'Check the server connection, then try again.'
         : 'MarketMonk couldn’t refresh your portfolio. Check your internet '
-              'connection, then try again.';
+            'connection, then try again.';
 
     return Center(
       child: Padding(
@@ -1027,9 +1039,17 @@ class PortfolioPageState extends State<PortfolioPage>
     final positions = snap.data?.positions ?? _positions;
     final netLiquidation = snap.data?.netLiquidation ?? _netLiquidation;
     final accounts = context.watch<AccountManager>();
-    final cashBalance =
-        snap.data?.cashBalance ?? accounts.portfolioCacheFor()?.cashBalance;
-    final cashUsd = snap.data?.cashUsd ?? accounts.portfolioCacheFor()?.cashUsd;
+    final cachedPortfolio = accounts.portfolioCacheFor();
+    final cashBalance = snap.data?.cashBalance ?? cachedPortfolio?.cashBalance;
+    final cashUsd = snap.data?.cashUsd ??
+        cachedPortfolio?.cashUsd ??
+        ibkrCashValueUsd(
+          cashBalance: cashBalance,
+          netLiquidation:
+              snap.data?.netLiquidation ?? cachedPortfolio?.netLiquidation,
+          netLiquidationUsd: snap.data?.netLiquidationUsd ??
+              cachedPortfolio?.netLiquidationUsd,
+        );
     final performance = accounts.ibkrPerformanceCacheFor(
       accounts.activeAccount,
       '1Y',
@@ -1061,10 +1081,8 @@ class PortfolioPageState extends State<PortfolioPage>
       });
     }
     if (positions.isEmpty && cashBalance == null) {
-      final ibkrEnabled = context
-          .watch<AccountManager>()
-          .ibkrConfigFor()
-          .enabled;
+      final ibkrEnabled =
+          context.watch<AccountManager>().ibkrConfigFor().enabled;
       return _refreshableState(
         AppEmptyState(
           icon: ibkrEnabled
@@ -1083,9 +1101,8 @@ class PortfolioPageState extends State<PortfolioPage>
           actionLabel: ibkrEnabled
               ? context.l10n.text('IBKR settings')
               : context.l10n.text('Import CSV'),
-          actionIcon: ibkrEnabled
-              ? Icons.settings_rounded
-              : Icons.upload_file_rounded,
+          actionIcon:
+              ibkrEnabled ? Icons.settings_rounded : Icons.upload_file_rounded,
           onAction: () => Navigator.push(
             context,
             adaptivePageRoute(context, builder: (_) => const SettingsPage()),
@@ -1114,41 +1131,44 @@ class PortfolioPageState extends State<PortfolioPage>
     final costBasisGain = totalValue - totalCost;
     final cashOutSummary = _ibkrCashOutSummary(performance, netLiquidation);
     final cutoff = _returnCutoff;
-    final historicalCashOut = cutoff == null
-        ? null
-        : _ibkrCashOutSummaryAt(performance, cutoff);
+    final historicalCashOut =
+        cutoff == null ? null : _ibkrCashOutSummaryAt(performance, cutoff);
     final totalGain = cutoff == null
         ? cashOutSummary?.gainUsd ?? costBasisGain
         : historicalCashOut?.gainUsd ?? double.nan;
     final totalGainPct = cutoff == null
         ? cashOutSummary?.gainPct ??
-              (totalCost > 0 ? (costBasisGain / totalCost) * 100 : 0.0)
+            (totalCost > 0 ? (costBasisGain / totalCost) * 100 : 0.0)
         : historicalCashOut?.gainPct ?? double.nan;
 
-    final allocation = [
-      ...?_allocationAt(positions, _period),
-      if (_returnCutoff == null && cashUsd != null && cashUsd > 0)
-        PortfolioAllocation('CASH', 'IBKR cash', cashUsd),
-    ];
+    final allocation = _allocationAt(
+          positions,
+          _period,
+          cashValueUsd: _returnCutoff == null ? cashUsd : null,
+        ) ??
+        [];
     final allocationTotal = allocation.fold<double>(
       0,
       (sum, holding) => sum + holding.value,
     );
+    final cashPercent = cashUsd != null && allocationTotal > 0
+        ? cashUsd / allocationTotal * 100
+        : null;
     final historicalNav = cutoff == null || performance == null
         ? null
         : accountNetAssetValueAt(performance, cutoff);
     final displayTotal = cutoff == null
         ? netLiquidation == null
-              ? fmtCurrency(totalValue)
-              : fmtNativeCurrency(netLiquidation.value, netLiquidation.currency)
+            ? fmtCurrency(totalValue)
+            : fmtNativeCurrency(netLiquidation.value, netLiquidation.currency)
         : historicalNav == null
-        ? fmtCurrency(allocationTotal)
-        : fmtNativeCurrency(historicalNav, performance!.currency);
+            ? fmtCurrency(allocationTotal)
+            : fmtNativeCurrency(historicalNav, performance!.currency);
     final totalLabel = cutoff == null && netLiquidation == null
         ? 'Market value'
         : cutoff != null && historicalNav == null
-        ? 'Holdings value'
-        : 'Account value';
+            ? 'Holdings value'
+            : 'Account value';
     final sorted = [...allocation]..sort((a, b) => b.value.compareTo(a.value));
     final currentBySymbol = {
       for (final position in positions) position.symbol: position,
@@ -1159,8 +1179,7 @@ class PortfolioPageState extends State<PortfolioPage>
     ]);
     // Holdings can change while this page is kept alive (for example, after
     // switching accounts). Do not use a selection from the previous list.
-    final selectedIndex =
-        touchedIndex != null &&
+    final selectedIndex = touchedIndex != null &&
             touchedIndex! >= 0 &&
             touchedIndex! < sorted.length
         ? touchedIndex
@@ -1224,6 +1243,26 @@ class PortfolioPageState extends State<PortfolioPage>
               ),
             ),
           ),
+          if (cutoff == null && cashUsd != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: Card(
+                  child: ListTile(
+                    key: const Key('portfolio-cash-summary'),
+                    dense: true,
+                    leading: const Icon(Icons.account_balance_wallet_outlined),
+                    title: Text(context.l10n.text('Cash')),
+                    subtitle:
+                        Text('${cashPercent!.toStringAsFixed(2)}% allocation'),
+                    trailing: Text(
+                      fmtCurrency(cashUsd),
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(36, 12, 36, 8),
@@ -1286,9 +1325,8 @@ class PortfolioPageState extends State<PortfolioPage>
               itemBuilder: (context, index) {
                 final position = sorted[index];
                 final val = position.value;
-                final pct = allocationTotal > 0
-                    ? val / allocationTotal * 100
-                    : 0.0;
+                final pct =
+                    allocationTotal > 0 ? val / allocationTotal * 100 : 0.0;
                 return _LegendTile(
                   color: colors[index],
                   symbol: position.symbol,
@@ -1298,8 +1336,8 @@ class PortfolioPageState extends State<PortfolioPage>
                   changePct: currentBySymbol[position.symbol] == null
                       ? double.nan
                       : _holdingReturn(currentBySymbol[position.symbol]!)
-                                ?.percent ??
-                            double.nan,
+                              ?.percent ??
+                          double.nan,
                   isHighlighted: index == selectedIndex,
                   onTap: () => setState(
                     () => touchedIndex = touchedIndex == index ? null : index,
@@ -1417,25 +1455,20 @@ class PortfolioPageState extends State<PortfolioPage>
       0,
       (sum, holding) => sum + holding.value,
     );
-    final byReturn = [...positions]
-      ..sort(
+    final byReturn = [...positions]..sort(
         (firstPosition, secondPosition) =>
             (_holdingReturn(secondPosition)?.percent ?? double.negativeInfinity)
                 .compareTo(
-                  _holdingReturn(firstPosition)?.percent ??
-                      double.negativeInfinity,
-                ),
+          _holdingReturn(firstPosition)?.percent ?? double.negativeInfinity,
+        ),
       );
-    final currencyCount = positions
-        .map((position) => position.nativeCurrency)
-        .toSet()
-        .length;
+    final currencyCount =
+        positions.map((position) => position.nativeCurrency).toSet().length;
     final positionLabel = positions.length == 1 ? 'position' : 'positions';
     final currencyLabel = currencyCount == 1 ? 'currency' : 'currencies';
     final windowWidth = MediaQuery.sizeOf(context).width;
     final expandedActions = windowWidth >= 1280;
-    final inlineCurrencies =
-        settings.visibleCurrencies.length > 1 &&
+    final inlineCurrencies = settings.visibleCurrencies.length > 1 &&
         windowWidth >= 1080 + settings.visibleCurrencies.length * 70;
     return LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
@@ -1454,14 +1487,14 @@ class PortfolioPageState extends State<PortfolioPage>
                       onExport: expandedActions
                           ? null
                           : () => runDetachedTask(
-                              _exportCsv(context, positions),
-                              'Failed to export portfolio CSV',
-                            ),
+                                _exportCsv(context, positions),
+                                'Failed to export portfolio CSV',
+                              ),
                       onShare: !expandedActions && _supportsFileSharing
                           ? () => runDetachedTask(
-                              _shareCsv(context, positions),
-                              'Failed to share portfolio CSV',
-                            )
+                                _shareCsv(context, positions),
+                                'Failed to share portfolio CSV',
+                              )
                           : null,
                     ),
                     const SizedBox(width: 12),
@@ -1593,8 +1626,8 @@ class PortfolioPageState extends State<PortfolioPage>
                         isCashOut
                             ? 'Total P/L'
                             : _period == 0
-                            ? 'Unrealized P/L'
-                            : 'Open holdings P/L',
+                                ? 'Unrealized P/L'
+                                : 'Open holdings P/L',
                       ),
                       value: totalGain.isFinite
                           ? '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}'
@@ -1602,9 +1635,8 @@ class PortfolioPageState extends State<PortfolioPage>
                       detail: totalGainPct.isFinite
                           ? '${totalGainPct >= 0 ? '+' : ''}${totalGainPct.toStringAsFixed(2)}%'
                           : 'History does not cover this period',
-                      valueColor: totalGain >= 0
-                          ? Colors.green
-                          : Colors.redAccent,
+                      valueColor:
+                          totalGain >= 0 ? Colors.green : Colors.redAccent,
                       icon: totalGain >= 0
                           ? Icons.trending_up_rounded
                           : Icons.trending_down_rounded,
@@ -1671,10 +1703,10 @@ class PortfolioPageState extends State<PortfolioPage>
                                             final position = sorted[index];
                                             final allocationPct =
                                                 allocationTotal > 0
-                                                ? position.value /
-                                                      allocationTotal *
-                                                      100
-                                                : 0.0;
+                                                    ? position.value /
+                                                        allocationTotal *
+                                                        100
+                                                    : 0.0;
                                             return _DesktopAllocationRow(
                                               color: colors[index],
                                               symbol: position.symbol,
@@ -1685,8 +1717,8 @@ class PortfolioPageState extends State<PortfolioPage>
                                               onTap: () => setState(
                                                 () => touchedIndex =
                                                     touchedIndex == index
-                                                    ? null
-                                                    : index,
+                                                        ? null
+                                                        : index,
                                               ),
                                             );
                                           },
@@ -2159,7 +2191,7 @@ class _SummaryCard extends StatelessWidget {
                 Text(
                   totalGain.isFinite
                       ? '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}'
-                            '  (${totalGainPct.toStringAsFixed(2)}%)'
+                          '  (${totalGainPct.toStringAsFixed(2)}%)'
                       : 'Return history unavailable',
                   style: TextStyle(color: gainColor, fontSize: 13),
                 ),
@@ -2244,12 +2276,12 @@ class _LegendTile extends StatelessWidget {
             Text(
               fmtCurrency(value),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: !changePct.isFinite
-                    ? Theme.of(context).colorScheme.onSurfaceVariant
-                    : changePct >= 0
-                    ? Colors.green
-                    : Colors.redAccent,
-              ),
+                    color: !changePct.isFinite
+                        ? Theme.of(context).colorScheme.onSurfaceVariant
+                        : changePct >= 0
+                            ? Colors.green
+                            : Colors.redAccent,
+                  ),
             ),
             Text(
               changePct.isFinite
@@ -2260,8 +2292,8 @@ class _LegendTile extends StatelessWidget {
                 color: !changePct.isFinite
                     ? Theme.of(context).colorScheme.onSurfaceVariant
                     : changePct >= 0
-                    ? Colors.green
-                    : Colors.redAccent,
+                        ? Colors.green
+                        : Colors.redAccent,
               ),
             ),
           ],

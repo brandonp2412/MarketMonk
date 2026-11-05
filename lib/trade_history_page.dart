@@ -18,7 +18,7 @@ import 'package:provider/provider.dart';
 class TradeHistoryPage extends StatefulWidget {
   final SymbolSummary summary;
   final Future<IbkrTradeHistory> Function(IbkrAccountConfig)?
-  ibkrTradeHistoryLoader;
+      ibkrTradeHistoryLoader;
 
   const TradeHistoryPage({
     super.key,
@@ -44,16 +44,14 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
     _ibkrTradesStream = config.enabled && widget.summary.trades.isEmpty
         ? _loadBrokerTrades(config).asStream()
         : Stream.value(widget.summary.trades);
-    _tradesStream = profileDataRepository
-        .watchTradesForAccount(_accountName)
-        .map((trades) {
-          final filtered =
-              trades
-                  .where((trade) => trade.symbol == widget.summary.symbol)
-                  .toList()
-                ..sort((a, b) => b.tradeDate.compareTo(a.tradeDate));
-          return filtered;
-        });
+    _tradesStream =
+        profileDataRepository.watchTradesForAccount(_accountName).map((trades) {
+      final filtered = trades
+          .where((trade) => trade.symbol == widget.summary.symbol)
+          .toList()
+        ..sort((a, b) => b.tradeDate.compareTo(a.tradeDate));
+      return filtered;
+    });
     runDetachedTask(
       fetchSymbolCurrencyAndRate(widget.summary.symbol).then((_) {
         if (mounted) setState(() {});
@@ -63,9 +61,8 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
   }
 
   Future<List<Trade>> _loadBrokerTrades(IbkrAccountConfig config) async {
-    final history =
-        await (widget.ibkrTradeHistoryLoader?.call(config) ??
-            IbkrApiClient(config).fetchTradeHistory());
+    final history = await (widget.ibkrTradeHistoryLoader?.call(config) ??
+        IbkrApiClient(config).fetchTradeHistory());
     if (!history.available) {
       throw StateError('IBKR transaction history is currently unavailable');
     }
@@ -161,9 +158,9 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
     final cachedTrades = cachedHistory == null
         ? widget.summary.trades
         : (tradesFromIbkr(cachedHistory.trades)
-              .where((trade) => trade.symbol == widget.summary.symbol)
-              .toList()
-            ..sort((a, b) => b.tradeDate.compareTo(a.tradeDate)));
+            .where((trade) => trade.symbol == widget.summary.symbol)
+            .toList()
+          ..sort((a, b) => b.tradeDate.compareTo(a.tradeDate)));
 
     return StreamBuilder<List<Trade>>(
       stream: ibkrManaged ? _ibkrTradesStream : _tradesStream,
@@ -211,9 +208,8 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
         }
         final unrealizedPL = position?.unrealizedPL ?? 0.0;
         final realizedToday = liveSummary.realizedTodayUsd();
-        final totalGain = totalRealizedUsd == null
-            ? null
-            : totalRealizedUsd + unrealizedPL;
+        final totalGain =
+            totalRealizedUsd == null ? null : totalRealizedUsd + unrealizedPL;
 
         return Scaffold(
           appBar: AppBar(
@@ -223,10 +219,10 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                       'count': _selectedTradeIds.length,
                     })
                   : isDesktopLayout(context)
-                  ? context.l10n.text('Trade History')
-                  : context.l10n.text('{symbol} — History', {
-                      'symbol': widget.summary.symbol,
-                    }),
+                      ? context.l10n.text('Trade History')
+                      : context.l10n.text('{symbol} — History', {
+                          'symbol': widget.summary.symbol,
+                        }),
             ),
             actions: [
               if (_selectedTradeIds.isNotEmpty &&
@@ -388,8 +384,8 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                                   color: totalRealizedUsd == null
                                       ? null
                                       : totalRealizedUsd >= 0
-                                      ? Colors.green
-                                      : Colors.redAccent,
+                                          ? Colors.green
+                                          : Colors.redAccent,
                                 ),
                               ],
                               if (position != null || trades.isNotEmpty)
@@ -402,8 +398,8 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                                   color: totalGain == null
                                       ? null
                                       : totalGain >= 0
-                                      ? Colors.green
-                                      : Colors.redAccent,
+                                          ? Colors.green
+                                          : Colors.redAccent,
                                 ),
                             ],
                           ),
@@ -448,6 +444,10 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                                   : _showTradeActions(trade, ibkrManaged),
                               onLongPress: () =>
                                   _toggleTradeSelection(trade.id),
+                              onMore:
+                                  ibkrManaged || _selectedTradeIds.isNotEmpty
+                                      ? null
+                                      : () => _showTradeActions(trade, false),
                             ),
                           ),
                         ),
@@ -498,12 +498,12 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
       onAction: brokerManaged
           ? (snapshot.hasError ? _retryBrokerTrades : null)
           : () => Navigator.push(
-              context,
-              adaptivePageRoute(
                 context,
-                builder: (_) => EditTickerPage(symbol: widget.summary.symbol),
+                adaptivePageRoute(
+                  context,
+                  builder: (_) => EditTickerPage(symbol: widget.summary.symbol),
+                ),
               ),
-            ),
     );
   }
 
@@ -606,6 +606,7 @@ class _TradeTile extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+  final VoidCallback? onMore;
 
   const _TradeTile({
     required this.trade,
@@ -613,6 +614,7 @@ class _TradeTile extends StatelessWidget {
     required this.selected,
     required this.onTap,
     required this.onLongPress,
+    this.onMore,
   });
 
   @override
@@ -627,7 +629,9 @@ class _TradeTile extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
         selected: selected,
-        selectedTileColor: Theme.of(context).colorScheme.primaryContainer
+        selectedTileColor: Theme.of(context)
+            .colorScheme
+            .primaryContainer
             .withValues(alpha: 0.18),
         onTap: onTap,
         onLongPress: onLongPress,

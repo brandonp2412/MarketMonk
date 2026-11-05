@@ -214,11 +214,11 @@ void main() {
     final search = find.byKey(const Key('settings-search'));
     final preview = find.byKey(const Key('settings-chart-preview'));
     TickerLine ticker() => tester.widget<TickerLine>(
-      find.descendant(of: preview, matching: find.byType(TickerLine)),
-    );
+          find.descendant(of: preview, matching: find.byType(TickerLine)),
+        );
     MarketLineChart chart() => tester.widget<MarketLineChart>(
-      find.descendant(of: preview, matching: find.byType(MarketLineChart)),
-    );
+          find.descendant(of: preview, matching: find.byType(MarketLineChart)),
+        );
 
     await tester.enterText(search, 'moving average');
     await tester.pumpAndSettle();
@@ -415,7 +415,8 @@ void main() {
     expect(find.byKey(const Key('settings-candlestick-chart')), findsOneWidget);
     expect(find.byKey(const Key('settings-rolling-average')), findsNothing);
   });
-  testWidgets('desktop settings search stays compact', (tester) async {
+  testWidgets('desktop settings search stays within content bounds',
+      (tester) async {
     addTearDown(() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
@@ -423,7 +424,7 @@ void main() {
     await pumpSettings(tester, const Size(1400, 900));
     expect(
       tester.getSize(find.byKey(const Key('settings-search'))).width,
-      lessThanOrEqualTo(560),
+      lessThanOrEqualTo(1240),
     );
   });
 
@@ -435,9 +436,8 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
     await pumpSettings(tester, const Size(1200, 900));
-    final settings = tester
-        .element(find.byType(SettingsPage))
-        .read<SettingsState>();
+    final settings =
+        tester.element(find.byType(SettingsPage)).read<SettingsState>();
     await settings.setSystemColors(false);
     await tester.pumpAndSettle();
 
