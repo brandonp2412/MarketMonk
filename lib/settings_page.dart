@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -665,6 +666,50 @@ class _SettingsPageState extends State<SettingsPage> {
     onTap: () => onChanged(!value),
   );
 
+  Widget _chartPreview(SettingsState settings, {required double height}) {
+    const prices = <double>[
+      82,
+      86,
+      83,
+      90,
+      96,
+      92,
+      101,
+      98,
+      105,
+      110,
+      106,
+      114,
+    ];
+    final today = DateUtils.dateOnly(DateTime.now());
+    return SizedBox(
+      key: const Key('settings-chart-preview'),
+      height: height,
+      child: TickerLine(
+        spots: [
+          for (var i = 0; i < prices.length; i++)
+            MarketLineChartPoint(i.toDouble(), prices[i], column: i),
+        ],
+        dates: [
+          for (var i = 0; i < prices.length; i++)
+            today.subtract(Duration(days: prices.length - i - 1)),
+        ],
+        candles: [
+          for (var i = 0; i < prices.length; i++)
+            MarketCandlePoint(
+              column: i,
+              open: i == 0 ? 80 : prices[i - 1],
+              high: math.max(prices[i], i == 0 ? 80 : prices[i - 1]) + 3,
+              low: math.min(prices[i], i == 0 ? 80 : prices[i - 1]) - 3,
+              close: prices[i],
+            ),
+        ],
+        showRollingAverage: settings.showRollingAverage,
+        showCandlesticks: settings.showCandlesticks,
+      ),
+    );
+  }
+
   Widget _desktopSettingsCard({
     required IconData icon,
     required String title,
@@ -868,26 +913,8 @@ class _SettingsPageState extends State<SettingsPage> {
               ],
             ),
           ),
-        if (_matchesSearch('Charts', 'Curve smoothness'))
-          SizedBox(
-            height: 180,
-            child: TickerLine(
-              spots: const [
-                MarketLineChartPoint(0.0, 0.13, column: 0),
-                MarketLineChartPoint(1.0, 5, column: 1),
-                MarketLineChartPoint(2.0, 2, column: 2),
-                MarketLineChartPoint(3.0, 10, column: 3),
-                MarketLineChartPoint(4.0, 5, column: 4),
-              ],
-              dates: [
-                DateTime.now().subtract(const Duration(days: 4)),
-                DateTime.now().subtract(const Duration(days: 3)),
-                DateTime.now().subtract(const Duration(days: 2)),
-                DateTime.now().subtract(const Duration(days: 1)),
-                DateTime.now(),
-              ],
-            ),
-          ),
+        if (_hasMatches('Charts', _desktopSearchOptions['Charts']!))
+          _chartPreview(settings, height: 180),
       ],
     );
 
@@ -1422,25 +1449,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ],
             ),
-          if (_matchesSearch('Charts', 'Curve smoothness'))
-            SizedBox(
+          if (_hasMatches('Charts', _mobileSearchOptions['Charts']!))
+            _chartPreview(
+              settings,
               height: MediaQuery.of(context).size.height * 0.3,
-              child: TickerLine(
-                spots: const [
-                  MarketLineChartPoint(0.0, 0.13, column: 0),
-                  MarketLineChartPoint(1.0, 5, column: 1),
-                  MarketLineChartPoint(2.0, 2, column: 2),
-                  MarketLineChartPoint(3.0, 10, column: 3),
-                  MarketLineChartPoint(4.0, 5, column: 4),
-                ],
-                dates: [
-                  DateTime.now().subtract(const Duration(days: 4)),
-                  DateTime.now().subtract(const Duration(days: 3)),
-                  DateTime.now().subtract(const Duration(days: 2)),
-                  DateTime.now().subtract(const Duration(days: 1)),
-                  DateTime.now(),
-                ],
-              ),
             ),
           if (_hasMatches('Accounts', _mobileSearchOptions['Accounts']!))
             _sectionHeader(context.l10n.text('Accounts')),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/settings_page.dart';
+import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
@@ -175,6 +177,63 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('chart preview follows both chart modes during settings search', (
+    tester,
+  ) async {
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await pumpSettings(tester, const Size(430, 940));
+    final search = find.byKey(const Key('settings-search'));
+    final preview = find.byKey(const Key('settings-chart-preview'));
+    TickerLine ticker() => tester.widget<TickerLine>(
+          find.descendant(of: preview, matching: find.byType(TickerLine)),
+        );
+    MarketLineChart chart() => tester.widget<MarketLineChart>(
+          find.descendant(of: preview, matching: find.byType(MarketLineChart)),
+        );
+
+    await tester.enterText(search, 'moving average');
+    await tester.pumpAndSettle();
+    expect(preview, findsOneWidget);
+    expect(ticker().showRollingAverage, false);
+    expect(ticker().candles, isNotEmpty);
+    await tester.tap(find.byKey(const Key('settings-rolling-average')));
+    await tester.pumpAndSettle();
+    expect(ticker().showRollingAverage, true);
+    expect(chart().showRollingAverage, true);
+
+    await tester.enterText(search, 'candles');
+    await tester.pumpAndSettle();
+    expect(preview, findsOneWidget);
+    expect(ticker().showCandlesticks, false);
+    await tester.tap(find.byKey(const Key('settings-candlestick-chart')));
+    await tester.pumpAndSettle();
+    expect(ticker().showCandlesticks, true);
+    expect(chart().showCandlesticks, true);
+    expect(chart().candles.length, ticker().spots.length);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'desktop chart preview stays visible when filtering chart settings',
+    (tester) async {
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      await pumpSettings(tester, const Size(1200, 900));
+      await tester.enterText(
+        find.byKey(const Key('settings-search')),
+        'gridlines',
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('settings-chart-preview')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('new chart controls update persisted settings on mobile', (
     tester,
