@@ -341,7 +341,7 @@ class IntradayMarketData {
         }
         if (response.statusCode != 200) {
           throw StateError(
-              'Yahoo intraday returned HTTP ${response.statusCode}',
+            'Yahoo intraday returned HTTP ${response.statusCode}',
           );
         }
         final body = jsonDecode(response.body) as Map<String, dynamic>;

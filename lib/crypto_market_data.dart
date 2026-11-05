@@ -76,7 +76,8 @@ class CryptoPriceQuote {
 
 class CryptoMarketData {
   CryptoMarketData({Future<http.Response> Function(Uri)? fetch})
-      : _fetch = fetch ?? http.get;
+      : _fetch = fetch ??
+            ((uri) => http.get(uri, headers: {'User-Agent': 'Mozilla/5.0'}));
 
   final Future<http.Response> Function(Uri) _fetch;
 
@@ -136,11 +137,82 @@ class CryptoMarketData {
     CryptoAsset asset,
     DateTime from,
   ) async {
+    if (DateTime.now().toUtc().difference(from.toUtc()).inDays <= 700) {
+      try {
+        final candles = await _krakenDailyHistory(asset, from);
+        if (candles.isNotEmpty &&
+            !candles.first.date.isAfter(from.add(const Duration(days: 1)))) {
+          return candles;
+        }
+      } catch (_) {}
+    }
+    try {
+      final candles = await _yahooDailyHistory(asset, from);
+      if (candles.isNotEmpty) return candles;
+    } catch (_) {}
     try {
       final prices = await _llamaHistory(asset, from);
       if (prices.isNotEmpty) return prices;
     } catch (_) {}
     return _krakenDailyHistory(asset, from);
+  }
+
+  Future<List<CryptoDailyBar>> _yahooDailyHistory(
+    CryptoAsset asset,
+    DateTime from,
+  ) async {
+    final fromUtc = DateTime.utc(from.year, from.month, from.day);
+    final through = DateTime.now().toUtc().add(const Duration(days: 1));
+    final json = await _getJson(
+      Uri.https(
+        'query1.finance.yahoo.com',
+        '/v8/finance/chart/${asset.symbol}',
+        {
+          'period1': '${fromUtc.millisecondsSinceEpoch ~/ 1000}',
+          'period2': '${through.millisecondsSinceEpoch ~/ 1000}',
+          'interval': '1d',
+        },
+      ),
+    );
+    final chart = json['chart'] as Map<String, dynamic>;
+    final result =
+        (chart['result'] as List<dynamic>).first as Map<String, dynamic>;
+    final timestamps = result['timestamp'] as List<dynamic>;
+    final indicators = result['indicators'] as Map<String, dynamic>;
+    final quote =
+        (indicators['quote'] as List<dynamic>).first as Map<String, dynamic>;
+    final opens = quote['open'] as List<dynamic>;
+    final highs = quote['high'] as List<dynamic>;
+    final lows = quote['low'] as List<dynamic>;
+    final closes = quote['close'] as List<dynamic>;
+    final volumes = quote['volume'] as List<dynamic>?;
+    final bars = <CryptoDailyBar>[];
+    for (var i = 0; i < timestamps.length; i++) {
+      try {
+        final utc = DateTime.fromMillisecondsSinceEpoch(
+          (timestamps[i] as num).toInt() * 1000,
+          isUtc: true,
+        );
+        final open = _price(opens[i]);
+        final high = _price(highs[i]);
+        final low = _price(lows[i]);
+        final close = _price(closes[i]);
+        if (high < open || high < close || low > open || low > close) {
+          continue;
+        }
+        bars.add(CryptoDailyBar(
+          date: DateTime(utc.year, utc.month, utc.day),
+          open: open,
+          high: high,
+          low: low,
+          close: close,
+          volume: volumes == null || volumes[i] == null
+              ? 0
+              : (volumes[i] as num).toDouble(),
+        ),);
+      } catch (_) {}
+    }
+    return bars;
   }
 
   Future<List<CryptoDailyBar>> _llamaHistory(
@@ -180,7 +252,8 @@ class CryptoMarketData {
           );
           final rounded = utc.add(const Duration(hours: 12));
           final date = DateTime(rounded.year, rounded.month, rounded.day);
-          if (date.isBefore(DateTime(from.year, from.month, from.day))) continue;
+          if (date.isBefore(DateTime(from.year, from.month, from.day)))
+            continue;
           final price = _price(point['price']);
           byDate[date.millisecondsSinceEpoch] = CryptoDailyBar(
             date: date,

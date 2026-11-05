@@ -32,12 +32,12 @@ void main() {
         expect(uri.host, 'coins.llama.fi');
         expect(uri.path, '/prices/current/coingecko:monero');
         return http.Response(
-            jsonEncode({
-              'coins': {
-                'coingecko:monero': {'price': 638.25, 'timestamp': timestamp},
-              },
-            }),
-            200,
+          jsonEncode({
+            'coins': {
+              'coingecko:monero': {'price': 638.25, 'timestamp': timestamp},
+            },
+          }),
+          200,
         );
       },
     );
@@ -53,15 +53,15 @@ void main() {
         if (uri.host == 'coins.llama.fi') return http.Response('', 503);
         expect(uri.queryParameters['pair'], 'XMRUSD');
         return http.Response(
-            jsonEncode({
-              'error': [],
-              'result': {
-                'XXMRZUSD': {
-                  'c': ['641.75', '0.1'],
-                },
+          jsonEncode({
+            'error': [],
+            'result': {
+              'XXMRZUSD': {
+                'c': ['641.75', '0.1'],
               },
-            }),
-            200,
+            },
+          }),
+          200,
         );
       },
     );
@@ -77,35 +77,35 @@ void main() {
       fetch: (uri) async {
         expect(uri.queryParameters['interval'], '5');
         return http.Response(
-            jsonEncode({
-              'error': [],
-              'result': {
-                'XXMRZUSD': [
-                  [
-                    old.millisecondsSinceEpoch ~/ 1000,
-                    '10',
-                    '12',
-                    '9',
-                    '11',
-                    '11',
-                    '4.1',
-                    1,
-                  ],
-                  [
-                    recent.millisecondsSinceEpoch ~/ 1000,
-                    '600',
-                    '610',
-                    '590',
-                    '605',
-                    '604',
-                    '10.5',
-                    5,
-                  ],
+          jsonEncode({
+            'error': [],
+            'result': {
+              'XXMRZUSD': [
+                [
+                  old.millisecondsSinceEpoch ~/ 1000,
+                  '10',
+                  '12',
+                  '9',
+                  '11',
+                  '11',
+                  '4.1',
+                  1,
                 ],
-                'last': 123,
-              },
-            }),
-            200,
+                [
+                  recent.millisecondsSinceEpoch ~/ 1000,
+                  '600',
+                  '610',
+                  '590',
+                  '605',
+                  '604',
+                  '10.5',
+                  5,
+                ],
+              ],
+              'last': 123,
+            },
+          }),
+          200,
         );
       },
     );
@@ -118,6 +118,78 @@ void main() {
     expect(bars.single.volume, 11);
   });
 
+  test('daily crypto candles use genuine Kraken OHLC', () async {
+    final now = DateTime.now();
+    final from = DateTime(now.year, now.month, now.day - 30);
+    final firstTimestamp =
+        DateTime.utc(from.year, from.month, from.day).millisecondsSinceEpoch ~/
+            1000;
+    final service = CryptoMarketData(
+      fetch: (uri) async {
+        expect(uri.host, 'api.kraken.com');
+        expect(uri.queryParameters['interval'], '1440');
+        return http.Response(
+          jsonEncode({
+            'error': [],
+            'result': {
+              'XXMRZUSD': [
+                [firstTimestamp, '600', '620', '590', '615', '611', '12.5', 10],
+              ],
+            },
+          }),
+          200,
+        );
+      },
+    );
+    final bars = await service.dailyHistory(monero, from);
+    expect(bars, hasLength(1));
+    expect(bars.single.open, 600);
+    expect(bars.single.high, 620);
+    expect(bars.single.low, 590);
+    expect(bars.single.close, 615);
+  });
+
+  test('long crypto ranges use actual historical daily OHLC', () async {
+    final from = DateTime(2020, 1, 1);
+    final timestamp = DateTime.utc(2020, 1, 2).millisecondsSinceEpoch ~/ 1000;
+    final service = CryptoMarketData(
+      fetch: (uri) async {
+        expect(uri.host, 'query1.finance.yahoo.com');
+        expect(uri.path, '/v8/finance/chart/XMR-USD');
+        expect(uri.queryParameters['interval'], '1d');
+        return http.Response(
+          jsonEncode({
+            'chart': {
+              'result': [
+                {
+                  'timestamp': [timestamp],
+                  'indicators': {
+                    'quote': [
+                      {
+                        'open': [100.0],
+                        'high': [125.0],
+                        'low': [92.0],
+                        'close': [118.0],
+                        'volume': [12345],
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          }),
+          200,
+        );
+      },
+    );
+    final bars = await service.dailyHistory(monero, from);
+    expect(bars, hasLength(1));
+    expect(bars.single.date, DateTime(2020, 1, 2));
+    expect(bars.single.high, 125);
+    expect(bars.single.low, 92);
+    expect(bars.single.volume, 12345);
+  });
+
   test('long history stays within the provider 500-point limit', () async {
     final now = DateTime.now().toUtc();
     final from = now.subtract(const Duration(days: 1100));
@@ -125,26 +197,35 @@ void main() {
     var requests = 0;
     final service = CryptoMarketData(
       fetch: (uri) async {
+        if (uri.host == 'query1.finance.yahoo.com') {
+          return http.Response('', 503);
+        }
         if (uri.path.startsWith('/prices/current/')) {
-          return http.Response(jsonEncode({
-            'coins': {
-              'coingecko:monero': {'price': 650.0, 'timestamp': timestamp},
-            },
-          }), 200,);
+          return http.Response(
+            jsonEncode({
+              'coins': {
+                'coingecko:monero': {'price': 650.0, 'timestamp': timestamp},
+              },
+            }),
+            200,
+          );
         }
         requests++;
         final span = int.parse(uri.queryParameters['span']!);
         expect(span, inInclusiveRange(1, 500));
         final start = int.parse(uri.queryParameters['start']!);
-        return http.Response(jsonEncode({
-          'coins': {
-            'coingecko:monero': {
-              'prices': [
-                {'timestamp': start, 'price': 500.0 + requests},
-              ],
+        return http.Response(
+          jsonEncode({
+            'coins': {
+              'coingecko:monero': {
+                'prices': [
+                  {'timestamp': start, 'price': 500.0 + requests},
+                ],
+              },
             },
-          },
-        }), 200,);
+          }),
+          200,
+        );
       },
     );
     final bars = await service.dailyHistory(monero, from);
@@ -165,31 +246,35 @@ void main() {
     final service = CryptoMarketData(
       fetch: (uri) async {
         calls++;
+        if (uri.host == 'api.kraken.com' ||
+            uri.host == 'query1.finance.yahoo.com') {
+          return http.Response('', 503);
+        }
         if (uri.path.startsWith('/prices/current/')) {
           return http.Response(
-              jsonEncode({
-                'coins': {
-                  'coingecko:monero': {'price': 640.0, 'timestamp': timestamp},
-                },
-              }),
-              200,
+            jsonEncode({
+              'coins': {
+                'coingecko:monero': {'price': 640.0, 'timestamp': timestamp},
+              },
+            }),
+            200,
           );
         }
         expect(uri.path, '/chart/coingecko:monero');
         return http.Response(
-            jsonEncode({
-              'coins': {
-                'coingecko:monero': {
-                  'prices': [
-                    {
-                      'timestamp': yesterday.millisecondsSinceEpoch ~/ 1000 - 2,
-                      'price': 630.0,
-                    },
-                  ],
-                },
+          jsonEncode({
+            'coins': {
+              'coingecko:monero': {
+                'prices': [
+                  {
+                    'timestamp': yesterday.millisecondsSinceEpoch ~/ 1000 - 2,
+                    'price': 630.0,
+                  },
+                ],
               },
-            }),
-            200,
+            },
+          }),
+          200,
         );
       },
     );

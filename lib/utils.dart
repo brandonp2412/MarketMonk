@@ -1004,6 +1004,7 @@ Future<bool> _syncIbkrCandlesIfAvailable(
 /// identity and coverage are deliberately independent of account ownership.
 
 final _cryptoSyncAt = <String, DateTime>{};
+final _cryptoOhlcAttemptFrom = <String, DateTime>{};
 
 Future<void> _syncCryptoCandles(
   Database database,
@@ -1032,8 +1033,27 @@ Future<void> _syncCryptoCandles(
         ])
         ..limit(1))
       .getSingleOrNull();
+  final requestedFirst = await (database.candles.select()
+        ..where(
+          (row) =>
+              row.symbol.equals(asset.symbol) &
+              row.date.isBiggerOrEqualValue(start),
+        )
+        ..orderBy([(row) => OrderingTerm.asc(row.date)])
+        ..limit(1))
+      .getSingleOrNull();
   final fetchedAt = _cryptoSyncAt[asset.symbol];
+  final lastOhlcFrom = _cryptoOhlcAttemptFrom[asset.symbol];
+  final needsOhlcBackfill = requestedFirst != null &&
+      requestedFirst.open == requestedFirst.high &&
+      requestedFirst.high == requestedFirst.low &&
+      requestedFirst.low == requestedFirst.close &&
+      (lastOhlcFrom == null ||
+          lastOhlcFrom.isAfter(start) ||
+          fetchedAt == null ||
+          now.difference(fetchedAt) >= const Duration(minutes: 5));
   if (!forceRefresh &&
+      !needsOhlcBackfill &&
       first != null &&
       !canonicalMarketDay(first.date).isAfter(start) &&
       last != null &&
@@ -1043,18 +1063,19 @@ Future<void> _syncCryptoCandles(
     return;
   }
   final fetchFrom = forceRefresh ||
+          needsOhlcBackfill ||
           first == null ||
           canonicalMarketDay(first.date).isAfter(start)
       ? start
       : canonicalMarketDay(last?.date ?? start)
           .subtract(const Duration(days: 2));
   final bars = await backgroundNetworkCoordinator.coalesce(
-      'crypto.daily',
-      (
-        asset.symbol,
-        fetchFrom,
-      ),
-      () => marketData.dailyHistory(asset, fetchFrom),
+    'crypto.daily',
+    (
+      asset.symbol,
+      fetchFrom,
+    ),
+    () => marketData.dailyHistory(asset, fetchFrom),
   );
   if (bars.isEmpty) throw StateError('No crypto prices for ${asset.symbol}');
   for (var offset = 0; offset < bars.length; offset += 1000) {
@@ -1080,6 +1101,7 @@ Future<void> _syncCryptoCandles(
     );
   }
   _cryptoSyncAt[asset.symbol] = now;
+  _cryptoOhlcAttemptFrom[asset.symbol] = fetchFrom;
 }
 
 Future<void> syncCandles(

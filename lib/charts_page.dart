@@ -295,14 +295,17 @@ class ChartsPageState extends State<ChartsPage>
         );
         return;
       }
-      runDetachedTask(() async {
-        await _syncCandlesInBackground(refreshPerformance: true);
-        talker.info(
-          backgroundNetworkCoordinator.diagnosticsSummary(
-            label: 'Startup request summary',
-          ),
-        );
-      }(), 'Failed to initialize active chart data',);
+      runDetachedTask(
+        () async {
+          await _syncCandlesInBackground(refreshPerformance: true);
+          talker.info(
+            backgroundNetworkCoordinator.diagnosticsSummary(
+              label: 'Startup request summary',
+            ),
+          );
+        }(),
+        'Failed to initialize active chart data',
+      );
     }
   }
 
@@ -2230,22 +2233,25 @@ class ChartsPageState extends State<ChartsPage>
     });
     runDetachedTask(_savePeriod(), 'Failed to save chart period');
     if (!_periodTransition) return;
-    runDetachedTask(() async {
-      try {
-        await Future.wait([
-          if (_selectedFavorites.isNotEmpty)
-            _syncFavoriteCandles(selectedOnly: true),
-          if (_mode == _ChartMode.stock && _selectedSymbol != null)
-            _loadSelectedStock()
-          else if (!_restoreIntradayPortfolio())
-            _syncCandlesInBackground(),
-        ]);
-      } finally {
-        if (mounted && transitionGeneration == _periodTransitionGeneration) {
-          setState(() => _periodTransition = false);
+    runDetachedTask(
+      () async {
+        try {
+          await Future.wait([
+            if (_selectedFavorites.isNotEmpty)
+              _syncFavoriteCandles(selectedOnly: true),
+            if (_mode == _ChartMode.stock && _selectedSymbol != null)
+              _loadSelectedStock()
+            else if (!_restoreIntradayPortfolio())
+              _syncCandlesInBackground(),
+          ]);
+        } finally {
+          if (mounted && transitionGeneration == _periodTransitionGeneration) {
+            setState(() => _periodTransition = false);
+          }
         }
-      }
-    }(), 'Failed to load selected chart period',);
+      }(),
+      'Failed to load selected chart period',
+    );
   }
 
   void _clearSearch() {
@@ -2655,10 +2661,20 @@ class ChartsPageState extends State<ChartsPage>
   void _toggleCandlesticks() {
     _candleSelection.value = null;
     final settings = context.read<SettingsState>();
+    final enableCandles = !settings.showCandlesticks;
     runDetachedTask(
-      settings.setShowCandlesticks(!settings.showCandlesticks),
+      settings.setShowCandlesticks(enableCandles),
       'Failed to save chart style',
     );
+    if (enableCandles &&
+        _mode == _ChartMode.stock &&
+        !_usesIntraday &&
+        cryptoAssetForSymbol(_selectedSymbol ?? '') != null) {
+      runDetachedTask(
+        _loadSelectedStock(forceRefresh: true),
+        'Failed to load crypto candles',
+      );
+    }
   }
 
   Widget _buildTimeChips() {
@@ -2770,6 +2786,14 @@ class ChartsPageState extends State<ChartsPage>
         child: Center(child: Text(snapshot.error.toString())),
       );
     }
+    if (_networkLoading) {
+      return SizedBox(
+        height: height,
+        child: const Center(
+          child: MarketChartLoading(key: Key('stock-period-loading')),
+        ),
+      );
+    }
     if (snapshot.data == null || snapshot.data!.isEmpty) {
       if (_stockError != null) {
         return SizedBox(
@@ -2784,7 +2808,21 @@ class ChartsPageState extends State<ChartsPage>
       );
     }
 
-    final candles = snapshot.data!.map((tc) => tc.candle).toList();
+    final allCandles = snapshot.data!.map((tc) => tc.candle).toList();
+    final cryptoCandlesRequested = _showCandlesticks &&
+        !_usesIntraday &&
+        cryptoAssetForSymbol(_selectedSymbol ?? '') != null;
+    final genuineCandles = cryptoCandlesRequested
+        ? allCandles
+            .where(
+              (candle) =>
+                  candle.high.value > candle.low.value ||
+                  candle.open.value != candle.close.value,
+            )
+            .toList()
+        : const <CandlesCompanion>[];
+    final usingCryptoCandles = genuineCandles.isNotEmpty;
+    final candles = usingCryptoCandles ? genuineCandles : allCandles;
     String? observedUnit(CandlesCompanion candle) =>
         candle.rawCurrency.present ? candle.rawCurrency.value : null;
     if ((!_usesIntraday || _intradaySeries == null) &&
@@ -2886,7 +2924,9 @@ class ChartsPageState extends State<ChartsPage>
               ),
           ],
           showCandlesticks: _showCandlesticks &&
-              (cryptoAssetForSymbol(_selectedSymbol!) == null || _usesIntraday),
+              (cryptoAssetForSymbol(_selectedSymbol!) == null ||
+                  _usesIntraday ||
+                  usingCryptoCandles),
           candleSelection: _candleSelection,
           showRollingAverage: _showRollingAverage,
           nativeCurrency: _nativeCurrency,
@@ -2901,9 +2941,23 @@ class ChartsPageState extends State<ChartsPage>
     BuildContext context,
     AsyncSnapshot<List<CandleTicker>> snapshot,
   ) {
-    if (!snapshot.hasData || snapshot.data!.isEmpty) return const SizedBox();
+    if (_networkLoading || !snapshot.hasData || snapshot.data!.isEmpty) {
+      return const SizedBox();
+    }
 
-    final candles = snapshot.data!.map((tc) => tc.candle).toList();
+    final allCandles = snapshot.data!.map((tc) => tc.candle).toList();
+    final genuineCandles = _showCandlesticks &&
+            !_usesIntraday &&
+            cryptoAssetForSymbol(_selectedSymbol ?? '') != null
+        ? allCandles
+            .where(
+              (candle) =>
+                  candle.high.value > candle.low.value ||
+                  candle.open.value != candle.close.value,
+            )
+            .toList()
+        : const <CandlesCompanion>[];
+    final candles = genuineCandles.isNotEmpty ? genuineCandles : allCandles;
     final pct = safePercentChange(
       candles.first.close.value,
       candles.last.close.value,
