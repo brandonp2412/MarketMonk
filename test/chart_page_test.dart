@@ -92,6 +92,17 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(settings.displayCurrency, 'USD');
+        await tester.tap(menu);
+        await tester.pumpAndSettle();
+        expect(find.text('Filter range'), findsOneWidget);
+        await tester.tap(find.byKey(const Key('chart-menu-filter-range')));
+        await tester.pump();
+        expect(find.text('Pick start and end dots'), findsOneWidget);
+        await tester.tap(menu);
+        await tester.pumpAndSettle();
+        expect(find.text('Cancel picking'), findsOneWidget);
+        await tester.tap(find.byKey(const Key('chart-menu-filter-range')));
+        await tester.pumpAndSettle();
       }
       expect(find.byKey(const Key('chart-settings-button')), findsOneWidget);
       await tester.tap(find.byKey(const Key('chart-settings-button')));

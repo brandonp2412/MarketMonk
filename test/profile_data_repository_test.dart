@@ -119,4 +119,27 @@ void main() {
     expect(await repository.readTrades('profile-default'), isEmpty);
     expect(await repository.readTrades('profile-bot'), hasLength(1));
   });
+
+  test('batch delete is scoped to the selected ids and profile', () async {
+    Future<int> add(String profileId, String symbol) => repository.addTrade(
+          profileId,
+          ProfileTradeWrite(
+            symbol: symbol,
+            name: symbol,
+            quantity: 1,
+            price: 100,
+            tradeType: 'open',
+            tradeDate: DateTime.utc(2026, 10, 1),
+          ),
+        );
+    final first = await add('profile-default', 'AAA');
+    final keep = await add('profile-default', 'BBB');
+    final last = await add('profile-default', 'CCC');
+    await add('profile-bot', 'AAA');
+
+    expect(await repository.deleteTrades('profile-default', [first, last]), 2);
+    expect((await repository.readTrades('profile-default')).single.id, keep);
+    expect((await repository.readTrades('profile-bot')).single.symbol, 'AAA');
+    expect(await repository.deleteTrades('profile-default', []), 0);
+  });
 }

@@ -36,6 +36,7 @@ import 'package:market_monk/sqlite_settings.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/ticker_search_loading.dart';
 import 'package:market_monk/utils.dart';
+import 'package:market_monk/crypto_market_data.dart';
 import 'package:provider/provider.dart';
 
 enum _ChartMode { portfolio, searching, stock }
@@ -165,6 +166,7 @@ class ChartsPageState extends State<ChartsPage>
   int months = 0;
   int days = 0;
   (DateTime, DateTime)? _customChartRange;
+  bool _pickingChartRange = false;
 
   Stream<List<CandleTicker>>? _stockStream;
   late final _intradayData = widget._intradayData ?? IntradayMarketData();
@@ -775,10 +777,7 @@ class ChartsPageState extends State<ChartsPage>
       );
       if (!mounted || !widget.isActive) return;
       if (_usesIntraday && _selectedFavorites.isNotEmpty) {
-        await _syncFavoriteCandles(
-          forceRefresh: true,
-          selectedOnly: true,
-        );
+        await _syncFavoriteCandles(forceRefresh: true, selectedOnly: true);
       }
       if (_mode == _ChartMode.stock && _selectedSymbol != null) {
         await _loadSelectedStock(forceRefresh: true);
@@ -827,10 +826,7 @@ class ChartsPageState extends State<ChartsPage>
       return;
     await Future.wait(
       symbols.map(
-        (symbol) => _syncFavoriteCandle(
-          symbol,
-          forceRefresh: forceRefresh,
-        ),
+        (symbol) => _syncFavoriteCandle(symbol, forceRefresh: forceRefresh),
       ),
     );
   }
@@ -1494,8 +1490,9 @@ class ChartsPageState extends State<ChartsPage>
     required bool forceRefresh,
   }) async {
     final selectedDays = days;
-    final accountTrades =
-        await profileDataRepository.readTradesForAccount(accountName);
+    final accountTrades = await profileDataRepository.readTradesForAccount(
+      accountName,
+    );
     final holdings = <IntradayPortfolioHolding>[];
     final failureReasons = <String>[];
     final prefetched = loaded.positions.isNotEmpty &&
@@ -1929,6 +1926,7 @@ class ChartsPageState extends State<ChartsPage>
     _searchFocus.unfocus();
     setState(() {
       _customChartRange = null;
+      _pickingChartRange = false;
       _mode = _ChartMode.stock;
       _selectedSymbol = symbol;
       _networkLoading = widget.isActive;
@@ -2151,9 +2149,22 @@ class ChartsPageState extends State<ChartsPage>
 
   void _setChartRange(List<DateTime> dates, (int, int)? range) {
     setState(() {
+      _pickingChartRange = false;
       _customChartRange =
           range == null ? null : (dates[range.$1], dates[range.$2]);
     });
+  }
+
+  void _startChartRangePicker() {
+    setState(() {
+      _customChartRange = null;
+      _pickingChartRange = true;
+    });
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.hideCurrentSnackBar();
+    messenger?.showSnackBar(
+      const SnackBar(content: Text('Pick start and end dots')),
+    );
   }
 
   String get _chartPeriodCacheKey {
@@ -2173,6 +2184,7 @@ class ChartsPageState extends State<ChartsPage>
     setState(() {
       _periodTransition = true;
       _customChartRange = null;
+      _pickingChartRange = false;
       _portfolioLoadGeneration++;
       _portfolioLoads.clear();
       _backgroundSyncs.clear();
@@ -2249,6 +2261,7 @@ class ChartsPageState extends State<ChartsPage>
     _yahooApi.cancelPendingSearch();
     setState(() {
       _customChartRange = null;
+      _pickingChartRange = false;
       _mode = _ChartMode.portfolio;
       _searchResults = [];
       _selectedSymbol = null;
@@ -2419,10 +2432,7 @@ class ChartsPageState extends State<ChartsPage>
             tooltip: context.l10n.text('Settings'),
             onPressed: () => Navigator.push(
               context,
-              adaptivePageRoute(
-                context,
-                builder: (_) => const SettingsPage(),
-              ),
+              adaptivePageRoute(context, builder: (_) => const SettingsPage()),
             ),
           ),
           if (!desktop ||
@@ -2432,10 +2442,18 @@ class ChartsPageState extends State<ChartsPage>
               icon: const Icon(Icons.more_vert),
               tooltip: context.l10n.text('Show menu'),
               onSelected: (value) {
-                if (value == '__rolling_average__') {
+                if (value == '__filter_range__') {
+                  if (_pickingChartRange) {
+                    setState(() => _pickingChartRange = false);
+                    ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+                  } else {
+                    _startChartRangePicker();
+                  }
+                } else if (value == '__rolling_average__') {
                   runDetachedTask(
-                    settings
-                        .setShowRollingAverage(!settings.showRollingAverage),
+                    settings.setShowRollingAverage(
+                      !settings.showRollingAverage,
+                    ),
                     'Failed to save rolling average',
                   );
                 } else if (value == '__candles__') {
@@ -2462,6 +2480,26 @@ class ChartsPageState extends State<ChartsPage>
                   if (!desktop) const PopupMenuDivider(),
                 ],
                 if (!desktop) ...[
+                  PopupMenuItem<String>(
+                    key: const Key('chart-menu-filter-range'),
+                    value: '__filter_range__',
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _pickingChartRange
+                              ? Icons.close
+                              : Icons.filter_alt_outlined,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          _pickingChartRange
+                              ? 'Cancel picking'
+                              : 'Filter range',
+                        ),
+                      ],
+                    ),
+                  ),
                   PopupMenuItem<String>(
                     key: const Key('chart-menu-rolling-average'),
                     value: '__rolling_average__',
@@ -2623,10 +2661,20 @@ class ChartsPageState extends State<ChartsPage>
   void _toggleCandlesticks() {
     _candleSelection.value = null;
     final settings = context.read<SettingsState>();
+    final enableCandles = !settings.showCandlesticks;
     runDetachedTask(
-      settings.setShowCandlesticks(!settings.showCandlesticks),
+      settings.setShowCandlesticks(enableCandles),
       'Failed to save chart style',
     );
+    if (enableCandles &&
+        _mode == _ChartMode.stock &&
+        !_usesIntraday &&
+        cryptoAssetForSymbol(_selectedSymbol ?? '') != null) {
+      runDetachedTask(
+        _loadSelectedStock(forceRefresh: true),
+        'Failed to load crypto candles',
+      );
+    }
   }
 
   Widget _buildTimeChips() {
@@ -2710,7 +2758,7 @@ class ChartsPageState extends State<ChartsPage>
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            '${_intradaySeries!.source} · ${_intradaySeries!.isDaily ? "1 day" : (days == 1 ? "1 min" : "15 min")} · ${context.l10n.text('Local time')}',
+            '${_intradaySeries!.source} · ${_intradaySeries!.isDaily ? "1 day" : (days == 1 ? (cryptoAssetForSymbol(_selectedSymbol ?? '') != null ? "5 min" : "1 min") : "15 min")} · ${context.l10n.text('Local time')}',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall,
           ),
@@ -2738,6 +2786,14 @@ class ChartsPageState extends State<ChartsPage>
         child: Center(child: Text(snapshot.error.toString())),
       );
     }
+    if (_networkLoading) {
+      return SizedBox(
+        height: height,
+        child: const Center(
+          child: MarketChartLoading(key: Key('stock-period-loading')),
+        ),
+      );
+    }
     if (snapshot.data == null || snapshot.data!.isEmpty) {
       if (_stockError != null) {
         return SizedBox(
@@ -2752,7 +2808,21 @@ class ChartsPageState extends State<ChartsPage>
       );
     }
 
-    final candles = snapshot.data!.map((tc) => tc.candle).toList();
+    final allCandles = snapshot.data!.map((tc) => tc.candle).toList();
+    final cryptoCandlesRequested = _showCandlesticks &&
+        !_usesIntraday &&
+        cryptoAssetForSymbol(_selectedSymbol ?? '') != null;
+    final genuineCandles = cryptoCandlesRequested
+        ? allCandles
+            .where(
+              (candle) =>
+                  candle.high.value > candle.low.value ||
+                  candle.open.value != candle.close.value,
+            )
+            .toList()
+        : const <CandlesCompanion>[];
+    final usingCryptoCandles = genuineCandles.isNotEmpty;
+    final candles = usingCryptoCandles ? genuineCandles : allCandles;
     String? observedUnit(CandlesCompanion candle) =>
         candle.rawCurrency.present ? candle.rawCurrency.value : null;
     if ((!_usesIntraday || _intradaySeries == null) &&
@@ -2834,6 +2904,7 @@ class ChartsPageState extends State<ChartsPage>
           range: _chartRangeFor([
             for (final candle in candles) candle.date.value,
           ]),
+          pickRange: _pickingChartRange,
           onRangeChanged: (range) => _setChartRange(
             [
               for (final candle in candles) candle.date.value,
@@ -2852,7 +2923,10 @@ class ChartsPageState extends State<ChartsPage>
                 close: candles[i].close.value / scale(candles[i]),
               ),
           ],
-          showCandlesticks: _showCandlesticks,
+          showCandlesticks: _showCandlesticks &&
+              (cryptoAssetForSymbol(_selectedSymbol!) == null ||
+                  _usesIntraday ||
+                  usingCryptoCandles),
           candleSelection: _candleSelection,
           showRollingAverage: _showRollingAverage,
           nativeCurrency: _nativeCurrency,
@@ -2867,9 +2941,23 @@ class ChartsPageState extends State<ChartsPage>
     BuildContext context,
     AsyncSnapshot<List<CandleTicker>> snapshot,
   ) {
-    if (!snapshot.hasData || snapshot.data!.isEmpty) return const SizedBox();
+    if (_networkLoading || !snapshot.hasData || snapshot.data!.isEmpty) {
+      return const SizedBox();
+    }
 
-    final candles = snapshot.data!.map((tc) => tc.candle).toList();
+    final allCandles = snapshot.data!.map((tc) => tc.candle).toList();
+    final genuineCandles = _showCandlesticks &&
+            !_usesIntraday &&
+            cryptoAssetForSymbol(_selectedSymbol ?? '') != null
+        ? allCandles
+            .where(
+              (candle) =>
+                  candle.high.value > candle.low.value ||
+                  candle.open.value != candle.close.value,
+            )
+            .toList()
+        : const <CandlesCompanion>[];
+    final candles = genuineCandles.isNotEmpty ? genuineCandles : allCandles;
     final pct = safePercentChange(
       candles.first.close.value,
       candles.last.close.value,
@@ -3600,6 +3688,7 @@ class ChartsPageState extends State<ChartsPage>
               key: ValueKey('portfolio|$years|$months|$days'),
               range: _chartRangeFor(sortedDates),
               onRangeChanged: (range) => _setChartRange(sortedDates, range),
+              pickRange: _pickingChartRange,
               series: chartSeries,
               candles: chartCandles,
               showCandlesticks: _showCandlesticks,

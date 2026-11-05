@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/desktop_trade_history.dart';
@@ -33,6 +34,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
   late final String _accountName;
   late Stream<List<Trade>> _tradesStream;
   late Stream<List<Trade>> _ibkrTradesStream;
+  final Set<int> _selectedTradeIds = {};
 
   @override
   void initState() {
@@ -73,6 +75,78 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
   void _retryBrokerTrades() {
     final config = context.read<AccountManager>().ibkrConfigFor(_accountName);
     setState(() => _ibkrTradesStream = _loadBrokerTrades(config).asStream());
+  }
+
+  void _toggleTradeSelection(int id) {
+    setState(() {
+      if (!_selectedTradeIds.remove(id)) _selectedTradeIds.add(id);
+    });
+  }
+
+  void _clearTradeSelection() => setState(_selectedTradeIds.clear);
+
+  Future<void> _copyTrades(Iterable<Trade> trades) async {
+    final text = trades.map(_tradeCopyText).join('\n');
+    if (text.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: text));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.text('Copied trades'))),
+      );
+    }
+  }
+
+  String _tradeCopyText(Trade trade) =>
+      '${trade.symbol} ${trade.tradeType == 'open' ? 'BUY' : 'SELL'} '
+      '${trade.quantity.abs()} @ ${fmtTradeNative(trade, trade.price)} · '
+      '${DateFormat('yyyy-MM-dd').format(trade.tradeDate)}';
+
+  Future<void> _confirmDeleteTrades(Set<int> ids) async {
+    if (ids.isEmpty ||
+        context.read<AccountManager>().ibkrConfigFor(_accountName).enabled) {
+      return;
+    }
+    final count = ids.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          count == 1
+              ? context.l10n.text('Delete trade?')
+              : context.l10n.text('Delete {count} trades?', {'count': count}),
+        ),
+        content: Text(
+          context.l10n.text(
+            count == 1
+                ? 'Delete this trade? This cannot be undone.'
+                : 'Delete these trades? This cannot be undone.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(context.l10n.text('Cancel')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(context.l10n.text('Delete')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final profileId =
+        await profileDataRepository.profileIdForName(_accountName);
+    await profileDataRepository.deleteTrades(profileId, ids);
+    if (!mounted) return;
+    setState(() => _selectedTradeIds.removeAll(ids));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          context.l10n.text('Deleted {count} trades', {'count': count}),
+        ),
+      ),
+    );
   }
 
   @override
@@ -132,14 +206,62 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
         return Scaffold(
           appBar: AppBar(
             title: Text(
-              isDesktopLayout(context)
-                  ? context.l10n.text('Trade History')
-                  : context.l10n.text('{symbol} — History', {
-                      'symbol': widget.summary.symbol,
-                    }),
+              _selectedTradeIds.isNotEmpty && !isDesktopLayout(context)
+                  ? context.l10n.text(
+                      '{count} selected',
+                      {'count': _selectedTradeIds.length},
+                    )
+                  : isDesktopLayout(context)
+                      ? context.l10n.text('Trade History')
+                      : context.l10n.text('{symbol} — History', {
+                          'symbol': widget.summary.symbol,
+                        }),
             ),
             actions: [
-              if (!ibkrManaged && !isDesktopLayout(context))
+              if (_selectedTradeIds.isNotEmpty &&
+                  !isDesktopLayout(context)) ...[
+                IconButton(
+                  key: const Key('trade-select-all'),
+                  tooltip: context.l10n.text('Select all'),
+                  icon: const Icon(Icons.select_all),
+                  onPressed: () => setState(() {
+                    if (trades.isNotEmpty &&
+                        trades.every(
+                          (trade) => _selectedTradeIds.contains(trade.id),
+                        )) {
+                      _selectedTradeIds.clear();
+                    } else {
+                      _selectedTradeIds.addAll(trades.map((trade) => trade.id));
+                    }
+                  }),
+                ),
+                IconButton(
+                  key: const Key('trade-copy-selected'),
+                  tooltip: context.l10n.text('Copy selected trades'),
+                  icon: const Icon(Icons.copy_outlined),
+                  onPressed: () => _copyTrades(
+                    trades
+                        .where((trade) => _selectedTradeIds.contains(trade.id)),
+                  ),
+                ),
+                if (!ibkrManaged)
+                  IconButton(
+                    key: const Key('trade-delete-selected'),
+                    tooltip: context.l10n.text('Delete selected trades'),
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: () =>
+                        _confirmDeleteTrades(Set<int>.of(_selectedTradeIds)),
+                  ),
+                IconButton(
+                  key: const Key('trade-cancel-selection'),
+                  tooltip: context.l10n.text('Cancel selection'),
+                  icon: const Icon(Icons.close),
+                  onPressed: _clearTradeSelection,
+                ),
+              ],
+              if (_selectedTradeIds.isEmpty &&
+                  !ibkrManaged &&
+                  !isDesktopLayout(context))
                 IconButton(
                   icon: const Icon(Icons.add),
                   tooltip: context.l10n.text('Add trade'),
@@ -182,6 +304,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                     ),
                     onEditTrade: _editTrade,
                     onDeleteTrade: _confirmDeleteTrade,
+                    onDeleteTrades: _confirmDeleteTrades,
                   )
                 : ListView(
                     padding: const EdgeInsets.all(16),
@@ -302,9 +425,13 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                             copyLabel: context.l10n.text('Copy trade'),
                             child: _TradeTile(
                               trade: trade,
-                              onLongPress: ibkrManaged
-                                  ? null
-                                  : () => _showTradeActions(trade),
+                              selecting: _selectedTradeIds.isNotEmpty,
+                              selected: _selectedTradeIds.contains(trade.id),
+                              onTap: () => _selectedTradeIds.isNotEmpty
+                                  ? _toggleTradeSelection(trade.id)
+                                  : _showTradeActions(trade, ibkrManaged),
+                              onLongPress: () =>
+                                  _toggleTradeSelection(trade.id),
                             ),
                           ),
                         ),
@@ -364,7 +491,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
     );
   }
 
-  void _showTradeActions(Trade trade) {
+  void _showTradeActions(Trade trade, bool ibkrManaged) {
     runDetachedTask(
       showModalBottomSheet<void>(
         context: context,
@@ -373,27 +500,39 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.edit),
-                title: Text(context.l10n.text('Edit trade')),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  runDetachedTask(
-                    _editTrade(trade),
-                    'Failed to edit trade',
-                  );
-                },
+                title: Text(_tradeCopyText(trade)),
+                subtitle:
+                    Text(DateFormat('dd MMM yyyy').format(trade.tradeDate)),
               ),
               ListTile(
-                leading: const Icon(Icons.delete),
-                title: Text(context.l10n.text('Delete trade')),
+                leading: const Icon(Icons.copy_outlined),
+                title: Text(context.l10n.text('Copy trade')),
                 onTap: () {
                   Navigator.pop(ctx);
-                  runDetachedTask(
-                    _confirmDeleteTrade(trade),
-                    'Failed to delete trade',
-                  );
+                  runDetachedTask(_copyTrades([trade]), 'Failed to copy trade');
                 },
               ),
+              if (!ibkrManaged) ...[
+                ListTile(
+                  leading: const Icon(Icons.edit),
+                  title: Text(context.l10n.text('Edit trade')),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    runDetachedTask(_editTrade(trade), 'Failed to edit trade');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete_outline),
+                  title: Text(context.l10n.text('Delete trade')),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    runDetachedTask(
+                      _confirmDeleteTrade(trade),
+                      'Failed to delete trade',
+                    );
+                  },
+                ),
+              ],
             ],
           ),
         ),
@@ -409,31 +548,8 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
     );
   }
 
-  Future<void> _confirmDeleteTrade(Trade trade) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(context.l10n.text('Delete trade')),
-        content: Text(
-          context.l10n.text('Delete this trade? This cannot be undone.'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(context.l10n.text('Cancel')),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(context.l10n.text('Delete')),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    final profileId =
-        await profileDataRepository.profileIdForName(_accountName);
-    await profileDataRepository.deleteTrade(profileId, trade.id);
-  }
+  Future<void> _confirmDeleteTrade(Trade trade) =>
+      _confirmDeleteTrades({trade.id});
 }
 
 class _SummaryRow extends StatelessWidget {
@@ -450,10 +566,19 @@ class _SummaryRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: Theme.of(context).textTheme.bodyMedium),
-          Text(
-            value,
-            style: TextStyle(color: color),
+          Flexible(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: TextStyle(color: color),
+            ),
           ),
         ],
       ),
@@ -463,11 +588,17 @@ class _SummaryRow extends StatelessWidget {
 
 class _TradeTile extends StatelessWidget {
   final Trade trade;
-  final VoidCallback? onLongPress;
+  final bool selecting;
+  final bool selected;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
 
   const _TradeTile({
     required this.trade,
-    this.onLongPress,
+    required this.selecting,
+    required this.selected,
+    required this.onTap,
+    required this.onLongPress,
   });
 
   @override
@@ -478,18 +609,38 @@ class _TradeTile extends StatelessWidget {
     final total = (qty * trade.price).abs();
 
     return Card(
+      key: ValueKey('trade-tile-${trade.id}'),
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
+        selected: selected,
+        selectedTileColor: Theme.of(context)
+            .colorScheme
+            .primaryContainer
+            .withValues(alpha: 0.18),
+        onTap: onTap,
         onLongPress: onLongPress,
-        leading: CircleAvatar(
-          backgroundColor: isBuy
-              ? Colors.green.withValues(alpha: 0.15)
-              : Colors.red.withValues(alpha: 0.15),
-          child: Icon(
-            isBuy ? Icons.arrow_downward : Icons.arrow_upward,
-            color: isBuy ? Colors.green : Colors.redAccent,
-            size: 18,
-          ),
+        leading: SizedBox(
+          width: 40,
+          height: 40,
+          child: selecting
+              ? Center(
+                  child: Checkbox(
+                    value: selected,
+                    onChanged: (_) => onTap(),
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                )
+              : CircleAvatar(
+                  backgroundColor: isBuy
+                      ? Colors.green.withValues(alpha: 0.15)
+                      : Colors.red.withValues(alpha: 0.15),
+                  child: Icon(
+                    isBuy ? Icons.arrow_downward : Icons.arrow_upward,
+                    color: isBuy ? Colors.green : Colors.redAccent,
+                    size: 18,
+                  ),
+                ),
         ),
         title: Text(
           isBuy ? context.l10n.text('BUY') : context.l10n.text('SELL'),

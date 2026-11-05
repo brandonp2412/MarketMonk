@@ -180,9 +180,15 @@ void main() {
       await tester.pumpAndSettle();
       expect(tile('AAA').selected, isFalse);
 
+      final idleLeading = tile('AAA').leading! as SizedBox;
+      expect(idleLeading.width, 40);
+      expect(idleLeading.height, 40);
       await tester.longPress(find.text('AAA'));
       await tester.pumpAndSettle();
       expect(tile('AAA').selected, isTrue);
+      final selectedLeading = tile('AAA').leading! as SizedBox;
+      expect(selectedLeading.width, idleLeading.width);
+      expect(selectedLeading.height, idleLeading.height);
       expect(tile('BBB').selected, isFalse);
 
       await tester.tap(find.text('BBB'));
