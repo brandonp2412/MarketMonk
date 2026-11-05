@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -137,9 +138,7 @@ class _SettingsPageState extends State<SettingsPage> {
       options.any((option) => _matchesSearch(section, option));
 
   bool _hasAnyMatches(Map<String, List<String>> sections) =>
-      sections.entries.any(
-        (entry) => _hasMatches(entry.key, entry.value),
-      );
+      sections.entries.any((entry) => _hasMatches(entry.key, entry.value));
 
   Widget _searchField() => Padding(
         padding: EdgeInsets.fromLTRB(
@@ -150,9 +149,8 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: _desktopContentMaxWidth,
-            ),
+            constraints:
+                const BoxConstraints(maxWidth: _desktopContentMaxWidth),
             child: TextField(
               key: const Key('settings-search'),
               controller: _searchController,
@@ -659,6 +657,50 @@ class _SettingsPageState extends State<SettingsPage> {
         onTap: () => onChanged(!value),
       );
 
+  Widget _chartPreview(SettingsState settings, {required double height}) {
+    const prices = <double>[
+      82,
+      86,
+      83,
+      90,
+      96,
+      92,
+      101,
+      98,
+      105,
+      110,
+      106,
+      114,
+    ];
+    final today = DateUtils.dateOnly(DateTime.now());
+    return SizedBox(
+      key: const Key('settings-chart-preview'),
+      height: height,
+      child: TickerLine(
+        spots: [
+          for (var i = 0; i < prices.length; i++)
+            MarketLineChartPoint(i.toDouble(), prices[i], column: i),
+        ],
+        dates: [
+          for (var i = 0; i < prices.length; i++)
+            today.subtract(Duration(days: prices.length - i - 1)),
+        ],
+        candles: [
+          for (var i = 0; i < prices.length; i++)
+            MarketCandlePoint(
+              column: i,
+              open: i == 0 ? 80 : prices[i - 1],
+              high: math.max(prices[i], i == 0 ? 80 : prices[i - 1]) + 3,
+              low: math.min(prices[i], i == 0 ? 80 : prices[i - 1]) - 3,
+              close: prices[i],
+            ),
+        ],
+        showRollingAverage: settings.showRollingAverage,
+        showCandlesticks: settings.showCandlesticks,
+      ),
+    );
+  }
+
   Widget _desktopSettingsCard({
     required IconData icon,
     required String title,
@@ -862,26 +904,8 @@ class _SettingsPageState extends State<SettingsPage> {
               ],
             ),
           ),
-        if (_matchesSearch('Charts', 'Curve smoothness'))
-          SizedBox(
-            height: 180,
-            child: TickerLine(
-              spots: const [
-                MarketLineChartPoint(0.0, 0.13, column: 0),
-                MarketLineChartPoint(1.0, 5, column: 1),
-                MarketLineChartPoint(2.0, 2, column: 2),
-                MarketLineChartPoint(3.0, 10, column: 3),
-                MarketLineChartPoint(4.0, 5, column: 4),
-              ],
-              dates: [
-                DateTime.now().subtract(const Duration(days: 4)),
-                DateTime.now().subtract(const Duration(days: 3)),
-                DateTime.now().subtract(const Duration(days: 2)),
-                DateTime.now().subtract(const Duration(days: 1)),
-                DateTime.now(),
-              ],
-            ),
-          ),
+        if (_hasMatches('Charts', _desktopSearchOptions['Charts']!))
+          _chartPreview(settings, height: 180),
       ],
     );
 
@@ -1171,8 +1195,9 @@ class _SettingsPageState extends State<SettingsPage> {
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
           child: Center(
             child: ConstrainedBox(
-              constraints:
-                  const BoxConstraints(maxWidth: _desktopContentMaxWidth),
+              constraints: const BoxConstraints(
+                maxWidth: _desktopContentMaxWidth,
+              ),
               child: content,
             ),
           ),
@@ -1412,25 +1437,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ],
             ),
-          if (_matchesSearch('Charts', 'Curve smoothness'))
-            SizedBox(
+          if (_hasMatches('Charts', _mobileSearchOptions['Charts']!))
+            _chartPreview(
+              settings,
               height: MediaQuery.of(context).size.height * 0.3,
-              child: TickerLine(
-                spots: const [
-                  MarketLineChartPoint(0.0, 0.13, column: 0),
-                  MarketLineChartPoint(1.0, 5, column: 1),
-                  MarketLineChartPoint(2.0, 2, column: 2),
-                  MarketLineChartPoint(3.0, 10, column: 3),
-                  MarketLineChartPoint(4.0, 5, column: 4),
-                ],
-                dates: [
-                  DateTime.now().subtract(const Duration(days: 4)),
-                  DateTime.now().subtract(const Duration(days: 3)),
-                  DateTime.now().subtract(const Duration(days: 2)),
-                  DateTime.now().subtract(const Duration(days: 1)),
-                  DateTime.now(),
-                ],
-              ),
             ),
           if (_hasMatches('Accounts', _mobileSearchOptions['Accounts']!))
             _sectionHeader(context.l10n.text('Accounts')),
