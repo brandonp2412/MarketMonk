@@ -5,6 +5,7 @@ import 'dart:io' show HttpDate;
 
 import 'package:http/http.dart' as http;
 import 'package:market_monk/background_network_coordinator.dart';
+import 'package:market_monk/crypto_market_data.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/logging.dart';
 
@@ -124,12 +125,26 @@ class IntradayMarketData {
       (this, key, brokerTimeout),
       () async {
         IntradaySeries? series;
-        if (config.isConfigured) {
+        final cryptoAsset = cryptoAssetForSymbol(canonicalSymbol);
+        if (cryptoAsset != null) {
+          series = IntradaySeries(
+            currency: 'USD',
+            source: 'Kraken',
+            candles: await CryptoMarketData().intradayHistory(
+              cryptoAsset,
+              days: days,
+            ),
+          );
+        }
+        if (series == null && config.isConfigured) {
           try {
             final result = await backgroundNetworkCoordinator.observe(
               'ibkr.intradayAttempt',
-              () => _ibkrFetch(config, canonicalSymbol, days)
-                  .timeout(brokerTimeout ?? _brokerTimeout),
+              () => _ibkrFetch(
+                config,
+                canonicalSymbol,
+                days,
+              ).timeout(brokerTimeout ?? _brokerTimeout),
             );
             series = IntradaySeries(
               currency: result.currency,
@@ -143,6 +158,9 @@ class IntradayMarketData {
               'IBKR intraday unavailable; trying Yahoo',
             );
           }
+        }
+        if (series == null && cryptoAsset != null) {
+          throw StateError('Crypto intraday prices unavailable');
         }
         series ??= await _fetchYahoo(canonicalSymbol, days);
         if (_cache.length >= 256) _cache.remove(_cache.keys.first);
@@ -314,14 +332,16 @@ class IntradayMarketData {
           final error = chart is Map ? chart['error'] : null;
           final description = error is Map ? error['description'] : null;
           if (description is String &&
-              RegExp(r'fixed[ -]price', caseSensitive: false)
-                  .hasMatch(description)) {
+              RegExp(
+                r'fixed[ -]price',
+                caseSensitive: false,
+              ).hasMatch(description)) {
             return _fetchYahoo(symbol, days, daily: true);
           }
         }
         if (response.statusCode != 200) {
           throw StateError(
-            'Yahoo intraday returned HTTP ${response.statusCode}',
+              'Yahoo intraday returned HTTP ${response.statusCode}',
           );
         }
         final body = jsonDecode(response.body) as Map<String, dynamic>;

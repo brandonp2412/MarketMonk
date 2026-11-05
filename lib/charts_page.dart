@@ -36,6 +36,7 @@ import 'package:market_monk/sqlite_settings.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/ticker_search_loading.dart';
 import 'package:market_monk/utils.dart';
+import 'package:market_monk/crypto_market_data.dart';
 import 'package:provider/provider.dart';
 
 enum _ChartMode { portfolio, searching, stock }
@@ -294,17 +295,14 @@ class ChartsPageState extends State<ChartsPage>
         );
         return;
       }
-      runDetachedTask(
-        () async {
-          await _syncCandlesInBackground(refreshPerformance: true);
-          talker.info(
-            backgroundNetworkCoordinator.diagnosticsSummary(
-              label: 'Startup request summary',
-            ),
-          );
-        }(),
-        'Failed to initialize active chart data',
-      );
+      runDetachedTask(() async {
+        await _syncCandlesInBackground(refreshPerformance: true);
+        talker.info(
+          backgroundNetworkCoordinator.diagnosticsSummary(
+            label: 'Startup request summary',
+          ),
+        );
+      }(), 'Failed to initialize active chart data',);
     }
   }
 
@@ -776,10 +774,7 @@ class ChartsPageState extends State<ChartsPage>
       );
       if (!mounted || !widget.isActive) return;
       if (_usesIntraday && _selectedFavorites.isNotEmpty) {
-        await _syncFavoriteCandles(
-          forceRefresh: true,
-          selectedOnly: true,
-        );
+        await _syncFavoriteCandles(forceRefresh: true, selectedOnly: true);
       }
       if (_mode == _ChartMode.stock && _selectedSymbol != null) {
         await _loadSelectedStock(forceRefresh: true);
@@ -828,10 +823,7 @@ class ChartsPageState extends State<ChartsPage>
       return;
     await Future.wait(
       symbols.map(
-        (symbol) => _syncFavoriteCandle(
-          symbol,
-          forceRefresh: forceRefresh,
-        ),
+        (symbol) => _syncFavoriteCandle(symbol, forceRefresh: forceRefresh),
       ),
     );
   }
@@ -1495,8 +1487,9 @@ class ChartsPageState extends State<ChartsPage>
     required bool forceRefresh,
   }) async {
     final selectedDays = days;
-    final accountTrades =
-        await profileDataRepository.readTradesForAccount(accountName);
+    final accountTrades = await profileDataRepository.readTradesForAccount(
+      accountName,
+    );
     final holdings = <IntradayPortfolioHolding>[];
     final failureReasons = <String>[];
     final prefetched = loaded.positions.isNotEmpty &&
@@ -2237,25 +2230,22 @@ class ChartsPageState extends State<ChartsPage>
     });
     runDetachedTask(_savePeriod(), 'Failed to save chart period');
     if (!_periodTransition) return;
-    runDetachedTask(
-      () async {
-        try {
-          await Future.wait([
-            if (_selectedFavorites.isNotEmpty)
-              _syncFavoriteCandles(selectedOnly: true),
-            if (_mode == _ChartMode.stock && _selectedSymbol != null)
-              _loadSelectedStock()
-            else if (!_restoreIntradayPortfolio())
-              _syncCandlesInBackground(),
-          ]);
-        } finally {
-          if (mounted && transitionGeneration == _periodTransitionGeneration) {
-            setState(() => _periodTransition = false);
-          }
+    runDetachedTask(() async {
+      try {
+        await Future.wait([
+          if (_selectedFavorites.isNotEmpty)
+            _syncFavoriteCandles(selectedOnly: true),
+          if (_mode == _ChartMode.stock && _selectedSymbol != null)
+            _loadSelectedStock()
+          else if (!_restoreIntradayPortfolio())
+            _syncCandlesInBackground(),
+        ]);
+      } finally {
+        if (mounted && transitionGeneration == _periodTransitionGeneration) {
+          setState(() => _periodTransition = false);
         }
-      }(),
-      'Failed to load selected chart period',
-    );
+      }
+    }(), 'Failed to load selected chart period',);
   }
 
   void _clearSearch() {
@@ -2436,10 +2426,7 @@ class ChartsPageState extends State<ChartsPage>
             tooltip: context.l10n.text('Settings'),
             onPressed: () => Navigator.push(
               context,
-              adaptivePageRoute(
-                context,
-                builder: (_) => const SettingsPage(),
-              ),
+              adaptivePageRoute(context, builder: (_) => const SettingsPage()),
             ),
           ),
           if (!desktop ||
@@ -2458,8 +2445,9 @@ class ChartsPageState extends State<ChartsPage>
                   }
                 } else if (value == '__rolling_average__') {
                   runDetachedTask(
-                    settings
-                        .setShowRollingAverage(!settings.showRollingAverage),
+                    settings.setShowRollingAverage(
+                      !settings.showRollingAverage,
+                    ),
                     'Failed to save rolling average',
                   );
                 } else if (value == '__candles__') {
@@ -2754,7 +2742,7 @@ class ChartsPageState extends State<ChartsPage>
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            '${_intradaySeries!.source} · ${_intradaySeries!.isDaily ? "1 day" : (days == 1 ? "1 min" : "15 min")} · ${context.l10n.text('Local time')}',
+            '${_intradaySeries!.source} · ${_intradaySeries!.isDaily ? "1 day" : (days == 1 ? (cryptoAssetForSymbol(_selectedSymbol ?? '') != null ? "5 min" : "1 min") : "15 min")} · ${context.l10n.text('Local time')}',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall,
           ),
@@ -2897,7 +2885,8 @@ class ChartsPageState extends State<ChartsPage>
                 close: candles[i].close.value / scale(candles[i]),
               ),
           ],
-          showCandlesticks: _showCandlesticks,
+          showCandlesticks: _showCandlesticks &&
+              (cryptoAssetForSymbol(_selectedSymbol!) == null || _usesIntraday),
           candleSelection: _candleSelection,
           showRollingAverage: _showRollingAverage,
           nativeCurrency: _nativeCurrency,

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:market_monk/background_network_coordinator.dart';
+import 'package:market_monk/crypto_market_data.dart';
 import 'package:market_monk/exchange_rate_service.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
@@ -230,6 +231,20 @@ Future<void> fetchSymbolCurrencyAndRate(
 }) async {
   final canonicalSymbol = canonicalMarketSymbol(symbol);
   if (canonicalSymbol.isEmpty) return;
+  if (cryptoAssetForSymbol(canonicalSymbol) != null) {
+    cacheSymbolMeta(canonicalSymbol, 'USD');
+    final metadata = await marketDataDatabase.readSymbolMetadata(
+      canonicalSymbol,
+    );
+    if (rawCurrencyFromMetadata(metadata) != 'USD') {
+      await upsertSymbolCurrencyMetadata(
+        canonicalSymbol,
+        'USD',
+        source: 'crypto',
+      );
+    }
+    return;
+  }
   final seenAt = _observedSymbolAt[canonicalSymbol];
   final cachedCurrency = _symbolCurrencies[canonicalSymbol];
   if (rawCurrency == null &&
@@ -546,8 +561,9 @@ List<Position> computePositions(
         'and unit of legacy trades before calculating its cost basis.',
       );
     }
-    final legacyUnits =
-        symbolTrades.every((trade) => trade.rawCurrency == null);
+    final legacyUnits = symbolTrades.every(
+      (trade) => trade.rawCurrency == null,
+    );
     final avgCostUsd = legacyUnits
         ? null
         : _averageCostForOpenPosition(
@@ -933,8 +949,10 @@ Future<bool> _syncIbkrCandlesIfAvailable(
       throw StateError('IBKR returned no candles in the requested range');
     }
 
-    final verifiedFrom =
-        await _firstVerifiedCurrentQuoteDay(targetDatabase, symbol);
+    final verifiedFrom = await _firstVerifiedCurrentQuoteDay(
+      targetDatabase,
+      symbol,
+    );
     var stored = 0;
     if (verifiedFrom != null) {
       // Do not overwrite known older units, or assign today's quote unit to
@@ -985,6 +1003,85 @@ Future<bool> _syncIbkrCandlesIfAvailable(
 /// [syncNamespace] is retained for current call-site compatibility only; candle
 /// identity and coverage are deliberately independent of account ownership.
 
+final _cryptoSyncAt = <String, DateTime>{};
+
+Future<void> _syncCryptoCandles(
+  Database database,
+  CryptoAsset asset, {
+  DateTime? requiredFrom,
+  required bool forceRefresh,
+  required CryptoMarketData marketData,
+}) async {
+  final now = DateTime.now().toUtc();
+  final today = canonicalMarketDay(now);
+  final requested = canonicalMarketDay(
+    requiredFrom ?? now.subtract(defaultMarketCandleLookback),
+  );
+  final start = requested.isAfter(today) ? today : requested;
+  final first = await (database.candles.select()
+        ..where((row) => row.symbol.equals(asset.symbol))
+        ..orderBy([
+          (row) => OrderingTerm(expression: row.date, mode: OrderingMode.asc),
+        ])
+        ..limit(1))
+      .getSingleOrNull();
+  final last = await (database.candles.select()
+        ..where((row) => row.symbol.equals(asset.symbol))
+        ..orderBy([
+          (row) => OrderingTerm(expression: row.date, mode: OrderingMode.desc),
+        ])
+        ..limit(1))
+      .getSingleOrNull();
+  final fetchedAt = _cryptoSyncAt[asset.symbol];
+  if (!forceRefresh &&
+      first != null &&
+      !canonicalMarketDay(first.date).isAfter(start) &&
+      last != null &&
+      !canonicalMarketDay(last.date).isBefore(today) &&
+      fetchedAt != null &&
+      now.difference(fetchedAt) < const Duration(minutes: 5)) {
+    return;
+  }
+  final fetchFrom = forceRefresh ||
+          first == null ||
+          canonicalMarketDay(first.date).isAfter(start)
+      ? start
+      : canonicalMarketDay(last?.date ?? start)
+          .subtract(const Duration(days: 2));
+  final bars = await backgroundNetworkCoordinator.coalesce(
+      'crypto.daily',
+      (
+        asset.symbol,
+        fetchFrom,
+      ),
+      () => marketData.dailyHistory(asset, fetchFrom),
+  );
+  if (bars.isEmpty) throw StateError('No crypto prices for ${asset.symbol}');
+  for (var offset = 0; offset < bars.length; offset += 1000) {
+    final batch = bars.skip(offset).take(1000).map((bar) {
+      return CandlesCompanion.insert(
+        date: bar.date,
+        symbol: asset.symbol,
+        open: Value(bar.open),
+        high: Value(bar.high),
+        low: Value(bar.low),
+        close: Value(bar.close),
+        adjClose: Value(bar.close),
+        volume: Value(bar.volume.round()),
+        rawCurrency: const Value('USD'),
+      );
+    }).toList();
+    await database.batch(
+      (builder) => builder.insertAll(
+        database.candles,
+        batch,
+        mode: InsertMode.insertOrReplace,
+      ),
+    );
+  }
+  _cryptoSyncAt[asset.symbol] = now;
+}
+
 Future<void> syncCandles(
   String symbol, {
   Database? database,
@@ -994,9 +1091,23 @@ Future<void> syncCandles(
   bool forceRefresh = false,
   YahooCandleFetcher? yahooFetcher,
   IbkrCandleFetcher? ibkrFetcher,
+  CryptoMarketData? cryptoMarketData,
 }) async {
   final targetDatabase = database ?? marketDataDatabase;
   final canonicalSymbol = canonicalMarketSymbol(symbol);
+  final cryptoAsset = cryptoAssetForSymbol(canonicalSymbol);
+  if (cryptoAsset != null) {
+    if (database == null) await fetchSymbolCurrencyAndRate(canonicalSymbol);
+    cacheSymbolMeta(canonicalSymbol, 'USD');
+    await _syncCryptoCandles(
+      targetDatabase,
+      cryptoAsset,
+      requiredFrom: requiredFrom,
+      forceRefresh: forceRefresh,
+      marketData: cryptoMarketData ?? CryptoMarketData(),
+    );
+    return;
+  }
   if (database == null && ibkrConfig?.isConfigured != true) {
     await fetchSymbolCurrencyAndRate(canonicalSymbol);
   }
@@ -1014,7 +1125,7 @@ Future<void> syncCandles(
         bool covered,
         DateTime? oldestDay,
         DateTime? latestDay,
-        bool needsReconciliation
+        bool needsReconciliation,
       })> readCoverage() async {
     final oldest = await (targetDatabase.candles.select()
           ..where((row) => row.symbol.equals(canonicalSymbol))
@@ -1037,9 +1148,10 @@ Future<void> syncCandles(
     final currentRaw = rawCurrencyFromMetadata(
       await targetDatabase.readSymbolMetadata(canonicalSymbol),
     );
-    final transitioned =
-        (await targetDatabase.readQuoteCurrencyChanges(canonicalSymbol))
-            .isNotEmpty;
+    final transitioned = (await targetDatabase.readQuoteCurrencyChanges(
+      canonicalSymbol,
+    ))
+        .isNotEmpty;
     final unresolved = transitioned &&
         (await (targetDatabase.candles.select()
                   ..where(
@@ -1104,7 +1216,7 @@ Future<void> syncCandles(
       return (
         requested: true,
         progressed: progressed,
-        coverageFrom: requiredStart
+        coverageFrom: requiredStart,
       );
     }
 
@@ -1130,8 +1242,10 @@ Future<void> syncCandles(
       final day = canonicalMarketDay(candle.date);
       return !day.isBefore(requestFrom) && !day.isAfter(expectedMarketDay);
     }).toList();
-    final verifiedFrom =
-        await _firstVerifiedCurrentQuoteDay(targetDatabase, canonicalSymbol);
+    final verifiedFrom = await _firstVerifiedCurrentQuoteDay(
+      targetDatabase,
+      canonicalSymbol,
+    );
     var stored = 0;
     if (verifiedFrom != null) {
       stored += await insertCandles(
@@ -1173,7 +1287,7 @@ Future<void> syncCandles(
     return (
       requested: true,
       progressed: progressed,
-      coverageFrom: requiredStart
+      coverageFrom: requiredStart,
     );
   }
 
@@ -1324,6 +1438,16 @@ class YahooFinanceApi {
         'yahoo.search',
         query,
         () async {
+          final crypto = searchCryptoAssets(query)
+              .map(
+                (asset) => StockResult(
+                  symbol: asset.symbol,
+                  shortname: asset.name,
+                  longname: asset.name,
+                  exchange: 'Crypto',
+                ),
+              )
+              .toList();
           try {
             final response = await _searchFetcher(
               Uri.parse('$_baseUrl?q=${Uri.encodeComponent(query)}'),
@@ -1333,7 +1457,7 @@ class YahooFinanceApi {
               talker.warning(
                 'Ticker search returned HTTP ${response.statusCode}',
               );
-              return [];
+              return crypto;
             }
 
             final Map<String, dynamic> data = json.decode(response.body);
@@ -1341,13 +1465,16 @@ class YahooFinanceApi {
 
             // Include EQUITYs, ETFs, and ETNs — all have tradeable candle data.
             const tradeable = {'EQUITY', 'ETF', 'ETN'};
-            return quotes
+            final stocks = quotes
                 .where((quote) => tradeable.contains(quote['quoteType']))
                 .map((quote) => StockResult.fromJson(quote))
-                .toList();
+                .where(
+                  (stock) => !crypto.any((coin) => coin.symbol == stock.symbol),
+                );
+            return [...crypto, ...stocks];
           } catch (error, stackTrace) {
             talker.handle(error, stackTrace, 'Ticker search request failed');
-            return [];
+            return crypto;
           }
         },
       );
