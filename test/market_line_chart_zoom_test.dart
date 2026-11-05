@@ -18,9 +18,10 @@ void main() {
     int pointCount = 10,
     List<MarketLineChartSeries>? series,
     ValueChanged<int>? onTooltipIndex,
+    TargetPlatform platform = TargetPlatform.linux,
   }) =>
       MaterialApp(
-        theme: ThemeData(platform: TargetPlatform.linux),
+        theme: ThemeData(platform: platform),
         home: Scaffold(
           body: DesktopContextMenu(
             actions:
@@ -670,6 +671,35 @@ void main() {
     await drag(tester, 2, 7, kind: PointerDeviceKind.touch);
     expect(scene(tester).marks, hasLength(10));
     expect(find.byTooltip('Reset zoom'), findsNothing);
+  });
+
+  testWidgets('mobile range filter needs a long press and a second finger',
+      (tester) async {
+    await tester.pumpWidget(chart(platform: TargetPlatform.android));
+    final first = scene(tester).marks[2].center;
+    final last = scene(tester).marks[7].center;
+
+    final early = await tester.startGesture(first);
+    final earlySecond = await tester.startGesture(last);
+    await earlySecond.up();
+    await early.up();
+    await tester.pump();
+    expect(scene(tester).marks, hasLength(10));
+
+    final primary = await tester.startGesture(first);
+    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 20));
+    final secondary = await tester.startGesture(last);
+    await tester.pump();
+    await secondary.up();
+    await tester.pump();
+    expect(scene(tester).marks.map((mark) => mark.index), [2, 3, 4, 5, 6, 7]);
+    expect(find.text('Filtered'), findsOneWidget);
+    expect(find.text('Undo'), findsOneWidget);
+    await primary.up();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('Undo'));
+    await tester.pump();
+    expect(scene(tester).marks, hasLength(10));
   });
 
   testWidgets('zoom survives rebuilds and resets when chart data changes',

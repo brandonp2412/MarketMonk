@@ -25,6 +25,7 @@ class _FailedCacheAccountManager extends AccountManager {
     IbkrAccountValue? netLiquidation, {
     double? netLiquidationUsd,
     IbkrAccountValue? cashBalance,
+    double? cashUsd,
     DateTime? asOfDate,
   }) async =>
       throw failure;

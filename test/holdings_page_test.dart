@@ -455,9 +455,7 @@ void main() {
 
       for (final hidden in [false, true]) {
         if (width < 1000) {
-          await tester.tap(find.byKey(const Key('holdings-menu-button')));
-          await tester.pumpAndSettle();
-          await tester.tap(find.text('Settings'));
+          await tester.tap(find.byKey(const Key('holdings-settings-button')));
         } else {
           Navigator.of(tester.element(find.byType(HoldingsPage))).push(
             MaterialPageRoute<void>(builder: (_) => const SettingsPage()),
@@ -1107,6 +1105,46 @@ void main() {
     final pnlCell = menu.child as Align;
     expect((pnlCell.child! as Text).data, '—');
     expect(find.textContaining('Realized'), findsNothing);
+  });
+
+  testWidgets('cached IBKR cash appears in mobile holdings', (tester) async {
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.setIbkrConfig(
+      'Default',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'test-token',
+      ),
+    );
+    await accounts.cachePortfolio(
+      'Default',
+      const [],
+      const IbkrAccountValue(value: 17, currency: 'NZD'),
+      cashBalance: const IbkrAccountValue(value: 17, currency: 'NZD'),
+      cashUsd: 10,
+    );
+    final pending = Completer<IbkrPortfolioSnapshot>();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: HoldingsPage(
+            ibkrLoader: (_) => pending.future,
+            ibkrTradeHistoryLoader: (_) async =>
+                const IbkrTradeHistory(available: false, trades: []),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.byKey(const Key('holdings-ibkr-cash')), findsOneWidget);
+    expect(find.text('Cash'), findsOneWidget);
   });
 
   testWidgets('cached IBKR positions show before trade history completes',

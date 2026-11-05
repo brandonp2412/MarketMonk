@@ -486,6 +486,10 @@ class _MarketLineChartInteractionState
   Offset? _dragStart;
   double? _dragX;
   int? _dragPointer;
+  int? _firstTouchPointer;
+  Offset? _touchRangeStart;
+  int? _secondTouchPointer;
+  double? _touchRangeEndX;
   bool _scrubFrameScheduled = false;
   int? _pendingScrubIndex;
 
@@ -501,6 +505,42 @@ class _MarketLineChartInteractionState
       _clear();
     });
     widget.onRangeChanged?.call(range);
+    if (range == null)
+      ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+  }
+
+  bool get _isMobileChart => switch (Theme.of(context).platform) {
+        TargetPlatform.android || TargetPlatform.iOS => true,
+        _ => false,
+      };
+
+  void _clearTouchRange() {
+    _touchRangeStart = null;
+    _secondTouchPointer = null;
+    _touchRangeEndX = null;
+  }
+
+  void _finishTouchRange(ChartScene scene, double endX) {
+    final start = _touchRangeStart;
+    setState(_clearTouchRange);
+    if (start == null) return;
+    final first = ChartHitTest.nearestIndexAtX(scene, start.dx);
+    final last = ChartHitTest.nearestIndexAtX(scene, endX);
+    if (first == null || last == null || first == last) return;
+    _setRange((min(first, last), max(first, last)));
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.hideCurrentSnackBar();
+    messenger?.showSnackBar(
+      SnackBar(
+        content: const Text('Filtered'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () {
+            if (mounted) _setRange(null);
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _showStartDateMenu(
@@ -592,6 +632,8 @@ class _MarketLineChartInteractionState
       _dragStart = null;
       _dragX = null;
       _dragPointer = null;
+      _firstTouchPointer = null;
+      _clearTouchRange();
       _clear();
     }
     if (oldWidget.stickyTooltip != widget.stickyTooltip) {
@@ -635,6 +677,21 @@ class _MarketLineChartInteractionState
             final size = constraints.biggest;
             final renderer = _renderer;
             final scene = renderer.buildScene(size);
+            final bounds = scene.bounds;
+            final rangeStartX = _dragStart?.dx ?? _touchRangeStart?.dx;
+            final rangeEndX = _dragX ?? _touchRangeEndX;
+            final rangeLeft =
+                rangeStartX != null && rangeEndX != null && bounds != null
+                    ? min(rangeStartX, rangeEndX)
+                        .clamp(bounds.left, bounds.right)
+                        .toDouble()
+                    : null;
+            final rangeRight =
+                rangeStartX != null && rangeEndX != null && bounds != null
+                    ? max(rangeStartX, rangeEndX)
+                        .clamp(bounds.left, bounds.right)
+                        .toDouble()
+                    : null;
 
             return MouseRegion(
               onHover: (event) => _activate(event.localPosition, scene),
@@ -645,7 +702,24 @@ class _MarketLineChartInteractionState
                 behavior: HitTestBehavior.opaque,
                 onPointerDown: (event) {
                   _activate(event.localPosition, scene);
-                  final bounds = scene.bounds;
+                  if (_isMobileChart && event.kind == PointerDeviceKind.touch) {
+                    if (_firstTouchPointer == null) {
+                      _firstTouchPointer = event.pointer;
+                    } else if (_touchRangeStart != null &&
+                        _secondTouchPointer == null &&
+                        bounds != null &&
+                        Rect.fromLTRB(
+                          bounds.left,
+                          bounds.top,
+                          bounds.right,
+                          bounds.bottom,
+                        ).contains(event.localPosition)) {
+                      setState(() {
+                        _secondTouchPointer = event.pointer;
+                        _touchRangeEndX = event.localPosition.dx;
+                      });
+                    }
+                  }
                   if (event.kind == PointerDeviceKind.mouse &&
                       event.buttons == kPrimaryMouseButton &&
                       bounds != null &&
@@ -660,6 +734,13 @@ class _MarketLineChartInteractionState
                   }
                 },
                 onPointerMove: (event) {
+                  if (event.pointer == _secondTouchPointer) {
+                    setState(() {
+                      _touchRangeEndX = event.localPosition.dx;
+                    });
+                    _activate(event.localPosition, scene);
+                    return;
+                  }
                   if (event.pointer != _dragPointer || _dragStart == null)
                     return;
                   setState(() {
@@ -668,6 +749,13 @@ class _MarketLineChartInteractionState
                   _activate(event.localPosition, scene);
                 },
                 onPointerUp: (event) {
+                  if (event.pointer == _secondTouchPointer) {
+                    _finishTouchRange(scene, event.localPosition.dx);
+                  }
+                  if (event.pointer == _firstTouchPointer) {
+                    _firstTouchPointer = null;
+                    setState(_clearTouchRange);
+                  }
                   if (event.pointer == _dragPointer) {
                     final start = _dragStart;
                     if (start != null &&
@@ -693,10 +781,15 @@ class _MarketLineChartInteractionState
                   }
                   if (!_keepTooltipOnTapUp) _clear();
                 },
-                onPointerCancel: (_) => setState(() {
+                onPointerCancel: (event) => setState(() {
                   _dragStart = null;
                   _dragX = null;
                   _dragPointer = null;
+                  if (event.pointer == _firstTouchPointer ||
+                      event.pointer == _secondTouchPointer) {
+                    _firstTouchPointer = null;
+                    _clearTouchRange();
+                  }
                   _clear();
                 }),
                 child: GestureDetector(
@@ -721,8 +814,20 @@ class _MarketLineChartInteractionState
                       _showStartDateMenu(details.globalPosition, start, end),
                     );
                   },
-                  onLongPressStart: (details) =>
-                      _activate(details.localPosition, scene),
+                  onLongPressStart: (details) {
+                    _activate(details.localPosition, scene);
+                    if (_isMobileChart &&
+                        _firstTouchPointer != null &&
+                        bounds != null &&
+                        Rect.fromLTRB(
+                          bounds.left,
+                          bounds.top,
+                          bounds.right,
+                          bounds.bottom,
+                        ).contains(details.localPosition)) {
+                      setState(() => _touchRangeStart = details.localPosition);
+                    }
+                  },
                   onLongPressMoveUpdate: (details) =>
                       _activateScrub(details.localPosition, scene),
                   onLongPressEnd: (_) {
@@ -741,22 +846,14 @@ class _MarketLineChartInteractionState
                           animate: false,
                         ),
                       ),
-                      if (_dragStart != null &&
-                          _dragX != null &&
-                          scene.bounds != null)
+                      if (rangeLeft != null &&
+                          rangeRight != null &&
+                          bounds != null)
                         Positioned(
-                          left: min(_dragStart!.dx, _dragX!)
-                              .clamp(scene.bounds!.left, scene.bounds!.right),
-                          top: scene.bounds!.top,
-                          width: (max(_dragStart!.dx, _dragX!).clamp(
-                                scene.bounds!.left,
-                                scene.bounds!.right,
-                              ) -
-                              min(_dragStart!.dx, _dragX!).clamp(
-                                scene.bounds!.left,
-                                scene.bounds!.right,
-                              )),
-                          height: scene.bounds!.height,
+                          left: rangeLeft,
+                          top: bounds.top,
+                          width: rangeRight - rangeLeft,
+                          height: bounds.height,
                           child: IgnorePointer(
                             child: ColoredBox(
                               color: Theme.of(context)

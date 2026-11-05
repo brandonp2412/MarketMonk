@@ -18,6 +18,7 @@ import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/exchange_rate_service.dart';
 import 'package:market_monk/ibkr_api.dart';
+import 'package:market_monk/ibkr_cash.dart';
 import 'package:market_monk/intraday_market_data.dart';
 import 'package:market_monk/intraday_portfolio.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
@@ -446,11 +447,14 @@ class ChartsPageState extends State<ChartsPage>
             );
             final currentValue = snapshot.netLiquidation;
             final currentValueUsd = snapshot.netLiquidationUsd?.value;
+            final cash = resolveIbkrCash(snapshot);
             await accountManager.cachePortfolio(
               accountName,
               positions,
               snapshot.netLiquidation,
               netLiquidationUsd: currentValueUsd,
+              cashBalance: cash?.reported,
+              cashUsd: cash?.usd,
               asOfDate: snapshot.asOfDate,
             );
             return _LoadedChartPortfolio(
@@ -2352,17 +2356,28 @@ class ChartsPageState extends State<ChartsPage>
     final inlineCurrencies = desktop &&
         settings.visibleCurrencies.length > 1 &&
         availableWidth >= 750 + settings.visibleCurrencies.length * 65;
-    final leading = canReturnToPortfolio
+    final leading = _customChartRange != null
         ? IconButton(
-            icon: const Icon(Icons.arrow_back),
-            tooltip: context.l10n.text('Back'),
+            key: const Key('chart-clear-filter'),
+            icon: const Icon(Icons.filter_alt_off_rounded),
+            tooltip: 'Clear date filter',
             padding: const EdgeInsets.only(left: 16, right: 8),
-            onPressed: _clearSearch,
+            onPressed: () {
+              ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+              _setChartRange(const [], null);
+            },
           )
-        : const Padding(
-            padding: EdgeInsets.only(left: 16, right: 8),
-            child: Icon(Icons.search),
-          );
+        : canReturnToPortfolio
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                tooltip: context.l10n.text('Back'),
+                padding: const EdgeInsets.only(left: 16, right: 8),
+                onPressed: _clearSearch,
+              )
+            : const Padding(
+                padding: EdgeInsets.only(left: 16, right: 8),
+                child: Icon(Icons.search),
+              );
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -2398,6 +2413,18 @@ class ChartsPageState extends State<ChartsPage>
             ),
           if (inlineCurrencies)
             const CurrencyButtons(key: Key('chart-currency-buttons')),
+          IconButton(
+            key: const Key('chart-settings-button'),
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: context.l10n.text('Settings'),
+            onPressed: () => Navigator.push(
+              context,
+              adaptivePageRoute(
+                context,
+                builder: (_) => const SettingsPage(),
+              ),
+            ),
+          ),
           if (!desktop ||
               (settings.visibleCurrencies.length > 1 && !inlineCurrencies))
             PopupMenuButton<String>(
@@ -2405,15 +2432,7 @@ class ChartsPageState extends State<ChartsPage>
               icon: const Icon(Icons.more_vert),
               tooltip: context.l10n.text('Show menu'),
               onSelected: (value) {
-                if (value == '__settings__') {
-                  Navigator.push(
-                    context,
-                    adaptivePageRoute(
-                      context,
-                      builder: (_) => const SettingsPage(),
-                    ),
-                  );
-                } else if (value == '__rolling_average__') {
+                if (value == '__rolling_average__') {
                   runDetachedTask(
                     settings
                         .setShowRollingAverage(!settings.showRollingAverage),
@@ -2481,30 +2500,8 @@ class ChartsPageState extends State<ChartsPage>
                       ],
                     ),
                   ),
-                  const PopupMenuDivider(),
                 ],
-                if (!desktop)
-                  PopupMenuItem<String>(
-                    value: '__settings__',
-                    child: ListTile(
-                      leading: const Icon(Icons.settings),
-                      title: Text(context.l10n.text('Settings')),
-                    ),
-                  ),
               ],
-            ),
-          if (desktop)
-            IconButton(
-              key: const Key('chart-settings-button'),
-              icon: const Icon(Icons.settings_outlined),
-              tooltip: context.l10n.text('Settings'),
-              onPressed: () => Navigator.push(
-                context,
-                adaptivePageRoute(
-                  context,
-                  builder: (_) => const SettingsPage(),
-                ),
-              ),
             ),
         ],
       ),

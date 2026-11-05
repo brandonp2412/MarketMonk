@@ -119,10 +119,10 @@ void main() {
       netLiquidation: null,
       cachedAt: DateTime.now(),
     );
-    final oldJson = cached.toJson()..remove('hasCashSnapshot');
-    expect(CachedPortfolioData.fromJson(oldJson).hasCashSnapshot, isFalse);
+    final oldJson = cached.toJson()..remove('cashChecked');
+    expect(CachedPortfolioData.fromJson(oldJson).cashChecked, isFalse);
     expect(
-      CachedPortfolioData.fromJson(cached.toJson()).hasCashSnapshot,
+      CachedPortfolioData.fromJson(cached.toJson()).cashChecked,
       isTrue,
     );
   });
@@ -159,6 +159,38 @@ void main() {
         ],
         child: MaterialApp(home: page),
       );
+
+  testWidgets('IBKR cash stays in the mobile legend and donut',
+      (tester) async {
+    await seedTestSqlite({});
+    final accounts = await configuredAccounts();
+    allRatesFromUsd['NZD'] = 1.7;
+    await accounts.cachePortfolio(
+      'Default',
+      [cachedPosition()],
+      const IbkrAccountValue(value: 9400, currency: 'NZD'),
+      cashBalance: const IbkrAccountValue(value: 17, currency: 'NZD'),
+      cashUsd: 10,
+    );
+    final pending = Completer<IbkrPortfolioSnapshot>();
+    await tester.pumpWidget(
+      app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
+    );
+    await tester.pump();
+    expect(find.byKey(const Key('portfolio-ibkr-cash')), findsNothing);
+    expect(find.text('Cash'), findsNothing);
+    final donut = tester.widget<MarketDonutChart>(
+      find.byType(MarketDonutChart),
+    );
+    expect(donut.slices.length, 2);
+    expect(donut.slices.any((slice) => slice.label == 'CASH'), isTrue);
+    await tester.scrollUntilVisible(
+      find.text('CASH'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('CASH'), findsOneWidget);
+  });
 
   testWidgets('portfolio shows a spinner while uncached remote data loads', (
     tester,
