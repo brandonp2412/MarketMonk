@@ -375,12 +375,26 @@ jobs:
         working-directory: /home/brandon/market_monk
         run: |
           expected='io.flutter.plugins.sharedpreferences.SharedPreferencesApiRegistrar java.lang.Object getAll(java.lang.String,java.util.List,kotlin.coroutines.Continuation)'
+          required_classes=(
+            'kotlin.Unit'
+            'kotlin.Result'
+            'kotlin.Result$Failure'
+            'kotlin.coroutines.Continuation'
+            'kotlin.coroutines.intrinsics.CoroutineSingletons'
+            'kotlin.coroutines.intrinsics.IntrinsicsKt'
+          )
           for apk in build/app/outputs/flutter-apk/app-*-release.apk build/app/outputs/flutter-apk/market_monk.apk; do
             methods="$("$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" dex packages --defined-only "$apk")"
             if [[ "$methods" != *"$expected"* ]]; then
               echo "::error file=$apk::shared_preferences Pigeon ABI missing; Android startup would fail"
               exit 1
             fi
+            for required in "${required_classes[@]}"; do
+              if ! awk -v symbol="$required" '$1 == "C" && $2 == "d" && $NF == symbol { found = 1 } END { exit !found }' <<< "$methods"; then
+                echo "::error file=$apk::Missing Kotlin JNI class: $required"
+                exit 1
+              fi
+            done
           done
 
       - name: Upload APK artifact
