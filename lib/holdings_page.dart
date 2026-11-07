@@ -2,11 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:market_monk/desktop_context_menu.dart';
-import 'package:market_monk/ticker_context_actions.dart';
 import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/database.dart';
+import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
@@ -20,6 +19,7 @@ import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/profile_picker.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
+import 'package:market_monk/ticker_context_actions.dart';
 import 'package:market_monk/trade_history_page.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
@@ -805,7 +805,6 @@ class HoldingsPageState extends State<HoldingsPage>
               child: Text(account),
             ),
           ),
-          const PopupMenuDivider(),
         ],
       ],
     );
