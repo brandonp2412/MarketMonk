@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/charts_page.dart';
+import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/market_chart_loading.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
@@ -485,6 +486,11 @@ void main() {
       'chartPeriodMonths': 0,
       'chartPeriodDays': 0,
     });
+    final now = DateTime.now();
+    cacheSymbolMeta('VOO', 'USD');
+    await seedTestCandle('VOO', now.subtract(const Duration(days: 800)), 100);
+    await seedTestCandle('VOO', now, 105);
+    backgroundNetworkCoordinator.resetDiagnostics();
     final accounts = testAccountManager();
     await accounts.init();
     await accounts.cachePortfolio(
@@ -572,6 +578,14 @@ void main() {
     expect(find.text('All portfolios are hidden'), findsNothing);
     expect(find.byType(MarketLineChart), findsOneWidget);
     expect(tester.takeException(), null);
+    expect(
+      backgroundNetworkCoordinator.startedCount(RequestCategory.ibkrHistorical),
+      0,
+    );
+    expect(
+      backgroundNetworkCoordinator.startedCount(RequestCategory.yahooCandles),
+      0,
+    );
   });
 
   testWidgets(

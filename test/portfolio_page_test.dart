@@ -175,7 +175,7 @@ void main() {
     );
     await tester.pump();
     expect(find.byKey(const Key('portfolio-ibkr-cash')), findsNothing);
-    expect(find.byKey(const Key('portfolio-cash-summary')), findsOneWidget);
+    expect(find.byKey(const Key('portfolio-cash-summary')), findsNothing);
     final donut = tester.widget<MarketDonutChart>(
       find.byType(MarketDonutChart),
     );
@@ -287,8 +287,7 @@ void main() {
     );
     await tester.pump();
     expect(find.text('CASH'), findsOneWidget);
-    expect(find.byKey(const Key('portfolio-cash-summary')), findsOneWidget);
-    expect(find.text('50.00% allocation'), findsOneWidget);
+    expect(find.byKey(const Key('portfolio-cash-summary')), findsNothing);
     expect(find.text('50.0%'), findsNWidgets(2));
     final chart = tester.widget<MarketDonutChart>(
       find.byType(MarketDonutChart),
@@ -296,7 +295,7 @@ void main() {
     expect(chart.slices.map((slice) => slice.value), [5500, 5500]);
   });
 
-  testWidgets('tiny cash balance is explicit above the allocation chart', (
+  testWidgets('tiny cash balance stays in the allocation legend and donut', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -319,8 +318,8 @@ void main() {
       app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
     );
     await tester.pump();
-    expect(find.byKey(const Key('portfolio-cash-summary')), findsOneWidget);
-    expect(find.text('0.02% allocation'), findsOneWidget);
+    expect(find.byKey(const Key('portfolio-cash-summary')), findsNothing);
+    expect(find.text('CASH'), findsOneWidget);
     final chart = tester.widget<MarketDonutChart>(
       find.byType(MarketDonutChart),
     );
@@ -427,7 +426,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('IBKR Bot'), findsOneWidget);
 
-      await tester.tap(find.text('IBKR Bot'));
+      await tester.tap(
+        find.ancestor(
+          of: find.text('IBKR Bot'),
+          matching: find.byType(CheckedPopupMenuItem<String>),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(accounts.activeAccount, 'IBKR Bot');
       if (width == 1400) {

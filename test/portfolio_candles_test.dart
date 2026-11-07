@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/charts_page.dart';
+import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/provisional_portfolio.dart';
@@ -39,6 +40,9 @@ void main() {
       }
       await seedTestCandle('SPY', usSessionDisplayDay(dates[i]), 110 + i * 3);
     }
+    await seedTestCandle('SPY', now.subtract(const Duration(days: 800)), 100);
+    await seedTestCandle('SPY', now, 128);
+    backgroundNetworkCoordinator.resetDiagnostics();
     final accounts = testAccountManager();
     await accounts.init();
     await accounts.setIbkrConfig(
@@ -117,6 +121,14 @@ void main() {
     expect(chart.candles.any((bar) => !bar.sampled), true);
     expect(chart.showCandlesticks, true);
     expect(tester.takeException(), isNull);
+    expect(
+      backgroundNetworkCoordinator.startedCount(RequestCategory.ibkrHistorical),
+      0,
+    );
+    expect(
+      backgroundNetworkCoordinator.startedCount(RequestCategory.yahooCandles),
+      0,
+    );
 
     tester.view.physicalSize = const Size(1200, 900);
     await tester.pumpAndSettle();
