@@ -200,16 +200,18 @@ class CryptoMarketData {
         if (high < open || high < close || low > open || low > close) {
           continue;
         }
-        bars.add(CryptoDailyBar(
-          date: DateTime(utc.year, utc.month, utc.day),
-          open: open,
-          high: high,
-          low: low,
-          close: close,
-          volume: volumes == null || volumes[i] == null
-              ? 0
-              : (volumes[i] as num).toDouble(),
-        ),);
+        bars.add(
+          CryptoDailyBar(
+            date: DateTime(utc.year, utc.month, utc.day),
+            open: open,
+            high: high,
+            low: low,
+            close: close,
+            volume: volumes == null || volumes[i] == null
+                ? 0
+                : (volumes[i] as num).toDouble(),
+          ),
+        );
       } catch (_) {}
     }
     return bars;

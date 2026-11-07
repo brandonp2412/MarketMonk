@@ -15,25 +15,25 @@ import 'package:market_monk/currency_buttons.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/empty_state.dart';
+import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/ibkr_cash.dart';
-import 'package:market_monk/holdings_page.dart';
-import 'package:market_monk/trade_history_page.dart';
 import 'package:market_monk/ibkr_cash_out_pnl.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/main.dart';
-import 'package:market_monk/market_donut_chart.dart';
 import 'package:market_monk/market_data_store.dart';
-import 'package:market_monk/profile_data_repository.dart';
-import 'package:market_monk/profile_picker.dart';
-import 'package:market_monk/portfolio_returns.dart';
+import 'package:market_monk/market_donut_chart.dart';
 import 'package:market_monk/portfolio_allocation.dart';
 import 'package:market_monk/portfolio_period_picker.dart';
+import 'package:market_monk/portfolio_returns.dart';
+import 'package:market_monk/profile_data_repository.dart';
+import 'package:market_monk/profile_picker.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/sqlite_settings.dart';
 import 'package:market_monk/ticker_context_actions.dart';
+import 'package:market_monk/trade_history_page.dart';
 import 'package:market_monk/utils.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
@@ -1151,9 +1151,6 @@ class PortfolioPageState extends State<PortfolioPage>
       0,
       (sum, holding) => sum + holding.value,
     );
-    final cashPercent = cashUsd != null && allocationTotal > 0
-        ? cashUsd / allocationTotal * 100
-        : null;
     final historicalNav = cutoff == null || performance == null
         ? null
         : accountNetAssetValueAt(performance, cutoff);
@@ -1243,26 +1240,6 @@ class PortfolioPageState extends State<PortfolioPage>
               ),
             ),
           ),
-          if (cutoff == null && cashUsd != null)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                child: Card(
-                  child: ListTile(
-                    key: const Key('portfolio-cash-summary'),
-                    dense: true,
-                    leading: const Icon(Icons.account_balance_wallet_outlined),
-                    title: Text(context.l10n.text('Cash')),
-                    subtitle:
-                        Text('${cashPercent!.toStringAsFixed(2)}% allocation'),
-                    trailing: Text(
-                      fmtCurrency(cashUsd),
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                ),
-              ),
-            ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(36, 12, 36, 8),

@@ -12,25 +12,27 @@ void main() {
         tester.view.resetPhysicalSize();
         tester.view.resetDevicePixelRatio();
       });
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: Padding(
-            padding: const EdgeInsets.all(16),
-            child: desktopMetricGrid(
-              minCardWidth: 235,
-              cards: [
-                for (var index = 0; index < 5; index++)
-                  Expanded(
-                    child: SizedBox(
-                      height: 88,
-                      child: Text('metric-$index'),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Padding(
+              padding: const EdgeInsets.all(16),
+              child: desktopMetricGrid(
+                minCardWidth: 235,
+                cards: [
+                  for (var index = 0; index < 5; index++)
+                    Expanded(
+                      child: SizedBox(
+                        height: 88,
+                        child: Text('metric-$index'),
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
-      ),);
+      );
       expect(find.text('metric-0'), findsOneWidget);
       expect(find.text('metric-4'), findsOneWidget);
       expect(tester.takeException(), isNull);

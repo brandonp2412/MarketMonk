@@ -325,7 +325,9 @@ void main() {
       find.byType(MarketDonutChart),
     );
     expect(
-        chart.slices.singleWhere((slice) => slice.label == 'CASH').value, 1.1,);
+      chart.slices.singleWhere((slice) => slice.label == 'CASH').value,
+      1.1,
+    );
   });
 
   testWidgets('mobile portfolio lists positions without a filter field', (

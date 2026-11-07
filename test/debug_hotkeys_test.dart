@@ -4,11 +4,11 @@ import 'package:market_monk/debug_hotkeys.dart';
 
 void main() {
   KeyDownEvent keyDown(String? character) => KeyDownEvent(
-    physicalKey: PhysicalKeyboardKey.keyR,
-    logicalKey: LogicalKeyboardKey.keyR,
-    character: character,
-    timeStamp: Duration.zero,
-  );
+        physicalKey: PhysicalKeyboardKey.keyR,
+        logicalKey: LogicalKeyboardKey.keyR,
+        character: character,
+        timeStamp: Duration.zero,
+      );
 
   DebugHotkeyAction? actionFor(
     KeyEvent event, {
@@ -17,14 +17,15 @@ void main() {
     bool controlPressed = false,
     bool altPressed = false,
     bool metaPressed = false,
-  }) => debugHotkeyAction(
-    event,
-    editableFocused: editableFocused,
-    shiftPressed: shiftPressed,
-    controlPressed: controlPressed,
-    altPressed: altPressed,
-    metaPressed: metaPressed,
-  );
+  }) =>
+      debugHotkeyAction(
+        event,
+        editableFocused: editableFocused,
+        shiftPressed: shiftPressed,
+        controlPressed: controlPressed,
+        altPressed: altPressed,
+        metaPressed: metaPressed,
+      );
 
   test('r reloads and R restarts', () {
     expect(actionFor(keyDown('r')), DebugHotkeyAction.reload);
