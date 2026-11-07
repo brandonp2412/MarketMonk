@@ -1,0 +1,4 @@
+• Delete double-upped cash notice in Portfolio tab
+• Remove margin from debug banner
+• fix(android): enable edge-to-edge window rendering
+• Fix pace IBKR candles and surface fallback errors
