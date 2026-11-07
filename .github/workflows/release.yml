@@ -371,6 +371,18 @@ jobs:
         working-directory: /home/brandon/market_monk
         run: flutter build appbundle --release --build-name=${{ needs.version-bump.outputs.version }} --build-number=${{ needs.version-bump.outputs.build_number }}
 
+      - name: Verify Android Pigeon startup ABI
+        working-directory: /home/brandon/market_monk
+        run: |
+          expected='io.flutter.plugins.sharedpreferences.SharedPreferencesApiRegistrar java.lang.Object getAll(java.lang.String,java.util.List,kotlin.coroutines.Continuation)'
+          for apk in build/app/outputs/flutter-apk/app-*-release.apk build/app/outputs/flutter-apk/market_monk.apk; do
+            methods="$("$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" dex packages --defined-only "$apk")"
+            if [[ "$methods" != *"$expected"* ]]; then
+              echo "::error file=$apk::shared_preferences Pigeon ABI missing; Android startup would fail"
+              exit 1
+            fi
+          done
+
       - name: Upload APK artifact
         if: github.actor != 'nektos/act'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
