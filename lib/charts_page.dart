@@ -169,6 +169,7 @@ class ChartsPageState extends State<ChartsPage>
   bool _pickingChartRange = false;
 
   Stream<List<CandleTicker>>? _stockStream;
+  StreamSubscription<String>? _chartsFocusSubscription;
   late final _intradayData = widget._intradayData ?? IntradayMarketData();
   IntradaySeries? _intradaySeries;
   List<CandleTicker> _stockDailyPreview = const [];
@@ -225,6 +226,8 @@ class ChartsPageState extends State<ChartsPage>
         'Failed to refresh provisional account quotes',
       ),
     );
+    _chartsFocusSubscription =
+        ChartsFocusController.instance.requests.listen(_selectSymbol);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _measureOverlay();
@@ -658,6 +661,7 @@ class ChartsPageState extends State<ChartsPage>
   @override
   void dispose() {
     _accountManager?.removeListener(_handleAccountManagerChanged);
+    unawaited(_chartsFocusSubscription?.cancel());
     _provisionalRefreshTimer?.cancel();
     _searchController.dispose();
     _searchFocus.dispose();

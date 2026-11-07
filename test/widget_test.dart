@@ -314,4 +314,45 @@ void main() {
     expect(find.byType(FloatingActionButton), findsNothing);
     await _disposeTestApp(tester);
   });
+
+  testWidgets(
+      'open chart from a context action focuses the charts tab on desktop',
+      (tester) async {
+    await seedTestSqlite({});
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1400, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final accounts = testAccountManager();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: const MyApp(),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('desktop-PortfolioPage')));
+    await tester.pump();
+    expect(
+      tester.widget<PortfolioPage>(find.byType(PortfolioPage)).isActive,
+      isTrue,
+    );
+
+    ChartsFocusController.instance.focus('AAPL');
+    await tester.pump();
+
+    expect(
+      tester.widget<ChartsPage>(find.byType(ChartsPage)).isActive,
+      isTrue,
+    );
+    expect(find.byType(PortfolioPage), findsNothing);
+    await _disposeTestApp(tester);
+  });
 }

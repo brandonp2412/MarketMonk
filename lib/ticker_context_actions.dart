@@ -11,6 +11,7 @@ import 'package:market_monk/utils.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/sqlite_settings.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 
 /// Resolves stock actions using the current favorites and account permissions.
 Future<List<DesktopMenuAction>> tickerContextActions(
@@ -23,47 +24,81 @@ Future<List<DesktopMenuAction>> tickerContextActions(
   final favorite =
       (settings.getStringList('favoriteStocks') ?? []).contains(symbol);
   final managed = context.read<AccountManager>().ibkrConfigFor().enabled;
+  final encoded = Uri.encodeComponent(symbol);
   return [
-    DesktopMenuAction(context.l10n.text('Open chart'), () {
-      Navigator.push<void>(
-        context,
-        adaptivePageRoute(
-          context,
-          builder: (_) => Scaffold(
-            appBar: AppBar(title: Text(symbol)),
-            body: ChartsPage(initialSymbol: symbol),
-          ),
-        ),
-      );
-    }),
     DesktopMenuAction(
-        context.l10n.text(favorite ? 'Remove favorite' : 'Add favorite'), () {
-      runDetachedTask(
-        () async {
-          final favorites = [...?settings.getStringList('favoriteStocks')];
-          if (favorite) {
-            favorites.remove(symbol);
-          } else if (!favorites.contains(symbol)) {
-            favorites.add(symbol);
-          }
-          await settings.setStringList('favoriteStocks', favorites);
-        }(),
-        'Failed to update ticker favorite',
-      );
-    }),
-    if (!managed)
-      DesktopMenuAction(context.l10n.text('Add trade'), () {
+      context.l10n.text('Open chart'),
+      () {
+        if (isDesktopLayout(context)) {
+          ChartsFocusController.instance.focus(symbol);
+          return;
+        }
         Navigator.push<void>(
           context,
           adaptivePageRoute(
             context,
-            builder: (_) => EditTickerPage(symbol: symbol),
+            builder: (_) => Scaffold(
+              appBar: AppBar(title: Text(symbol)),
+              body: ChartsPage(initialSymbol: symbol),
+            ),
           ),
         );
-      }),
-    DesktopMenuAction(context.l10n.text('Copy symbol'), () {
-      unawaited(Clipboard.setData(ClipboardData(text: symbol)));
-    }),
+      },
+      icon: Icons.show_chart_rounded,
+    ),
+    DesktopMenuAction(
+      context.l10n.text(favorite ? 'Remove favorite' : 'Add favorite'),
+      () {
+        runDetachedTask(
+          () async {
+            final favorites = [...?settings.getStringList('favoriteStocks')];
+            if (favorite) {
+              favorites.remove(symbol);
+            } else if (!favorites.contains(symbol)) {
+              favorites.add(symbol);
+            }
+            await settings.setStringList('favoriteStocks', favorites);
+          }(),
+          'Failed to update ticker favorite',
+        );
+      },
+      icon: favorite ? Icons.star_rounded : Icons.star_border_rounded,
+    ),
+    if (!managed)
+      DesktopMenuAction(
+        context.l10n.text('Add trade'),
+        () {
+          Navigator.push<void>(
+            context,
+            adaptivePageRoute(
+              context,
+              builder: (_) => EditTickerPage(symbol: symbol),
+            ),
+          );
+        },
+        icon: Icons.add_rounded,
+      ),
+    DesktopMenuAction(
+      context.l10n.text('Open in Yahoo Finance'),
+      () => unawaited(
+        launchUrlString('https://finance.yahoo.com/quote/$encoded'),
+      ),
+      icon: Icons.open_in_new_rounded,
+    ),
+    DesktopMenuAction(
+      context.l10n.text('Open in Google'),
+      () => unawaited(
+        launchUrlString('https://www.google.com/search?q=$encoded'),
+      ),
+      icon: Icons.search_rounded,
+    ),
+    DesktopMenuAction(
+      context.l10n.text('Copy symbol'),
+      () {
+        unawaited(Clipboard.setData(ClipboardData(text: symbol)));
+      },
+      icon: Icons.copy_rounded,
+    ),
     ...extraActions,
   ];
 }

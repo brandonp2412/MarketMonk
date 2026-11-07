@@ -968,6 +968,19 @@ class MyApp extends StatelessWidget {
   }
 }
 
+/// Broadcasts requests to show a specific ticker in the persistent charts tab.
+class ChartsFocusController {
+  ChartsFocusController._();
+
+  static final instance = ChartsFocusController._();
+
+  final _requests = StreamController<String>.broadcast();
+
+  Stream<String> get requests => _requests.stream;
+
+  void focus(String symbol) => _requests.add(symbol);
+}
+
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
 
@@ -981,6 +994,7 @@ class _MyHomePageState extends State<MyHomePage> {
   late int _currentIndex;
   bool _desktopSettingsSelected = false;
   bool _hasOpenedDesktopSettings = false;
+  StreamSubscription<String>? _chartsFocusSubscription;
 
   static const _tabs = ['ChartPage', 'PortfolioPage', 'HoldingsPage'];
 
@@ -991,6 +1005,8 @@ class _MyHomePageState extends State<MyHomePage> {
     _pageController = PageController(initialPage: startPage);
     _selectedPage = ValueNotifier<int>(startPage);
     _currentIndex = startPage;
+    _chartsFocusSubscription = ChartsFocusController.instance.requests
+        .listen((_) => _selectDesktopPage(0));
     WidgetsBinding.instance.addPostFrameCallback((_) => _showUpdateNotice());
   }
 
@@ -1037,6 +1053,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   void dispose() {
+    unawaited(_chartsFocusSubscription?.cancel());
     _pageController.dispose();
     _selectedPage.dispose();
     super.dispose();
@@ -1108,6 +1125,7 @@ class _MyHomePageState extends State<MyHomePage> {
               onNotification: _onPageScrollEnd,
               child: PageView(
                 controller: _pageController,
+                allowImplicitScrolling: true,
                 physics: desktop
                     ? const NeverScrollableScrollPhysics()
                     : const PageScrollPhysics(),
