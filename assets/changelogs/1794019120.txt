@@ -1,0 +1,10 @@
+• Account for chart footer in height regression test
+• Constrain desktop settings search width
+• Fix chart period loading and prefetch favorites on refresh
+• Keep hidden portfolio empty state at chart height
+• Show settings in MarketMonk desktop content pane
+• Use fixed test viewport to assert chart placeholder height
+• Animate portfolio allocation slices on time changes
+• add Linux desktop debug hot reload shortcuts
+• add bouncing chart loader for MarketMonk charts
+• add configurable start page and chart appearance
