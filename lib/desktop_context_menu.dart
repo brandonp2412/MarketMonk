@@ -7,13 +7,16 @@ import 'package:market_monk/l10n/app_localizations.dart';
 /// An existing app action offered by a secondary-click menu.
 class DesktopMenuAction {
   /// A null callback keeps an unavailable action visible but disabled.
-  const DesktopMenuAction(this.label, this.onSelected);
+  const DesktopMenuAction(this.label, this.onSelected, {this.icon});
 
   /// Localized text shown in the popup.
   final String label;
 
   /// Invoked only after the user chooses this action.
   final VoidCallback? onSelected;
+
+  /// Icon shown before the label when present.
+  final IconData? icon;
 }
 
 /// Adds a pointer-positioned menu without changing primary-click behavior.
@@ -61,9 +64,13 @@ class DesktopContextMenu extends StatelessWidget {
         final entries = [
           ...resolved,
           if (copyText != null)
-            DesktopMenuAction(copyLabel ?? context.l10n.text('Copy'), () {
-              unawaited(Clipboard.setData(ClipboardData(text: copyText!)));
-            }),
+            DesktopMenuAction(
+              copyLabel ?? context.l10n.text('Copy'),
+              () {
+                unawaited(Clipboard.setData(ClipboardData(text: copyText!)));
+              },
+              icon: Icons.copy_rounded,
+            ),
         ];
         if (entries.isEmpty) return;
         final position = overlay.globalToLocal(details.globalPosition);
@@ -79,7 +86,15 @@ class DesktopContextMenu extends StatelessWidget {
               PopupMenuItem(
                 value: i,
                 enabled: entries[i].onSelected != null,
-                child: Text(entries[i].label),
+                child: entries[i].icon == null
+                    ? Text(entries[i].label)
+                    : Row(
+                        children: [
+                          Icon(entries[i].icon, size: 18),
+                          const SizedBox(width: 10),
+                          Expanded(child: Text(entries[i].label)),
+                        ],
+                      ),
               ),
           ],
         );

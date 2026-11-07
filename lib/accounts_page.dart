@@ -19,6 +19,7 @@ class AccountsPage extends StatelessWidget {
         DesktopMenuAction(
           context.l10n.text('New account'),
           () => _addAccount(context, accounts),
+          icon: Icons.add_rounded,
         ),
       ],
       child: Scaffold(
@@ -31,19 +32,24 @@ class AccountsPage extends StatelessWidget {
             return DesktopContextMenu(
               actions: [
                 if (!isActive)
-                  DesktopMenuAction(context.l10n.text('Switch account'),
-                      () async {
-                    await accounts.switchAccount(name);
-                    if (context.mounted) Navigator.pop(context);
-                  }),
+                  DesktopMenuAction(
+                    context.l10n.text('Switch account'),
+                    () async {
+                      await accounts.switchAccount(name);
+                      if (context.mounted) Navigator.pop(context);
+                    },
+                    icon: Icons.swap_horiz_rounded,
+                  ),
                 if (name != 'Default') ...[
                   DesktopMenuAction(
                     context.l10n.text('Rename account'),
                     () => _renameAccount(context, accounts, name),
+                    icon: Icons.edit_rounded,
                   ),
                   DesktopMenuAction(
                     context.l10n.text('Delete account'),
                     () => _confirmDelete(context, accounts, name),
+                    icon: Icons.delete_rounded,
                   ),
                 ],
               ],

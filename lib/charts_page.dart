@@ -2295,6 +2295,7 @@ class ChartsPageState extends State<ChartsPage>
             _refreshCurrentChart(),
             'Failed to refresh chart',
           ),
+          icon: Icons.refresh_rounded,
         ),
       ],
       child: ValueListenableBuilder<int?>(
@@ -2584,6 +2585,7 @@ class ChartsPageState extends State<ChartsPage>
               DesktopMenuAction(
                 context.l10n.text('Open chart'),
                 () => _selectStock(result),
+                icon: Icons.show_chart_rounded,
               ),
               DesktopMenuAction(
                 context.l10n.text(
@@ -2592,6 +2594,9 @@ class ChartsPageState extends State<ChartsPage>
                       : 'Add favorite',
                 ),
                 () => _toggleFavorite(result.symbol),
+                icon: _favoriteStocks.contains(result.symbol)
+                    ? Icons.star_rounded
+                    : Icons.star_border_rounded,
               ),
             ],
             copyText: result.symbol,
@@ -2874,6 +2879,7 @@ class ChartsPageState extends State<ChartsPage>
             _refreshCurrentChart(),
             'Failed to refresh chart',
           ),
+          icon: Icons.refresh_rounded,
         ),
         DesktopMenuAction(
           context.l10n.text(
@@ -2882,6 +2888,9 @@ class ChartsPageState extends State<ChartsPage>
                 : 'Add favorite',
           ),
           () => _toggleFavorite(_selectedSymbol!),
+          icon: _favoriteStocks.contains(_selectedSymbol)
+              ? Icons.star_rounded
+              : Icons.star_border_rounded,
         ),
         if (!context.read<AccountManager>().ibkrConfigFor().enabled)
           DesktopMenuAction(
@@ -2893,6 +2902,7 @@ class ChartsPageState extends State<ChartsPage>
                 builder: (_) => EditTickerPage(symbol: _selectedSymbol),
               ),
             ),
+            icon: Icons.add_rounded,
           ),
       ],
       copyText: _selectedSymbol,
@@ -3220,14 +3230,17 @@ class ChartsPageState extends State<ChartsPage>
                             _renameFavorite(symbol),
                             'Failed to rename favorite',
                           ),
+                          icon: Icons.edit_rounded,
                         ),
                         DesktopMenuAction(
                           context.l10n.text('Open chart'),
                           () => _selectSymbol(symbol),
+                          icon: Icons.show_chart_rounded,
                         ),
                         DesktopMenuAction(
                           context.l10n.text('Remove favorite'),
                           () => _toggleFavorite(symbol),
+                          icon: Icons.star_border_rounded,
                         ),
                         if (!context
                             .read<AccountManager>()
@@ -3242,6 +3255,7 @@ class ChartsPageState extends State<ChartsPage>
                                 builder: (_) => EditTickerPage(symbol: symbol),
                               ),
                             ),
+                            icon: Icons.add_rounded,
                           ),
                       ],
                       copyText: symbol,
@@ -3906,11 +3920,13 @@ class ChartsPageState extends State<ChartsPage>
                       accounts.where((name) => name != accountName),
                     );
                   }),
+                  icon: Icons.visibility_rounded,
                 ),
                 if (_hiddenAccounts.isNotEmpty)
                   DesktopMenuAction(
                     context.l10n.text('Show all accounts'),
                     () => setState(_hiddenAccounts.clear),
+                    icon: Icons.visibility_rounded,
                   ),
               ],
               copyText: '$accountName: ${valueText.data} · ${changeText.data}',

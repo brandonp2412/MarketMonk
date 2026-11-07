@@ -834,6 +834,7 @@ class HoldingsPageState extends State<HoldingsPage>
               _refreshCandles(),
               'Failed to refresh holdings',
             ),
+            icon: Icons.refresh_rounded,
           ),
           if (!ibkrManaged)
             DesktopMenuAction(
@@ -845,6 +846,7 @@ class HoldingsPageState extends State<HoldingsPage>
                   builder: (_) => const EditTickerPage(),
                 ),
               ),
+              icon: Icons.add_rounded,
             ),
         ],
         child: Scaffold(
@@ -997,6 +999,7 @@ class HoldingsPageState extends State<HoldingsPage>
             _refreshCandles(),
             'Failed to refresh holdings',
           ),
+          icon: Icons.refresh_rounded,
         ),
         if (!ibkrManaged)
           DesktopMenuAction(
@@ -1008,6 +1011,7 @@ class HoldingsPageState extends State<HoldingsPage>
                 builder: (_) => const EditTickerPage(),
               ),
             ),
+            icon: Icons.add_rounded,
           ),
       ],
       child: Scaffold(
@@ -1875,6 +1879,7 @@ class HoldingsPageState extends State<HoldingsPage>
           DesktopMenuAction(
             context.l10n.text('Trade History'),
             () => _openDetail(summary),
+            icon: Icons.history_rounded,
           ),
           if (!ibkrManaged) ...[
             DesktopMenuAction(
@@ -1883,6 +1888,7 @@ class HoldingsPageState extends State<HoldingsPage>
                 _deleteSelected(context, symbols: {summary.symbol}),
                 'Failed to delete holding',
               ),
+              icon: Icons.delete_rounded,
             ),
             DesktopMenuAction(
               context.l10n.text(
@@ -1891,6 +1897,9 @@ class HoldingsPageState extends State<HoldingsPage>
                     : 'Select holding',
               ),
               () => _toggleHoldingSelection(summary.symbol),
+              icon: _selectedSymbols.contains(summary.symbol)
+                  ? Icons.indeterminate_check_box_rounded
+                  : Icons.check_box_outline_blank_rounded,
             ),
           ],
         ],

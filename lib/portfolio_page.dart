@@ -863,6 +863,7 @@ class PortfolioPageState extends State<PortfolioPage>
           context.l10n.text('Refresh'),
           () =>
               runDetachedTask(_updateCandles(), 'Failed to refresh portfolio'),
+          icon: Icons.refresh_rounded,
         ),
       ],
       child: Scaffold(

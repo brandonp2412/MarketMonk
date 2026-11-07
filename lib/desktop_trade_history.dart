@@ -89,6 +89,7 @@ class _DesktopTradeHistoryState extends State<DesktopTradeHistory> {
         context.l10n.text('Edit trade'),
         () =>
             runDetachedTask(widget.onEditTrade(trade), 'Failed to edit trade'),
+        icon: Icons.edit_rounded,
       ),
       DesktopMenuAction(
         context.l10n.text('Delete trade'),
@@ -96,6 +97,7 @@ class _DesktopTradeHistoryState extends State<DesktopTradeHistory> {
           widget.onDeleteTrade(trade),
           'Failed to delete trade',
         ),
+        icon: Icons.delete_rounded,
       ),
     ];
   }

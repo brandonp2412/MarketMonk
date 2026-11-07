@@ -422,6 +422,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                                     _editTrade(trade),
                                     'Failed to edit trade',
                                   ),
+                                  icon: Icons.edit_rounded,
                                 ),
                                 DesktopMenuAction(
                                   context.l10n.text('Delete trade'),
@@ -429,6 +430,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                                     _confirmDeleteTrade(trade),
                                     'Failed to delete trade',
                                   ),
+                                  icon: Icons.delete_rounded,
                                 ),
                               ],
                             ],

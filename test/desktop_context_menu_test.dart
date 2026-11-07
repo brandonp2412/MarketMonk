@@ -54,6 +54,46 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('menu actions show their icons beside the labels',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(platform: TargetPlatform.linux),
+        home: Scaffold(
+          body: DesktopContextMenu(
+            actions: [
+              const DesktopMenuAction(
+                'Edit trade',
+                null,
+                icon: Icons.edit_rounded,
+              ),
+            ],
+            child: const Text('Trade'),
+          ),
+        ),
+      ),
+    );
+    await rightClick(tester, find.text('Trade'));
+    final item = tester.widget<PopupMenuItem<int>>(
+      find.byType(PopupMenuItem<int>),
+    );
+    expect(item.child, isA<Row>());
+    expect(
+      find.descendant(
+        of: find.byType(PopupMenuItem<int>),
+        matching: find.byIcon(Icons.edit_rounded),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(PopupMenuItem<int>),
+        matching: find.text('Edit trade'),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('secondary click offers actions without firing primary click',
       (tester) async {
     var primary = 0;
