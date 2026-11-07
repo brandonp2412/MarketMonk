@@ -100,21 +100,6 @@ def build_history():
             "changes": notes_between(previous, ref),
         })
 
-    last_tag = releases[-1]["ref"]
-    current_version = next(
-        line.partition("version:")[2].strip().split("+", 1)[0]
-        for line in (ROOT / "pubspec.yaml").read_text().splitlines()
-        if line.startswith("version:")
-    )
-    development = notes_between(last_tag, "HEAD")
-    if development:
-        history.append({
-            "version": f"Unreleased (app {current_version})",
-            "date": git("log", "-1", "--format=%cs", "HEAD"),
-            "sourceUrl": f"{REPOSITORY_URL}/compare/{last_tag}...main",
-            "changes": development,
-        })
-
     return list(reversed(history))
 
 
