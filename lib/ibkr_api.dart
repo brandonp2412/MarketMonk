@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -446,16 +447,74 @@ class IbkrPortfolioSnapshot {
   }
 }
 
+class IbkrRateLimitException extends StateError {
+  IbkrRateLimitException(super.message);
+}
+
+class IbkrHistoricalPacer {
+  IbkrHistoricalPacer({
+    this.spacing = const Duration(seconds: 2),
+    this.cooldown = const Duration(minutes: 2),
+    DateTime Function()? clock,
+  }) : _clock = clock ?? DateTime.now;
+
+  final Duration spacing;
+  final Duration cooldown;
+  final DateTime Function() _clock;
+  Future<void> _tail = Future<void>.value();
+  DateTime? _nextRequestAt;
+  DateTime? _cooldownUntil;
+
+  Future<T> run<T>(Future<T> Function() request) async {
+    final previous = _tail;
+    final released = Completer<void>();
+    _tail = released.future;
+    try {
+      await previous;
+      final now = _clock();
+      if (_cooldownUntil?.isAfter(now) == true) {
+        throw IbkrRateLimitException(
+          'IBKR historical requests paused after HTTP 429',
+        );
+      }
+      final next = _nextRequestAt;
+      if (next != null && next.isAfter(now)) {
+        await Future<void>.delayed(next.difference(now));
+      }
+      final start = _clock();
+      if (_cooldownUntil?.isAfter(start) == true) {
+        throw IbkrRateLimitException(
+          'IBKR historical requests paused after HTTP 429',
+        );
+      }
+      _nextRequestAt = start.add(spacing);
+      try {
+        return await request();
+      } on IbkrRateLimitException {
+        _cooldownUntil = _clock().add(cooldown);
+        rethrow;
+      }
+    } finally {
+      released.complete();
+    }
+  }
+}
+
+final ibkrHistoricalPacer = IbkrHistoricalPacer();
+
 /// Client for the small read-only service hosted alongside the IBKR gateway.
 class IbkrApiClient {
   final IbkrAccountConfig config;
   final Future<http.Response> Function(Uri, {Map<String, String>? headers})
       _get;
+  final IbkrHistoricalPacer _historicalPacer;
 
   IbkrApiClient(
     this.config, {
     Future<http.Response> Function(Uri, {Map<String, String>? headers})? get,
-  }) : _get = get ?? http.get;
+    IbkrHistoricalPacer? historicalPacer,
+  })  : _get = get ?? http.get,
+        _historicalPacer = historicalPacer ?? ibkrHistoricalPacer;
 
   Future<void> testConnection() => backgroundNetworkCoordinator.observe<void>(
         RequestCategory.ibkrHealth,
@@ -539,7 +598,7 @@ class IbkrApiClient {
     return backgroundNetworkCoordinator.coalesce<IbkrHistoricalSeries>(
       RequestCategory.ibkrHistorical,
       (config, symbol, years),
-      () async {
+      () => _historicalPacer.run(() async {
         final response = await _request(
           '/v1/historical',
           queryParameters: {'symbol': symbol, 'years': '$years'},
@@ -547,7 +606,7 @@ class IbkrApiClient {
         return IbkrHistoricalSeries.fromJson(
           _decodeJsonObject(response, '/v1/historical'),
         );
-      },
+      }),
     );
   }
 
@@ -646,6 +705,10 @@ class IbkrApiClient {
         detail =
             body['detail'] as String? ?? body['error'] as String? ?? detail;
       } catch (_) {}
+      if (response.statusCode == 429 ||
+          RegExp(r'\bHTTP 429\b').hasMatch(detail)) {
+        throw IbkrRateLimitException(detail);
+      }
       throw StateError(detail);
     }
     return response;

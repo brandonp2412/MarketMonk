@@ -10,6 +10,7 @@ import 'package:market_monk/crypto_market_data.dart';
 import 'package:market_monk/exchange_rate_service.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
+import 'package:market_monk/ibkr_candle_failure_notice.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/sqlite_settings.dart';
@@ -993,6 +994,7 @@ Future<bool> _syncIbkrCandlesIfAvailable(
     talker.warning(
       'IBKR candle sync failed for $symbol; falling back to Yahoo: $error',
     );
+    ibkrCandleFailureNotice.report(symbol, error);
     return false;
   }
 }
