@@ -23,6 +23,7 @@ class DesktopTradeHistory extends StatefulWidget {
   final VoidCallback onAddTrade;
   final Future<void> Function(Trade) onEditTrade;
   final Future<void> Function(Trade) onDeleteTrade;
+  final Future<void> Function(Set<int>) onDeleteTrades;
 
   const DesktopTradeHistory({
     super.key,
@@ -39,6 +40,7 @@ class DesktopTradeHistory extends StatefulWidget {
     required this.onAddTrade,
     required this.onEditTrade,
     required this.onDeleteTrade,
+    required this.onDeleteTrades,
   });
 
   @override
@@ -50,6 +52,14 @@ class _DesktopTradeHistoryState extends State<DesktopTradeHistory> {
   String _sideFilter = 'all';
   int _sortColumn = 0;
   bool _sortAscending = false;
+  final Set<int> _selectedTradeIds = {};
+
+  @override
+  void didUpdateWidget(covariant DesktopTradeHistory oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final visibleIds = widget.trades.map((trade) => trade.id).toSet();
+    _selectedTradeIds.removeWhere((id) => !visibleIds.contains(id));
+  }
 
   @override
   void dispose() {
@@ -220,6 +230,7 @@ class _DesktopTradeHistoryState extends State<DesktopTradeHistory> {
               ),
               child: DataTable(
                 key: const Key('desktop-trade-history-data-table'),
+                showCheckboxColumn: !widget.brokerManaged,
                 sortColumnIndex: _sortColumn,
                 sortAscending: _sortAscending,
                 dataRowMinHeight: 62,
@@ -264,6 +275,14 @@ class _DesktopTradeHistoryState extends State<DesktopTradeHistory> {
     final muted = theme.colorScheme.onSurfaceVariant;
 
     return DataRow(
+      selected: _selectedTradeIds.contains(trade.id),
+      onSelectChanged: widget.brokerManaged
+          ? null
+          : (_) => setState(() {
+                if (!_selectedTradeIds.remove(trade.id)) {
+                  _selectedTradeIds.add(trade.id);
+                }
+              }),
       key: ValueKey(
         'desktop-trade-${trade.id}-${trade.tradeDate.microsecondsSinceEpoch}',
       ),
@@ -552,6 +571,34 @@ class _DesktopTradeHistoryState extends State<DesktopTradeHistory> {
               },
             ),
             const SizedBox(height: 14),
+            if (_selectedTradeIds.isNotEmpty && !widget.brokerManaged) ...[
+              Row(
+                children: [
+                  Text(
+                    context.l10n.text(
+                      '{count} selected',
+                      {'count': _selectedTradeIds.length},
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  FilledButton.tonalIcon(
+                    key: const Key('desktop-trade-delete-selected'),
+                    onPressed: () => runDetachedTask(
+                      widget.onDeleteTrades(Set<int>.of(_selectedTradeIds)),
+                      'Failed to delete selected trades',
+                    ),
+                    icon: const Icon(Icons.delete_outline),
+                    label: Text(context.l10n.text('Delete')),
+                  ),
+                  IconButton(
+                    tooltip: context.l10n.text('Cancel selection'),
+                    onPressed: () => setState(_selectedTradeIds.clear),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
             if (widget.trades.isEmpty)
               SizedBox(height: 300, child: widget.emptyState)
             else if (displayedTrades.isEmpty)

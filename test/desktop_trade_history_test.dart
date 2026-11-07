@@ -37,6 +37,7 @@ void main() {
       ),
     ];
     var addCalls = 0;
+    Set<int>? deletedIds;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -55,6 +56,7 @@ void main() {
             onAddTrade: () => addCalls++,
             onEditTrade: (_) async {},
             onDeleteTrade: (_) async {},
+            onDeleteTrades: (ids) async => deletedIds = ids,
           ),
         ),
       ),
@@ -99,5 +101,22 @@ void main() {
 
     await tester.tap(find.text('Add trade'));
     expect(addCalls, 1);
+
+    await tester.tap(find.text('All'));
+    await tester.pumpAndSettle();
+    var table = tester.widget<DataTable>(find.byType(DataTable));
+    expect(table.showCheckboxColumn, isTrue);
+    table.rows.first.onSelectChanged!(true);
+    await tester.pumpAndSettle();
+    table = tester.widget<DataTable>(find.byType(DataTable));
+    table.rows.last.onSelectChanged!(true);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('desktop-trade-delete-selected')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('desktop-trade-delete-selected')));
+    await tester.pumpAndSettle();
+    expect(deletedIds, {1, 2});
   });
 }

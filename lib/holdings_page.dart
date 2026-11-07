@@ -1065,12 +1065,16 @@ class HoldingsPageState extends State<HoldingsPage>
         floatingActionButton: ibkrManaged
             ? null
             : _selecting
-                ? FloatingActionButton.extended(
-                    onPressed: () => _deleteSelected(context),
-                    label: Text(
-                      context.l10n.text('Delete ({count})', {
-                        'count': _selectedSymbols.length,
-                      }),
+                ? Padding(
+                    padding: const EdgeInsets.only(bottom: bottomNavHeight),
+                    child: FloatingActionButton.extended(
+                      onPressed: () => _deleteSelected(context),
+                      label: Text(
+                        context.l10n.text('Delete ({count})', {
+                          'count': _selectedSymbols.length,
+                        }),
+                      ),
+                      icon: const Icon(Icons.delete),
                     ),
                   )
                 : Padding(
@@ -1230,12 +1234,12 @@ class HoldingsPageState extends State<HoldingsPage>
     );
     final accounts = context.watch<AccountManager>();
     final cashOutSummary = _ibkrCashOutSummary(accounts);
+    final cashBalance =
+        ibkrManaged ? accounts.portfolioCacheFor()?.cashBalance : null;
     final totalUnrealized = cashOutSummary?.gainUsd ?? costBasisGain;
     final totalUnrealizedPct = cashOutSummary?.gainPct ??
         (totalCost > 0 ? costBasisGain / totalCost * 100 : 0.0);
     final winners = open.where((position) => position.change >= 0).length;
-    final cashBalance =
-        ibkrManaged ? accounts.portfolioCacheFor()?.cashBalance : null;
     final sorted = _sortDesktopSummaries(summaries);
 
     DataCell textCell(
@@ -1275,16 +1279,16 @@ class HoldingsPageState extends State<HoldingsPage>
             key: const Key('desktop-holdings-metrics'),
             minCardWidth: 235,
             cards: [
-              _desktopMetric(
-                context,
-                label: context.l10n.text('Market value'),
-                value: fmtCurrency(totalValue),
               if (cashBalance != null)
                 _desktopMetric(
                   context,
                   label: context.l10n.text('Cash'),
                   value: formatIbkrReportedCash(cashBalance),
                 ),
+              _desktopMetric(
+                context,
+                label: context.l10n.text('Market value'),
+                value: fmtCurrency(totalValue),
               ),
               _desktopMetric(
                 context,
@@ -1663,20 +1667,20 @@ class HoldingsPageState extends State<HoldingsPage>
 
     final ibkrManaged = context.watch<AccountManager>().ibkrConfigFor().enabled;
     final summaries = ibkrManaged ? _summaries : snap.data ?? _summaries;
-
-    if (ibkrManaged &&
-        summaries.isEmpty &&
-        _ibkrTrades.isEmpty &&
     final cashBalance = ibkrManaged
         ? context.watch<AccountManager>().portfolioCacheFor()?.cashBalance
         : null;
     final cashMatches = _search.text.trim().isEmpty ||
         'cash'.contains(_search.text.trim().toLowerCase());
     final showCash = cashBalance != null && cashMatches;
+
+    if (ibkrManaged &&
+        summaries.isEmpty &&
+        cashBalance == null &&
+        _ibkrTrades.isEmpty &&
         !_ibkrPreloadCompleted &&
         !snap.hasData) {
       return _refreshableState(
-        cashBalance == null &&
         const Center(child: CircularProgressIndicator()),
       );
     }
@@ -1889,10 +1893,20 @@ class _SymbolTile extends StatelessWidget {
     final changePct = position?.change ?? 0.0;
     Widget leadingWidget;
     if (selecting) {
-      leadingWidget = Checkbox(
-        value: isSelected,
-        onChanged: (_) => onTap(),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      leadingWidget = SizedBox(
+        width: 40,
+        height: 40,
+        child: Center(
+          child: Checkbox(
+            value: isSelected,
+            onChanged: (_) => onTap(),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ),
       );
     } else {
       leadingWidget = SizedBox(
