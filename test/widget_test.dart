@@ -83,6 +83,15 @@ void main() {
     );
     await tester.pump();
 
+    expect(
+      tester
+          .widget<PortfolioPage>(
+            find.byType(PortfolioPage, skipOffstage: false),
+          )
+          .isActive,
+      isFalse,
+    );
+
     await tester.tap(find.byKey(const Key('PortfolioPage')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 140));

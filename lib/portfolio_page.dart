@@ -1114,11 +1114,14 @@ class PortfolioPageState extends State<PortfolioPage>
 
     final historyKey =
         '${accounts.activeAccount}:${positions.map((p) => '${p.symbol}:${p.netShares}:${p.costBasis}').join(',')}';
-    if (_historyAccount != historyKey) {
+    if (widget.isActive && _historyAccount != historyKey) {
       unawaited(_loadReturnHistory(historyKey, positions));
     }
 
-    _availablePeriods = _coveredPeriods(positions, performance, netLiquidation);
+    if (widget.isActive) {
+      _availablePeriods =
+          _coveredPeriods(positions, performance, netLiquidation);
+    }
     if (!_availablePeriods.contains(_period)) _period = _availablePeriods.first;
 
     final totalValue = positions.fold(
