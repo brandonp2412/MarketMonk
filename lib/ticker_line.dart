@@ -33,6 +33,9 @@ class TickerLine extends StatelessWidget {
   final bool intraday;
   final DateTime? requestedStartDate;
 
+  /// Shows the grid and axes for the requested period without prices.
+  final bool loading;
+
   const TickerLine({
     super.key,
     required this.spots,
@@ -43,6 +46,7 @@ class TickerLine extends StatelessWidget {
     this.nativeCurrency = 'USD',
     this.intraday = false,
     this.requestedStartDate,
+    this.loading = false,
     this.showRollingAverage = false,
     this.range,
     this.onRangeChanged,
@@ -66,19 +70,38 @@ class TickerLine extends StatelessWidget {
     final axisFormatter = DateFormat(intraday ? 'HH:mm' : settings.dateFormat);
     final colorScheme = Theme.of(context).colorScheme;
     final datesList = dates.toList();
-    final labels = [for (final date in datesList) axisFormatter.format(date)];
     final candlesByColumn = {
       for (final candle in candles) candle.column: candle,
     };
     final chartStart = intraday ? null : requestedStartDate;
-    final datePositions = chartStart == null
-        ? null
-        : [
-            for (final date in datesList)
-              date.difference(chartStart).inMinutes / Duration.minutesPerDay,
-          ];
     final chartEnd = DateUtils.dateOnly(DateTime.now());
-    final partialHistory = chartStart != null &&
+    List<String> labels;
+    List<double>? datePositions;
+    if (loading) {
+      if (chartStart == null) {
+        labels = const [];
+      } else {
+        final start = DateUtils.dateOnly(chartStart);
+        final days = chartEnd.difference(start).inDays.clamp(0, 10 * 366);
+        labels = [
+          for (var day = 0; day <= days; day++)
+            axisFormatter.format(start.add(Duration(days: day))),
+        ];
+        datePositions = [
+          for (var day = 0; day <= days; day++) day.toDouble(),
+        ];
+      }
+    } else {
+      labels = [for (final date in datesList) axisFormatter.format(date)];
+      datePositions = chartStart == null
+          ? null
+          : [
+              for (final date in datesList)
+                date.difference(chartStart).inMinutes / Duration.minutesPerDay,
+            ];
+    }
+    final partialHistory = !loading &&
+        chartStart != null &&
         datesList.isNotEmpty &&
         datesList.first.isAfter(chartStart.add(const Duration(days: 14)));
 
@@ -112,6 +135,7 @@ class TickerLine extends StatelessWidget {
             xLabels: labels,
             pointCount: spots.length,
             xAxisPositions: datePositions,
+            loading: loading,
             xAxisBounds: chartStart == null
                 ? null
                 : (
@@ -148,8 +172,11 @@ class TickerLine extends StatelessWidget {
             fillChartArea: settings.fillChartArea,
             leftInset: 64,
             accessibilityLabel: 'Price history',
-            accessibilityValue:
-                spots.isEmpty ? 'No prices' : '${spots.length} price points',
+            accessibilityValue: loading
+                ? 'Loading prices'
+                : spots.isEmpty
+                    ? 'No prices'
+                    : '${spots.length} price points',
           ),
         ),
         if (partialHistory && range == null)

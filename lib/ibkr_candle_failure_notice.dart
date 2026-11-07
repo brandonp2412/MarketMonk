@@ -7,8 +7,8 @@ class IbkrCandleFailureNotice {
     this.quietPeriod = const Duration(minutes: 10),
     DateTime Function()? clock,
     ScaffoldMessengerState? Function()? messenger,
-  }) : _clock = clock ?? DateTime.now,
-       _messenger = messenger ?? (() => debugHotkeyMessengerKey.currentState);
+  })  : _clock = clock ?? DateTime.now,
+        _messenger = messenger ?? (() => debugHotkeyMessengerKey.currentState);
 
   final Duration quietPeriod;
   final DateTime Function() _clock;

@@ -873,7 +873,7 @@ void main() {
       },
     );
     await tester.pump();
-    expect(find.byType(TickerLine), findsNothing);
+    expect(tester.widget<TickerLine>(find.byType(TickerLine)).spots, isEmpty);
     expect(find.byType(MarketChartLoading), findsOneWidget);
 
     pending.complete(

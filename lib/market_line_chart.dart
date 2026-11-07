@@ -269,6 +269,9 @@ class MarketLineChart extends StatelessWidget {
   final ValueChanged<(int, int)?>? onRangeChanged;
   final bool pickRange;
 
+  /// Renders the grid and axes without price values.
+  final bool loading;
+
   const MarketLineChart({
     super.key,
     required this.series,
@@ -294,6 +297,7 @@ class MarketLineChart extends StatelessWidget {
     this.range,
     this.onRangeChanged,
     this.pickRange = false,
+    this.loading = false,
   });
 
   @visibleForTesting
@@ -418,6 +422,7 @@ class MarketLineChart extends StatelessWidget {
       renderer: _MarketLineChartRenderer(
         series: series,
         candles: candles,
+        loading: loading,
         showCandlesticks: showCandlesticks,
         minY: yBounds.$1,
         maxY: yBounds.$2,
@@ -1008,6 +1013,7 @@ class _MarketLineChartRenderer extends ChartRenderer
     implements InteractiveRenderer {
   final List<MarketLineChartSeries> series;
   final List<MarketCandlePoint> candles;
+  final bool loading;
   final bool showCandlesticks;
   final double minY;
   final double maxY;
@@ -1031,6 +1037,7 @@ class _MarketLineChartRenderer extends ChartRenderer
   const _MarketLineChartRenderer({
     required this.series,
     required this.candles,
+    required this.loading,
     required this.showCandlesticks,
     required this.minY,
     required this.maxY,
@@ -1052,6 +1059,7 @@ class _MarketLineChartRenderer extends ChartRenderer
         _accessibilityValue = accessibilityValue;
 
   List<Object> get dataSignature => [
+        loading,
         uniformXCount ?? -1,
         showGridlines,
         fillChartArea,
@@ -1154,6 +1162,7 @@ class _MarketLineChartRenderer extends ChartRenderer
     return _MarketLineChartRenderer(
       series: visibleSeries,
       candles: visibleCandles,
+      loading: loading,
       showCandlesticks: showCandlesticks,
       minY: bounds.$1,
       maxY: bounds.$2,
@@ -1324,6 +1333,16 @@ class _MarketLineChartRenderer extends ChartRenderer
     for (var i = 0; i <= tickCount; i++) {
       final value = minY + (maxY - minY) * i / tickCount;
       final y = _yForValue(value, bounds);
+      if (loading) {
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(bounds.left - 41, y - 5, 34, 10),
+            const Radius.circular(5),
+          ),
+          Paint()..color = axisLabelColor.withValues(alpha: 0.18),
+        );
+        continue;
+      }
       drawChartText(
         canvas,
         yLabelFormatter(value),

@@ -2792,6 +2792,29 @@ class ChartsPageState extends State<ChartsPage>
       );
     }
     if (_networkLoading) {
+      if (isDesktopLayout(context)) {
+        return SizedBox(
+          height: height,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              TickerLine(
+                key: const ValueKey('stock-loading-frame'),
+                spots: const [],
+                dates: const [],
+                loading: true,
+                nativeCurrency: _nativeCurrency,
+                intraday: _usesIntraday,
+                requestedStartDate:
+                    _usesIntraday ? null : _requiredCandleStart(),
+              ),
+              const Center(
+                child: MarketChartLoading(key: Key('stock-period-loading')),
+              ),
+            ],
+          ),
+        );
+      }
       return SizedBox(
         height: height,
         child: const Center(
@@ -2947,11 +2970,30 @@ class ChartsPageState extends State<ChartsPage>
     );
   }
 
+  // Total height of the summary rows (percent + price, then period change),
+  // so the loading placeholder takes exactly the space the values will.
+  static const double _stockSummaryHeight = 54;
+
   Widget _buildStockSummary(
     BuildContext context,
     AsyncSnapshot<List<CandleTicker>> snapshot,
   ) {
     if (_networkLoading || !snapshot.hasData || snapshot.data!.isEmpty) {
+      if (_networkLoading && _selectedSymbol != null) {
+        return Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: isDesktopLayout(context) ? 32 : 16,
+            vertical: 8,
+          ),
+          child: Column(
+            children: [
+              _buildStockSummarySkeleton(),
+              const SizedBox(height: 12),
+              _stockActionChips(_selectedSymbol!),
+            ],
+          ),
+        );
+      }
       return const SizedBox();
     }
 
@@ -2984,82 +3026,124 @@ class ChartsPageState extends State<ChartsPage>
       ),
       child: Column(
         children: [
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 16,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    pct >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
-                    color: color,
-                  ),
-                  Text(
-                    '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge!
-                        .copyWith(color: color),
-                  ),
-                ],
-              ),
-              Text(
-                fmtNativeCurrency(
-                  candles.last.close.value / _centDivisor,
-                  _nativeCurrency,
+          ConstrainedBox(
+            constraints: const BoxConstraints(
+              minHeight: _stockSummaryHeight,
+            ),
+            child: Column(
+              children: [
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 16,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          pct >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
+                          color: color,
+                        ),
+                        Text(
+                          '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge!
+                              .copyWith(color: color),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      fmtNativeCurrency(
+                        candles.last.close.value / _centDivisor,
+                        _nativeCurrency,
+                      ),
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ],
                 ),
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
+                const SizedBox(height: 4),
+                Text(
+                  context.l10n.text('{value} period change', {
+                    'value':
+                        '${dollarChange >= 0 ? '+' : ''}${fmtNativeCurrency(dollarChange, _nativeCurrency)}',
+                  }),
+                  style: TextStyle(color: color, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _stockActionChips(symbol),
+        ],
+      ),
+    );
+  }
+
+  Widget _stockActionChips(String symbol) {
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _ActionChip(
+          icon: Icons.add,
+          label: context.l10n.text('Add trade'),
+          onTap: () => Navigator.push(
+            context,
+            adaptivePageRoute(
+              context,
+              builder: (_) => EditTickerPage(symbol: symbol),
+            ),
+          ),
+        ),
+        _ActionChip(
+          icon: _favoriteStocks.contains(symbol)
+              ? Icons.favorite
+              : Icons.favorite_border,
+          label: context.l10n.text('Favorite'),
+          onTap: () => _toggleFavorite(symbol),
+        ),
+        _buildRollingAverageChip(),
+        Semantics(
+          key: const Key('chart-candlestick-toggle'),
+          selected: _showCandlesticks,
+          button: true,
+          child: _ActionChip(
+            icon: _showCandlesticks
+                ? Icons.candlestick_chart
+                : Icons.candlestick_chart_outlined,
+            label: 'Candles',
+            onTap: _toggleCandlesticks,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStockSummarySkeleton() {
+    final color = Theme.of(context).colorScheme.outline.withValues(alpha: 0.18);
+    Widget bar(double width, double height) => Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(height / 2),
+          ),
+        );
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: _stockSummaryHeight),
+      child: Column(
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              bar(88, 20),
+              const SizedBox(width: 16),
+              bar(96, 20),
             ],
           ),
           const SizedBox(height: 4),
-          Text(
-            context.l10n.text('{value} period change', {
-              'value':
-                  '${dollarChange >= 0 ? '+' : ''}${fmtNativeCurrency(dollarChange, _nativeCurrency)}',
-            }),
-            style: TextStyle(color: color, fontSize: 13),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _ActionChip(
-                icon: Icons.add,
-                label: context.l10n.text('Add trade'),
-                onTap: () => Navigator.push(
-                  context,
-                  adaptivePageRoute(
-                    context,
-                    builder: (_) => EditTickerPage(symbol: symbol),
-                  ),
-                ),
-              ),
-              _ActionChip(
-                icon: _favoriteStocks.contains(symbol)
-                    ? Icons.favorite
-                    : Icons.favorite_border,
-                label: context.l10n.text('Favorite'),
-                onTap: () => _toggleFavorite(symbol),
-              ),
-              _buildRollingAverageChip(),
-              Semantics(
-                key: const Key('chart-candlestick-toggle'),
-                selected: _showCandlesticks,
-                button: true,
-                child: _ActionChip(
-                  icon: _showCandlesticks
-                      ? Icons.candlestick_chart
-                      : Icons.candlestick_chart_outlined,
-                  label: 'Candles',
-                  onTap: _toggleCandlesticks,
-                ),
-              ),
-            ],
-          ),
+          bar(140, 12),
         ],
       ),
     );
@@ -3787,24 +3871,32 @@ class ChartsPageState extends State<ChartsPage>
     final accounts = context.read<AccountManager>().accounts;
     if (accounts.isEmpty) return const SizedBox.shrink();
 
+    final rows = Column(
+      children: [
+        for (final accountName in accounts)
+          _buildAccountSummaryRow(
+            context,
+            accounts,
+            accountName,
+            _portfolioSeriesByAccount[accountName] ?? const [],
+            accountColors,
+          ),
+      ],
+    );
     return Padding(
       key: const Key('portfolio-summary-content'),
       padding: EdgeInsets.symmetric(
         horizontal: isDesktopLayout(context) ? 32 : 16,
         vertical: 8,
       ),
-      child: Column(
-        children: [
-          for (final accountName in accounts)
-            _buildAccountSummaryRow(
-              context,
-              accounts,
-              accountName,
-              _portfolioSeriesByAccount[accountName] ?? const [],
-              accountColors,
-            ),
-        ],
-      ),
+      child: isDesktopLayout(context)
+          ? Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: rows,
+              ),
+            )
+          : rows,
     );
   }
 
@@ -4094,6 +4186,10 @@ class _ActionChip extends StatelessWidget {
 /// A small card showing a favorited symbol's latest price and selected period change,
 /// used in the favorites row on the portfolio landing view.
 class _FavoriteCard extends StatelessWidget {
+  // Price (11) + gap (8) + percent change (10), so the empty state
+  // matches the filled state and the card height never shifts.
+  static const double _valueHeight = 29;
+
   final String symbol;
   final String displayName;
   final DateTime periodStart;
@@ -4215,7 +4311,7 @@ class _FavoriteCard extends StatelessWidget {
                     builder: (context, snapshot) {
                       final candles = snapshot.data;
                       if (candles == null || candles.isEmpty) {
-                        return const SizedBox(height: 14, width: 14);
+                        return const SizedBox(height: _valueHeight, width: 14);
                       }
                       final range = visibleRange;
                       final visibleCandles = range == null
@@ -4228,7 +4324,7 @@ class _FavoriteCard extends StatelessWidget {
                               )
                               .toList();
                       if (visibleCandles.isEmpty) {
-                        return const SizedBox(height: 14, width: 14);
+                        return const SizedBox(height: _valueHeight, width: 14);
                       }
                       final price = visibleCandles.first.close /
                           candleCentDivisor(visibleCandles.first);
@@ -4240,24 +4336,28 @@ class _FavoriteCard extends StatelessWidget {
                           : null;
                       final changeColor =
                           (pct ?? 0) >= 0 ? Colors.green : Colors.redAccent;
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            fmtNativeCurrency(price, symbolCurrency(symbol)),
-                            style: const TextStyle(fontSize: 11, height: 1),
-                          ),
-                          const SizedBox(height: 8),
-                          if (pct != null)
+                      return SizedBox(
+                        height: _valueHeight,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
                             Text(
-                              '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%',
-                              style: TextStyle(
-                                fontSize: 10,
-                                height: 1,
-                                color: changeColor,
-                              ),
+                              fmtNativeCurrency(price, symbolCurrency(symbol)),
+                              style: const TextStyle(fontSize: 11, height: 1),
                             ),
-                        ],
+                            const SizedBox(height: 8),
+                            if (pct != null)
+                              Text(
+                                '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  height: 1,
+                                  color: changeColor,
+                                ),
+                              ),
+                          ],
+                        ),
                       );
                     },
                   ),
