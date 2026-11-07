@@ -4,11 +4,11 @@ import 'package:market_monk/debug_hotkeys.dart';
 
 void main() {
   KeyDownEvent keyDown(String? character) => KeyDownEvent(
-        physicalKey: PhysicalKeyboardKey.keyR,
-        logicalKey: LogicalKeyboardKey.keyR,
-        character: character,
-        timeStamp: Duration.zero,
-      );
+    physicalKey: PhysicalKeyboardKey.keyR,
+    logicalKey: LogicalKeyboardKey.keyR,
+    character: character,
+    timeStamp: Duration.zero,
+  );
 
   DebugHotkeyAction? actionFor(
     KeyEvent event, {
@@ -17,15 +17,14 @@ void main() {
     bool controlPressed = false,
     bool altPressed = false,
     bool metaPressed = false,
-  }) =>
-      debugHotkeyAction(
-        event,
-        editableFocused: editableFocused,
-        shiftPressed: shiftPressed,
-        controlPressed: controlPressed,
-        altPressed: altPressed,
-        metaPressed: metaPressed,
-      );
+  }) => debugHotkeyAction(
+    event,
+    editableFocused: editableFocused,
+    shiftPressed: shiftPressed,
+    controlPressed: controlPressed,
+    altPressed: altPressed,
+    metaPressed: metaPressed,
+  );
 
   test('r reloads and R restarts', () {
     expect(actionFor(keyDown('r')), DebugHotkeyAction.reload);
@@ -77,22 +76,33 @@ void main() {
     final separator = String.fromCharCode(0);
     expect(
       isFlutterToolRunner(
-        ['/usr/bin/dart', '/sdk/flutter_tools.snapshot', 'run', '-d', 'linux']
-            .join(separator),
+        [
+          '/usr/bin/dart',
+          '/sdk/flutter_tools.snapshot',
+          'run',
+          '-d',
+          'linux',
+        ].join(separator),
       ),
       isTrue,
     );
     expect(
       isFlutterToolRunner(
-        ['/usr/bin/dart', '/sdk/flutter_tools.snapshot', 'attach']
-            .join(separator),
+        [
+          '/usr/bin/dart',
+          '/sdk/flutter_tools.snapshot',
+          'attach',
+        ].join(separator),
       ),
       isTrue,
     );
     expect(
       isFlutterToolRunner(
-        ['/usr/bin/dart', '/sdk/flutter_tools.snapshot', 'daemon']
-            .join(separator),
+        [
+          '/usr/bin/dart',
+          '/sdk/flutter_tools.snapshot',
+          'daemon',
+        ].join(separator),
       ),
       isFalse,
     );
@@ -100,5 +110,9 @@ void main() {
       isFlutterToolRunner(['/usr/bin/unrelated', 'run'].join(separator)),
       isFalse,
     );
+  });
+  test('hotkey feedback identifies the requested action', () {
+    expect(debugHotkeyToastLabel(DebugHotkeyAction.reload), 'Hot reloading…');
+    expect(debugHotkeyToastLabel(DebugHotkeyAction.restart), 'Hot restarting…');
   });
 }

@@ -24,6 +24,7 @@ class TickerLine extends StatelessWidget {
 
   /// Notifies the parent when the visible period changes or is reset.
   final ValueChanged<(int, int)?>? onRangeChanged;
+  final bool pickRange;
 
   /// ISO 4217 currency the [spots] values are denominated in.
   final String nativeCurrency;
@@ -45,6 +46,7 @@ class TickerLine extends StatelessWidget {
     this.showRollingAverage = false,
     this.range,
     this.onRangeChanged,
+    this.pickRange = false,
   });
 
   String tooltipTextAt(int index, DateFormat formatter) {
@@ -87,6 +89,7 @@ class TickerLine extends StatelessWidget {
             range: range,
             showRollingAverage: showRollingAverage,
             onRangeChanged: onRangeChanged,
+            pickRange: pickRange,
             series: [
               MarketLineChartSeries(
                 points: datePositions == null

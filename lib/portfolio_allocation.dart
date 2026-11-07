@@ -1,12 +1,53 @@
 import 'package:market_monk/database.dart';
+import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/utils.dart';
+
+IbkrAccountValue? ibkrCashBalanceForCache(IbkrPortfolioSnapshot snapshot) {
+  final cash = snapshot.cashBalance;
+  if (cash == null || cash.currency == 'USD') return cash;
+  if (snapshot.netLiquidation?.currency != cash.currency) return cash;
+  final rate = snapshot.usdExchangeRateInBase;
+  if (rate == null) return cash;
+  return IbkrAccountValue(value: cash.value / rate, currency: 'USD');
+}
+
+String formatCashAllocationPercent(double percent) =>
+    percent.abs() < 1 ? percent.toStringAsFixed(2) : percent.toStringAsFixed(1);
+
+double? ibkrCashValueUsd({
+  required IbkrAccountValue? cashBalance,
+  required IbkrAccountValue? netLiquidation,
+  required double? netLiquidationUsd,
+}) {
+  if (cashBalance == null ||
+      cashBalance.currency.isEmpty ||
+      !cashBalance.value.isFinite) return null;
+  if (cashBalance.currency == 'USD') return cashBalance.value;
+  if (netLiquidation?.currency == cashBalance.currency &&
+      netLiquidation!.value.isFinite &&
+      netLiquidation.value > 0 &&
+      netLiquidationUsd != null &&
+      netLiquidationUsd.isFinite &&
+      netLiquidationUsd > 0) {
+    return cashBalance.value * netLiquidationUsd / netLiquidation.value;
+  }
+  final rate = allRatesFromUsd[cashBalance.currency];
+  if (rate == null || !rate.isFinite || rate <= 0) return null;
+  return cashBalance.value / rate;
+}
 
 class PortfolioAllocation {
   final String symbol;
   final String name;
   final double value;
+  final bool isCash;
 
-  const PortfolioAllocation(this.symbol, this.name, this.value);
+  const PortfolioAllocation(
+    this.symbol,
+    this.name,
+    this.value, {
+    this.isCash = false,
+  });
 }
 
 List<PortfolioAllocation>? portfolioAllocationAt({
@@ -14,6 +55,7 @@ List<PortfolioAllocation>? portfolioAllocationAt({
   required List<Trade> trades,
   required Map<String, List<StoredCandle>> candles,
   required DateTime? date,
+  double? cashValueUsd,
 }) {
   if (date == null) {
     return [
@@ -23,6 +65,8 @@ List<PortfolioAllocation>? portfolioAllocationAt({
           position.name,
           position.currentValue,
         ),
+      if (cashValueUsd != null && cashValueUsd.isFinite && cashValueUsd > 0)
+        PortfolioAllocation('CASH', 'Cash', cashValueUsd, isCash: true),
     ];
   }
   final shares = {

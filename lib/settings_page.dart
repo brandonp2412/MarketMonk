@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -51,6 +52,27 @@ const _languageNames = <String, String>{
   'zh-Hans': '简体中文',
   'zh-Hant': '繁體中文',
 };
+
+const _dateFormatOptions = <String>[
+  'yyyy-MM-dd',
+  'yyyy/MM/dd',
+  'yyyy.MM.dd',
+  'd/M/yy',
+  'M/d/yy',
+  'dd/MM/yyyy',
+  'MM/dd/yyyy',
+  'd-M-yy',
+  'M-d-yy',
+  'dd-MM-yyyy',
+  'MM-dd-yyyy',
+  'd.M.yy',
+  'M.d.yy',
+  'dd.MM.yyyy',
+  'd MMM yyyy',
+  'MMM d, yyyy',
+  'd MMM yy',
+  'MMM d, yy',
+];
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -137,9 +159,7 @@ class _SettingsPageState extends State<SettingsPage> {
       options.any((option) => _matchesSearch(section, option));
 
   bool _hasAnyMatches(Map<String, List<String>> sections) =>
-      sections.entries.any(
-        (entry) => _hasMatches(entry.key, entry.value),
-      );
+      sections.entries.any((entry) => _hasMatches(entry.key, entry.value));
 
   Widget _searchField() => Padding(
         padding: EdgeInsets.fromLTRB(
@@ -150,7 +170,7 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(
+            constraints: BoxConstraints(
               maxWidth: _desktopContentMaxWidth,
             ),
             child: TextField(
@@ -565,7 +585,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _sectionHeader(String text) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
         child: Text(
           text,
           style: Theme.of(context)
@@ -659,6 +679,50 @@ class _SettingsPageState extends State<SettingsPage> {
         onTap: () => onChanged(!value),
       );
 
+  Widget _chartPreview(SettingsState settings, {required double height}) {
+    const prices = <double>[
+      82,
+      86,
+      83,
+      90,
+      96,
+      92,
+      101,
+      98,
+      105,
+      110,
+      106,
+      114,
+    ];
+    final today = DateUtils.dateOnly(DateTime.now());
+    return SizedBox(
+      key: const Key('settings-chart-preview'),
+      height: height,
+      child: TickerLine(
+        spots: [
+          for (var i = 0; i < prices.length; i++)
+            MarketLineChartPoint(i.toDouble(), prices[i], column: i),
+        ],
+        dates: [
+          for (var i = 0; i < prices.length; i++)
+            today.subtract(Duration(days: prices.length - i - 1)),
+        ],
+        candles: [
+          for (var i = 0; i < prices.length; i++)
+            MarketCandlePoint(
+              column: i,
+              open: i == 0 ? 80 : prices[i - 1],
+              high: math.max(prices[i], i == 0 ? 80 : prices[i - 1]) + 3,
+              low: math.min(prices[i], i == 0 ? 80 : prices[i - 1]) - 3,
+              close: prices[i],
+            ),
+        ],
+        showRollingAverage: settings.showRollingAverage,
+        showCandlesticks: settings.showCandlesticks,
+      ),
+    );
+  }
+
   Widget _desktopSettingsCard({
     required IconData icon,
     required String title,
@@ -713,15 +777,14 @@ class _SettingsPageState extends State<SettingsPage> {
         if (_matchesSearch('General', 'Date format'))
           DropdownButtonFormField<String>(
             initialValue: settings.dateFormat,
-            items: const [
-              DropdownMenuItem(value: 'yyyy-MM-dd', child: Text('yyyy-MM-dd')),
-              DropdownMenuItem(value: 'd/M/yy', child: Text('d/M/yy')),
-              DropdownMenuItem(value: 'M/d/yy', child: Text('M/d/yy')),
-              DropdownMenuItem(value: 'd-M-yy', child: Text('d-M-yy')),
-              DropdownMenuItem(value: 'M-d-yy', child: Text('M-d-yy')),
-              DropdownMenuItem(value: 'd.M.yy', child: Text('d.M.yy')),
-              DropdownMenuItem(value: 'M.d.yy', child: Text('M.d.yy')),
-            ],
+            items: _dateFormatOptions
+                .map(
+                  (format) => DropdownMenuItem(
+                    value: format,
+                    child: Text(format),
+                  ),
+                )
+                .toList(),
             onChanged: (value) => settings.setDateFormat(value ?? 'd/M/yy'),
             decoration: InputDecoration(
               labelText: context.l10n.text('Date format ({example})', {
@@ -862,26 +925,8 @@ class _SettingsPageState extends State<SettingsPage> {
               ],
             ),
           ),
-        if (_matchesSearch('Charts', 'Curve smoothness'))
-          SizedBox(
-            height: 180,
-            child: TickerLine(
-              spots: const [
-                MarketLineChartPoint(0.0, 0.13, column: 0),
-                MarketLineChartPoint(1.0, 5, column: 1),
-                MarketLineChartPoint(2.0, 2, column: 2),
-                MarketLineChartPoint(3.0, 10, column: 3),
-                MarketLineChartPoint(4.0, 5, column: 4),
-              ],
-              dates: [
-                DateTime.now().subtract(const Duration(days: 4)),
-                DateTime.now().subtract(const Duration(days: 3)),
-                DateTime.now().subtract(const Duration(days: 2)),
-                DateTime.now().subtract(const Duration(days: 1)),
-                DateTime.now(),
-              ],
-            ),
-          ),
+        if (_hasMatches('Charts', _desktopSearchOptions['Charts']!))
+          _chartPreview(settings, height: 180),
       ],
     );
 
@@ -1171,8 +1216,9 @@ class _SettingsPageState extends State<SettingsPage> {
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
           child: Center(
             child: ConstrainedBox(
-              constraints:
-                  const BoxConstraints(maxWidth: _desktopContentMaxWidth),
+              constraints: const BoxConstraints(
+                maxWidth: _desktopContentMaxWidth,
+              ),
               child: content,
             ),
           ),
@@ -1231,18 +1277,14 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 child: DropdownButtonFormField<String>(
                   initialValue: settings.dateFormat,
-                  items: const [
-                    DropdownMenuItem(
-                      value: "yyyy-MM-dd",
-                      child: Text("yyyy-MM-dd"),
-                    ),
-                    DropdownMenuItem(value: "d/M/yy", child: Text("d/M/yy")),
-                    DropdownMenuItem(value: "M/d/yy", child: Text("M/d/yy")),
-                    DropdownMenuItem(value: "d-M-yy", child: Text("d-M-yy")),
-                    DropdownMenuItem(value: "M-d-yy", child: Text("M-d-yy")),
-                    DropdownMenuItem(value: "d.M.yy", child: Text("d.M.yy")),
-                    DropdownMenuItem(value: "M.d.yy", child: Text("M.d.yy")),
-                  ],
+                  items: _dateFormatOptions
+                      .map(
+                        (format) => DropdownMenuItem(
+                          value: format,
+                          child: Text(format),
+                        ),
+                      )
+                      .toList(),
                   onChanged: (value) =>
                       settings.setDateFormat(value ?? 'd/M/yy'),
                   decoration: InputDecoration(
@@ -1412,25 +1454,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ],
             ),
-          if (_matchesSearch('Charts', 'Curve smoothness'))
-            SizedBox(
+          if (_hasMatches('Charts', _mobileSearchOptions['Charts']!))
+            _chartPreview(
+              settings,
               height: MediaQuery.of(context).size.height * 0.3,
-              child: TickerLine(
-                spots: const [
-                  MarketLineChartPoint(0.0, 0.13, column: 0),
-                  MarketLineChartPoint(1.0, 5, column: 1),
-                  MarketLineChartPoint(2.0, 2, column: 2),
-                  MarketLineChartPoint(3.0, 10, column: 3),
-                  MarketLineChartPoint(4.0, 5, column: 4),
-                ],
-                dates: [
-                  DateTime.now().subtract(const Duration(days: 4)),
-                  DateTime.now().subtract(const Duration(days: 3)),
-                  DateTime.now().subtract(const Duration(days: 2)),
-                  DateTime.now().subtract(const Duration(days: 1)),
-                  DateTime.now(),
-                ],
-              ),
             ),
           if (_hasMatches('Accounts', _mobileSearchOptions['Accounts']!))
             _sectionHeader(context.l10n.text('Accounts')),
@@ -1608,15 +1635,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           if ((Platform.isAndroid || Platform.isWindows) &&
               _hasMatches('About', _mobileSearchOptions['About']!)) ...[
-            const SizedBox(height: 16),
-            const Divider(),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text(
-                context.l10n.text('About'),
-                style: Theme.of(context).textTheme.headlineLarge,
-              ),
-            ),
+            _sectionHeader(context.l10n.text('About')),
             if (_matchesSearch('About', 'What\'s New'))
               ListTile(
                 leading: const Icon(Icons.new_releases_outlined),
@@ -1866,19 +1885,25 @@ class _IbkrSettingsDialogState extends State<_IbkrSettingsDialog> {
       );
 }
 
-class _ColorPicker extends StatelessWidget {
+Color? parseHexThemeColor(String input) {
+  final hex = input.trim().replaceFirst(RegExp(r'^#'), '');
+  if (!RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(hex)) return null;
+  return Color(int.parse('FF$hex', radix: 16));
+}
+
+class _ColorPicker extends StatefulWidget {
   static const _colors = [
     defaultSeedColor,
-    Color(0xFF2B7A78), // teal
-    Color(0xFF6750A4), // purple
-    Color(0xFF1976D2), // blue
-    Color(0xFF388E3C), // green
-    Color(0xFFD32F2F), // red
-    Color(0xFFF57C00), // orange
-    Color(0xFF7B1FA2), // violet
-    Color(0xFF0097A7), // cyan
-    Color(0xFF5D4037), // brown
-    Color(0xFF455A64), // blue-grey
+    Color(0xFF2B7A78),
+    Color(0xFF6750A4),
+    Color(0xFF1976D2),
+    Color(0xFF388E3C),
+    Color(0xFFD32F2F),
+    Color(0xFFF57C00),
+    Color(0xFF7B1FA2),
+    Color(0xFF0097A7),
+    Color(0xFF5D4037),
+    Color(0xFF455A64),
   ];
 
   final SettingsState settings;
@@ -1886,7 +1911,60 @@ class _ColorPicker extends StatelessWidget {
   const _ColorPicker({required this.settings});
 
   @override
+  State<_ColorPicker> createState() => _ColorPickerState();
+}
+
+class _ColorPickerState extends State<_ColorPicker> {
+  late final TextEditingController _hexController;
+  late Color _lastSeedColor;
+  String? _hexError;
+
+  static String _hexFor(Color color) => color
+      .toARGB32()
+      .toRadixString(16)
+      .padLeft(8, '0')
+      .substring(2)
+      .toUpperCase();
+
+  @override
+  void initState() {
+    super.initState();
+    _lastSeedColor = widget.settings.seedColor;
+    _hexController = TextEditingController(text: _hexFor(_lastSeedColor));
+  }
+
+  @override
+  void didUpdateWidget(covariant _ColorPicker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_lastSeedColor != widget.settings.seedColor) {
+      _lastSeedColor = widget.settings.seedColor;
+      _hexController.text = _hexFor(_lastSeedColor);
+      _hexError = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _hexController.dispose();
+    super.dispose();
+  }
+
+  void _applyHex() {
+    final selected = parseHexThemeColor(_hexController.text);
+    if (selected == null) {
+      setState(() => _hexError = 'Enter a 6-digit hex color');
+      return;
+    }
+    setState(() => _hexError = null);
+    runDetachedTask(
+      widget.settings.setSeedColor(selected),
+      'Failed to save custom theme color',
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final selectedColor = widget.settings.seedColor;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       child: Column(
@@ -1900,36 +1978,81 @@ class _ColorPicker extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _colors.map((color) {
-              final isSelected = settings.seedColor == color;
-              return GestureDetector(
-                onTap: () => settings.setSeedColor(color),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
+            children: [
+              for (final color in _ColorPicker._colors)
+                InkWell(
+                  onTap: () => widget.settings.setSeedColor(color),
+                  customBorder: const CircleBorder(),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: selectedColor == color
+                            ? Theme.of(context).colorScheme.onSurface
+                            : Colors.transparent,
+                        width: 3,
+                      ),
+                    ),
+                    child: selectedColor == color
+                        ? Icon(
+                            Icons.check,
+                            color: color.computeLuminance() > 0.5
+                                ? Colors.black
+                                : Colors.white,
+                            size: 20,
+                          )
+                        : null,
+                  ),
+                ),
+              if (!_ColorPicker._colors.contains(selectedColor))
+                Container(
+                  key: const Key('settings-custom-color-preview'),
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: color,
+                    color: selectedColor,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: isSelected
-                          ? Theme.of(context).colorScheme.onSurface
-                          : Colors.transparent,
+                      color: Theme.of(context).colorScheme.onSurface,
                       width: 3,
                     ),
                   ),
-                  child: isSelected
-                      ? Icon(
-                          Icons.check,
-                          color: color.computeLuminance() > 0.5
-                              ? Colors.black
-                              : Colors.white,
-                          size: 20,
-                        )
-                      : null,
+                  child: Icon(
+                    Icons.check,
+                    color: selectedColor.computeLuminance() > 0.5
+                        ? Colors.black
+                        : Colors.white,
+                    size: 20,
+                  ),
                 ),
-              );
-            }).toList(),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: 220,
+            child: TextField(
+              key: const Key('settings-custom-color-hex'),
+              controller: _hexController,
+              textCapitalization: TextCapitalization.characters,
+              maxLength: 7,
+              onSubmitted: (_) => _applyHex(),
+              decoration: InputDecoration(
+                labelText: 'Hex color',
+                hintText: '#RRGGBB',
+                errorText: _hexError,
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  key: const Key('settings-apply-custom-color'),
+                  tooltip: 'Apply color',
+                  onPressed: _applyHex,
+                  icon: const Icon(Icons.check_rounded),
+                ),
+              ),
+            ),
           ),
         ],
       ),

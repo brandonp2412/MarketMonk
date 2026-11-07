@@ -55,8 +55,9 @@ Future<void> main() async {
           readActiveProfile: sqliteSettings.database.readActiveProfile,
           openProfileDatabase: (name) async {
             final directory = await getApplicationSupportDirectory();
-            final file =
-                File(p.join(directory.path, databaseFileNameForAccount(name)));
+            final file = File(
+              p.join(directory.path, databaseFileNameForAccount(name)),
+            );
             if (!await file.exists()) return null;
             return legacy.LegacyProfileDatabase.connect(NativeDatabase(file));
           },
@@ -844,6 +845,7 @@ class MyApp extends StatelessWidget {
 
     return DynamicColorBuilder(
       builder: (lightDynamic, darkDynamic) => MaterialApp(
+        scaffoldMessengerKey: debugHotkeyMessengerKey,
         title: 'Market Monk',
         debugShowCheckedModeBanner: false,
         builder: (context, child) => Stack(
@@ -1023,9 +1025,9 @@ class _MyHomePageState extends State<MyHomePage> {
         'New version ${info.version}',
         SnackBarAction(
           label: context.l10n.text("What's New"),
-          onPressed: () => Navigator.of(context).push(
-            adaptivePageRoute(context, builder: (_) => const WhatsNew()),
-          ),
+          onPressed: () => Navigator.of(
+            context,
+          ).push(adaptivePageRoute(context, builder: (_) => const WhatsNew())),
         ),
       );
     } catch (error, stackTrace) {

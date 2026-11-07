@@ -23,14 +23,15 @@ PageRoute<T> adaptivePageRoute<T>(
   );
 }
 
-/// Keeps desktop summary metrics legible by switching from four cards to two rows.
+/// Keeps desktop summary metrics legible at desktop and compact widths.
 /// Each card must be an [Expanded] widget that fills its row allocation.
 Widget desktopMetricGrid({
   required List<Widget> cards,
   required double minCardWidth,
   Key? key,
 }) {
-  assert(cards.length == 4);
+  assert(cards.isNotEmpty);
+  assert(minCardWidth > 0);
   const gap = 12.0;
 
   Widget row(int from, int to) => Row(
@@ -45,15 +46,22 @@ Widget desktopMetricGrid({
   return LayoutBuilder(
     key: key,
     builder: (context, constraints) {
-      if (constraints.maxWidth >= minCardWidth * 4 + gap * 3) {
-        return row(0, 4);
+      final fullRowWidth =
+          minCardWidth * cards.length + gap * (cards.length - 1);
+      if (constraints.maxWidth >= fullRowWidth) {
+        return row(0, cards.length);
       }
+      final columns = cards.length == 5 &&
+              constraints.maxWidth >= minCardWidth * 3 + gap * 2
+          ? 3
+          : 2;
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          row(0, 2),
-          const SizedBox(height: gap),
-          row(2, 4),
+          for (var start = 0; start < cards.length; start += columns) ...[
+            if (start > 0) const SizedBox(height: gap),
+            row(start, (start + columns).clamp(0, cards.length)),
+          ],
         ],
       );
     },

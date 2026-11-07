@@ -17,6 +17,8 @@ import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/ibkr_cash.dart';
+import 'package:market_monk/holdings_page.dart';
+import 'package:market_monk/trade_history_page.dart';
 import 'package:market_monk/ibkr_cash_out_pnl.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
@@ -154,7 +156,10 @@ class PortfolioPageState extends State<PortfolioPage>
       return [
         0,
         for (var period = 1; period < _periods.length; period++)
-          if (!portfolioReturnCutoff(period, DateTime.now())!
+          if (!portfolioReturnCutoff(
+                period,
+                DateTime.now(),
+              )!
                   .isBefore(firstKnownDate) &&
               (accountPeriodReturn(
                         performance,
@@ -181,7 +186,10 @@ class PortfolioPageState extends State<PortfolioPage>
     return [
       0,
       for (var period = 1; period < _periods.length; period++)
-        if (!portfolioReturnCutoff(period, DateTime.now())!
+        if (!portfolioReturnCutoff(
+              period,
+              DateTime.now(),
+            )!
                 .isBefore(dates.first) &&
             positions.every(
               (position) => _holdingReturn(position, period: period) != null,
@@ -193,13 +201,15 @@ class PortfolioPageState extends State<PortfolioPage>
 
   List<PortfolioAllocation>? _allocationAt(
     List<Position> positions,
-    int period,
-  ) =>
+    int period, {
+    double? cashValueUsd,
+  }) =>
       portfolioAllocationAt(
         positions: positions,
         trades: _returnTrades,
         candles: _returnCandles,
         date: portfolioReturnCutoff(period, DateTime.now()),
+        cashValueUsd: cashValueUsd,
       );
 
   Future<void> _loadReturnHistory(
@@ -214,8 +224,9 @@ class PortfolioPageState extends State<PortfolioPage>
     final accounts = context.read<AccountManager>();
     final accountName = accounts.activeAccount;
     try {
-      final trades =
-          await profileDataRepository.readTradesForAccount(accountName);
+      final trades = await profileDataRepository.readTradesForAccount(
+        accountName,
+      );
       if (!mounted || _historyAccount != account) return;
       final candles = <String, List<StoredCandle>>{};
       final symbols = {
@@ -283,9 +294,9 @@ class PortfolioPageState extends State<PortfolioPage>
         baseline.close /
         candleCentDivisor(baseline) /
         requireUsdRate(currency);
-    if (trades
-        .any((trade) => verifiedTradeAmountUsd(trade, trade.price) == null))
-      return null;
+    if (trades.any(
+      (trade) => verifiedTradeAmountUsd(trade, trade.price) == null,
+    )) return null;
     if (trades.isEmpty)
       return PortfolioReturn(position.currentValue - basis, basis);
     return openHoldingPeriodReturn(
@@ -298,7 +309,7 @@ class PortfolioPageState extends State<PortfolioPage>
           (
             date: trade.tradeDate,
             quantity: trade.quantity,
-            price: tradeAmountUsd(trade, trade.price)
+            price: tradeAmountUsd(trade, trade.price),
           ),
       ],
     );
@@ -308,7 +319,10 @@ class PortfolioPageState extends State<PortfolioPage>
     final now = DateTime.now();
     final past = _availablePeriods.where((period) => period != 0).toList()
       ..sort(
-        (a, b) => portfolioReturnCutoff(b, now)!
+        (a, b) => portfolioReturnCutoff(
+          b,
+          now,
+        )!
             .compareTo(portfolioReturnCutoff(a, now)!),
       );
     final ordered = [0, ...past];
@@ -437,6 +451,8 @@ class PortfolioPageState extends State<PortfolioPage>
         positions: cached?.positions ?? _positions,
         netLiquidation: cached?.netLiquidation ?? _netLiquidation,
         netLiquidationUsd: cached?.netLiquidationUsd,
+        cashBalance: cached?.cashBalance,
+        cashUsd: cached?.cashUsd,
         asOfDate: cached?.asOfDate,
       );
     }
@@ -469,6 +485,8 @@ class PortfolioPageState extends State<PortfolioPage>
         positions: cached.positions,
         netLiquidation: cached.netLiquidation,
         netLiquidationUsd: cached.netLiquidationUsd,
+        cashBalance: cached.cashBalance,
+        cashUsd: cached.cashUsd,
         asOfDate: cached.asOfDate,
       );
     }
@@ -479,6 +497,8 @@ class PortfolioPageState extends State<PortfolioPage>
           positions: cached.positions,
           netLiquidation: cached.netLiquidation,
           netLiquidationUsd: cached.netLiquidationUsd,
+          cashBalance: cached.cashBalance,
+          cashUsd: cached.cashUsd,
         );
       }
       throw StateError('IBKR portfolio source is not fully configured');
@@ -489,6 +509,8 @@ class PortfolioPageState extends State<PortfolioPage>
         positions: cached?.positions ?? _positions,
         netLiquidation: cached?.netLiquidation ?? _netLiquidation,
         netLiquidationUsd: cached?.netLiquidationUsd,
+        cashBalance: cached?.cashBalance,
+        cashUsd: cached?.cashUsd,
         asOfDate: cached?.asOfDate,
       );
     }
@@ -598,8 +620,9 @@ class PortfolioPageState extends State<PortfolioPage>
       setState(() => _loadError = null);
     }
     try {
-      final trades =
-          await profileDataRepository.readTradesForAccount(accountName);
+      final trades = await profileDataRepository.readTradesForAccount(
+        accountName,
+      );
       if (!mounted ||
           !widget.isActive ||
           accounts.activeAccount != accountName) {
@@ -657,8 +680,9 @@ class PortfolioPageState extends State<PortfolioPage>
     final config = accounts.ibkrConfigFor(accountName);
     try {
       final useIbkr = config.enabled;
-      final trades =
-          await profileDataRepository.readTradesForAccount(accountName);
+      final trades = await profileDataRepository.readTradesForAccount(
+        accountName,
+      );
       if (!mounted ||
           !widget.isActive ||
           accounts.activeAccount != accountName) {
@@ -708,8 +732,9 @@ class PortfolioPageState extends State<PortfolioPage>
     }
 
     final config = accounts.ibkrConfigFor(accountName);
-    Stream<List<Trade>> trades =
-        profileDataRepository.watchTradesForAccount(accountName);
+    Stream<List<Trade>> trades = profileDataRepository.watchTradesForAccount(
+      accountName,
+    );
     if (skipInitial) trades = trades.skip(1);
     return trades.asyncMap(
       (rows) => _loadPortfolioForStream(accountName, rows, config, accounts),
@@ -799,10 +824,7 @@ class PortfolioPageState extends State<PortfolioPage>
     talker.info('Exported portfolio CSV with ${positions.length} positions');
   }
 
-  Future<void> _shareCsv(
-    BuildContext context,
-    List<Position> positions,
-  ) async {
+  Future<void> _shareCsv(BuildContext context, List<Position> positions) async {
     if (!_supportsFileSharing) return;
     final messenger = ScaffoldMessenger.maybeOf(context);
     final failureMessage = context.l10n.text('Couldn’t share CSV');
@@ -839,10 +861,8 @@ class PortfolioPageState extends State<PortfolioPage>
       actions: [
         DesktopMenuAction(
           context.l10n.text('Refresh'),
-          () => runDetachedTask(
-            _updateCandles(),
-            'Failed to refresh portfolio',
-          ),
+          () =>
+              runDetachedTask(_updateCandles(), 'Failed to refresh portfolio'),
         ),
       ],
       child: Scaffold(
@@ -1019,9 +1039,17 @@ class PortfolioPageState extends State<PortfolioPage>
     final positions = snap.data?.positions ?? _positions;
     final netLiquidation = snap.data?.netLiquidation ?? _netLiquidation;
     final accounts = context.watch<AccountManager>();
-    final cashBalance =
-        snap.data?.cashBalance ?? accounts.portfolioCacheFor()?.cashBalance;
-    final cashUsd = snap.data?.cashUsd ?? accounts.portfolioCacheFor()?.cashUsd;
+    final cachedPortfolio = accounts.portfolioCacheFor();
+    final cashBalance = snap.data?.cashBalance ?? cachedPortfolio?.cashBalance;
+    final cashUsd = snap.data?.cashUsd ??
+        cachedPortfolio?.cashUsd ??
+        ibkrCashValueUsd(
+          cashBalance: cashBalance,
+          netLiquidation:
+              snap.data?.netLiquidation ?? cachedPortfolio?.netLiquidation,
+          netLiquidationUsd: snap.data?.netLiquidationUsd ??
+              cachedPortfolio?.netLiquidationUsd,
+        );
     final performance = accounts.ibkrPerformanceCacheFor(
       accounts.activeAccount,
       '1Y',
@@ -1113,13 +1141,19 @@ class PortfolioPageState extends State<PortfolioPage>
             (totalCost > 0 ? (costBasisGain / totalCost) * 100 : 0.0)
         : historicalCashOut?.gainPct ?? double.nan;
 
-    final allocation = [
-      ...?_allocationAt(positions, _period),
-      if (_returnCutoff == null && cashUsd != null && cashUsd > 0)
-        PortfolioAllocation('CASH', 'IBKR cash', cashUsd),
-    ];
-    final allocationTotal =
-        allocation.fold<double>(0, (sum, holding) => sum + holding.value);
+    final allocation = _allocationAt(
+          positions,
+          _period,
+          cashValueUsd: _returnCutoff == null ? cashUsd : null,
+        ) ??
+        [];
+    final allocationTotal = allocation.fold<double>(
+      0,
+      (sum, holding) => sum + holding.value,
+    );
+    final cashPercent = cashUsd != null && allocationTotal > 0
+        ? cashUsd / allocationTotal * 100
+        : null;
     final historicalNav = cutoff == null || performance == null
         ? null
         : accountNetAssetValueAt(performance, cutoff);
@@ -1140,8 +1174,9 @@ class PortfolioPageState extends State<PortfolioPage>
       for (final position in positions) position.symbol: position,
     };
 
-    final colors =
-        _buildColors(context, [for (final position in sorted) position.symbol]);
+    final colors = _buildColors(context, [
+      for (final position in sorted) position.symbol,
+    ]);
     // Holdings can change while this page is kept alive (for example, after
     // switching accounts). Do not use a selection from the previous list.
     final selectedIndex = touchedIndex != null &&
@@ -1208,6 +1243,26 @@ class PortfolioPageState extends State<PortfolioPage>
               ),
             ),
           ),
+          if (cutoff == null && cashUsd != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: Card(
+                  child: ListTile(
+                    key: const Key('portfolio-cash-summary'),
+                    dense: true,
+                    leading: const Icon(Icons.account_balance_wallet_outlined),
+                    title: Text(context.l10n.text('Cash')),
+                    subtitle:
+                        Text('${cashPercent!.toStringAsFixed(2)}% allocation'),
+                    trailing: Text(
+                      fmtCurrency(cashUsd),
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(36, 12, 36, 8),
@@ -1246,9 +1301,7 @@ class PortfolioPageState extends State<PortfolioPage>
                             Text(
                               sorted[selectedIndex].symbol,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 13,
-                              ),
+                              style: const TextStyle(fontSize: 13),
                             ),
                             Text(
                               sorted[selectedIndex].name,
@@ -1361,6 +1414,25 @@ class PortfolioPageState extends State<PortfolioPage>
     );
   }
 
+  void _openHoldingHistory(Position position) {
+    final trades = _returnTrades
+        .where((trade) => trade.symbol == position.symbol)
+        .toList();
+    Navigator.of(context).push(
+      adaptivePageRoute(
+        context,
+        builder: (_) => TradeHistoryPage(
+          summary: SymbolSummary(
+            symbol: position.symbol,
+            name: position.name,
+            position: position,
+            trades: trades,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildDesktopPortfolio({
     required List<Position> positions,
     required List<PortfolioAllocation> sorted,
@@ -1379,8 +1451,10 @@ class PortfolioPageState extends State<PortfolioPage>
     final colorScheme = theme.colorScheme;
     final settings = context.watch<SettingsState>();
     final accounts = context.watch<AccountManager>();
-    final allocationTotal =
-        sorted.fold<double>(0, (sum, holding) => sum + holding.value);
+    final allocationTotal = sorted.fold<double>(
+      0,
+      (sum, holding) => sum + holding.value,
+    );
     final byReturn = [...positions]..sort(
         (firstPosition, secondPosition) =>
             (_holdingReturn(secondPosition)?.percent ?? double.negativeInfinity)
@@ -1503,8 +1577,9 @@ class PortfolioPageState extends State<PortfolioPage>
                             vertical: 10,
                           ),
                           decoration: BoxDecoration(
-                            border:
-                                Border.all(color: colorScheme.outlineVariant),
+                            border: Border.all(
+                              color: colorScheme.outlineVariant,
+                            ),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
@@ -1599,8 +1674,9 @@ class PortfolioPageState extends State<PortfolioPage>
                                       ? context.l10n.text(
                                           'How your stock portfolio is distributed',
                                         )
-                                      : DateFormat.yMMMd()
-                                          .format(_returnCutoff!),
+                                      : DateFormat.yMMMd().format(
+                                          _returnCutoff!,
+                                        ),
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
                                   ),
@@ -1617,8 +1693,9 @@ class PortfolioPageState extends State<PortfolioPage>
                                         child: ListView.separated(
                                           controller:
                                               _allocationScrollController,
-                                          padding:
-                                              const EdgeInsets.only(right: 12),
+                                          padding: const EdgeInsets.only(
+                                            right: 12,
+                                          ),
                                           itemCount: sorted.length,
                                           separatorBuilder: (_, __) =>
                                               const SizedBox(height: 14),
@@ -1746,16 +1823,17 @@ class PortfolioPageState extends State<PortfolioPage>
                                       separatorBuilder: (_, __) => Divider(
                                         height: 1,
                                         color: colorScheme.outlineVariant
-                                            .withValues(
-                                          alpha: 0.7,
-                                        ),
+                                            .withValues(alpha: 0.7),
                                       ),
                                       itemBuilder: (context, index) {
                                         final position = byReturn[index];
                                         return _DesktopReturnRow(
                                           position: position,
-                                          periodReturn:
-                                              _holdingReturn(position),
+                                          periodReturn: _holdingReturn(
+                                            position,
+                                          ),
+                                          onTap: () =>
+                                              _openHoldingHistory(position),
                                         );
                                       },
                                     ),
@@ -1928,11 +2006,7 @@ class _DesktopAllocationRow extends StatelessWidget {
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            symbol,
-                          ),
-                        ],
+                        children: [Text(symbol)],
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1942,9 +2016,7 @@ class _DesktopAllocationRow extends StatelessWidget {
                         Text(
                           fmtCurrency(value),
                           style: theme.textTheme.labelLarge?.copyWith(
-                            fontFeatures: const [
-                              FontFeature.tabularFigures(),
-                            ],
+                            fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),
                         Text(
@@ -1968,10 +2040,14 @@ class _DesktopAllocationRow extends StatelessWidget {
 
 class _DesktopReturnRow extends StatelessWidget {
   final Position position;
-
   final PortfolioReturn? periodReturn;
+  final VoidCallback onTap;
 
-  const _DesktopReturnRow({required this.position, required this.periodReturn});
+  const _DesktopReturnRow({
+    required this.position,
+    required this.periodReturn,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1981,51 +2057,59 @@ class _DesktopReturnRow extends StatelessWidget {
     final color = positive ? Colors.green : Colors.redAccent;
     final pnl = periodReturn?.gain ?? double.nan;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 13),
-      child: Row(
-        children: [
-          Icon(
-            positive ? Icons.trending_up_rounded : Icons.trending_down_rounded,
-            size: 20,
-            color: color,
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return DesktopContextMenu(
+      actionsBuilder: () => tickerContextActions(context, position.symbol),
+      copyText:
+          '${position.symbol} ${pnl.isFinite ? fmtCurrency(pnl) : 'Unavailable'}',
+      copyLabel: 'Copy holding return',
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          key: Key('desktop-return-${position.symbol}'),
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 13),
+            child: Row(
               children: [
-                Text(
-                  position.symbol,
+                Icon(
+                  positive
+                      ? Icons.trending_up_rounded
+                      : Icons.trending_down_rounded,
+                  size: 20,
+                  color: color,
+                ),
+                const SizedBox(width: 11),
+                Expanded(child: Text(position.symbol)),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      pnl.isFinite
+                          ? (pnl >= 0 ? '+' : '') + fmtCurrency(pnl)
+                          : 'Unavailable',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: pnl >= 0 ? Colors.green : Colors.redAccent,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                    Text(
+                      change.isFinite
+                          ? '${positive ? '+' : ''}${change.toStringAsFixed(2)}%'
+                          : '—',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: color,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                pnl.isFinite
-                    ? (pnl >= 0 ? '+' : '') + fmtCurrency(pnl)
-                    : 'Unavailable',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: pnl >= 0 ? Colors.green : Colors.redAccent,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-              Text(
-                change.isFinite
-                    ? '${positive ? '+' : ''}${change.toStringAsFixed(2)}%'
-                    : '—',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: color,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -2098,10 +2182,7 @@ class _SummaryCard extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  totalLabel,
-                  style: Theme.of(context).textTheme.labelSmall,
-                ),
+                Text(totalLabel, style: Theme.of(context).textTheme.labelSmall),
                 Text(
                   displayTotal,
                   key: const Key('portfolio-total-value'),

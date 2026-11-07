@@ -15,6 +15,7 @@ import 'package:market_monk/ibkr_cash_out_pnl.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/main.dart';
+import 'package:market_monk/portfolio_allocation.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/profile_picker.dart';
 import 'package:market_monk/settings_page.dart';
@@ -1210,6 +1211,27 @@ class HoldingsPageState extends State<HoldingsPage>
     }
   }
 
+  ({double valueUsd, double percent})? _cashAllocation(
+    AccountManager accounts,
+    Iterable<Position> positions,
+  ) {
+    if (!accounts.ibkrConfigFor().enabled) return null;
+    final cached = accounts.portfolioCacheFor();
+    final cash = ibkrCashValueUsd(
+      cashBalance: cached?.cashBalance,
+      netLiquidation: cached?.netLiquidation,
+      netLiquidationUsd: cached?.netLiquidationUsd,
+    );
+    if (cash == null) return null;
+    final accountPositions = cached?.positions ?? positions;
+    final stocks = accountPositions.fold<double>(
+      0,
+      (sum, position) => sum + position.currentValue,
+    );
+    final total = stocks + cash;
+    return (valueUsd: cash, percent: total > 0 ? cash / total * 100 : 0);
+  }
+
   Widget _buildDesktopHoldings(
     BuildContext context,
     List<SymbolSummary> summaries,
@@ -1236,6 +1258,10 @@ class HoldingsPageState extends State<HoldingsPage>
     final cashOutSummary = _ibkrCashOutSummary(accounts);
     final cashBalance =
         ibkrManaged ? accounts.portfolioCacheFor()?.cashBalance : null;
+    final cash = ibkrManaged ? _cashAllocation(accounts, open) : null;
+    final query = _search.text.trim().toLowerCase();
+    final showCashRow =
+        cash != null && (query.isEmpty || 'cash'.contains(query));
     final totalUnrealized = cashOutSummary?.gainUsd ?? costBasisGain;
     final totalUnrealizedPct = cashOutSummary?.gainPct ??
         (totalCost > 0 ? costBasisGain / totalCost * 100 : 0.0);
@@ -1284,6 +1310,9 @@ class HoldingsPageState extends State<HoldingsPage>
                   context,
                   label: context.l10n.text('Cash'),
                   value: formatIbkrReportedCash(cashBalance),
+                  detail: cash == null
+                      ? null
+                      : '${formatCashAllocationPercent(cash.percent)}% allocation',
                 ),
               _desktopMetric(
                 context,
@@ -1446,6 +1475,33 @@ class HoldingsPageState extends State<HoldingsPage>
                                   ),
                                 ],
                                 rows: [
+                                  if (showCashRow)
+                                    DataRow(
+                                      cells: [
+                                        DataCell(
+                                          Row(
+                                            children: [
+                                              const Icon(
+                                                Icons
+                                                    .account_balance_wallet_outlined,
+                                                size: 20,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                'Cash · ${formatCashAllocationPercent(cash.percent)}%',
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        for (var i = 0; i < 3; i++)
+                                          const DataCell(Text('—')),
+                                        DataCell(
+                                          Text(fmtCurrency(cash.valueUsd)),
+                                        ),
+                                        const DataCell(Text('—')),
+                                        const DataCell(Text('—')),
+                                      ],
+                                    ),
                                   for (final summary in sorted)
                                     (() {
                                       final position = summary.position;
@@ -1673,6 +1729,14 @@ class HoldingsPageState extends State<HoldingsPage>
     final cashMatches = _search.text.trim().isEmpty ||
         'cash'.contains(_search.text.trim().toLowerCase());
     final showCash = cashBalance != null && cashMatches;
+    final cash = ibkrManaged
+        ? _cashAllocation(
+            context.read<AccountManager>(),
+            summaries
+                .where((summary) => summary.position != null)
+                .map((summary) => summary.position!),
+          )
+        : null;
 
     if (ibkrManaged &&
         summaries.isEmpty &&
@@ -1764,7 +1828,11 @@ class HoldingsPageState extends State<HoldingsPage>
               key: const Key('holdings-ibkr-cash'),
               leading: const Icon(Icons.account_balance_wallet_outlined),
               title: const Text('Cash'),
-              subtitle: Text(cashBalance.currency),
+              subtitle: Text(
+                cash == null
+                    ? cashBalance.currency
+                    : '${formatCashAllocationPercent(cash.percent)}% allocation',
+              ),
               trailing: Text(
                 formatIbkrReportedCash(cashBalance),
                 style: Theme.of(context).textTheme.bodyMedium,
