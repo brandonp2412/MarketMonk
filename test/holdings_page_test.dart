@@ -8,12 +8,79 @@ import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/settings_page.dart';
+import 'package:market_monk/profile_data_repository.dart';
+import 'package:market_monk/vi_navigation.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 import 'sqlite_test_support.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('desktop vi delete restores trades from the undo stack',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1400, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      ViNavigation.instance.target = null;
+    });
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    await seedTestTrade(
+      symbol: 'AAA',
+      name: 'AAA',
+      quantity: 2,
+      price: 10,
+      tradeType: 'BUY',
+      tradeDate: DateTime(2026, 11, 1),
+    );
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: HoldingsPage(
+            positionsLoader: (_) async => [
+              Position(
+                symbol: 'AAA',
+                name: 'AAA',
+                nativeCurrency: 'USD',
+                netShares: 2,
+                avgCost: 10,
+                currentPrice: 12,
+                firstBuyDate: DateTime(2026, 11, 1),
+                lastBuyDate: DateTime(2026, 11, 1),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final target = ViNavigation.instance.target!;
+    target.moveFocus(1);
+    await tester.pumpAndSettle();
+    target.deleteFocus?.call();
+    await tester.pumpAndSettle();
+    expect(find.text('Delete 1 holding?'), findsOneWidget);
+    expect(find.textContaining('Undo shortcut'), findsOneWidget);
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+    final profileId = await profileDataRepository.profileIdForName('Default');
+    expect(await profileDataRepository.readTrades(profileId), isEmpty);
+
+    target.undoDelete?.call();
+    await tester.pumpAndSettle();
+    final restored = await profileDataRepository.readTrades(profileId);
+    expect(restored, hasLength(1));
+    expect(restored.single.symbol, 'AAA');
+    expect(restored.single.quantity, 2);
+  });
 
   testWidgets('cash-only IBKR account appears in mobile holdings',
       (tester) async {

@@ -148,6 +148,7 @@ class HoldingsPageState extends State<HoldingsPage>
   final _viRowKey = GlobalKey();
   final _searchFocusNode = FocusNode();
   final List<_UndoEntry> _undoStack = [];
+  bool _undoInProgress = false;
   late final ViTarget _viTarget = ViTarget(
     requestSearch: () => _requestViSearch(),
     moveFocus: (delta) => _moveViFocus(delta),
@@ -718,6 +719,8 @@ class HoldingsPageState extends State<HoldingsPage>
     }
 
     final count = targets.length;
+    final canUndo =
+        isDesktopLayout(context) && context.read<SettingsState>().viModeEnabled;
     final ctx = context;
     final confirmed = await showDialog<bool>(
       context: ctx,
@@ -730,7 +733,8 @@ class HoldingsPageState extends State<HoldingsPage>
         ),
         content: Text(
           'All trades for the selected symbol${count == 1 ? '' : 's'} will '
-          'be permanently deleted. This cannot be undone.',
+          'be deleted. ${canUndo ? 'Use your Undo shortcut to restore them '
+              'before closing the app.' : 'This cannot be undone.'}',
         ),
         actions: [
           TextButton(
@@ -834,35 +838,44 @@ class HoldingsPageState extends State<HoldingsPage>
   }
 
   Future<void> _undoLastDelete() async {
-    if (_undoStack.isEmpty) return;
-    final entry = _undoStack.removeLast();
-    await profileDataRepository.addTrades(
-      entry.profileId,
-      entry.trades
-          .map(
-            (trade) => ProfileTradeWrite(
-              symbol: trade.symbol,
-              name: trade.name,
-              quantity: trade.quantity,
-              price: trade.price,
-              tradeType: trade.tradeType,
-              tradeDate: trade.tradeDate,
-              realizedPL: trade.realizedPL,
-              commission: trade.commission,
-              rawCurrency: trade.rawCurrency,
-              usdRateAtTrade: trade.usdRateAtTrade,
-              brokerConid: trade.brokerConid,
-            ),
-          )
-          .toList(),
-    );
-    if (mounted) {
-      toast(
-        context,
-        context.l10n.text('Restored {count} trades', {
-          'count': entry.trades.length,
-        }),
+    if (_undoStack.isEmpty || _undoInProgress) return;
+    _undoInProgress = true;
+    final entry = _undoStack.last;
+    try {
+      await profileDataRepository.addTrades(
+        entry.profileId,
+        entry.trades
+            .map(
+              (trade) => ProfileTradeWrite(
+                symbol: trade.symbol,
+                name: trade.name,
+                quantity: trade.quantity,
+                price: trade.price,
+                tradeType: trade.tradeType,
+                tradeDate: trade.tradeDate,
+                realizedPL: trade.realizedPL,
+                commission: trade.commission,
+                rawCurrency: trade.rawCurrency,
+                usdRateAtTrade: trade.usdRateAtTrade,
+                brokerConid: trade.brokerConid,
+              ),
+            )
+            .toList(),
       );
+      _undoStack.removeLast();
+      if (mounted) {
+        toast(
+          context,
+          context.l10n.text('Restored {count} trades', {
+            'count': entry.trades.length,
+          }),
+        );
+      }
+    } catch (error, stackTrace) {
+      talker.handle(error, stackTrace, 'Failed to undo holdings delete');
+      if (mounted) toast(context, 'Could not restore trades. Try undo again.');
+    } finally {
+      _undoInProgress = false;
     }
   }
 
