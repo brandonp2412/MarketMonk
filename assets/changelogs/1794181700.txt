@@ -1,0 +1,10 @@
+• Fix release notes
+• add desktop vi key bindings with settings page
+• add sub-day periods to the portfolio period picker
+• complete portfolio and holdings TODO refinements
+• open ticker charts in the charts tab on desktop
+• show a chart skeleton while prices load
+• show icons in desktop context menu actions
+• Fix complete MarketMonk TODO keyboard and period behavior
+• Fix expand market charts to available history width
+• Fix make JNI Android builds reproducible for F-Droid
