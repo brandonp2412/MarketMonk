@@ -3671,19 +3671,6 @@ class ChartsPageState extends State<ChartsPage>
             for (final date in sortedDates)
               date.difference(chartStart).inMinutes / Duration.minutesPerDay,
           ];
-    final chartEnd = DateUtils.dateOnly(DateTime.now());
-    final chartBounds = chartStart == null
-        ? null
-        : (
-            0.0,
-            max(
-              1.0,
-              chartEnd.difference(chartStart).inMinutes /
-                  Duration.minutesPerDay,
-            ),
-          );
-    final partialHistory = chartStart != null &&
-        sortedDates.first.isAfter(chartStart.add(const Duration(days: 14)));
     final dateIndex = <DateTime, int>{
       for (var index = 0; index < sortedDates.length; index++)
         sortedDates[index]: index,
@@ -3834,7 +3821,6 @@ class ChartsPageState extends State<ChartsPage>
               ],
               pointCount: sortedDates.length,
               xAxisPositions: chartPositions,
-              xAxisBounds: chartBounds,
               yLabelFormatter: (value) => scaleForComparison
                   ? fmtChartAxisPercent(value)
                   : fmtCompactCurrency(value),
@@ -3879,16 +3865,6 @@ class ChartsPageState extends State<ChartsPage>
                   '${chartSeries.length} ${context.l10n.text('portfolios')}',
             ),
           ),
-          if (partialHistory && _customChartRange == null)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                '${context.l10n.text('Earlier history unavailable')} · '
-                '${formatter.format(sortedDates.first)}',
-                style: Theme.of(context).textTheme.labelSmall,
-                textAlign: TextAlign.center,
-              ),
-            ),
         ],
       ),
     );

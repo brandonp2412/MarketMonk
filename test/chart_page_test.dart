@@ -927,14 +927,18 @@ void main() {
     expect(find.text('History unavailable'), findsNothing);
     expect(find.textContaining('10,100'), findsWidgets);
     expect(find.text('+11.69%'), findsOneWidget);
-    expect(find.textContaining('Earlier history unavailable'), findsOneWidget);
+    expect(find.textContaining('Earlier history unavailable'), findsNothing);
     final longRange =
         tester.widget<MarketLineChart>(find.byType(MarketLineChart));
     expect(longRange.series.single.points, hasLength(2));
-    expect(longRange.xAxisBounds, isNotNull);
+    expect(longRange.xAxisBounds, isNull);
     expect(
+      longRange.xAxisPositions!.first,
       longRange.series.single.points.first.x,
-      greaterThan(longRange.xAxisBounds!.$2 * 0.8),
+    );
+    expect(
+      longRange.xAxisPositions!.last,
+      longRange.series.single.points.last.x,
     );
 
     expect(ibkrLoads, refreshedIbkrLoads);
