@@ -1,4 +1,5 @@
 import 'package:market_monk/ibkr_api.dart';
+import 'package:market_monk/intraday_portfolio.dart';
 
 class PortfolioReturn {
   final double gain;
@@ -91,6 +92,12 @@ PortfolioReturn? openHoldingPeriodReturn({
   return PortfolioReturn(currentValue - basis, basis);
 }
 
+/// Index of the first intraday return period (12H, 6H, 2H, 1H).
+const int firstIntradayPeriod = 13;
+
+/// The cutoff for a portfolio period, where period is an index into the
+/// portfolio page's period list. Returns null for "All time". Periods from
+/// [firstIntradayPeriod] on are sub-day hours-ago cutoffs.
 DateTime? portfolioReturnCutoff(int period, DateTime now) => switch (period) {
       0 => null,
       >= 1 && <= 5 => DateTime(now.year - (6 - period), now.month, now.day),
@@ -101,5 +108,25 @@ DateTime? portfolioReturnCutoff(int period, DateTime now) => switch (period) {
       10 => DateTime(now.year, now.month, now.day - 1),
       11 => DateTime(now.year, now.month - 2, now.day),
       12 => DateTime(now.year, now.month, now.day - 14),
+      13 => now.subtract(const Duration(hours: 12)),
+      14 => now.subtract(const Duration(hours: 6)),
+      15 => now.subtract(const Duration(hours: 2)),
+      16 => now.subtract(const Duration(hours: 1)),
       _ => DateTime(now.year, now.month, now.day - 1),
     };
+
+/// USD value of an intraday portfolio at or before [cutoff], or null when
+/// [values] starts after the cutoff.
+///
+/// [values] must be in ascending date order.
+double? intradayAccountValueAt(
+  List<IntradayPortfolioValue> values,
+  DateTime cutoff,
+) {
+  double? value;
+  for (final point in values) {
+    if (point.date.isAfter(cutoff)) break;
+    value = point.valueUsd;
+  }
+  return value;
+}

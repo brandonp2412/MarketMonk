@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
+import 'package:market_monk/intraday_market_data.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/market_donut_chart.dart';
 import 'package:market_monk/portfolio_page.dart';
@@ -103,12 +104,21 @@ PortfolioPage _portfolioPage({
       ibkrPerformanceLoader,
   Future<ShareResult> Function(ShareParams)? shareFile,
   Future<void> Function(File, List<int>)? writeShareFile,
+  IntradayMarketData? intradayData,
 }) =>
     PortfolioPage(
       ibkrLoader: ibkrLoader,
       ibkrPerformanceLoader: ibkrPerformanceLoader ?? _performanceLoader,
       shareFile: shareFile,
       writeShareFile: writeShareFile,
+      intradayData: intradayData ??
+          IntradayMarketData(
+            ibkrFetch: (config, symbol, days) async =>
+                throw StateError('IBKR network disabled in tests'),
+            ibkrPortfolioFetch: (config, days) async => const [],
+            yahooGet: (uri) => throw StateError('network disabled in tests'),
+            retryDelay: (_) async {},
+          ),
     );
 
 void main() {
@@ -896,6 +906,134 @@ void main() {
       expect(tester.takeException(), null);
     });
   }
+
+  testWidgets('short-lived IBKR portfolios get sub-day period dots', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1000, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({});
+    final accounts = await configuredAccounts();
+    final now = DateTime.now().toUtc();
+    final start = DateTime(now.year, now.month, now.day - 100);
+    final week = DateTime(now.year, now.month, now.day - 7);
+    await accounts.cachePortfolio(
+      'Default',
+      [
+        Position(
+          symbol: 'VOO',
+          name: 'Vanguard S&P 500 ETF',
+          nativeCurrency: 'USD',
+          netShares: 10,
+          avgCost: 500,
+          currentPrice: 735,
+          firstBuyDate: DateTime(2026),
+          lastBuyDate: DateTime(2026),
+        ),
+        Position(
+          symbol: 'MSFT',
+          name: 'Microsoft',
+          nativeCurrency: 'USD',
+          netShares: 10,
+          avgCost: 100,
+          currentPrice: 335,
+          firstBuyDate: DateTime(2026),
+          lastBuyDate: DateTime(2026),
+        ),
+      ],
+      const IbkrAccountValue(value: 10700, currency: 'USD'),
+      netLiquidationUsd: 10700,
+    );
+    await accounts.cacheIbkrPerformance(
+      'Default',
+      IbkrPerformanceSeries(
+        period: '1Y',
+        measure: 'TWR',
+        currency: 'USD',
+        startDate: start,
+        startNav: 0,
+        dates: [start, week, now],
+        nav: const [100, 110, 121],
+        returnDates: [start, week, now],
+        returns: const [0, .1, .21],
+      ),
+    );
+    for (final period in [7, 8, 9, 10, 11, 12]) {
+      final date = portfolioReturnCutoff(period, now)!;
+      for (final symbol in ['VOO', 'MSFT']) {
+        await testDatabase.into(testDatabase.candles).insert(
+              CandlesCompanion.insert(
+                symbol: symbol,
+                date: date,
+                rawCurrency: const Value('USD'),
+                close: const Value(100),
+              ),
+            );
+      }
+    }
+    // A 4-hour 1-minute series ending near now covers 2H and 1H but not 6H.
+    List<IbkrHistoricalCandle> candlesFor(double base) => [
+          for (var m = 5; m <= 240; m += 5)
+            IbkrHistoricalCandle(
+              date: now.subtract(Duration(minutes: m)),
+              open: base + 240 - m,
+              high: base + 240 - m,
+              low: base + 240 - m,
+              close: base + 240 - m,
+              volume: 0,
+            ),
+        ];
+    final intraday = IntradayMarketData(
+      ibkrPortfolioFetch: (config, days) async => [
+        IbkrHistoricalSeries(
+          symbol: 'VOO',
+          currency: 'USD',
+          candles: candlesFor(500),
+        ),
+        IbkrHistoricalSeries(
+          symbol: 'MSFT',
+          currency: 'USD',
+          candles: candlesFor(100),
+        ),
+      ],
+      now: () => now,
+    );
+    await tester
+        .pumpWidget(app(accounts, _portfolioPage(intradayData: intraday)));
+    await tester.pumpAndSettle();
+    final finder = find.byKey(const Key('portfolio-return-period'));
+    var slider = tester.widget<Slider>(finder);
+    expect(slider.divisions, 8);
+    expect(slider.semanticFormatterCallback!(0), 'Now, current allocation');
+    expect(slider.semanticFormatterCallback!(1), contains('1H ago'));
+    expect(slider.semanticFormatterCallback!(2), contains('2H ago'));
+    expect(slider.semanticFormatterCallback!(3), contains('1D ago'));
+    expect(slider.semanticFormatterCallback!(8), contains('3M ago'));
+    expect(
+      List.generate(
+        (slider.divisions ?? 0) + 1,
+        (i) => slider.semanticFormatterCallback!(i.toDouble()),
+      ).any((label) => label.contains('6H ago') || label.contains('12H ago')),
+      isFalse,
+    );
+
+    Map<String, double> pieValues() => {
+          for (final slice in tester
+              .widget<MarketDonutChart>(find.byType(MarketDonutChart))
+              .slices)
+            slice.label: slice.value,
+        };
+    slider.onChanged!(1);
+    await tester.pumpAndSettle();
+    expect(pieValues(), {'VOO': 6800, 'MSFT': 2800});
+    expect(find.text(fmtCurrency(9600)), findsWidgets);
+    expect(find.text('Account value'), findsOneWidget);
+    expect(tester.takeException(), null);
+  });
 
   testWidgets('desktop portfolio summary cards keep readable widths', (
     tester,

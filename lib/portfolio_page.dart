@@ -19,6 +19,8 @@ import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/ibkr_cash.dart';
 import 'package:market_monk/ibkr_cash_out_pnl.dart';
+import 'package:market_monk/intraday_market_data.dart';
+import 'package:market_monk/intraday_portfolio.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/main.dart';
@@ -73,6 +75,7 @@ class PortfolioPage extends StatefulWidget {
       _ibkrPerformanceLoader;
   final Future<ShareResult> Function(ShareParams)? _shareFile;
   final Future<void> Function(File, List<int>)? _writeShareFile;
+  final IntradayMarketData? _intradayData;
 
   const PortfolioPage({
     super.key,
@@ -82,10 +85,12 @@ class PortfolioPage extends StatefulWidget {
         ibkrPerformanceLoader,
     Future<ShareResult> Function(ShareParams)? shareFile,
     Future<void> Function(File, List<int>)? writeShareFile,
+    IntradayMarketData? intradayData,
   })  : _ibkrLoader = ibkrLoader,
         _ibkrPerformanceLoader = ibkrPerformanceLoader,
         _shareFile = shareFile,
-        _writeShareFile = writeShareFile;
+        _writeShareFile = writeShareFile,
+        _intradayData = intradayData;
 
   @override
   State<PortfolioPage> createState() => PortfolioPageState();
@@ -125,11 +130,20 @@ class PortfolioPageState extends State<PortfolioPage>
     '1D',
     '2M',
     '2W',
+    '12H',
+    '6H',
+    '2H',
+    '1H',
   ];
   int _period = 0;
   String? _historyAccount;
   Map<String, List<StoredCandle>> _returnCandles = {};
   List<Trade> _returnTrades = [];
+  late final IntradayMarketData _returnIntraday =
+      widget._intradayData ?? IntradayMarketData();
+  List<IntradayPortfolioValue> _intradayValues = const [];
+  final Map<String, IntradayPortfolioHolding> _intradayHoldings = {};
+  double? _intradayCurrentValueUsd;
   bool _historyLoading = false;
   bool _historyFailed = false;
 
@@ -153,27 +167,31 @@ class PortfolioPageState extends State<PortfolioPage>
       final firstKnownDate = knownDates.reduce(
         (first, second) => first.isBefore(second) ? first : second,
       );
-      return [
-        0,
-        for (var period = 1; period < _periods.length; period++)
-          if (!portfolioReturnCutoff(
-                period,
-                DateTime.now(),
-              )!
-                  .isBefore(firstKnownDate) &&
-              (accountPeriodReturn(
-                        performance,
-                        netLiquidation.value,
-                        portfolioReturnCutoff(period, DateTime.now())!,
-                      ) !=
-                      null ||
-                  positions.every(
-                    (position) =>
-                        _holdingReturn(position, period: period) != null,
-                  )) &&
-              _allocationAt(positions, period) != null)
-            period,
-      ];
+      final covered = <int>[0];
+      for (var period = 1; period < _periods.length; period++) {
+        final cutoff = portfolioReturnCutoff(period, DateTime.now())!;
+        if (cutoff.isBefore(firstKnownDate)) continue;
+        if (period >= firstIntradayPeriod) {
+          if (intradayAccountValueAt(_intradayValues, cutoff) != null) {
+            covered.add(period);
+          }
+          continue;
+        }
+        if ((accountPeriodReturn(
+                      performance,
+                      netLiquidation.value,
+                      cutoff,
+                    ) !=
+                    null ||
+                positions.every(
+                  (position) =>
+                      _holdingReturn(position, period: period) != null,
+                )) &&
+            _allocationAt(positions, period) != null) {
+          covered.add(period);
+        }
+      }
+      return covered;
     }
     final dates = _returnTrades.isNotEmpty
         ? _returnTrades.map((trade) => trade.tradeDate).toList()
@@ -185,7 +203,7 @@ class PortfolioPageState extends State<PortfolioPage>
     dates.sort();
     return [
       0,
-      for (var period = 1; period < _periods.length; period++)
+      for (var period = 1; period < firstIntradayPeriod; period++)
         if (!portfolioReturnCutoff(
               period,
               DateTime.now(),
@@ -247,6 +265,17 @@ class PortfolioPageState extends State<PortfolioPage>
         _returnCandles = candles;
         _historyLoading = false;
       });
+      final config = accounts.ibkrConfigFor(accountName);
+      if (config.enabled &&
+          positions.any((position) => position.netShares != 0)) {
+        await _loadReturnIntraday(
+          account,
+          accountName,
+          positions,
+          trades,
+          config,
+        );
+      }
     } catch (error, stack) {
       talker.handle(error, stack, 'Failed to load portfolio return history');
       if (!mounted || _historyAccount != account) return;
@@ -263,6 +292,19 @@ class PortfolioPageState extends State<PortfolioPage>
       return PortfolioReturn(position.unrealizedPL, position.costBasis);
     }
     if (_historyLoading || _historyFailed) return null;
+    if (period != null && period >= firstIntradayPeriod) {
+      final holding = _intradayHoldings[position.symbol];
+      if (holding == null) return null;
+      double? baselineUsd;
+      for (final entry in holding.pricesUsd.entries) {
+        if (entry.key.isAfter(cutoff)) break;
+        baselineUsd = entry.value;
+      }
+      if (baselineUsd == null || baselineUsd <= 0) return null;
+      final basis = position.netShares * baselineUsd;
+      if (basis <= 0) return null;
+      return PortfolioReturn(position.currentValue - basis, basis);
+    }
     final trades = _returnTrades
         .where((trade) => trade.symbol == position.symbol)
         .toList()
@@ -313,6 +355,102 @@ class PortfolioPageState extends State<PortfolioPage>
           ),
       ],
     );
+  }
+
+  Future<void> _loadReturnIntraday(
+    String historyKey,
+    String accountName,
+    List<Position> positions,
+    List<Trade> trades,
+    IbkrAccountConfig config,
+  ) async {
+    final accounts = context.read<AccountManager>();
+    final priced =
+        positions.where((position) => position.netShares != 0).toList();
+    if (priced.isEmpty) return;
+    try {
+      await _returnIntraday.prefetchPortfolio(config, days: 1);
+      final holdings = <IntradayPortfolioHolding>[];
+      for (final position in priced) {
+        final series = await _returnIntraday.fetch(
+          position.symbol,
+          days: 1,
+          config: config,
+        );
+        await fetchSymbolCurrencyAndRate(
+          position.symbol,
+          rawCurrency: series.currency,
+        );
+        holdings.add(
+          IntradayPortfolioHolding.fromSeries(
+            series,
+            quantity: position.netShares,
+            currencyPerUsd: requireUsdRate(symbolCurrency(position.symbol)),
+            centDivisor: symbolCentDivisor(position.symbol),
+            trades: [
+              for (final trade in trades)
+                if (trade.symbol == position.symbol)
+                  IntradayPortfolioTrade(
+                    trade.tradeDate.toUtc(),
+                    trade.quantity,
+                    tradeAmountUsd(trade, trade.price),
+                  ),
+            ],
+          ),
+        );
+      }
+      final cached = accounts.portfolioCacheFor(accountName);
+      final nav = cached?.netLiquidation;
+      final currentValueUsd = cached?.netLiquidationUsd ??
+          (nav != null && nav.value.isFinite
+              ? nav.value / requireUsdRate(nav.currency)
+              : null) ??
+          positions.fold<double>(
+            0,
+            (sum, position) => sum + position.currentValue,
+          );
+      if (!mounted || _historyAccount != historyKey) return;
+      setState(() {
+        _intradayValues = buildIntradayPortfolio(
+          holdings: holdings,
+          currentValueUsd: currentValueUsd,
+        );
+        _intradayHoldings
+          ..clear()
+          ..addAll({
+            for (var i = 0; i < holdings.length; i++)
+              priced[i].symbol: holdings[i],
+          });
+        _intradayCurrentValueUsd = currentValueUsd;
+      });
+    } catch (error, stack) {
+      talker.handle(error, stack, 'Failed to load intraday portfolio values');
+    }
+  }
+
+  List<PortfolioAllocation> _intradayAllocationAt(
+    List<Position> positions,
+    DateTime cutoff,
+  ) {
+    final allocations = <PortfolioAllocation>[];
+    for (final position in positions) {
+      if (position.netShares == 0) continue;
+      final holding = _intradayHoldings[position.symbol];
+      if (holding == null) continue;
+      double? priceUsd;
+      for (final entry in holding.pricesUsd.entries) {
+        if (entry.key.isAfter(cutoff)) break;
+        priceUsd = entry.value;
+      }
+      if (priceUsd == null || !priceUsd.isFinite) continue;
+      final value = position.netShares * priceUsd;
+      if (value.isFinite) {
+        allocations.add(
+          PortfolioAllocation(position.symbol, position.name, value),
+        );
+      }
+    }
+    return allocations;
   }
 
   Widget _periodPicker() {
@@ -1135,41 +1273,60 @@ class PortfolioPageState extends State<PortfolioPage>
     final costBasisGain = totalValue - totalCost;
     final cashOutSummary = _ibkrCashOutSummary(performance, netLiquidation);
     final cutoff = _returnCutoff;
-    final historicalCashOut =
-        cutoff == null ? null : _ibkrCashOutSummaryAt(performance, cutoff);
+    final intraday = cutoff != null && _period >= firstIntradayPeriod;
+    final intradayValueUsd =
+        intraday ? intradayAccountValueAt(_intradayValues, cutoff) : null;
+    final historicalCashOut = cutoff == null || intraday
+        ? null
+        : _ibkrCashOutSummaryAt(performance, cutoff);
     final totalGain = cutoff == null
         ? cashOutSummary?.gainUsd ?? costBasisGain
-        : historicalCashOut?.gainUsd ?? double.nan;
+        : intradayValueUsd != null && _intradayCurrentValueUsd != null
+            ? _intradayCurrentValueUsd! - intradayValueUsd
+            : historicalCashOut?.gainUsd ?? double.nan;
     final totalGainPct = cutoff == null
         ? cashOutSummary?.gainPct ??
             (totalCost > 0 ? (costBasisGain / totalCost) * 100 : 0.0)
-        : historicalCashOut?.gainPct ?? double.nan;
+        : intradayValueUsd != null &&
+                _intradayCurrentValueUsd != null &&
+                intradayValueUsd != 0
+            ? (_intradayCurrentValueUsd! / intradayValueUsd - 1) * 100
+            : historicalCashOut?.gainPct ?? double.nan;
 
-    final allocation = _allocationAt(
-          positions,
-          _period,
-          cashValueUsd: _returnCutoff == null ? cashUsd : null,
-        ) ??
-        [];
+    final allocation = intraday
+        ? _intradayAllocationAt(positions, cutoff)
+        : _allocationAt(
+              positions,
+              _period,
+              cashValueUsd: _returnCutoff == null ? cashUsd : null,
+            ) ??
+            [];
     final allocationTotal = allocation.fold<double>(
       0,
       (sum, holding) => sum + holding.value,
     );
-    final historicalNav = cutoff == null || performance == null
+    final historicalNav = cutoff == null || intraday || performance == null
         ? null
         : accountNetAssetValueAt(performance, cutoff);
-    final displayTotal = cutoff == null
-        ? netLiquidation == null
-            ? fmtCurrency(totalValue)
-            : fmtNativeCurrency(netLiquidation.value, netLiquidation.currency)
-        : historicalNav == null
-            ? fmtCurrency(allocationTotal)
-            : fmtNativeCurrency(historicalNav, performance!.currency);
-    final totalLabel = cutoff == null && netLiquidation == null
-        ? 'Market value'
-        : cutoff != null && historicalNav == null
-            ? 'Holdings value'
-            : 'Account value';
+    final displayTotal = intraday && intradayValueUsd != null
+        ? fmtCurrency(intradayValueUsd)
+        : cutoff == null
+            ? netLiquidation == null
+                ? fmtCurrency(totalValue)
+                : fmtNativeCurrency(
+                    netLiquidation.value,
+                    netLiquidation.currency,
+                  )
+            : historicalNav == null
+                ? fmtCurrency(allocationTotal)
+                : fmtNativeCurrency(historicalNav, performance!.currency);
+    final totalLabel = intraday
+        ? 'Account value'
+        : cutoff == null && netLiquidation == null
+            ? 'Market value'
+            : cutoff != null && historicalNav == null
+                ? 'Holdings value'
+                : 'Account value';
     final sorted = [...allocation]..sort((a, b) => b.value.compareTo(a.value));
     final currentBySymbol = {
       for (final position in positions) position.symbol: position,
@@ -1207,7 +1364,7 @@ class PortfolioPageState extends State<PortfolioPage>
         cashBalance: _returnCutoff == null ? cashBalance : null,
         totalGain: totalGain,
         totalGainPct: totalGainPct,
-        isCashOut: cutoff == null ? cashOutSummary != null : true,
+        isCashOut: cutoff == null ? cashOutSummary != null : !intraday,
         hasRefreshWarning: hasLoadError,
       );
     }
