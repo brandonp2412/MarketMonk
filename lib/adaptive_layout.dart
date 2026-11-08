@@ -34,13 +34,16 @@ Widget desktopMetricGrid({
   assert(minCardWidth > 0);
   const gap = 12.0;
 
-  Widget row(int from, int to) => Row(
-        children: [
-          for (var index = from; index < to; index++) ...[
-            if (index > from) const SizedBox(width: gap),
-            cards[index],
+  Widget row(int from, int to) => IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var index = from; index < to; index++) ...[
+              if (index > from) const SizedBox(width: gap),
+              cards[index],
+            ],
           ],
-        ],
+        ),
       );
 
   return LayoutBuilder(

@@ -3,7 +3,6 @@
 import 'package:drafter/drafter.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
@@ -100,10 +99,6 @@ class TickerLine extends StatelessWidget {
                 date.difference(chartStart).inMinutes / Duration.minutesPerDay,
             ];
     }
-    final partialHistory = !loading &&
-        chartStart != null &&
-        datesList.isNotEmpty &&
-        datesList.first.isAfter(chartStart.add(const Duration(days: 14)));
 
     return Column(
       children: [
@@ -136,7 +131,7 @@ class TickerLine extends StatelessWidget {
             pointCount: spots.length,
             xAxisPositions: datePositions,
             loading: loading,
-            xAxisBounds: chartStart == null
+            xAxisBounds: !loading || chartStart == null
                 ? null
                 : (
                     0.0,
@@ -179,16 +174,6 @@ class TickerLine extends StatelessWidget {
                     : '${spots.length} price points',
           ),
         ),
-        if (partialHistory && range == null)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              '${context.l10n.text('Earlier history unavailable')} · '
-              '${tooltipFormatter.format(datesList.first)}',
-              style: Theme.of(context).textTheme.labelSmall,
-              textAlign: TextAlign.center,
-            ),
-          ),
       ],
     );
   }

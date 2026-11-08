@@ -483,6 +483,7 @@ class PortfolioPageState extends State<PortfolioPage>
   final _allocationScrollController = ScrollController();
   final _returnScrollController = ScrollController();
   String _lastAccount = '';
+  SymbolSummary? _desktopHistorySummary;
   int _lastIbkrRefreshVersion = -1;
   IbkrAccountConfig _lastIbkrConfig = const IbkrAccountConfig();
   final Map<(String, IbkrAccountConfig), Future<IbkrPortfolioSnapshot>>
@@ -548,7 +549,10 @@ class PortfolioPageState extends State<PortfolioPage>
       _positions = cached?.positions ?? [];
       _netLiquidation = cached?.netLiquidation;
       _hasCachedPortfolio = cached != null;
-      if (accountChanged) _period = 0;
+      if (accountChanged) {
+        _period = 0;
+        _desktopHistorySummary = null;
+      }
       touchedIndex = null;
     });
     if (widget.isActive) {
@@ -995,6 +999,14 @@ class PortfolioPageState extends State<PortfolioPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final summary = _desktopHistorySummary;
+    if (isDesktopLayout(context) && summary != null) {
+      return TradeHistoryPage(
+        key: ValueKey('portfolio-history-$_lastAccount-${summary.symbol}'),
+        summary: summary,
+        onClose: () => setState(() => _desktopHistorySummary = null),
+      );
+    }
     return DesktopContextMenu(
       actions: [
         DesktopMenuAction(
@@ -1257,8 +1269,11 @@ class PortfolioPageState extends State<PortfolioPage>
     }
 
     if (widget.isActive) {
-      _availablePeriods =
-          _coveredPeriods(positions, performance, netLiquidation);
+      _availablePeriods = _coveredPeriods(
+        positions,
+        performance,
+        netLiquidation,
+      );
     }
     if (!_availablePeriods.contains(_period)) _period = _availablePeriods.first;
 
@@ -1439,12 +1454,12 @@ class PortfolioPageState extends State<PortfolioPage>
                             Text(
                               sorted[selectedIndex].symbol,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(fontSize: 13),
+                              style: Theme.of(context).textTheme.labelLarge,
                             ),
                             Text(
                               sorted[selectedIndex].name,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(fontSize: 10),
+                              style: Theme.of(context).textTheme.bodySmall,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -1556,17 +1571,20 @@ class PortfolioPageState extends State<PortfolioPage>
     final trades = _returnTrades
         .where((trade) => trade.symbol == position.symbol)
         .toList();
+    final summary = SymbolSummary(
+      symbol: position.symbol,
+      name: position.name,
+      position: position,
+      trades: trades,
+    );
+    if (isDesktopLayout(context)) {
+      setState(() => _desktopHistorySummary = summary);
+      return;
+    }
     Navigator.of(context).push(
       adaptivePageRoute(
         context,
-        builder: (_) => TradeHistoryPage(
-          summary: SymbolSummary(
-            symbol: position.symbol,
-            name: position.name,
-            position: position,
-            trades: trades,
-          ),
-        ),
+        builder: (_) => TradeHistoryPage(summary: summary),
       ),
     );
   }
@@ -1657,8 +1675,11 @@ class PortfolioPageState extends State<PortfolioPage>
                       ),
                     ),
                     if (expandedActions) ...[
-                      OutlinedButton.icon(
+                      TextButton.icon(
                         key: const Key('desktop-portfolio-export'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: colorScheme.onSurface,
+                        ),
                         onPressed: () => runDetachedTask(
                           _exportCsv(context, positions),
                           'Failed to export portfolio CSV',
@@ -2331,7 +2352,10 @@ class _SummaryCard extends StatelessWidget {
                       ? '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}'
                           '  (${totalGainPct.toStringAsFixed(2)}%)'
                       : 'Return history unavailable',
-                  style: TextStyle(color: gainColor, fontSize: 13),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: gainColor),
                 ),
               ],
             ),
@@ -2425,14 +2449,13 @@ class _LegendTile extends StatelessWidget {
               changePct.isFinite
                   ? '${changePct >= 0 ? '+' : ''}${changePct.toStringAsFixed(2)}%'
                   : '—',
-              style: TextStyle(
-                fontSize: 13,
-                color: !changePct.isFinite
-                    ? Theme.of(context).colorScheme.onSurfaceVariant
-                    : changePct >= 0
-                        ? Colors.green
-                        : Colors.redAccent,
-              ),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: !changePct.isFinite
+                        ? Theme.of(context).colorScheme.onSurfaceVariant
+                        : changePct >= 0
+                            ? Colors.green
+                            : Colors.redAccent,
+                  ),
             ),
           ],
         ),

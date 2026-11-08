@@ -49,6 +49,10 @@ class PortfolioPeriodPicker extends StatelessWidget {
               ),
             ),
             const Spacer(),
+            if (selectedDate == null) ...[
+              Icon(Icons.adjust_rounded, size: 14, color: colors.primary),
+              const SizedBox(width: 4),
+            ],
             Text(
               selectedDate == null ? 'PRESENT' : '${labels[value]} AGO',
               style: theme.textTheme.labelSmall?.copyWith(

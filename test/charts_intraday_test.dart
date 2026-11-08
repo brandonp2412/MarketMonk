@@ -396,6 +396,24 @@ void main() {
     expect(calls, 2);
   });
 
+  testWidgets('unknown ticker retains chart frame with a clear error', (
+    tester,
+  ) async {
+    final loader = IntradayMarketData(
+      yahooGet: (_) async => http.Response('not found', 404),
+    );
+    await mountChart(tester, loader);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Stock not found'), findsOneWidget);
+    expect(
+      find.text('This stock could not be found. Check the ticker symbol.'),
+      findsOneWidget,
+    );
+    expect(find.byIcon(Icons.search_off_rounded), findsOneWidget);
+    expect(find.textContaining('HTTP 404'), findsNothing);
+  });
+
   testWidgets('period changes replace favorite lines together', (tester) async {
     final first = Completer<http.Response>();
     final second = Completer<http.Response>();

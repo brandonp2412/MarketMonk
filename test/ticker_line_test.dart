@@ -44,7 +44,7 @@ void main() {
     expect(chart.pointCount, 10);
   });
 
-  testWidgets('five-year range leaves missing earlier years blank', (
+  testWidgets('five-year range fills available history width', (
     WidgetTester tester,
   ) async {
     await seedTestSqlite({});
@@ -80,20 +80,14 @@ void main() {
 
     final chart = tester.widget<MarketLineChart>(find.byType(MarketLineChart));
     expect(chart.series.single.points, hasLength(3));
-    expect(chart.xAxisBounds, isNotNull);
+    expect(chart.xAxisBounds, isNull);
     expect(chart.xAxisPositions!.first, greaterThan(1000));
-    expect(
-      chart.series.single.points.first.x / chart.xAxisBounds!.$2,
-      closeTo(0.6, 0.02),
-    );
-    expect(find.textContaining('Earlier history unavailable'), findsOneWidget);
+    expect(find.textContaining('Earlier history unavailable'), findsNothing);
     final canvas = tester.widget<ChartCanvas>(find.byType(ChartCanvas));
     final scene = (canvas.renderer as InteractiveRenderer)
         .buildScene(tester.getSize(find.byType(ChartCanvas)));
-    expect(
-      scene.marks.first.center.dx,
-      greaterThan(scene.bounds!.left + scene.bounds!.width * 0.55),
-    );
+    expect(scene.marks.first.center.dx, closeTo(scene.bounds!.left, 0.1));
+    expect(scene.marks.last.center.dx, closeTo(scene.bounds!.right, 0.1));
     expect(tester.takeException(), isNull);
   });
 
