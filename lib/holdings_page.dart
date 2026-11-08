@@ -31,7 +31,7 @@ enum _HoldingsSort {
   price,
   value,
   unrealized,
-  returnPct
+  returnPct,
 }
 
 /// A summary of a symbol: open position (if any) + full trade history.
@@ -140,6 +140,7 @@ class HoldingsPageState extends State<HoldingsPage>
 
   bool _selecting = false;
   final Set<String> _selectedSymbols = {};
+  SymbolSummary? _desktopHistorySummary;
   _HoldingsSort _desktopSort = _HoldingsSort.value;
   bool _desktopSortAscending = false;
 
@@ -213,6 +214,7 @@ class HoldingsPageState extends State<HoldingsPage>
       _search.clear();
       _selectedSymbols.clear();
       _selecting = false;
+      _desktopHistorySummary = null;
     }
     if (configChanged) _profileSummaries.remove(profileId);
     final cachedPositions = accounts.portfolioCacheFor(account)?.positions;
@@ -369,8 +371,10 @@ class HoldingsPageState extends State<HoldingsPage>
       final cachedBefore = accounts.portfolioCacheFor(accountName);
       if (cachedBefore != null && accounts.ibkrConfigFor(accountName).enabled) {
         setState(() {
-          _summaries =
-              _summariesFromPositions(_ibkrTrades, cachedBefore.positions);
+          _summaries = _summariesFromPositions(
+            _ibkrTrades,
+            cachedBefore.positions,
+          );
           _ibkrPreloadCompleted = true;
         });
       }
@@ -593,8 +597,9 @@ class HoldingsPageState extends State<HoldingsPage>
       return const Stream<List<SymbolSummary>>.empty();
     }
     final accountName = accounts.activeAccount;
-    Stream<List<Trade>> trades =
-        profileDataRepository.watchTradesForAccount(accountName);
+    Stream<List<Trade>> trades = profileDataRepository.watchTradesForAccount(
+      accountName,
+    );
     if (skipInitial) trades = trades.skip(1);
     return trades
         .asyncMap((rows) => _summariesForStream(accountName, rows))
@@ -676,9 +681,7 @@ class HoldingsPageState extends State<HoldingsPage>
     if (mounted) {
       toast(
         context,
-        context.l10n.text('Copied {count} symbols', {
-          'count': symbols.length,
-        }),
+        context.l10n.text('Copied {count} symbols', {'count': symbols.length}),
       );
     }
   }
@@ -725,10 +728,7 @@ class HoldingsPageState extends State<HoldingsPage>
 
     final accountName = context.read<AccountManager>().activeAccount;
     final profileId = await profileDataRepository.profileIdForName(accountName);
-    await profileDataRepository.deleteTradesForSymbols(
-      profileId,
-      targets,
-    );
+    await profileDataRepository.deleteTradesForSymbols(profileId, targets);
     _exitSelecting();
     if (ctx.mounted)
       toast(
@@ -743,11 +743,23 @@ class HoldingsPageState extends State<HoldingsPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    context
-        .select<SettingsState, bool>((settings) => settings.hideDollarAmounts);
+    context.select<SettingsState, bool>(
+      (settings) => settings.hideDollarAmounts,
+    );
 
     final desktop = isDesktopLayout(context);
     final accounts = context.watch<AccountManager>();
+    final summary = _desktopHistorySummary;
+    if (desktop && summary != null) {
+      return TradeHistoryPage(
+        key: ValueKey(
+          'holdings-history-${accounts.activeAccount}-${summary.symbol}',
+        ),
+        summary: summary,
+        ibkrTradeHistoryLoader: widget._ibkrTradeHistoryLoader,
+        onClose: () => setState(() => _desktopHistorySummary = null),
+      );
+    }
     final ibkrManaged = accounts.ibkrConfigFor().enabled;
     final allSelected = _summaries.isNotEmpty &&
         _selectedSymbols.containsAll(
@@ -764,7 +776,9 @@ class HoldingsPageState extends State<HoldingsPage>
           enabled: _summaries.isNotEmpty,
           onTap: _toggleSelectAll,
           child: ListTile(
-            leading: Icon(allSelected ? Icons.deselect : Icons.select_all),
+            leading: Icon(
+              allSelected ? Icons.deselect : Icons.done_all_rounded,
+            ),
             title: Text(
               allSelected
                   ? context.l10n.text('Deselect all')
@@ -889,7 +903,7 @@ class HoldingsPageState extends State<HoldingsPage>
                       TextButton.icon(
                         onPressed: _toggleSelectAll,
                         icon: Icon(
-                          allSelected ? Icons.deselect : Icons.select_all,
+                          allSelected ? Icons.deselect : Icons.done_all_rounded,
                         ),
                         label: Text(
                           allSelected
@@ -995,10 +1009,8 @@ class HoldingsPageState extends State<HoldingsPage>
       actions: [
         DesktopMenuAction(
           context.l10n.text('Refresh'),
-          () => runDetachedTask(
-            _refreshCandles(),
-            'Failed to refresh holdings',
-          ),
+          () =>
+              runDetachedTask(_refreshCandles(), 'Failed to refresh holdings'),
           icon: Icons.refresh_rounded,
         ),
         if (!ibkrManaged)
@@ -1110,18 +1122,24 @@ class HoldingsPageState extends State<HoldingsPage>
 
       final comparison = switch (_desktopSort) {
         _HoldingsSort.symbol => a.symbol.compareTo(b.symbol),
-        _HoldingsSort.shares =>
-          a.position!.netShares.compareTo(b.position!.netShares),
-        _HoldingsSort.avgCost =>
-          a.position!.avgCost.compareTo(b.position!.avgCost),
-        _HoldingsSort.price =>
-          a.position!.currentPrice.compareTo(b.position!.currentPrice),
-        _HoldingsSort.value =>
-          a.position!.currentValue.compareTo(b.position!.currentValue),
-        _HoldingsSort.unrealized =>
-          a.position!.unrealizedPL.compareTo(b.position!.unrealizedPL),
-        _HoldingsSort.returnPct =>
-          a.position!.change.compareTo(b.position!.change),
+        _HoldingsSort.shares => a.position!.netShares.compareTo(
+            b.position!.netShares,
+          ),
+        _HoldingsSort.avgCost => a.position!.avgCost.compareTo(
+            b.position!.avgCost,
+          ),
+        _HoldingsSort.price => a.position!.currentPrice.compareTo(
+            b.position!.currentPrice,
+          ),
+        _HoldingsSort.value => a.position!.currentValue.compareTo(
+            b.position!.currentValue,
+          ),
+        _HoldingsSort.unrealized => a.position!.unrealizedPL.compareTo(
+            b.position!.unrealizedPL,
+          ),
+        _HoldingsSort.returnPct => a.position!.change.compareTo(
+            b.position!.change,
+          ),
       };
       return comparison == 0
           ? a.symbol.compareTo(b.symbol)
@@ -1174,9 +1192,7 @@ class HoldingsPageState extends State<HoldingsPage>
               value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: valueColor,
-              ),
+              style: theme.textTheme.titleLarge?.copyWith(color: valueColor),
             ),
             if (detail != null || detailWidget != null) ...[
               const SizedBox(height: 3),
@@ -1387,8 +1403,10 @@ class HoldingsPageState extends State<HoldingsPage>
                         scrollDirection: Axis.horizontal,
                         child: ConstrainedBox(
                           constraints: BoxConstraints(
-                            minWidth: (constraints.maxWidth - 8)
-                                .clamp(0, double.infinity),
+                            minWidth: (constraints.maxWidth - 8).clamp(
+                              0,
+                              double.infinity,
+                            ),
                           ),
                           child: Scrollbar(
                             controller: _desktopTableScrollController,
@@ -1439,28 +1457,29 @@ class HoldingsPageState extends State<HoldingsPage>
                                         _setDesktopSort(_HoldingsSort.avgCost),
                                   ),
                                   DataColumn(
-                                    columnWidth:
-                                        const IntrinsicColumnWidth(flex: 1),
+                                    columnWidth: const IntrinsicColumnWidth(
+                                      flex: 1,
+                                    ),
                                     numeric: true,
                                     label: Text(context.l10n.text('Price')),
                                     onSort: (_, __) =>
                                         _setDesktopSort(_HoldingsSort.price),
                                   ),
                                   DataColumn(
-                                    columnWidth:
-                                        const IntrinsicColumnWidth(flex: 1),
+                                    columnWidth: const IntrinsicColumnWidth(
+                                      flex: 1,
+                                    ),
                                     numeric: true,
                                     label: Text(
-                                      context.l10n.text(
-                                        'Market value',
-                                      ),
+                                      context.l10n.text('Market value'),
                                     ),
                                     onSort: (_, __) =>
                                         _setDesktopSort(_HoldingsSort.value),
                                   ),
                                   DataColumn(
-                                    columnWidth:
-                                        const IntrinsicColumnWidth(flex: 1),
+                                    columnWidth: const IntrinsicColumnWidth(
+                                      flex: 1,
+                                    ),
                                     numeric: true,
                                     label: Text(context.l10n.text('P/L')),
                                     onSort: (_, __) => _setDesktopSort(
@@ -1468,8 +1487,9 @@ class HoldingsPageState extends State<HoldingsPage>
                                     ),
                                   ),
                                   DataColumn(
-                                    columnWidth:
-                                        const IntrinsicColumnWidth(flex: 1),
+                                    columnWidth: const IntrinsicColumnWidth(
+                                      flex: 1,
+                                    ),
                                     numeric: true,
                                     label: Text(context.l10n.text('Return')),
                                     onSort: (_, __) => _setDesktopSort(
@@ -1906,6 +1926,10 @@ class HoldingsPageState extends State<HoldingsPage>
       );
 
   void _openDetail(SymbolSummary s) {
+    if (isDesktopLayout(context)) {
+      setState(() => _desktopHistorySummary = s);
+      return;
+    }
     unawaited(
       Navigator.push(
         context,

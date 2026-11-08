@@ -226,8 +226,9 @@ class ChartsPageState extends State<ChartsPage>
         'Failed to refresh provisional account quotes',
       ),
     );
-    _chartsFocusSubscription =
-        ChartsFocusController.instance.requests.listen(_selectSymbol);
+    _chartsFocusSubscription = ChartsFocusController.instance.requests.listen(
+      _selectSymbol,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _measureOverlay();
@@ -2783,6 +2784,45 @@ class ChartsPageState extends State<ChartsPage>
     ];
   }
 
+  Widget _stockUnavailable(BuildContext context, Object error, double height) {
+    final missing = RegExp(r'(?<!\d)404(?!\d)').hasMatch(error.toString());
+    final theme = Theme.of(context);
+    return SizedBox(
+      height: height,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                missing ? Icons.search_off_rounded : Icons.cloud_off_rounded,
+                size: 44,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                missing ? 'Stock not found' : 'Stock data unavailable',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleMedium,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                missing
+                    ? 'This stock could not be found. Check the ticker symbol.'
+                    : error.toString(),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildStockChart(
     BuildContext context,
     AsyncSnapshot<List<CandleTicker>> snapshot,
@@ -2790,10 +2830,7 @@ class ChartsPageState extends State<ChartsPage>
   ) {
     final height = MediaQuery.of(context).size.height * 0.35;
     if (snapshot.hasError) {
-      return SizedBox(
-        height: height,
-        child: Center(child: Text(snapshot.error.toString())),
-      );
+      return _stockUnavailable(context, snapshot.error!, height);
     }
     if (_networkLoading) {
       if (isDesktopLayout(context)) {
@@ -2828,10 +2865,7 @@ class ChartsPageState extends State<ChartsPage>
     }
     if (snapshot.data == null || snapshot.data!.isEmpty) {
       if (_stockError != null) {
-        return SizedBox(
-          height: height,
-          child: Center(child: Text(_stockError!)),
-        );
+        return _stockUnavailable(context, _stockError!, height);
       }
       return SizedBox(
         height: height,
@@ -2943,9 +2977,7 @@ class ChartsPageState extends State<ChartsPage>
           ]),
           pickRange: _pickingChartRange,
           onRangeChanged: (range) => _setChartRange(
-            [
-              for (final candle in candles) candle.date.value,
-            ],
+            [for (final candle in candles) candle.date.value],
             range,
           ),
           dates: candles.map((candle) => candle.date.value),
@@ -3031,9 +3063,7 @@ class ChartsPageState extends State<ChartsPage>
       child: Column(
         children: [
           ConstrainedBox(
-            constraints: const BoxConstraints(
-              minHeight: _stockSummaryHeight,
-            ),
+            constraints: const BoxConstraints(minHeight: _stockSummaryHeight),
             child: Column(
               children: [
                 Wrap(
@@ -3140,11 +3170,7 @@ class ChartsPageState extends State<ChartsPage>
         children: [
           Row(
             mainAxisSize: MainAxisSize.min,
-            children: [
-              bar(88, 20),
-              const SizedBox(width: 16),
-              bar(96, 20),
-            ],
+            children: [bar(88, 20), const SizedBox(width: 16), bar(96, 20)],
           ),
           const SizedBox(height: 4),
           bar(140, 12),

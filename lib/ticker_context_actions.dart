@@ -6,12 +6,31 @@ import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/edit_ticker_page.dart';
+import 'package:market_monk/google_finance_url.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/utils.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/sqlite_settings.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher_string.dart';
+
+Future<void> _openGoogleFinance(String symbol) async {
+  var url = googleFinanceUrl(symbol);
+  if (url.contains('/finance/search?')) {
+    final yahoo = YahooFinanceApi();
+    try {
+      final matches = await yahoo.searchTickers(symbol);
+      for (final match in matches) {
+        if (match.symbol.toUpperCase() != symbol.toUpperCase()) continue;
+        url = googleFinanceUrl(symbol, yahooExchange: match.exchange);
+        break;
+      }
+    } finally {
+      yahoo.dispose();
+    }
+  }
+  await launchUrlString(url);
+}
 
 /// Resolves stock actions using the current favorites and account permissions.
 Future<List<DesktopMenuAction>> tickerContextActions(
@@ -21,8 +40,9 @@ Future<List<DesktopMenuAction>> tickerContextActions(
 }) async {
   final settings = await SqliteSettings.getInstance();
   if (!context.mounted) return [];
-  final favorite =
-      (settings.getStringList('favoriteStocks') ?? []).contains(symbol);
+  final favorite = (settings.getStringList('favoriteStocks') ?? []).contains(
+    symbol,
+  );
   final managed = context.read<AccountManager>().ibkrConfigFor().enabled;
   final encoded = Uri.encodeComponent(symbol);
   return [
@@ -86,10 +106,8 @@ Future<List<DesktopMenuAction>> tickerContextActions(
       icon: Icons.open_in_new_rounded,
     ),
     DesktopMenuAction(
-      context.l10n.text('Open in Google'),
-      () => unawaited(
-        launchUrlString('https://www.google.com/search?q=$encoded'),
-      ),
+      context.l10n.text('Open in Google Finance'),
+      () => unawaited(_openGoogleFinance(symbol)),
       icon: Icons.search_rounded,
     ),
     DesktopMenuAction(

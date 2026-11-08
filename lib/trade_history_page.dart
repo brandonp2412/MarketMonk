@@ -17,12 +17,14 @@ import 'package:provider/provider.dart';
 
 class TradeHistoryPage extends StatefulWidget {
   final SymbolSummary summary;
+  final VoidCallback? onClose;
   final Future<IbkrTradeHistory> Function(IbkrAccountConfig)?
       ibkrTradeHistoryLoader;
 
   const TradeHistoryPage({
     super.key,
     required this.summary,
+    this.onClose,
     this.ibkrTradeHistoryLoader,
   });
 
@@ -213,6 +215,14 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
 
         return Scaffold(
           appBar: AppBar(
+            leading: widget.onClose == null
+                ? null
+                : IconButton(
+                    key: const Key('embedded-trade-history-back'),
+                    tooltip: context.l10n.text('Back'),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    onPressed: widget.onClose,
+                  ),
             title: Text(
               _selectedTradeIds.isNotEmpty && !isDesktopLayout(context)
                   ? context.l10n.text('{count} selected', {
@@ -230,7 +240,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                 IconButton(
                   key: const Key('trade-select-all'),
                   tooltip: context.l10n.text('Select all'),
-                  icon: const Icon(Icons.select_all),
+                  icon: const Icon(Icons.done_all_rounded),
                   onPressed: () => setState(() {
                     if (trades.isNotEmpty &&
                         trades.every(
