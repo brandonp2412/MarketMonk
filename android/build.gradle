@@ -10,6 +10,18 @@ allprojects {
 
 rootProject.buildDir = "../build"
 subprojects {
+    if (project.name == 'jni') {
+        plugins.withId('com.android.library') {
+            android {
+                defaultConfig {
+                    // Build IDs include debug paths that differ on F-Droid's build server.
+                    externalNativeBuild.cmake.arguments '-DCMAKE_SHARED_LINKER_FLAGS=-Wl,--build-id=none'
+                }
+            }
+        }
+    }
+}
+subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
     project.evaluationDependsOn(":app")
 }
