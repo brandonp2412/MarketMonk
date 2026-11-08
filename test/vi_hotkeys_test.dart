@@ -13,6 +13,7 @@ void main() {
   tearDown(() {
     ViNavigation.instance.target = null;
     ViNavigation.instance.fallbackSearch = null;
+    ViNavigation.instance.fallbackMoveFocus = null;
     ModalRouteTracker.instance.modalDepth = 0;
   });
 
@@ -50,5 +51,15 @@ void main() {
     await tester.sendKeyDownEvent(LogicalKeyboardKey.slash);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.slash);
     expect(searchCount, 2);
+
+    var fallbackMovement = 0;
+    ViNavigation.instance.fallbackMoveFocus =
+        (delta) => fallbackMovement += delta;
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyJ);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyJ);
+    expect(fallbackMovement, 1);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyK);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyK);
+    expect(fallbackMovement, 0);
   });
 }

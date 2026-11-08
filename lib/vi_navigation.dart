@@ -33,6 +33,7 @@ final class ViNavigation {
 
   ViTarget? target;
   VoidCallback? fallbackSearch;
+  void Function(int delta)? fallbackMoveFocus;
 }
 
 /// Focus index after moving [delta] from [current] in a list of [length]

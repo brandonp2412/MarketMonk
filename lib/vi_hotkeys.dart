@@ -31,14 +31,21 @@ void installDesktopViHotkeys(SettingsState settings) {
 
     final target = ViNavigation.instance.target;
     if (target == null) {
-      if (action == ViAction.search) {
-        final search = ViNavigation.instance.fallbackSearch;
-        if (search != null) {
+      switch (action) {
+        case ViAction.search:
+          final search = ViNavigation.instance.fallbackSearch;
+          if (search == null) return false;
           search();
           return true;
-        }
+        case ViAction.next:
+        case ViAction.previous:
+          final move = ViNavigation.instance.fallbackMoveFocus;
+          if (move == null) return false;
+          move(action == ViAction.next ? 1 : -1);
+          return true;
+        default:
+          return false;
       }
-      return false;
     }
     final VoidCallback? callback = switch (action) {
       ViAction.search => target.requestSearch,
