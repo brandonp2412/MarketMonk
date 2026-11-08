@@ -86,9 +86,9 @@ Future<List<DesktopMenuAction>> tickerContextActions(
       icon: Icons.open_in_new_rounded,
     ),
     DesktopMenuAction(
-      context.l10n.text('Open in Google'),
+      context.l10n.text('Open in Google Finance'),
       () => unawaited(
-        launchUrlString('https://www.google.com/search?q=$encoded'),
+        launchUrlString('https://www.google.com/finance/quote/$encoded'),
       ),
       icon: Icons.search_rounded,
     ),
