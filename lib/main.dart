@@ -1011,6 +1011,7 @@ class _MyHomePageState extends State<MyHomePage> {
     _currentIndex = startPage;
     _chartsFocusSubscription = ChartsFocusController.instance.requests
         .listen((_) => _selectDesktopPage(0));
+    ViNavigation.instance.fallbackSearch = _openViSearch;
     WidgetsBinding.instance.addPostFrameCallback((_) => _showUpdateNotice());
   }
 
@@ -1057,6 +1058,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   void dispose() {
+    ViNavigation.instance.fallbackSearch = null;
     unawaited(_chartsFocusSubscription?.cancel());
     _pageController.dispose();
     _selectedPage.dispose();
@@ -1074,6 +1076,15 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       );
     }
+  }
+
+  void _openViSearch() {
+    _selectDesktopPage(0);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _currentIndex == 0 && !_desktopSettingsSelected) {
+        ViNavigation.instance.target?.requestSearch();
+      }
+    });
   }
 
   void _selectDesktopPage(int index) {

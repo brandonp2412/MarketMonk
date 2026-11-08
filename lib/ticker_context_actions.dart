@@ -8,6 +8,7 @@ import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/google_finance_url.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
+import 'package:market_monk/logging.dart';
 import 'package:market_monk/utils.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/sqlite_settings.dart';
@@ -25,6 +26,8 @@ Future<void> _openGoogleFinance(String symbol) async {
         url = googleFinanceUrl(symbol, yahooExchange: match.exchange);
         break;
       }
+    } catch (error, stackTrace) {
+      talker.handle(error, stackTrace, 'Google Finance exchange lookup failed');
     } finally {
       yahoo.dispose();
     }

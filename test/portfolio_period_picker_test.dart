@@ -59,6 +59,29 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('intraday periods display the exact cutoff time', (tester) async {
+    final now = DateTime(2026, 11, 8, 15, 30);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: PortfolioPeriodPicker(
+            labels: const ['Now', '12H', '1H'],
+            dates: [
+              null,
+              now.subtract(const Duration(hours: 12)),
+              now.subtract(const Duration(hours: 1)),
+            ],
+            value: 2,
+            onChanged: (_) {},
+          ),
+        ),
+      ),
+    );
+    expect(find.text('8 Nov 2026, 2:30 PM'), findsOneWidget);
+    expect(find.text('FURTHEST · 8 NOV 2:30 PM'), findsOneWidget);
+    expect(find.text('1H AGO'), findsOneWidget);
+  });
+
   testWidgets('one available instant leaves the timeline disabled',
       (tester) async {
     await tester.pumpWidget(

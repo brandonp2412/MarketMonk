@@ -32,6 +32,7 @@ final class ViNavigation {
   static final instance = ViNavigation._();
 
   ViTarget? target;
+  VoidCallback? fallbackSearch;
 }
 
 /// Focus index after moving [delta] from [current] in a list of [length]

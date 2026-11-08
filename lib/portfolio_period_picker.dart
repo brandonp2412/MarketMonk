@@ -23,11 +23,15 @@ class PortfolioPeriodPicker extends StatelessWidget {
     final selectedDate = dates[value];
     final title = selectedDate == null
         ? 'Now'
-        : DateFormat('d MMM yyyy').format(selectedDate);
+        : DateFormat(
+            labels[value].endsWith('H') ? 'd MMM yyyy, h:mm a' : 'd MMM yyyy',
+          ).format(selectedDate);
     final oldestDate = dates.last;
     final oldestLabel = oldestDate == null
         ? 'NOW'
-        : DateFormat('MMM yyyy').format(oldestDate).toUpperCase();
+        : DateFormat(labels.last.endsWith('H') ? 'd MMM h:mm a' : 'MMM yyyy')
+            .format(oldestDate)
+            .toUpperCase();
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,

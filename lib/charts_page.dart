@@ -127,7 +127,7 @@ class ChartsPageState extends State<ChartsPage>
       _searchController.selection =
           TextSelection.collapsed(offset: _searchController.text.length);
     },
-    moveFocus: (_) {},
+    moveFocus: _moveViStockFocus,
   );
 
   _ChartMode _mode = _ChartMode.portfolio;
@@ -1919,6 +1919,17 @@ class ChartsPageState extends State<ChartsPage>
       talker.handle(error, stackTrace, 'Ticker search failed');
       if (!mounted || _searchController.text != text) return;
       setState(() => _searchLoading = false);
+    }
+  }
+
+  void _moveViStockFocus(int delta) {
+    if (_favoriteStocks.isEmpty) return;
+    final current = _selectedSymbol == null
+        ? -1
+        : _favoriteStocks.indexOf(_selectedSymbol!);
+    final next = viFocusIndex(current, delta, _favoriteStocks.length);
+    if (_favoriteStocks[next] != _selectedSymbol) {
+      _selectSymbol(_favoriteStocks[next]);
     }
   }
 

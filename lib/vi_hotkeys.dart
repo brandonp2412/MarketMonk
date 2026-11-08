@@ -30,26 +30,28 @@ void installDesktopViHotkeys(SettingsState settings) {
     if (action == null) return false;
 
     final target = ViNavigation.instance.target;
-    if (target != null) {
-      switch (action) {
-        case ViAction.search:
-          target.requestSearch();
-        case ViAction.next:
-          target.moveFocus(1);
-        case ViAction.previous:
-          target.moveFocus(-1);
-        case ViAction.select:
-          target.toggleSelect?.call();
-        case ViAction.delete:
-          target.deleteFocus?.call();
-        case ViAction.undo:
-          target.undoDelete?.call();
-        case ViAction.halfPageUp:
-          target.halfPageUp?.call();
-        case ViAction.halfPageDown:
-          target.halfPageDown?.call();
+    if (target == null) {
+      if (action == ViAction.search) {
+        final search = ViNavigation.instance.fallbackSearch;
+        if (search != null) {
+          search();
+          return true;
+        }
       }
+      return false;
     }
-    return false;
+    final VoidCallback? callback = switch (action) {
+      ViAction.search => target.requestSearch,
+      ViAction.next => () => target.moveFocus(1),
+      ViAction.previous => () => target.moveFocus(-1),
+      ViAction.select => target.toggleSelect,
+      ViAction.delete => target.deleteFocus,
+      ViAction.undo => target.undoDelete,
+      ViAction.halfPageUp => target.halfPageUp,
+      ViAction.halfPageDown => target.halfPageDown,
+    };
+    if (callback == null) return false;
+    callback();
+    return true;
   });
 }
