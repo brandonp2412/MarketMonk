@@ -36,6 +36,7 @@ import 'package:market_monk/sqlite_settings.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/ticker_search_loading.dart';
 import 'package:market_monk/utils.dart';
+import 'package:market_monk/vi_navigation.dart';
 import 'package:market_monk/crypto_market_data.dart';
 import 'package:provider/provider.dart';
 
@@ -120,6 +121,14 @@ class ChartsPageState extends State<ChartsPage>
     with AutomaticKeepAliveClientMixin {
   final _searchController = TextEditingController();
   final _searchFocus = FocusNode();
+  late final ViTarget _viTarget = ViTarget(
+    requestSearch: () {
+      _searchFocus.requestFocus();
+      _searchController.selection =
+          TextSelection.collapsed(offset: _searchController.text.length);
+    },
+    moveFocus: (_) {},
+  );
 
   _ChartMode _mode = _ChartMode.portfolio;
   String? _selectedSymbol;
@@ -238,6 +247,7 @@ class ChartsPageState extends State<ChartsPage>
   @override
   void didUpdateWidget(covariant ChartsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _syncViTarget();
     if (oldWidget.isActive && !widget.isActive) {
       _candleSelection.value = null;
       _portfolioLoadGeneration++;
@@ -629,6 +639,7 @@ class ChartsPageState extends State<ChartsPage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _syncViTarget();
     final version = context.watch<SettingsState>().tradesVersion;
     if (version != _lastTradesVersion) {
       _lastTradesVersion = version;
@@ -658,8 +669,19 @@ class ChartsPageState extends State<ChartsPage>
     }
   }
 
+  void _syncViTarget() {
+    if (widget.isActive && isDesktopLayout(context)) {
+      ViNavigation.instance.target = _viTarget;
+    } else if (ViNavigation.instance.target == _viTarget) {
+      ViNavigation.instance.target = null;
+    }
+  }
+
   @override
   void dispose() {
+    if (ViNavigation.instance.target == _viTarget) {
+      ViNavigation.instance.target = null;
+    }
     _accountManager?.removeListener(_handleAccountManagerChanged);
     unawaited(_chartsFocusSubscription?.cancel());
     _provisionalRefreshTimer?.cancel();

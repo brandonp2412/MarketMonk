@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/accounts_page.dart';
 import 'package:market_monk/adaptive_layout.dart';
@@ -18,6 +19,7 @@ import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
+import 'package:market_monk/vi_keys.dart';
 import 'package:market_monk/whats_new.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
@@ -92,6 +94,7 @@ class _SettingsPageState extends State<SettingsPage> {
       'Chart gridlines',
       'Chart shading',
     ],
+    'Keyboard': ['Vi key bindings', 'Reset to defaults'],
     'Accounts': ['Manage accounts', 'Currencies', 'Interactive Brokers'],
     'Data': ['Export database', 'Import database', 'Import CSV', 'Sync'],
     'Danger zone': ['Delete all data'],
@@ -108,6 +111,7 @@ class _SettingsPageState extends State<SettingsPage> {
       'Chart gridlines',
       'Chart shading',
     ],
+    'Keyboard': ['Vi key bindings', 'Reset to defaults'],
     'Accounts': ['Manage accounts', 'Currencies', 'Interactive Brokers'],
     'Data': ['Export database', 'Import database', 'Import CSV', 'Sync'],
     'Danger zone': ['Delete all data'],
@@ -147,6 +151,8 @@ class _SettingsPageState extends State<SettingsPage> {
       'Start page' => 'home launch default tab navigation',
       'Chart gridlines' => 'grid guide horizontal lines',
       'Chart shading' => 'fill shaded area gradient',
+      'Vi key bindings' => 'vi mode hotkeys keyboard shortcuts',
+      'Reset to defaults' => 'restore default vi bindings',
       _ => '',
     };
     final searchable =
@@ -679,6 +685,30 @@ class _SettingsPageState extends State<SettingsPage> {
         onTap: () => onChanged(!value),
       );
 
+  Widget _viBindingRow(SettingsState settings, ViAction action) {
+    final label = settings.viBindings[action] ?? kDefaultViBindings[action]!;
+    return ListTile(
+      key: Key('settings-vi-binding-${action.name}'),
+      contentPadding: EdgeInsets.zero,
+      title: Text(context.l10n.text(action.label)),
+      trailing: Text(viKeyDisplayName(label)),
+      onTap: () => _showViRebindDialog(context, settings, action),
+    );
+  }
+
+  void _showViRebindDialog(
+    BuildContext context,
+    SettingsState settings,
+    ViAction action,
+  ) {
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (_) => _ViRebindDialog(settings: settings, action: action),
+      ),
+    );
+  }
+
   Widget _chartPreview(SettingsState settings, {required double height}) {
     const prices = <double>[
       82,
@@ -930,6 +960,38 @@ class _SettingsPageState extends State<SettingsPage> {
       ],
     );
 
+    final keyboard = _desktopSettingsCard(
+      icon: Icons.keyboard_outlined,
+      title: context.l10n.text('Keyboard'),
+      children: [
+        const SizedBox(height: 8),
+        if (_matchesSearch('Keyboard', 'Vi key bindings'))
+          ListTile(
+            key: const Key('settings-vi-mode'),
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.keyboard_tab),
+            title: Text(context.l10n.text('Vi key bindings')),
+            trailing: Switch(
+              value: settings.viModeEnabled,
+              onChanged: settings.setViModeEnabled,
+            ),
+            onTap: () => settings.setViModeEnabled(!settings.viModeEnabled),
+          ),
+        for (final action in ViAction.values)
+          if (_matchesSearch('Keyboard', action.label))
+            _viBindingRow(settings, action),
+        if (_matchesSearch('Keyboard', 'Reset to defaults'))
+          ListTile(
+            key: const Key('settings-vi-reset'),
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.restart_alt),
+            title: Text(context.l10n.text('Reset to defaults')),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => settings.resetViBindings(),
+          ),
+      ],
+    );
+
     final accountSettings = _desktopSettingsCard(
       icon: Icons.account_balance_wallet_outlined,
       title: context.l10n.text('Accounts'),
@@ -1162,6 +1224,7 @@ class _SettingsPageState extends State<SettingsPage> {
       if (_hasMatches('Accounts', _desktopSearchOptions['Accounts']!))
         accountSettings,
       if (_hasMatches('Charts', _desktopSearchOptions['Charts']!)) charts,
+      if (_hasMatches('Keyboard', _desktopSearchOptions['Keyboard']!)) keyboard,
       if (_hasMatches('Data', _desktopSearchOptions['Data']!)) data,
       if (_hasMatches('Danger zone', _desktopSearchOptions['Danger zone']!))
         danger,
@@ -1458,6 +1521,30 @@ class _SettingsPageState extends State<SettingsPage> {
             _chartPreview(
               settings,
               height: MediaQuery.of(context).size.height * 0.3,
+            ),
+          if (_hasMatches('Keyboard', _mobileSearchOptions['Keyboard']!))
+            _sectionHeader(context.l10n.text('Keyboard')),
+          if (_matchesSearch('Keyboard', 'Vi key bindings'))
+            ListTile(
+              key: const Key('settings-vi-mode'),
+              leading: const Icon(Icons.keyboard_tab),
+              title: Text(context.l10n.text('Vi key bindings')),
+              trailing: Switch(
+                value: settings.viModeEnabled,
+                onChanged: settings.setViModeEnabled,
+              ),
+              onTap: () => settings.setViModeEnabled(!settings.viModeEnabled),
+            ),
+          for (final action in ViAction.values)
+            if (_matchesSearch('Keyboard', action.label))
+              _viBindingRow(settings, action),
+          if (_matchesSearch('Keyboard', 'Reset to defaults'))
+            ListTile(
+              key: const Key('settings-vi-reset'),
+              leading: const Icon(Icons.restart_alt),
+              title: Text(context.l10n.text('Reset to defaults')),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => settings.resetViBindings(),
             ),
           if (_hasMatches('Accounts', _mobileSearchOptions['Accounts']!))
             _sectionHeader(context.l10n.text('Accounts')),
@@ -2056,6 +2143,101 @@ class _ColorPickerState extends State<_ColorPicker> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ViRebindDialog extends StatefulWidget {
+  const _ViRebindDialog({required this.settings, required this.action});
+
+  final SettingsState settings;
+  final ViAction action;
+
+  @override
+  State<_ViRebindDialog> createState() => _ViRebindDialogState();
+}
+
+class _ViRebindDialogState extends State<_ViRebindDialog> {
+  String? _captured;
+  bool _handlerInstalled = false;
+
+  bool _handleKeyEvent(KeyEvent event) {
+    final label = viKeyLabelFromEvent(
+      event,
+      shiftPressed: ViKeyState.instance.shiftPressed,
+      otherModifierPressed: ViKeyState.instance.controlPressed ||
+          ViKeyState.instance.altPressed ||
+          ViKeyState.instance.metaPressed,
+    );
+    if (label != null) {
+      setState(() => _captured = label);
+    }
+    return false;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    ViKeyState.instance.ensureInstalled();
+    HardwareKeyboard.instance.addHandler(_handleKeyEvent);
+    _handlerInstalled = true;
+  }
+
+  @override
+  void dispose() {
+    if (_handlerInstalled) {
+      HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      title: Text(
+        context.l10n.text('Bind {action}', {'action': widget.action.label}),
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _captured == null
+                  ? context.l10n.text('Press a key...')
+                  : viKeyDisplayName(_captured!),
+              style: theme.textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              context.l10n.text(
+                'Use a single letter, number, or symbol. '
+                'Shift makes a letter uppercase.',
+              ),
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          key: const Key('vi-rebind-cancel'),
+          onPressed: () => Navigator.pop(context),
+          child: Text(context.l10n.text('Cancel')),
+        ),
+        FilledButton(
+          key: const Key('vi-rebind-done'),
+          onPressed: _captured == null
+              ? null
+              : () {
+                  final label = _captured!;
+                  Navigator.pop(context);
+                  unawaited(widget.settings.setViBinding(widget.action, label));
+                },
+          child: Text(context.l10n.text('Done')),
+        ),
+      ],
     );
   }
 }

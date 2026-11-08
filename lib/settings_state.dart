@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
@@ -11,6 +12,7 @@ import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/utils.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/sqlite_settings.dart';
+import 'package:market_monk/vi_keys.dart';
 
 /// Golden monk icon color used as the default app theme seed.
 const defaultSeedColor = Color(0xFFFFB52E);
@@ -20,6 +22,18 @@ int _colorToInt(Color color) =>
     ((color.r * 255).round() << 16) |
     ((color.g * 255).round() << 8) |
     (color.b * 255).round();
+
+ViAction? _viActionByName(String name) {
+  for (final action in ViAction.values) {
+    if (action.name == name) return action;
+  }
+  return null;
+}
+
+bool _isSinglePrintableAscii(String label) =>
+    label.length == 1 &&
+    label.codeUnitAt(0) >= 0x20 &&
+    label.codeUnitAt(0) <= 0x7E;
 
 /// Display currencies supported by MarketMonk.
 const supportedCurrencies = [
@@ -78,6 +92,9 @@ class SettingsState extends ChangeNotifier {
   int startPage = 0;
   bool showChartGridlines = false;
   bool fillChartArea = true;
+  bool viModeEnabled = true;
+  final Map<ViAction, String> viBindings =
+      Map<ViAction, String>.of(kDefaultViBindings);
 
   SettingsState({
     Future<http.Response> Function(Uri)? rateFetcher,
@@ -199,6 +216,28 @@ class SettingsState extends ChangeNotifier {
             : 0;
     showChartGridlines = prefs.getBool('showChartGridlines') ?? false;
     fillChartArea = prefs.getBool('fillChartArea') ?? true;
+    viModeEnabled = prefs.getBool('viModeEnabled') ?? true;
+    final savedBindings = prefs.getString('viBindings');
+    if (savedBindings != null) {
+      try {
+        final parsed = jsonDecode(savedBindings) as Map<String, dynamic>;
+        for (final entry in parsed.entries) {
+          final action = _viActionByName(entry.key);
+          final label = entry.value;
+          if (action == null ||
+              label is! String ||
+              !_isSinglePrintableAscii(label)) {
+            continue;
+          }
+          if (viBindings.containsValue(label)) continue;
+          viBindings[action] = label;
+        }
+      } catch (_) {
+        viBindings
+          ..clear()
+          ..addAll(kDefaultViBindings);
+      }
+    }
 
     displayCurrency = prefs.getString('displayCurrency') ?? homeCurrency;
     if (!visibleCurrencies.contains(displayCurrency)) {
@@ -337,6 +376,43 @@ class SettingsState extends ChangeNotifier {
     fillChartArea = value;
     notifyListeners();
     await (await SqliteSettings.getInstance()).setBool('fillChartArea', value);
+  }
+
+  /// Persists whether vi key bindings are active.
+  Future<void> setViModeEnabled(bool value) async {
+    viModeEnabled = value;
+    notifyListeners();
+    final prefs = await SqliteSettings.getInstance();
+    await prefs.setBool('viModeEnabled', value);
+  }
+
+  /// Persists a vi binding, swapping labels with the action that uses the new one.
+  Future<void> setViBinding(ViAction action, String label) async {
+    final swapped = viBindingsWithSwap(viBindings, action, label);
+    viBindings
+      ..clear()
+      ..addAll(swapped);
+    notifyListeners();
+    await _persistViBindings();
+  }
+
+  /// Restores and persists the default vi bindings.
+  Future<void> resetViBindings() async {
+    viBindings
+      ..clear()
+      ..addAll(kDefaultViBindings);
+    notifyListeners();
+    await _persistViBindings();
+  }
+
+  Future<void> _persistViBindings() async {
+    final encoded = jsonEncode(
+      viBindings.map(
+        (action, label) => MapEntry(action.name, label),
+      ),
+    );
+    final prefs = await SqliteSettings.getInstance();
+    await prefs.setString('viBindings', encoded);
   }
 
   Future<void> setCurveSmoothness(double value) async {

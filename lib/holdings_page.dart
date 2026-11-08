@@ -22,6 +22,7 @@ import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/ticker_context_actions.dart';
 import 'package:market_monk/trade_history_page.dart';
 import 'package:market_monk/utils.dart';
+import 'package:market_monk/vi_navigation.dart';
 import 'package:provider/provider.dart';
 
 enum _HoldingsSort {
@@ -142,6 +143,19 @@ class HoldingsPageState extends State<HoldingsPage>
   final Set<String> _selectedSymbols = {};
   _HoldingsSort _desktopSort = _HoldingsSort.value;
   bool _desktopSortAscending = false;
+  int _viFocusIndex = -1;
+  final _viRowKey = GlobalKey();
+  final _searchFocusNode = FocusNode();
+  final List<_UndoEntry> _undoStack = [];
+  late final ViTarget _viTarget = ViTarget(
+    requestSearch: () => _requestViSearch(),
+    moveFocus: (delta) => _moveViFocus(delta),
+    toggleSelect: () => _viToggleSelect(),
+    deleteFocus: () => _viDeleteFocus(),
+    undoDelete: () => _undoLastDelete(),
+    halfPageUp: () => _viScrollHalfPage(up: true),
+    halfPageDown: () => _viScrollHalfPage(up: false),
+  );
 
   @override
   void initState() {
@@ -152,6 +166,7 @@ class HoldingsPageState extends State<HoldingsPage>
   @override
   void didUpdateWidget(covariant HoldingsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _syncViTarget();
     if (oldWidget.isActive == widget.isActive) return;
 
     setState(() => _stream = _buildStream());
@@ -163,6 +178,10 @@ class HoldingsPageState extends State<HoldingsPage>
 
   @override
   void dispose() {
+    if (ViNavigation.instance.target == _viTarget) {
+      ViNavigation.instance.target = null;
+    }
+    _searchFocusNode.dispose();
     _search.dispose();
     _desktopTableScrollController.dispose();
     _desktopTableHorizontalScrollController.dispose();
@@ -172,6 +191,7 @@ class HoldingsPageState extends State<HoldingsPage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _syncViTarget();
     final accounts = context.watch<AccountManager>();
     final account = accounts.activeAccount;
     final profileId = accounts.activeProfileId;
@@ -213,6 +233,7 @@ class HoldingsPageState extends State<HoldingsPage>
       _search.clear();
       _selectedSymbols.clear();
       _selecting = false;
+      setState(() => _viFocusIndex = -1);
     }
     if (configChanged) _profileSummaries.remove(profileId);
     final cachedPositions = accounts.portfolioCacheFor(account)?.positions;
@@ -725,11 +746,18 @@ class HoldingsPageState extends State<HoldingsPage>
 
     final accountName = context.read<AccountManager>().activeAccount;
     final profileId = await profileDataRepository.profileIdForName(accountName);
+    final allTrades = await profileDataRepository.readTrades(profileId);
+    final deleted =
+        allTrades.where((trade) => targets.contains(trade.symbol)).toList();
     await profileDataRepository.deleteTradesForSymbols(
       profileId,
       targets,
     );
     _exitSelecting();
+    if (deleted.isNotEmpty) {
+      _undoStack.add(_UndoEntry(profileId, deleted));
+      if (_undoStack.length > 10) _undoStack.removeAt(0);
+    }
     if (ctx.mounted)
       toast(
         ctx,
@@ -738,6 +766,104 @@ class HoldingsPageState extends State<HoldingsPage>
           {'count': count},
         ),
       );
+  }
+
+  List<String> get _viSymbols => _sortDesktopSummaries(_summaries)
+      .map((summary) => summary.symbol)
+      .toList();
+
+  void _syncViTarget() {
+    if (widget.isActive && isDesktopLayout(context)) {
+      ViNavigation.instance.target = _viTarget;
+    } else if (ViNavigation.instance.target == _viTarget) {
+      ViNavigation.instance.target = null;
+    }
+  }
+
+  void _requestViSearch() {
+    _searchFocusNode.requestFocus();
+    _search.selection = TextSelection.collapsed(offset: _search.text.length);
+  }
+
+  void _moveViFocus(int delta) {
+    final symbols = _viSymbols;
+    if (symbols.isEmpty) return;
+    setState(() {
+      _viFocusIndex = viFocusIndex(_viFocusIndex, delta, symbols.length);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final rowContext = _viRowKey.currentContext;
+      if (rowContext == null) return;
+      Scrollable.ensureVisible(
+        rowContext,
+        alignment: 0.5,
+        duration: const Duration(milliseconds: 300),
+      );
+    });
+  }
+
+  void _viToggleSelect() {
+    final symbols = _viSymbols;
+    if (_viFocusIndex < 0 || _viFocusIndex >= symbols.length) return;
+    _toggleHoldingSelection(symbols[_viFocusIndex]);
+  }
+
+  void _viDeleteFocus() {
+    final symbols = _viSymbols;
+    if (_viFocusIndex < 0 || _viFocusIndex >= symbols.length) return;
+    final symbol = symbols[_viFocusIndex];
+    unawaited(
+      _deleteSelected(
+        context,
+        symbols: _selectedSymbols.contains(symbol) ? null : {symbol},
+      ),
+    );
+  }
+
+  void _viScrollHalfPage({required bool up}) {
+    if (!_desktopTableScrollController.hasClients) return;
+    final position = _desktopTableScrollController.position;
+    final step = position.viewportDimension / 2;
+    final offset = (up ? position.pixels - step : position.pixels + step)
+        .clamp(0.0, position.maxScrollExtent);
+    position.animateTo(
+      offset,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+  }
+
+  Future<void> _undoLastDelete() async {
+    if (_undoStack.isEmpty) return;
+    final entry = _undoStack.removeLast();
+    await profileDataRepository.addTrades(
+      entry.profileId,
+      entry.trades
+          .map(
+            (trade) => ProfileTradeWrite(
+              symbol: trade.symbol,
+              name: trade.name,
+              quantity: trade.quantity,
+              price: trade.price,
+              tradeType: trade.tradeType,
+              tradeDate: trade.tradeDate,
+              realizedPL: trade.realizedPL,
+              commission: trade.commission,
+              rawCurrency: trade.rawCurrency,
+              usdRateAtTrade: trade.usdRateAtTrade,
+              brokerConid: trade.brokerConid,
+            ),
+          )
+          .toList(),
+    );
+    if (mounted) {
+      toast(
+        context,
+        context.l10n.text('Restored {count} trades', {
+          'count': entry.trades.length,
+        }),
+      );
+    }
   }
 
   @override
@@ -943,6 +1069,7 @@ class HoldingsPageState extends State<HoldingsPage>
                     width: 460,
                     child: TextField(
                       controller: _search,
+                      focusNode: _searchFocusNode,
                       onChanged: (_) => _onSearchChanged(),
                       decoration: InputDecoration(
                         hintText: context.l10n.text('Search...'),
@@ -1270,6 +1397,9 @@ class HoldingsPageState extends State<HoldingsPage>
         (totalCost > 0 ? costBasisGain / totalCost * 100 : 0.0);
     final winners = open.where((position) => position.change >= 0).length;
     final sorted = _sortDesktopSummaries(summaries);
+    final focusedSymbol = _viFocusIndex >= 0 && _viFocusIndex < sorted.length
+        ? sorted[_viFocusIndex].symbol
+        : null;
 
     DataCell textCell(
       String text, {
@@ -1535,6 +1665,12 @@ class HoldingsPageState extends State<HoldingsPage>
                                               : Colors.redAccent;
 
                                       return DataRow(
+                                        color: summary.symbol == focusedSymbol
+                                            ? WidgetStatePropertyAll(
+                                                theme.colorScheme.secondary
+                                                    .withValues(alpha: 0.15),
+                                              )
+                                            : null,
                                         selected: _selectedSymbols.contains(
                                           summary.symbol,
                                         ),
@@ -1545,6 +1681,12 @@ class HoldingsPageState extends State<HoldingsPage>
                                         cells: [
                                           DataCell(
                                             DesktopContextMenu(
+                                              key: summary.symbol ==
+                                                      focusedSymbol
+                                                  ? _viRowKey
+                                                  : ValueKey<String>(
+                                                      summary.symbol,
+                                                    ),
                                               actionsBuilder: () =>
                                                   _holdingActions(
                                                 summary,
@@ -2027,4 +2169,11 @@ class _SymbolTile extends StatelessWidget {
       onLongPress: onLongPress,
     );
   }
+}
+
+class _UndoEntry {
+  _UndoEntry(this.profileId, this.trades);
+
+  final String profileId;
+  final List<Trade> trades;
 }

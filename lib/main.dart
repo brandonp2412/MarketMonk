@@ -30,6 +30,8 @@ import 'package:market_monk/sqlite_settings.dart';
 import 'package:market_monk/unified_database_backup.dart';
 import 'package:market_monk/update_notice.dart';
 import 'package:market_monk/utils.dart';
+import 'package:market_monk/vi_hotkeys.dart';
+import 'package:market_monk/vi_navigation.dart';
 import 'package:market_monk/whats_new.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
@@ -64,6 +66,7 @@ Future<void> main() async {
         ),
       );
       final settings = SettingsState();
+      installDesktopViHotkeys(settings);
       final accounts = AccountManager(database: database);
       await Future.wait([settings.initialized, accounts.init()]);
       await sqliteSettings.cleanupLegacyAppStateAfterMigration();
@@ -848,6 +851,7 @@ class MyApp extends StatelessWidget {
         scaffoldMessengerKey: debugHotkeyMessengerKey,
         title: 'Market Monk',
         debugShowCheckedModeBanner: false,
+        navigatorObservers: [ModalRouteTracker.instance],
         builder: (context, child) => Stack(
           children: [
             if (child != null) child,
