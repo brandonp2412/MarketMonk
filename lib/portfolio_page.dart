@@ -1530,24 +1530,26 @@ class PortfolioPageState extends State<PortfolioPage>
                     ),
                   if (selectedIndex != null)
                     IgnorePointer(
-                      child: SizedBox(
-                        width: 100,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              sorted[selectedIndex].symbol,
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.labelLarge,
-                            ),
-                            Text(
-                              sorted[selectedIndex].name,
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.bodySmall,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
+                      child: Center(
+                        child: SizedBox(
+                          width: 100,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                sorted[selectedIndex].symbol,
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context).textTheme.labelLarge,
+                              ),
+                              Text(
+                                sorted[selectedIndex].name,
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context).textTheme.bodySmall,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),

@@ -34,6 +34,9 @@ void main() {
     expect(slider.value, 0);
     expect(slider.divisions, 3);
     expect(theme.trackShape.runtimeType.toString(), '_TimeRulerTrack');
+    // Discrete rounded sliders inset the thumb, but this ruler's ticks start
+    // at the actual endpoints; the thumb and ticks must share coordinates.
+    expect(theme.trackShape!.isRounded, isFalse);
     expect(theme.tickMarkShape, SliderTickMarkShape.noTickMark);
     expect(find.text('WHEN'), findsOneWidget);
     expect(find.text('Now'), findsOneWidget);
@@ -56,6 +59,24 @@ void main() {
       findsOneWidget,
     );
     await gesture.up();
+
+    // The first, last, and every intermediate tick are interactive stops.
+    final renderBox = tester.renderObject<RenderBox>(finder);
+    final track = theme.trackShape!.getPreferredRect(
+      parentBox: renderBox,
+      sliderTheme: theme,
+      isEnabled: true,
+      isDiscrete: true,
+    );
+    for (var index = 0; index < dates.length; index++) {
+      final tick = Offset(
+        bounds.left + track.left + track.width * index / (dates.length - 1),
+        bounds.top + track.center.dy,
+      );
+      await tester.tapAt(tick);
+      await tester.pumpAndSettle();
+      expect(selected, index);
+    }
     expect(tester.takeException(), isNull);
   });
 

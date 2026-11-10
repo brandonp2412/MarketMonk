@@ -166,6 +166,11 @@ class _TimeRulerTrack extends RoundedRectSliderTrackShape {
     required this.selectedColor,
   });
 
+  // Flutter insets discrete thumbs by half the track height for rounded
+  // tracks. Our ruler uses lines, so its stops must use the full track width.
+  @override
+  bool get isRounded => false;
+
   @override
   void paint(
     PaintingContext context,

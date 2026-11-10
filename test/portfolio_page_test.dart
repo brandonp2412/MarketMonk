@@ -300,6 +300,41 @@ void main() {
     },
   );
 
+  testWidgets('mobile donut selection label stays centered in the hole',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(700, 1100);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({});
+    final accounts = await configuredAccounts();
+    await accounts.cachePortfolio(
+      'Default',
+      [cachedPosition()],
+      const IbkrAccountValue(value: 5500, currency: 'USD'),
+    );
+    final pending = Completer<IbkrPortfolioSnapshot>();
+    await tester.pumpWidget(
+      app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
+    );
+    await tester.pump();
+
+    final donutCenter = tester.getCenter(find.byType(MarketDonutChart));
+    await tester.tapAt(donutCenter + const Offset(0, -100));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final symbol = find.descendant(
+      of: find.byType(SliverPersistentHeader),
+      matching: find.text('VOO'),
+    );
+    expect(symbol, findsOneWidget);
+    final labelCenter = tester.getCenter(symbol);
+    expect((labelCenter.dx - donutCenter.dx).abs(), lessThan(2));
+    expect((labelCenter.dy - donutCenter.dy).abs(), lessThan(30));
+  });
+
   testWidgets('portfolio shows cached IBKR cash as an allocation slice', (
     tester,
   ) async {
