@@ -258,9 +258,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.byType(DesktopNav), findsNothing);
     expect(find.byType(BottomNav), findsOneWidget);
+    expect(find.byType(SettingsPage), findsOneWidget);
+    expect(find.byType(PageView), findsNothing);
+    expect(tester.widget<BottomNav>(find.byType(BottomNav)).currentIndex, 2);
+    await tester.tap(find.byKey(const Key('HoldingsPage')));
+    await tester.pumpAndSettle();
     expect(find.byType(SettingsPage), findsNothing);
     expect(find.byType(PageView), findsOneWidget);
-    expect(tester.widget<BottomNav>(find.byType(BottomNav)).currentIndex, 2);
     await _disposeTestApp(tester);
   });
 

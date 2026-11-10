@@ -31,6 +31,13 @@ final class ViNavigation {
 
   static final instance = ViNavigation._();
 
+  final focusedContext = ValueNotifier<BuildContext?>(null);
+  KeyEvent? consumedEvent;
+  bool capturingBinding = false;
+  bool overlayActive = false;
+  VoidCallback? openSettings;
+  bool Function()? closeSettings;
+  void Function(int index)? selectTab;
   ViTarget? target;
   VoidCallback? fallbackSearch;
   void Function(int delta)? fallbackMoveFocus;

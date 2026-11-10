@@ -58,7 +58,11 @@ class PortfolioPeriodPicker extends StatelessWidget {
               const SizedBox(width: 4),
             ],
             Text(
-              selectedDate == null ? 'PRESENT' : '${labels[value]} AGO',
+              selectedDate == null
+                  ? 'PRESENT'
+                  : labels[value] == 'Inception'
+                      ? 'INCEPTION'
+                      : '${labels[value]} AGO',
               style: theme.textTheme.labelSmall?.copyWith(
                 color: colors.primary,
                 letterSpacing: 1,
@@ -115,7 +119,7 @@ class PortfolioPeriodPicker extends StatelessWidget {
               final date = dates[index];
               return date == null
                   ? 'Now, current allocation'
-                  : '${DateFormat.yMMMMd().format(date)}, ${labels[index]} ago';
+                  : '${DateFormat.yMMMMd().format(date)}, ${labels[index]}${labels[index] == 'Inception' ? '' : ' ago'}';
             },
             onChanged: labels.length > 1
                 ? (position) => onChanged(position.round())

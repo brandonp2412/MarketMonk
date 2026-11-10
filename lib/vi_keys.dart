@@ -1,5 +1,7 @@
 import 'package:flutter/services.dart';
 
+const viReservedKeys = {'f', 'F', '?', ',', '1', '2', '3'};
+
 enum ViAction {
   search,
   next,

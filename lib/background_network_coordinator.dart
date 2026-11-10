@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
+import 'package:flutter/foundation.dart';
 
 abstract final class RequestCategory {
   static const ibkrHealth = 'ibkr.health';
@@ -27,7 +28,9 @@ class BackgroundNetworkCoordinator with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed ||
+        (defaultTargetPlatform == TargetPlatform.linux &&
+            state == AppLifecycleState.inactive)) {
       final pending = _foreground;
       _foreground = null;
       pending?.complete();

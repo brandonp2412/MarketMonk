@@ -38,6 +38,17 @@ void main() {
     maskCurrencyAmounts = false;
   });
 
+  test('startup restores cached account currencies while displaying USD',
+      () async {
+    final prefs = await SqliteSettings.getInstance();
+    await prefs.setString('displayCurrency', 'USD');
+    final settings = SettingsState();
+    await settings.initialized;
+    expect(settings.displayCurrency, 'USD');
+    expect(allRatesFromUsd['NZD'], 1.6);
+    expect(allRatesFromUsd['GBP'], .8);
+  });
+
   test('locale currency detection respects the device region', () {
     expect(SettingsState.currencyForLocale(const Locale('en', 'NZ')), 'NZD');
     expect(SettingsState.currencyForLocale(const Locale('en', 'GB')), 'GBP');

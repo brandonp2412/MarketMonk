@@ -32,6 +32,7 @@ import 'package:market_monk/update_notice.dart';
 import 'package:market_monk/utils.dart';
 import 'package:market_monk/vi_hotkeys.dart';
 import 'package:market_monk/vi_navigation.dart';
+import 'package:market_monk/vi_overlay.dart';
 import 'package:market_monk/whats_new.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
@@ -854,7 +855,7 @@ class MyApp extends StatelessWidget {
         navigatorObservers: [ModalRouteTracker.instance],
         builder: (context, child) => Stack(
           children: [
-            if (child != null) child,
+            if (child != null) ViOverlay(child: child),
             if (kDebugMode)
               PositionedDirectional(
                 bottom: 0,
@@ -985,6 +986,16 @@ class ChartsFocusController {
   void focus(String symbol) => _requests.add(symbol);
 }
 
+void openAppSettings(BuildContext context) {
+  final home = context.findAncestorStateOfType<_MyHomePageState>();
+  if (home != null) {
+    home._selectDesktopSettings();
+  } else {
+    Navigator.of(context)
+        .push(adaptivePageRoute(context, builder: (_) => const SettingsPage()));
+  }
+}
+
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
 
@@ -1011,6 +1022,9 @@ class _MyHomePageState extends State<MyHomePage> {
     _currentIndex = startPage;
     _chartsFocusSubscription = ChartsFocusController.instance.requests
         .listen((_) => _selectDesktopPage(0));
+    ViNavigation.instance.openSettings = _selectDesktopSettings;
+    ViNavigation.instance.closeSettings = _closeSettings;
+    ViNavigation.instance.selectTab = _selectDesktopPage;
     ViNavigation.instance.fallbackSearch = _openViSearch;
     ViNavigation.instance.fallbackMoveFocus = _openViHoldingsFocus;
     WidgetsBinding.instance.addPostFrameCallback((_) => _showUpdateNotice());
@@ -1059,6 +1073,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   void dispose() {
+    ViNavigation.instance.openSettings = null;
+    ViNavigation.instance.closeSettings = null;
+    ViNavigation.instance.selectTab = null;
     ViNavigation.instance.fallbackSearch = null;
     ViNavigation.instance.fallbackMoveFocus = null;
     unawaited(_chartsFocusSubscription?.cancel());
@@ -1068,6 +1085,8 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _selectPage(int index) {
+    if (_desktopSettingsSelected)
+      setState(() => _desktopSettingsSelected = false);
     _selectedPage.value = index;
     if (_pageController.hasClients) {
       unawaited(
@@ -1099,6 +1118,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _selectDesktopPage(int index) {
+    ViNavigation.instance.focusedContext.value = null;
     if (index == _currentIndex && !_desktopSettingsSelected) return;
     if (_pageController.hasClients) {
       _pageController.jumpToPage(index);
@@ -1110,7 +1130,14 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
+  bool _closeSettings() {
+    if (!_desktopSettingsSelected) return false;
+    setState(() => _desktopSettingsSelected = false);
+    return true;
+  }
+
   void _selectDesktopSettings() {
+    ViNavigation.instance.focusedContext.value = null;
     if (_desktopSettingsSelected) return;
     setState(() {
       _desktopSettingsSelected = true;
@@ -1140,81 +1167,93 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
     );
 
-    return Scaffold(
-      extendBody: true,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final desktop = constraints.maxWidth >= desktopLayoutBreakpoint;
-            final settingsVisible = desktop && _desktopSettingsSelected;
-            final pages = NotificationListener<ScrollEndNotification>(
-              onNotification: _onPageScrollEnd,
-              child: PageView(
-                controller: _pageController,
-                allowImplicitScrolling: true,
-                physics: desktop
-                    ? const NeverScrollableScrollPhysics()
-                    : const PageScrollPhysics(),
-                onPageChanged: (index) => _selectedPage.value = index,
-                children: [
-                  ChartsPage(isActive: !settingsVisible && _currentIndex == 0),
-                  PortfolioPage(
-                    isActive: !settingsVisible && _currentIndex == 1,
-                  ),
-                  HoldingsPage(
-                    isActive: !settingsVisible && _currentIndex == 2,
-                  ),
-                ],
-              ),
-            );
-
-            final content = Stack(
-              children: [
-                pages,
-                if (!desktop)
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: ValueListenableBuilder<int>(
-                      valueListenable: _selectedPage,
-                      builder: (context, selectedIndex, _) => BottomNav(
-                        tabs: _tabs,
-                        currentIndex: selectedIndex,
-                        onTap: _selectPage,
-                      ),
+    return PopScope(
+      canPop: !_desktopSettingsSelected,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _closeSettings();
+      },
+      child: Scaffold(
+        extendBody: true,
+        body: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final desktop = constraints.maxWidth >= desktopLayoutBreakpoint;
+              final settingsVisible = _desktopSettingsSelected;
+              final pages = NotificationListener<ScrollEndNotification>(
+                onNotification: _onPageScrollEnd,
+                child: PageView(
+                  controller: _pageController,
+                  allowImplicitScrolling: true,
+                  physics: desktop
+                      ? const NeverScrollableScrollPhysics()
+                      : const PageScrollPhysics(),
+                  onPageChanged: (index) => _selectedPage.value = index,
+                  children: [
+                    ChartsPage(
+                      isActive: !settingsVisible && _currentIndex == 0,
                     ),
-                  ),
-              ],
-            );
-
-            if (!desktop) return content;
-
-            return Row(
-              children: [
-                DesktopNav(
-                  tabs: _tabs,
-                  compact: false,
-                  currentIndex: settingsVisible ? _tabs.length : _currentIndex,
-                  onTap: _selectDesktopPage,
-                  onSettings: _selectDesktopSettings,
+                    PortfolioPage(
+                      isActive: !settingsVisible && _currentIndex == 1,
+                    ),
+                    HoldingsPage(
+                      isActive: !settingsVisible && _currentIndex == 2,
+                    ),
+                  ],
                 ),
-                const VerticalDivider(width: 1, thickness: 1),
-                Expanded(
-                  child: IndexedStack(
+              );
+
+              final content = Stack(
+                children: [
+                  IndexedStack(
                     index: settingsVisible ? 1 : 0,
                     children: [
-                      content,
+                      pages,
                       if (_hasOpenedDesktopSettings)
-                        const SettingsPage()
+                        SettingsPage(
+                          isActive: settingsVisible,
+                          onClose: _closeSettings,
+                        )
                       else
                         const SizedBox.shrink(),
                     ],
                   ),
-                ),
-              ],
-            );
-          },
+                  if (!desktop)
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: ValueListenableBuilder<int>(
+                        valueListenable: _selectedPage,
+                        builder: (context, selectedIndex, _) => BottomNav(
+                          tabs: _tabs,
+                          currentIndex: selectedIndex,
+                          onTap: _selectPage,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+
+              if (!desktop) return content;
+
+              return Row(
+                children: [
+                  DesktopNav(
+                    tabs: _tabs,
+                    compact: false,
+                    currentIndex:
+                        settingsVisible ? _tabs.length : _currentIndex,
+                    onTap: _selectDesktopPage,
+                    onSettings: _selectDesktopSettings,
+                  ),
+                  const VerticalDivider(width: 1, thickness: 1),
+                  Expanded(
+                    child: content,
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );

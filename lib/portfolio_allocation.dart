@@ -50,12 +50,35 @@ class PortfolioAllocation {
   });
 }
 
+Map<String, double> portfolioSharesAt({
+  required List<Position> positions,
+  required List<Trade> trades,
+  required DateTime date,
+}) {
+  final shares = {
+    for (final position in positions) position.symbol: position.netShares,
+  };
+  for (final trade in trades) {
+    final day = DateTime(
+      trade.tradeDate.year,
+      trade.tradeDate.month,
+      trade.tradeDate.day,
+    );
+    if (day.isAfter(date)) {
+      shares[trade.symbol] = (shares[trade.symbol] ?? 0) - trade.quantity;
+    }
+  }
+  return shares;
+}
+
 List<PortfolioAllocation>? portfolioAllocationAt({
   required List<Position> positions,
   required List<Trade> trades,
   required Map<String, List<StoredCandle>> candles,
   required DateTime? date,
   double? cashValueUsd,
+  double? historicalAccountValueUsd,
+  Map<String, double>? currencyRates,
 }) {
   if (date == null) {
     return [
@@ -69,23 +92,12 @@ List<PortfolioAllocation>? portfolioAllocationAt({
         PortfolioAllocation('CASH', 'Cash', cashValueUsd, isCash: true),
     ];
   }
-  final shares = {
-    for (final position in positions) position.symbol: position.netShares,
-  };
+  final shares =
+      portfolioSharesAt(positions: positions, trades: trades, date: date);
   final names = {
     for (final trade in trades) trade.symbol: trade.name,
     for (final position in positions) position.symbol: position.name,
   };
-  for (final trade in trades) {
-    final day = DateTime(
-      trade.tradeDate.year,
-      trade.tradeDate.month,
-      trade.tradeDate.day,
-    );
-    if (day.isAfter(date)) {
-      shares[trade.symbol] = (shares[trade.symbol] ?? 0) - trade.quantity;
-    }
-  }
   final allocations = <PortfolioAllocation>[];
   for (final entry in shares.entries) {
     if (entry.value < -1e-6) return null;
@@ -102,9 +114,11 @@ List<PortfolioAllocation>? portfolioAllocationAt({
       final currency = normalizedQuoteCurrency(
         baseline.rawCurrency ?? symbolCurrency(entry.key),
       );
-      final price = baseline.close /
-          candleCentDivisor(baseline) /
-          requireUsdRate(currency);
+      final rate = currencyRates == null
+          ? requireUsdRate(currency)
+          : currencyRates[currency];
+      if (rate == null || !rate.isFinite || rate <= 0) return null;
+      final price = baseline.close / candleCentDivisor(baseline) / rate;
       final value = entry.value * price;
       if (!value.isFinite || value < 0) return null;
       allocations.add(
@@ -112,6 +126,20 @@ List<PortfolioAllocation>? portfolioAllocationAt({
       );
     } on StateError {
       return null;
+    }
+  }
+  if (historicalAccountValueUsd != null) {
+    if (!historicalAccountValueUsd.isFinite || historicalAccountValueUsd < 0) {
+      return null;
+    }
+    final holdingsValue = allocations.fold<double>(
+      0,
+      (sum, holding) => sum + holding.value,
+    );
+    final cash = historicalAccountValueUsd - holdingsValue;
+    if (cash < -0.01) return null;
+    if (cash > 0.01) {
+      allocations.add(PortfolioAllocation('CASH', 'Cash', cash, isCash: true));
     }
   }
   return allocations;

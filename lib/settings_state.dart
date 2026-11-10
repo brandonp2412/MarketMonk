@@ -226,7 +226,8 @@ class SettingsState extends ChangeNotifier {
           final label = entry.value;
           if (action == null ||
               label is! String ||
-              !_isSinglePrintableAscii(label)) {
+              !_isSinglePrintableAscii(label) ||
+              viReservedKeys.contains(label)) {
             continue;
           }
           if (viBindings.containsValue(label)) continue;
@@ -242,6 +243,12 @@ class SettingsState extends ChangeNotifier {
     displayCurrency = prefs.getString('displayCurrency') ?? homeCurrency;
     if (!visibleCurrencies.contains(displayCurrency)) {
       displayCurrency = visibleCurrencies.first;
+    }
+    for (final code in supportedCurrencies) {
+      final cachedRate = readCachedUsdRate(code, prefs)?.rate;
+      if (cachedRate != null && cachedRate.isFinite && cachedRate > 0) {
+        allRatesFromUsd[code] = cachedRate;
+      }
     }
     final cachedRate = readCachedUsdRate(displayCurrency, prefs)?.rate;
     _applyRate(displayCurrency, cachedRate);
@@ -388,6 +395,7 @@ class SettingsState extends ChangeNotifier {
 
   /// Persists a vi binding, swapping labels with the action that uses the new one.
   Future<void> setViBinding(ViAction action, String label) async {
+    if (viReservedKeys.contains(label)) return;
     final swapped = viBindingsWithSwap(viBindings, action, label);
     viBindings
       ..clear()

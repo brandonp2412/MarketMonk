@@ -17,7 +17,6 @@ import 'package:market_monk/main.dart';
 import 'package:market_monk/portfolio_allocation.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/profile_picker.dart';
-import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/ticker_context_actions.dart';
 import 'package:market_monk/trade_history_page.dart';
@@ -798,6 +797,7 @@ class HoldingsPageState extends State<HoldingsPage>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final rowContext = _viRowKey.currentContext;
       if (rowContext == null) return;
+      ViNavigation.instance.focusedContext.value = rowContext;
       Scrollable.ensureVisible(
         rowContext,
         alignment: 0.5,
@@ -1008,86 +1008,97 @@ class HoldingsPageState extends State<HoldingsPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const ProfilePicker(key: Key('holdings-profile-picker')),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${accounts.activeAccount} · ${context.l10n.text('Holdings')}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.headlineMedium,
+                SizedBox(
+                  height: 64,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const ProfilePicker(key: Key('holdings-profile-picker')),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${accounts.activeAccount} · ${context.l10n.text('Holdings')}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.headlineMedium,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '$openCount open · ${_summaries.length} total symbols',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_selecting) ...[
+                        SizedBox(
+                          width: 150,
+                          child: TextButton.icon(
+                            onPressed: _toggleSelectAll,
+                            icon: Icon(
+                              allSelected
+                                  ? Icons.deselect
+                                  : Icons.done_all_rounded,
+                            ),
+                            label: Text(
+                              allSelected
+                                  ? context.l10n.text('Deselect all')
+                                  : context.l10n.text('Select all'),
+                            ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '$openCount open · ${_summaries.length} total symbols',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
-                                ),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          onPressed: _copySelectedSymbols,
+                          icon: const Icon(Icons.copy_rounded),
+                          label: Text(context.l10n.text('Copy symbols')),
+                        ),
+                        if (!ibkrManaged) ...[
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            width: 150,
+                            child: FilledButton.tonalIcon(
+                              onPressed: () => _deleteSelected(context),
+                              icon: const Icon(Icons.delete_outline),
+                              label: Text(
+                                context.l10n.text('Delete ({count})', {
+                                  'count': _selectedSymbols.length,
+                                }),
+                              ),
+                            ),
                           ),
                         ],
-                      ),
-                    ),
-                    if (_selecting) ...[
-                      TextButton.icon(
-                        onPressed: _toggleSelectAll,
-                        icon: Icon(
-                          allSelected ? Icons.deselect : Icons.done_all_rounded,
-                        ),
-                        label: Text(
-                          allSelected
-                              ? context.l10n.text('Deselect all')
-                              : context.l10n.text('Select all'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      OutlinedButton.icon(
-                        onPressed: _copySelectedSymbols,
-                        icon: const Icon(Icons.copy_rounded),
-                        label: Text(context.l10n.text('Copy symbols')),
-                      ),
-                      if (!ibkrManaged) ...[
                         const SizedBox(width: 8),
-                        FilledButton.tonalIcon(
-                          onPressed: () => _deleteSelected(context),
-                          icon: const Icon(Icons.delete_outline),
-                          label: Text(
-                            context.l10n.text('Delete ({count})', {
-                              'count': _selectedSymbols.length,
-                            }),
+                        IconButton(
+                          onPressed: _exitSelecting,
+                          tooltip: context.l10n.text('Cancel selection'),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ] else if (!ibkrManaged) ...[
+                        FilledButton.icon(
+                          onPressed: () => Navigator.push(
+                            context,
+                            adaptivePageRoute(
+                              context,
+                              builder: (_) => const EditTickerPage(),
+                            ),
                           ),
+                          icon: const Icon(Icons.add),
+                          label: Text(context.l10n.text('Add trade')),
                         ),
                       ],
-                      const SizedBox(width: 8),
-                      IconButton(
-                        onPressed: _exitSelecting,
-                        tooltip: context.l10n.text('Cancel selection'),
-                        icon: const Icon(Icons.close),
-                      ),
-                    ] else if (!ibkrManaged) ...[
-                      FilledButton.icon(
-                        onPressed: () => Navigator.push(
-                          context,
-                          adaptivePageRoute(
-                            context,
-                            builder: (_) => const EditTickerPage(),
-                          ),
-                        ),
-                        icon: const Icon(Icons.add),
-                        label: Text(context.l10n.text('Add trade')),
-                      ),
                     ],
-                  ],
+                  ),
                 ),
                 const SizedBox(height: 20),
                 Align(
@@ -1194,13 +1205,7 @@ class HoldingsPageState extends State<HoldingsPage>
                       key: const Key('holdings-settings-button'),
                       icon: const Icon(Icons.settings_outlined),
                       tooltip: context.l10n.text('Settings'),
-                      onPressed: () => Navigator.push(
-                        context,
-                        adaptivePageRoute(
-                          context,
-                          builder: (_) => const SettingsPage(),
-                        ),
-                      ),
+                      onPressed: () => openAppSettings(context),
                     ),
                     menuButton,
                   ],
@@ -1975,15 +1980,19 @@ class HoldingsPageState extends State<HoldingsPage>
               : query.isEmpty
                   ? Icons.upload_file_rounded
                   : Icons.add_rounded,
-          onAction: () => Navigator.push(
-            context,
-            adaptivePageRoute(
-              context,
-              builder: (_) => ibkrManaged || query.isEmpty
-                  ? const SettingsPage()
-                  : EditTickerPage(symbol: query.toUpperCase()),
-            ),
-          ),
+          onAction: () {
+            if (ibkrManaged || query.isEmpty) {
+              openAppSettings(context);
+            } else {
+              Navigator.push(
+                context,
+                adaptivePageRoute(
+                  context,
+                  builder: (_) => EditTickerPage(symbol: query.toUpperCase()),
+                ),
+              );
+            }
+          },
         ),
       );
     }

@@ -20,6 +20,8 @@ import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
 import 'package:market_monk/vi_keys.dart';
+import 'package:market_monk/vi_navigation.dart';
+import 'package:market_monk/theme_color_wheel.dart';
 import 'package:market_monk/whats_new.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
@@ -77,7 +79,9 @@ const _dateFormatOptions = <String>[
 ];
 
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key});
+  const SettingsPage({super.key, this.isActive = true, this.onClose});
+  final VoidCallback? onClose;
+  final bool isActive;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -127,9 +131,44 @@ class _SettingsPageState extends State<SettingsPage> {
 
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  final _searchFocus = FocusNode();
+  late final _viTarget = ViTarget(
+    requestSearch: _searchFocus.requestFocus,
+    moveFocus: (delta) {
+      final scope = FocusScope.of(context);
+      if (delta > 0) {
+        scope.nextFocus();
+      } else {
+        scope.previousFocus();
+      }
+    },
+  );
+
+  void _syncViTarget() {
+    if (widget.isActive) {
+      ViNavigation.instance.target = _viTarget;
+    } else if (identical(ViNavigation.instance.target, _viTarget)) {
+      ViNavigation.instance.target = null;
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _syncViTarget();
+  }
+
+  @override
+  void didUpdateWidget(covariant SettingsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncViTarget();
+  }
 
   @override
   void dispose() {
+    if (identical(ViNavigation.instance.target, _viTarget))
+      ViNavigation.instance.target = null;
+    _searchFocus.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -181,6 +220,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             child: TextField(
               key: const Key('settings-search'),
+              focusNode: _searchFocus,
               controller: _searchController,
               onChanged: (value) => setState(() => _searchQuery = value),
               decoration: InputDecoration(
@@ -691,7 +731,10 @@ class _SettingsPageState extends State<SettingsPage> {
       key: Key('settings-vi-binding-${action.name}'),
       contentPadding: EdgeInsets.zero,
       title: Text(context.l10n.text(action.label)),
-      trailing: Text(viKeyDisplayName(label)),
+      trailing: Text(
+        viKeyDisplayName(label),
+        style: const TextStyle(fontFamily: 'monospace', fontSize: 16),
+      ),
       onTap: () => _showViRebindDialog(context, settings, action),
     );
   }
@@ -1296,6 +1339,13 @@ class _SettingsPageState extends State<SettingsPage> {
     final settings = context.watch<SettingsState>();
 
     final appBar = AppBar(
+      leading: widget.onClose == null
+          ? null
+          : IconButton(
+              onPressed: widget.onClose,
+              tooltip: 'Back',
+              icon: const Icon(Icons.arrow_back),
+            ),
       title: Text(context.l10n.text('Settings')),
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(76),
@@ -2119,6 +2169,14 @@ class _ColorPickerState extends State<_ColorPicker> {
             ],
           ),
           const SizedBox(height: 12),
+          ThemeColorWheel(
+            color: selectedColor,
+            onChanged: (color) => runDetachedTask(
+              widget.settings.setSeedColor(color),
+              'Failed to save theme color',
+            ),
+          ),
+          const SizedBox(height: 12),
           SizedBox(
             width: 220,
             child: TextField(
@@ -2160,6 +2218,7 @@ class _ViRebindDialog extends StatefulWidget {
 class _ViRebindDialogState extends State<_ViRebindDialog> {
   String? _captured;
   bool _handlerInstalled = false;
+  bool _reservedKey = false;
 
   bool _handleKeyEvent(KeyEvent event) {
     final label = viKeyLabelFromEvent(
@@ -2170,7 +2229,10 @@ class _ViRebindDialogState extends State<_ViRebindDialog> {
           ViKeyState.instance.metaPressed,
     );
     if (label != null) {
-      setState(() => _captured = label);
+      setState(() {
+        _reservedKey = viReservedKeys.contains(label) || event.character == '?';
+        _captured = _reservedKey ? null : label;
+      });
     }
     return false;
   }
@@ -2179,12 +2241,14 @@ class _ViRebindDialogState extends State<_ViRebindDialog> {
   void initState() {
     super.initState();
     ViKeyState.instance.ensureInstalled();
+    ViNavigation.instance.capturingBinding = true;
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
     _handlerInstalled = true;
   }
 
   @override
   void dispose() {
+    ViNavigation.instance.capturingBinding = false;
     if (_handlerInstalled) {
       HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     }
@@ -2204,16 +2268,18 @@ class _ViRebindDialogState extends State<_ViRebindDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              _captured == null
-                  ? context.l10n.text('Press a key...')
-                  : viKeyDisplayName(_captured!),
+              _reservedKey
+                  ? 'That key is reserved for navigation or help'
+                  : _captured == null
+                      ? context.l10n.text('Press a key...')
+                      : viKeyDisplayName(_captured!),
               style: theme.textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             Text(
               context.l10n.text(
                 'Use a single letter, number, or symbol. '
-                'Shift makes a letter uppercase.',
+                'Shift makes a letter uppercase. f, F, ?, comma and 1–3 are reserved.',
               ),
               style: theme.textTheme.bodySmall,
             ),

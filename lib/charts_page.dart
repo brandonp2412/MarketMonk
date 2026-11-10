@@ -30,7 +30,6 @@ import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/portfolio_chart_scale.dart';
 import 'package:market_monk/provisional_portfolio.dart';
 import 'package:market_monk/profile_data_repository.dart';
-import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/sqlite_settings.dart';
 import 'package:market_monk/ticker_line.dart';
@@ -2469,10 +2468,7 @@ class ChartsPageState extends State<ChartsPage>
             key: const Key('chart-settings-button'),
             icon: const Icon(Icons.settings_outlined),
             tooltip: context.l10n.text('Settings'),
-            onPressed: () => Navigator.push(
-              context,
-              adaptivePageRoute(context, builder: (_) => const SettingsPage()),
-            ),
+            onPressed: () => openAppSettings(context),
           ),
           if (!desktop ||
               (settings.visibleCurrencies.length > 1 && !inlineCurrencies))

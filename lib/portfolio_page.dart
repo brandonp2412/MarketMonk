@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:csv/csv.dart';
-import 'package:drift/drift.dart' hide Column;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -28,10 +27,10 @@ import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/market_donut_chart.dart';
 import 'package:market_monk/portfolio_allocation.dart';
 import 'package:market_monk/portfolio_period_picker.dart';
+import 'package:market_monk/portfolio_history.dart';
 import 'package:market_monk/portfolio_returns.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/profile_picker.dart';
-import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/sqlite_settings.dart';
 import 'package:market_monk/ticker_context_actions.dart';
@@ -76,6 +75,10 @@ class PortfolioPage extends StatefulWidget {
   final Future<ShareResult> Function(ShareParams)? _shareFile;
   final Future<void> Function(File, List<int>)? _writeShareFile;
   final IntradayMarketData? _intradayData;
+  final Future<IbkrTradeHistory> Function(IbkrAccountConfig)?
+      _historyTradeLoader;
+  final PortfolioCandleSync? _historyCandleSync;
+  final PortfolioHistoricalRate? _historyRateLoader;
 
   const PortfolioPage({
     super.key,
@@ -86,11 +89,17 @@ class PortfolioPage extends StatefulWidget {
     Future<ShareResult> Function(ShareParams)? shareFile,
     Future<void> Function(File, List<int>)? writeShareFile,
     IntradayMarketData? intradayData,
+    Future<IbkrTradeHistory> Function(IbkrAccountConfig)? historyTradeLoader,
+    PortfolioCandleSync? historyCandleSync,
+    PortfolioHistoricalRate? historyRateLoader,
   })  : _ibkrLoader = ibkrLoader,
         _ibkrPerformanceLoader = ibkrPerformanceLoader,
         _shareFile = shareFile,
         _writeShareFile = writeShareFile,
-        _intradayData = intradayData;
+        _intradayData = intradayData,
+        _historyTradeLoader = historyTradeLoader,
+        _historyCandleSync = historyCandleSync,
+        _historyRateLoader = historyRateLoader;
 
   @override
   State<PortfolioPage> createState() => PortfolioPageState();
@@ -137,19 +146,29 @@ class PortfolioPageState extends State<PortfolioPage>
   ];
   int _period = 0;
   String? _historyAccount;
+  Future<void>? _historyFuture;
+  bool _forceHistoryRefresh = false;
+  IbkrTradeHistory? _loadedTradeCache;
   Map<String, List<StoredCandle>> _returnCandles = {};
   List<Trade> _returnTrades = [];
+  PortfolioHistory? _returnHistory;
   late final IntradayMarketData _returnIntraday =
       widget._intradayData ?? IntradayMarketData();
   List<IntradayPortfolioValue> _intradayValues = const [];
   final Map<String, IntradayPortfolioHolding> _intradayHoldings = {};
   double? _intradayCurrentValueUsd;
   bool _historyLoading = false;
+  bool _historyRefreshing = false;
   bool _historyFailed = false;
 
   List<int> _availablePeriods = const [0];
 
-  DateTime? get _returnCutoff => portfolioReturnCutoff(_period, DateTime.now());
+  DateTime? _inceptionDate;
+
+  DateTime? _cutoff(int period, DateTime now) =>
+      period == -1 ? _inceptionDate : portfolioReturnCutoff(period, now);
+
+  DateTime? get _returnCutoff => _cutoff(_period, DateTime.now());
 
   List<int> _coveredPeriods(
     List<Position> positions,
@@ -167,9 +186,10 @@ class PortfolioPageState extends State<PortfolioPage>
       final firstKnownDate = knownDates.reduce(
         (first, second) => first.isBefore(second) ? first : second,
       );
-      final covered = <int>[0];
+      _inceptionDate = portfolioInception(performance);
+      final covered = <int>[0, -1];
       for (var period = 1; period < _periods.length; period++) {
-        final cutoff = portfolioReturnCutoff(period, DateTime.now())!;
+        final cutoff = _cutoff(period, DateTime.now())!;
         if (cutoff.isBefore(firstKnownDate)) continue;
         if (period >= firstIntradayPeriod) {
           if (intradayAccountValueAt(_intradayValues, cutoff) != null) {
@@ -177,17 +197,7 @@ class PortfolioPageState extends State<PortfolioPage>
           }
           continue;
         }
-        if ((accountPeriodReturn(
-                      performance,
-                      netLiquidation.value,
-                      cutoff,
-                    ) !=
-                    null ||
-                positions.every(
-                  (position) =>
-                      _holdingReturn(position, period: period) != null,
-                )) &&
-            _allocationAt(positions, period) != null) {
+        if (accountNetAssetValueAt(performance, cutoff) != null) {
           covered.add(period);
         }
       }
@@ -204,7 +214,7 @@ class PortfolioPageState extends State<PortfolioPage>
     return [
       0,
       for (var period = 1; period < firstIntradayPeriod; period++)
-        if (!portfolioReturnCutoff(
+        if (!_cutoff(
               period,
               DateTime.now(),
             )!
@@ -221,14 +231,30 @@ class PortfolioPageState extends State<PortfolioPage>
     List<Position> positions,
     int period, {
     double? cashValueUsd,
-  }) =>
-      portfolioAllocationAt(
-        positions: positions,
-        trades: _returnTrades,
-        candles: _returnCandles,
-        date: portfolioReturnCutoff(period, DateTime.now()),
-        cashValueUsd: cashValueUsd,
-      );
+  }) {
+    final accounts = context.read<AccountManager>();
+    final history = _returnHistory;
+    if (period != 0 && history == null) return null;
+    return (history ??
+            const PortfolioHistory(trades: [], candles: {}, rates: {}))
+        .allocationAt(
+      positions: positions,
+      date: _cutoff(period, DateTime.now()),
+      performance: accounts.ibkrConfigFor().enabled
+          ? accounts.ibkrPerformanceCacheFor(accounts.activeAccount, '1Y')
+          : null,
+      currentCashUsd: cashValueUsd,
+    );
+  }
+
+  String _returnHistoryKey(AccountManager accounts, List<Position> positions) =>
+      '${accounts.activeAccount}:${accounts.ibkrConfigFor().hashCode}:${accounts.ibkrRefreshVersion}:${identityHashCode(accounts.ibkrPerformanceCacheFor(accounts.activeAccount, '1Y'))}:${positions.map((p) => '${p.symbol}:${p.netShares}:${p.costBasis}').join(',')}';
+
+  Future<void> _ensureReturnHistory(String key, List<Position> positions) {
+    if (_historyAccount == key && _historyFuture != null)
+      return _historyFuture!;
+    return _historyFuture = _loadReturnHistory(key, positions);
+  }
 
   Future<void> _loadReturnHistory(
     String account,
@@ -236,34 +262,62 @@ class PortfolioPageState extends State<PortfolioPage>
   ) async {
     _historyAccount = account;
     _historyLoading = true;
+    _historyRefreshing = true;
     _historyFailed = false;
     _returnCandles = {};
     _returnTrades = [];
+    _returnHistory = null;
     final accounts = context.read<AccountManager>();
     final accountName = accounts.activeAccount;
     try {
-      final trades = await profileDataRepository.readTradesForAccount(
-        accountName,
+      final forceRefresh = _forceHistoryRefresh;
+      _forceHistoryRefresh = false;
+      final cachedHistory = await loadPortfolioHistory(
+        accounts: accounts,
+        accountName: accountName,
+        positions: positions,
+        database: marketDataDatabase,
+        cacheOnly: true,
       );
       if (!mounted || _historyAccount != account) return;
-      final candles = <String, List<StoredCandle>>{};
-      final symbols = {
-        for (final position in positions) position.symbol,
-        for (final trade in trades) trade.symbol,
-      };
-      for (final symbol in symbols) {
-        candles[symbol] = await (marketDataDatabase.candles.select()
-              ..where(
-                (row) => row.symbol.equals(canonicalMarketSymbol(symbol)),
-              ))
-            .get();
-        candles[symbol]!.sort((a, b) => a.date.compareTo(b.date));
+      final performance = accounts.ibkrPerformanceCacheFor(accountName, '1Y');
+      final inception = portfolioInception(performance);
+      final hasBrokerTrades = !accounts.ibkrConfigFor(accountName).enabled ||
+          accounts.ibkrTradeHistoryCacheFor(accountName)?.available == true;
+      if (hasBrokerTrades &&
+          (inception == null ||
+              cachedHistory.allocationAt(
+                    positions: positions,
+                    date: inception,
+                    performance: performance,
+                  ) !=
+                  null)) {
+        setState(() {
+          _returnHistory = cachedHistory;
+          _returnTrades = cachedHistory.trades;
+          _returnCandles = cachedHistory.candles;
+          _loadedTradeCache = accounts.ibkrTradeHistoryCacheFor(accountName);
+          _historyLoading = false;
+        });
       }
+      final history = await loadPortfolioHistory(
+        accounts: accounts,
+        accountName: accountName,
+        positions: positions,
+        database: marketDataDatabase,
+        forceRefresh: forceRefresh,
+        tradeLoader: widget._historyTradeLoader,
+        candleSync: widget._historyCandleSync,
+        rateLoader: widget._historyRateLoader,
+      ).timeout(const Duration(seconds: 90));
       if (!mounted || _historyAccount != account) return;
       setState(() {
-        _returnTrades = trades;
-        _returnCandles = candles;
+        _returnHistory = history;
+        _loadedTradeCache = accounts.ibkrTradeHistoryCacheFor(accountName);
+        _returnTrades = history.trades;
+        _returnCandles = history.candles;
         _historyLoading = false;
+        _historyRefreshing = false;
       });
       final config = accounts.ibkrConfigFor(accountName);
       if (config.enabled &&
@@ -272,7 +326,7 @@ class PortfolioPageState extends State<PortfolioPage>
           account,
           accountName,
           positions,
-          trades,
+          history.trades,
           config,
         );
       }
@@ -281,13 +335,14 @@ class PortfolioPageState extends State<PortfolioPage>
       if (!mounted || _historyAccount != account) return;
       setState(() {
         _historyLoading = false;
-        _historyFailed = true;
+        _historyRefreshing = false;
+        _historyFailed = _returnHistory == null;
       });
     }
   }
 
   PortfolioReturn? _holdingReturn(Position position, {int? period}) {
-    final cutoff = portfolioReturnCutoff(period ?? _period, DateTime.now());
+    final cutoff = _cutoff(period ?? _period, DateTime.now());
     if (cutoff == null) {
       return PortfolioReturn(position.unrealizedPL, position.costBasis);
     }
@@ -450,6 +505,18 @@ class PortfolioPageState extends State<PortfolioPage>
         );
       }
     }
+    final accountValue = intradayAccountValueAt(_intradayValues, cutoff);
+    if (accountValue != null) {
+      final holdingsValue = allocations.fold<double>(
+        0,
+        (sum, holding) => sum + holding.value,
+      );
+      final cash = accountValue - holdingsValue;
+      if (cash > 0.01) {
+        allocations
+            .add(PortfolioAllocation('CASH', 'Cash', cash, isCash: true));
+      }
+    }
     return allocations;
   }
 
@@ -457,23 +524,43 @@ class PortfolioPageState extends State<PortfolioPage>
     final now = DateTime.now();
     final past = _availablePeriods.where((period) => period != 0).toList()
       ..sort(
-        (a, b) => portfolioReturnCutoff(
+        (a, b) => _cutoff(
           b,
           now,
         )!
-            .compareTo(portfolioReturnCutoff(a, now)!),
+            .compareTo(_cutoff(a, now)!),
       );
     final ordered = [0, ...past];
-    return PortfolioPeriodPicker(
-      labels: [
-        for (final period in ordered) period == 0 ? 'Now' : _periods[period],
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        PortfolioPeriodPicker(
+          labels: [
+            for (final period in ordered)
+              period == 0
+                  ? 'Now'
+                  : period == -1
+                      ? 'Inception'
+                      : _periods[period],
+          ],
+          dates: [for (final period in ordered) _cutoff(period, now)],
+          value: ordered.indexOf(_period),
+          onChanged: (index) => setState(() {
+            _period = ordered[index];
+            touchedIndex = null;
+          }),
+        ),
+        SizedBox(
+          height: 4,
+          child: _historyLoading ? const LinearProgressIndicator() : null,
+        ),
+        if (_historyFailed)
+          TextButton.icon(
+            onPressed: () => setState(() => _historyAccount = null),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry account history'),
+          ),
       ],
-      dates: [for (final period in ordered) portfolioReturnCutoff(period, now)],
-      value: ordered.indexOf(_period),
-      onChanged: (index) => setState(() {
-        _period = ordered[index];
-        touchedIndex = null;
-      }),
     );
   }
 
@@ -815,50 +902,6 @@ class PortfolioPageState extends State<PortfolioPage>
     }
   }
 
-  Future<void> _syncAllInBackground() async {
-    if (!mounted || !widget.isActive) return;
-    final accounts = context.read<AccountManager>();
-    final accountName = accounts.activeAccount;
-    final config = accounts.ibkrConfigFor(accountName);
-    try {
-      final useIbkr = config.enabled;
-      final trades = await profileDataRepository.readTradesForAccount(
-        accountName,
-      );
-      if (!mounted ||
-          !widget.isActive ||
-          accounts.activeAccount != accountName) {
-        return;
-      }
-      final loaded = await _loadPortfolio(accountName, trades, config);
-      final positions = loaded.positions;
-      final symbols = useIbkr
-          ? positions.map((position) => position.symbol).toSet()
-          : trades.map((trade) => trade.symbol).toSet();
-      for (final symbol in symbols) {
-        if (!mounted ||
-            !widget.isActive ||
-            accounts.activeAccount != accountName) {
-          return;
-        }
-        await syncCandles(
-          symbol,
-          ibkrConfig: config,
-          syncNamespace: accountName,
-        );
-      }
-      if (!mounted || accounts.activeAccount != accountName) return;
-      setState(() {
-        _historyAccount = null;
-        _positions = positions;
-        _netLiquidation = loaded.netLiquidation;
-        _hasCachedPortfolio = true;
-      });
-    } catch (error, stackTrace) {
-      talker.handle(error, stackTrace, 'Background portfolio sync failed');
-    }
-  }
-
   Stream<_LoadedPortfolio> _buildStream({bool skipInitial = false}) {
     final accounts = context.read<AccountManager>();
     final accountName = accounts.activeAccount;
@@ -902,10 +945,16 @@ class PortfolioPageState extends State<PortfolioPage>
   }
 
   Future<void> _updateCandles() async {
+    _forceHistoryRefresh = true;
     _historyAccount = null;
     clearAllSyncCache();
     await _preload(forceRefresh: true);
-    await _syncAllInBackground();
+    if (!mounted || !widget.isActive) return;
+    final accounts = context.read<AccountManager>();
+    await _ensureReturnHistory(
+      _returnHistoryKey(accounts, _positions),
+      _positions,
+    );
   }
 
   ({String fileName, Uint8List bytes}) _portfolioCsv(
@@ -1037,12 +1086,7 @@ class PortfolioPageState extends State<PortfolioPage>
   }
 
   void _openSettings() {
-    unawaited(
-      Navigator.push(
-        context,
-        adaptivePageRoute(context, builder: (_) => const SettingsPage()),
-      ),
-    );
+    openAppSettings(context);
   }
 
   Widget _buildLoadError(BuildContext context) {
@@ -1172,11 +1216,19 @@ class PortfolioPageState extends State<PortfolioPage>
     DateTime cutoff,
   ) {
     if (performance == null) return null;
+    if (performance.startNav == 0 && cutoff == performance.startDate) {
+      return (gainUsd: 0, gainPct: 0);
+    }
     try {
       final pnl = calculateIbkrCashOutPnlAt(performance, cutoff);
       if (pnl == null) return null;
-      final basePerUsd = requireUsdRate(performance.currency);
-      if (!basePerUsd.isFinite || basePerUsd <= 0) return null;
+      final index = accountNetAssetValueIndexAt(performance, cutoff);
+      if (index == null) return null;
+      final basePerUsd = _returnHistory?.rates[performance.dates[index]]
+          ?[performance.currency.toUpperCase()];
+      if (basePerUsd == null || !basePerUsd.isFinite || basePerUsd <= 0) {
+        return null;
+      }
       return (gainUsd: pnl.profitLoss / basePerUsd, gainPct: pnl.percent ?? 0);
     } catch (_) {
       return null;
@@ -1191,6 +1243,16 @@ class PortfolioPageState extends State<PortfolioPage>
     final netLiquidation = snap.data?.netLiquidation ?? _netLiquidation;
     final accounts = context.watch<AccountManager>();
     final cachedPortfolio = accounts.portfolioCacheFor();
+    final navUsd =
+        snap.data?.netLiquidationUsd ?? cachedPortfolio?.netLiquidationUsd;
+    if (netLiquidation != null &&
+        navUsd != null &&
+        navUsd.isFinite &&
+        navUsd > 0 &&
+        netLiquidation.value.isFinite &&
+        netLiquidation.value > 0) {
+      allRatesFromUsd[netLiquidation.currency] = netLiquidation.value / navUsd;
+    }
     final cashBalance = snap.data?.cashBalance ?? cachedPortfolio?.cashBalance;
     final cashUsd = snap.data?.cashUsd ??
         cachedPortfolio?.cashUsd ??
@@ -1254,18 +1316,21 @@ class PortfolioPageState extends State<PortfolioPage>
               : context.l10n.text('Import CSV'),
           actionIcon:
               ibkrEnabled ? Icons.settings_rounded : Icons.upload_file_rounded,
-          onAction: () => Navigator.push(
-            context,
-            adaptivePageRoute(context, builder: (_) => const SettingsPage()),
-          ),
+          onAction: () => openAppSettings(context),
         ),
       );
     }
 
-    final historyKey =
-        '${accounts.activeAccount}:${positions.map((p) => '${p.symbol}:${p.netShares}:${p.costBasis}').join(',')}';
-    if (widget.isActive && _historyAccount != historyKey) {
-      unawaited(_loadReturnHistory(historyKey, positions));
+    final historyKey = _returnHistoryKey(accounts, positions);
+    final tradesChanged = !_historyRefreshing &&
+        !_historyFailed &&
+        !identical(
+          _loadedTradeCache,
+          accounts.ibkrTradeHistoryCacheFor(accounts.activeAccount),
+        );
+    if (widget.isActive && (_historyAccount != historyKey || tradesChanged)) {
+      if (tradesChanged) _historyAccount = null;
+      unawaited(_ensureReturnHistory(historyKey, positions));
     }
 
     if (widget.isActive) {
@@ -1322,19 +1387,33 @@ class PortfolioPageState extends State<PortfolioPage>
     );
     final historicalNav = cutoff == null || intraday || performance == null
         ? null
-        : accountNetAssetValueAt(performance, cutoff);
+        : performance.startNav == 0 && cutoff == performance.startDate
+            ? 0.0
+            : accountNetAssetValueAt(performance, cutoff);
+    final navIndex = cutoff == null || performance == null
+        ? null
+        : accountNetAssetValueIndexAt(performance, cutoff);
+    final historicalRate = navIndex == null
+        ? null
+        : _returnHistory?.rates[performance!.dates[navIndex]]
+            ?[performance.currency.toUpperCase()];
     final displayTotal = intraday && intradayValueUsd != null
         ? fmtCurrency(intradayValueUsd)
         : cutoff == null
             ? netLiquidation == null
                 ? fmtCurrency(totalValue)
-                : fmtNativeCurrency(
-                    netLiquidation.value,
-                    netLiquidation.currency,
-                  )
+                : allRatesFromUsd.containsKey(netLiquidation.currency)
+                    ? fmtNativeCurrency(
+                        netLiquidation.value,
+                        netLiquidation.currency,
+                      )
+                    : NumberFormat.simpleCurrency(name: netLiquidation.currency)
+                        .format(netLiquidation.value)
             : historicalNav == null
                 ? fmtCurrency(allocationTotal)
-                : fmtNativeCurrency(historicalNav, performance!.currency);
+                : historicalRate == null
+                    ? 'Unavailable'
+                    : fmtCurrency(historicalNav / historicalRate);
     final totalLabel = intraday
         ? 'Account value'
         : cutoff == null && netLiquidation == null
@@ -1428,10 +1507,15 @@ class PortfolioPageState extends State<PortfolioPage>
               height: 260,
               backgroundColor: Theme.of(context).scaffoldBackgroundColor,
               child: Stack(
+                fit: StackFit.expand,
                 alignment: Alignment.center,
                 children: [
                   if (slices.isEmpty)
-                    Text('No holdings on this date')
+                    Text(
+                      _allocationAt(positions, _period) == null
+                          ? 'Holdings history unavailable for this date'
+                          : 'No holdings on this date',
+                    )
                   else
                     MarketDonutChart(
                       slices: slices,
@@ -1512,6 +1596,7 @@ class PortfolioPageState extends State<PortfolioPage>
     required List<PortfolioAllocation> sorted,
     required int? selectedIndex,
     required bool compact,
+    required bool historyAvailable,
   }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -1520,7 +1605,11 @@ class PortfolioPageState extends State<PortfolioPage>
       alignment: Alignment.center,
       children: [
         if (slices.isEmpty)
-          Text('No holdings on this date')
+          Text(
+            historyAvailable
+                ? 'No holdings on this date'
+                : 'Holdings history unavailable for this date',
+          )
         else
           MarketDonutChart(
             slices: slices,
@@ -1774,10 +1863,17 @@ class PortfolioPageState extends State<PortfolioPage>
                     ),
                     _DesktopPortfolioMetric(
                       label: context.l10n.text('Market value'),
-                      value: fmtCurrency(allocationTotal),
-                      detail: cashBalance == null
-                          ? context.l10n.text('Open stock positions')
-                          : 'Cash · ${formatIbkrReportedCash(cashBalance)}',
+                      value: fmtCurrency(
+                        sorted.where((holding) => !holding.isCash).fold<double>(
+                              0,
+                              (sum, holding) => sum + holding.value,
+                            ),
+                      ),
+                      detail: _returnCutoff != null
+                          ? 'Cash · ${fmtCurrency(sorted.where((holding) => holding.isCash).fold<double>(0, (sum, holding) => sum + holding.value))}'
+                          : cashBalance == null
+                              ? context.l10n.text('Open stock positions')
+                              : 'Cash · ${formatIbkrReportedCash(cashBalance)}',
                       icon: Icons.show_chart_rounded,
                     ),
                     _DesktopPortfolioMetric(
@@ -1802,8 +1898,13 @@ class PortfolioPageState extends State<PortfolioPage>
                     ),
                     _DesktopPortfolioMetric(
                       label: context.l10n.text('Positions'),
-                      value: positions.length.toString(),
-                      detail: context.l10n.text('Currently open'),
+                      value: sorted
+                          .where((holding) => !holding.isCash)
+                          .length
+                          .toString(),
+                      detail: _returnCutoff == null
+                          ? context.l10n.text('Currently open')
+                          : 'Held on this date',
                       icon: Icons.view_list_outlined,
                     ),
                   ],
@@ -1889,6 +1990,11 @@ class PortfolioPageState extends State<PortfolioPage>
                                         child: AspectRatio(
                                           aspectRatio: 1,
                                           child: _buildDesktopAllocationChart(
+                                            historyAvailable: _allocationAt(
+                                                  positions,
+                                                  _period,
+                                                ) !=
+                                                null,
                                             slices: slices,
                                             sorted: sorted,
                                             selectedIndex: selectedIndex,
@@ -2014,13 +2120,26 @@ class PortfolioPageState extends State<PortfolioPage>
     );
   }
 
-  List<Color> _buildColors(BuildContext context, List<String> symbols) =>
-      portfolioHoldingColors(
-        Theme.of(context).colorScheme,
-        symbols,
-        accountCount: context.read<AccountManager>().accounts.length,
-        favorites: _chartFavorites,
+  final Map<String, int> _holdingColorIndices = {};
+
+  List<Color> _buildColors(BuildContext context, List<String> symbols) {
+    for (final symbol in symbols.toList()..sort()) {
+      _holdingColorIndices.putIfAbsent(
+        symbol,
+        () => _holdingColorIndices.length,
       );
+    }
+    final stableSymbols = _holdingColorIndices.keys.toList();
+    final palette = portfolioHoldingColors(
+      Theme.of(context).colorScheme,
+      stableSymbols,
+      accountCount: context.read<AccountManager>().accounts.length,
+      favorites: _chartFavorites,
+    );
+    return [
+      for (final symbol in symbols) palette[stableSymbols.indexOf(symbol)],
+    ];
+  }
 }
 
 class _DesktopPortfolioMetric extends StatelessWidget {

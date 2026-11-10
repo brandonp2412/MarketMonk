@@ -4,6 +4,7 @@ import 'package:drafter/drafter.dart';
 import 'package:drafter/painting.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/market_line_chart.dart';
@@ -86,6 +87,28 @@ void main() {
     await gesture.up();
     await tester.pump();
   }
+
+  testWidgets('keyboard selects points, filters a range and resets zoom',
+      (tester) async {
+    await tester.pumpWidget(chart(pickRange: true));
+    final focus = tester
+        .widgetList<Focus>(find.byType(Focus))
+        .firstWhere((widget) => widget.focusNode?.debugLabel == 'Chart');
+    focus.focusNode!.requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.home);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(find.byTooltip('Reset zoom'), findsOneWidget);
+    expect(scene(tester).marks.map((mark) => mark.index).toSet(), {0, 1, 2});
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyR);
+    await tester.pump();
+    expect(find.byTooltip('Reset zoom'), findsNothing);
+    expect(scene(tester).marks.length, 10);
+  });
 
   testWidgets('only candlestick tooltips paint a date heading', (tester) async {
     final selected = ValueNotifier<int?>(0);

@@ -557,6 +557,7 @@ class IbkrApiClient {
         final response = await _request(
           '/v1/performance',
           queryParameters: {'period': normalized},
+          timeout: const Duration(seconds: 75),
         );
         return IbkrPerformanceSeries.fromJson(
           _decodeJsonObject(response, '/v1/performance'),
@@ -577,7 +578,8 @@ class IbkrApiClient {
         final response = await _request(
           '/v1/trades',
           queryParameters: {'days': '$days'},
-        ).timeout(const Duration(seconds: 75));
+          timeout: const Duration(seconds: 75),
+        );
         return IbkrTradeHistory.fromJson(
           _decodeJsonObject(response, '/v1/trades'),
         );
@@ -676,6 +678,7 @@ class IbkrApiClient {
   Future<http.Response> _request(
     String path, {
     Map<String, String>? queryParameters,
+    Duration timeout = const Duration(seconds: 30),
   }) async {
     if (!config.isConfigured) {
       throw StateError('IBKR API is not fully configured');
@@ -697,7 +700,7 @@ class IbkrApiClient {
     final response = await _get(
       uri,
       headers: {'Authorization': 'Bearer ${config.token.trim()}'},
-    );
+    ).timeout(timeout);
     if (response.statusCode != 200) {
       String detail = 'HTTP ${response.statusCode}';
       try {

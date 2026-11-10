@@ -1,10 +1,30 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/background_network_coordinator.dart';
 
 void main() {
+  test('Linux focus loss keeps requests running while hidden windows pause',
+      () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final coordinator = BackgroundNetworkCoordinator();
+    coordinator.didChangeAppLifecycleState(AppLifecycleState.inactive);
+    expect(await coordinator.observe('history', () async => 42), 42);
+    coordinator.didChangeAppLifecycleState(AppLifecycleState.hidden);
+    var started = false;
+    final pending = coordinator.observe('history', () async {
+      started = true;
+      return 43;
+    });
+    await Future<void>.delayed(Duration.zero);
+    expect(started, isFalse);
+    coordinator.didChangeAppLifecycleState(AppLifecycleState.inactive);
+    expect(await pending, 43);
+  });
+
   test('background requests start immediately on resume', () async {
     final coordinator = BackgroundNetworkCoordinator();
     coordinator.didChangeAppLifecycleState(AppLifecycleState.paused);

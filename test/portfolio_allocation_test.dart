@@ -186,6 +186,37 @@ void main() {
     expect(result.single.value, 200);
   });
 
+  test('dated FX values holdings and reconciles cash to historical NAV', () {
+    final result = portfolioAllocationAt(
+      positions: [holding('GBP', 1, 20)],
+      trades: [],
+      candles: {
+        'GBP': [candle('GBP', date, 1000, currency: 'GBp')],
+      },
+      date: date,
+      currencyRates: {'GBP': 1},
+      historicalAccountValueUsd: 100,
+    )!;
+    expect(
+      {for (final holding in result) holding.symbol: holding.value},
+      {'GBP': 10, 'CASH': 90},
+    );
+    expect(result.last.isCash, isTrue);
+    expect(
+      portfolioAllocationAt(
+        positions: [holding('GBP', 1, 20)],
+        trades: [],
+        candles: {
+          'GBP': [candle('GBP', date, 1000, currency: 'GBp')],
+        },
+        date: date,
+        currencyRates: {'USD': 1},
+        historicalAccountValueUsd: 100,
+      ),
+      isNull,
+    );
+  });
+
   test('missing or stale prices cannot produce a partial allocation', () {
     for (final prices in [
       <StoredCandle>[],

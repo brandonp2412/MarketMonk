@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'package:market_monk/portfolio_chart_scale.dart';
 
 /// A chart value that can retain its absolute value for range comparisons.
@@ -492,6 +493,7 @@ class _MarketLineChartInteractionState
   ValueNotifier<int?> get _activeIndex =>
       widget.externalSelection ?? _ownedSelection;
 
+  final _keyboardFocus = FocusNode(debugLabel: 'Chart');
   (int, int)? _zoom;
   Offset? _dragStart;
   double? _dragX;
@@ -656,6 +658,7 @@ class _MarketLineChartInteractionState
 
   @override
   void dispose() {
+    _keyboardFocus.dispose();
     _pendingScrubIndex = null;
     _ownedSelection.dispose();
     super.dispose();
@@ -708,184 +711,236 @@ class _MarketLineChartInteractionState
                         .toDouble()
                     : null;
 
-            return MouseRegion(
-              onHover: (event) => _activate(event.localPosition, scene),
-              onExit: (_) {
-                if (_dragPointer == null) _clear();
+            return Focus(
+              focusNode: _keyboardFocus,
+              onKeyEvent: (_, event) {
+                if (event is KeyUpEvent) return KeyEventResult.ignored;
+                final key = event.logicalKey;
+                final indices = scene.marks
+                    .map((mark) => mark.index)
+                    .toSet()
+                    .toList()
+                  ..sort();
+                if (indices.isEmpty) return KeyEventResult.ignored;
+                final current = indices.indexOf(_activeIndex.value ?? -1);
+                if (key == LogicalKeyboardKey.arrowLeft ||
+                    key == LogicalKeyboardKey.arrowRight ||
+                    key == LogicalKeyboardKey.home ||
+                    key == LogicalKeyboardKey.end) {
+                  final next = key == LogicalKeyboardKey.home
+                      ? 0
+                      : key == LogicalKeyboardKey.end
+                          ? indices.length - 1
+                          : current < 0
+                              ? 0
+                              : (current +
+                                      (key == LogicalKeyboardKey.arrowRight
+                                          ? 1
+                                          : -1))
+                                  .clamp(0, indices.length - 1);
+                  _activeIndex.value = indices[next];
+                } else if (key == LogicalKeyboardKey.enter &&
+                    widget.pickRange &&
+                    _activeIndex.value != null) {
+                  final index = _activeIndex.value!;
+                  if (_tapRangeStart == null) {
+                    setState(() => _tapRangeStart = index);
+                  } else if (_tapRangeStart != index) {
+                    _setRange(
+                      (
+                        min(_tapRangeStart!, index),
+                        max(_tapRangeStart!, index)
+                      ),
+                    );
+                  }
+                } else if (key == LogicalKeyboardKey.keyR) {
+                  _setRange(null);
+                } else {
+                  return KeyEventResult.ignored;
+                }
+                return KeyEventResult.handled;
               },
-              child: Listener(
-                behavior: HitTestBehavior.opaque,
-                onPointerDown: (event) {
-                  _activate(event.localPosition, scene);
-                  if (event.kind == PointerDeviceKind.mouse &&
-                      event.buttons == kPrimaryMouseButton &&
-                      bounds != null &&
-                      Rect.fromLTRB(
-                        bounds.left,
-                        bounds.top,
-                        bounds.right,
-                        bounds.bottom,
-                      ).contains(event.localPosition)) {
-                    _dragStart = event.localPosition;
-                    _dragPointer = event.pointer;
-                  }
+              child: MouseRegion(
+                onHover: (event) => _activate(event.localPosition, scene),
+                onExit: (_) {
+                  if (_dragPointer == null) _clear();
                 },
-                onPointerMove: (event) {
-                  if (event.pointer != _dragPointer || _dragStart == null)
-                    return;
-                  setState(() {
-                    _dragX = event.localPosition.dx;
-                  });
-                  _activate(event.localPosition, scene);
-                },
-                onPointerUp: (event) {
-                  if (event.pointer == _dragPointer) {
-                    final start = _dragStart;
-                    if (start != null &&
-                        (event.localPosition.dx - start.dx).abs() >= 8) {
-                      final first =
-                          ChartHitTest.nearestIndexAtX(scene, start.dx);
-                      final last = ChartHitTest.nearestIndexAtX(
-                        scene,
-                        event.localPosition.dx,
-                      );
-                      if (first != null && last != null && first != last) {
-                        _setRange((min(first, last), max(first, last)));
-                      }
-                    }
-                    setState(() {
-                      _dragStart = null;
-                      _dragX = null;
-                      _dragPointer = null;
-                      _clear();
-                    });
-                  } else {
-                    _activate(event.localPosition, scene);
-                  }
-                  if (!_keepTooltipOnTapUp) _clear();
-                },
-                onPointerCancel: (event) => setState(() {
-                  _dragStart = null;
-                  _dragX = null;
-                  _dragPointer = null;
-                  _clear();
-                }),
-                child: GestureDetector(
+                child: Listener(
                   behavior: HitTestBehavior.opaque,
-                  onTapUp: (details) =>
-                      _pickRangeDot(scene, details.localPosition),
-                  onSecondaryTapUp: (details) {
-                    final bounds = scene.bounds;
-                    if (bounds == null ||
-                        !Rect.fromLTRB(
+                  onPointerDown: (event) {
+                    _activate(event.localPosition, scene);
+                    if (event.kind == PointerDeviceKind.mouse &&
+                        event.buttons == kPrimaryMouseButton &&
+                        bounds != null &&
+                        Rect.fromLTRB(
                           bounds.left,
                           bounds.top,
                           bounds.right,
                           bounds.bottom,
-                        ).contains(details.localPosition)) return;
-                    final start = ChartHitTest.nearestIndexAtX(
-                      scene,
-                      details.localPosition.dx,
-                    );
-                    if (start == null || scene.marks.isEmpty) return;
-                    final end =
-                        scene.marks.map((mark) => mark.index).reduce(max);
-                    unawaited(
-                      _showStartDateMenu(details.globalPosition, start, end),
-                    );
+                        ).contains(event.localPosition)) {
+                      _dragStart = event.localPosition;
+                      _dragPointer = event.pointer;
+                    }
                   },
-                  onLongPressStart: (details) =>
-                      _activate(details.localPosition, scene),
-                  onLongPressMoveUpdate: (details) =>
-                      _activateScrub(details.localPosition, scene),
-                  onLongPressEnd: (_) {
-                    if (_dragPointer == null && !widget.stickyTooltip) _clear();
+                  onPointerMove: (event) {
+                    if (event.pointer != _dragPointer || _dragStart == null)
+                      return;
+                    setState(() {
+                      _dragX = event.localPosition.dx;
+                    });
+                    _activate(event.localPosition, scene);
                   },
-                  onLongPressCancel: () {
-                    if (_dragPointer == null && !widget.stickyTooltip) _clear();
+                  onPointerUp: (event) {
+                    if (event.pointer == _dragPointer) {
+                      final start = _dragStart;
+                      if (start != null &&
+                          (event.localPosition.dx - start.dx).abs() >= 8) {
+                        final first =
+                            ChartHitTest.nearestIndexAtX(scene, start.dx);
+                        final last = ChartHitTest.nearestIndexAtX(
+                          scene,
+                          event.localPosition.dx,
+                        );
+                        if (first != null && last != null && first != last) {
+                          _setRange((min(first, last), max(first, last)));
+                        }
+                      }
+                      setState(() {
+                        _dragStart = null;
+                        _dragX = null;
+                        _dragPointer = null;
+                        _clear();
+                      });
+                    } else {
+                      _activate(event.localPosition, scene);
+                    }
+                    if (!_keepTooltipOnTapUp) _clear();
                   },
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      DrafterTheme(
-                        colors: theme,
-                        child: ChartCanvas(
-                          renderer: renderer,
-                          animate: false,
-                        ),
-                      ),
-                      if (rangeLeft != null &&
-                          rangeRight != null &&
-                          bounds != null)
-                        Positioned(
-                          left: rangeLeft,
-                          top: bounds.top,
-                          width: rangeRight - rangeLeft,
-                          height: bounds.height,
-                          child: IgnorePointer(
-                            child: ColoredBox(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primary
-                                  .withValues(alpha: 0.2),
-                            ),
+                  onPointerCancel: (event) => setState(() {
+                    _dragStart = null;
+                    _dragX = null;
+                    _dragPointer = null;
+                    _clear();
+                  }),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapUp: (details) =>
+                        _pickRangeDot(scene, details.localPosition),
+                    onSecondaryTapUp: (details) {
+                      final bounds = scene.bounds;
+                      if (bounds == null ||
+                          !Rect.fromLTRB(
+                            bounds.left,
+                            bounds.top,
+                            bounds.right,
+                            bounds.bottom,
+                          ).contains(details.localPosition)) return;
+                      final start = ChartHitTest.nearestIndexAtX(
+                        scene,
+                        details.localPosition.dx,
+                      );
+                      if (start == null || scene.marks.isEmpty) return;
+                      final end =
+                          scene.marks.map((mark) => mark.index).reduce(max);
+                      unawaited(
+                        _showStartDateMenu(details.globalPosition, start, end),
+                      );
+                    },
+                    onLongPressStart: (details) =>
+                        _activate(details.localPosition, scene),
+                    onLongPressMoveUpdate: (details) =>
+                        _activateScrub(details.localPosition, scene),
+                    onLongPressEnd: (_) {
+                      if (_dragPointer == null && !widget.stickyTooltip)
+                        _clear();
+                    },
+                    onLongPressCancel: () {
+                      if (_dragPointer == null && !widget.stickyTooltip)
+                        _clear();
+                    },
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        DrafterTheme(
+                          colors: theme,
+                          child: ChartCanvas(
+                            renderer: renderer,
+                            animate: false,
                           ),
                         ),
-                      if (startDot != null && widget.pickRange) ...[
-                        Positioned(
-                          left: startDot.dx - 1,
-                          top: bounds?.top ?? 0,
-                          width: 2,
-                          height: bounds?.height ?? size.height,
-                          child: IgnorePointer(
-                            child: ColoredBox(
-                              color: Theme.of(context).colorScheme.primary,
+                        if (rangeLeft != null &&
+                            rangeRight != null &&
+                            bounds != null)
+                          Positioned(
+                            left: rangeLeft,
+                            top: bounds.top,
+                            width: rangeRight - rangeLeft,
+                            height: bounds.height,
+                            child: IgnorePointer(
+                              child: ColoredBox(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withValues(alpha: 0.2),
+                              ),
                             ),
                           ),
-                        ),
-                        Positioned(
-                          left: startDot.dx - 7,
-                          top: startDot.dy - 7,
-                          width: 14,
-                          height: 14,
-                          child: IgnorePointer(
-                            child: DecoratedBox(
-                              key: const Key('chart-range-start-dot'),
-                              decoration: BoxDecoration(
+                        if (startDot != null && widget.pickRange) ...[
+                          Positioned(
+                            left: startDot.dx - 1,
+                            top: bounds?.top ?? 0,
+                            width: 2,
+                            height: bounds?.height ?? size.height,
+                            child: IgnorePointer(
+                              child: ColoredBox(
                                 color: Theme.of(context).colorScheme.primary,
-                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            left: startDot.dx - 7,
+                            top: startDot.dy - 7,
+                            width: 14,
+                            height: 14,
+                            child: IgnorePointer(
+                              child: DecoratedBox(
+                                key: const Key('chart-range-start-dot'),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (_range != null)
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: IconButton(
+                              tooltip: 'Reset zoom',
+                              icon: const Icon(Icons.zoom_out),
+                              onPressed: () => _setRange(null),
+                            ),
+                          ),
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: RepaintBoundary(
+                              child: CustomPaint(
+                                painter: _MarketLineTooltipPainter(
+                                  activeIndex: _activeIndex,
+                                  scene: scene,
+                                  theme: theme,
+                                  rowLabel: widget.rowLabel,
+                                  candleTooltipTitle: widget.candleTooltipTitle,
+                                  candleTooltipRows: widget.candleTooltipRows,
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ],
-                      if (_range != null)
-                        Positioned(
-                          top: 0,
-                          right: 0,
-                          child: IconButton(
-                            tooltip: 'Reset zoom',
-                            icon: const Icon(Icons.zoom_out),
-                            onPressed: () => _setRange(null),
-                          ),
-                        ),
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: RepaintBoundary(
-                            child: CustomPaint(
-                              painter: _MarketLineTooltipPainter(
-                                activeIndex: _activeIndex,
-                                scene: scene,
-                                theme: theme,
-                                rowLabel: widget.rowLabel,
-                                candleTooltipTitle: widget.candleTooltipTitle,
-                                candleTooltipRows: widget.candleTooltipRows,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),

@@ -395,6 +395,30 @@ void main() {
     expect(position.firstBuyDate, DateTime(2026, 1, 2));
   });
 
+  testWidgets(
+      'stalled historical prices release the IBKR queue after 30 seconds',
+      (tester) async {
+    final pending = Completer<http.Response>();
+    final client = IbkrApiClient(
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://timeout.example.test',
+        token: 'test',
+      ),
+      historicalPacer: IbkrHistoricalPacer(spacing: Duration.zero),
+      get: (uri, {headers}) => pending.future,
+    );
+    Object? failure;
+    final result = client.fetchHistoricalCandles('TIMEOUT').then<void>(
+          (_) {},
+          onError: (Object error) => failure = error,
+        );
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 31));
+    await result;
+    expect(failure, isA<TimeoutException>());
+  });
+
   testWidgets('stalled IBKR trade history ends with a timeout', (tester) async {
     final pending = Completer<http.Response>();
     final client = IbkrApiClient(
@@ -411,7 +435,9 @@ void main() {
           onError: (Object error) => failure = error,
         );
     await tester.pump();
-    await tester.pump(const Duration(seconds: 76));
+    await tester.pump(const Duration(seconds: 31));
+    expect(failure, isNull);
+    await tester.pump(const Duration(seconds: 45));
     await result;
     expect(failure, isA<TimeoutException>());
   });

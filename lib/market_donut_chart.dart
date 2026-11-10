@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:drafter/drafter.dart';
 import 'package:drafter/painting.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 @immutable
 class MarketDonutSlice {
@@ -66,6 +67,7 @@ class MarketDonutChart extends StatefulWidget {
 
 class _MarketDonutChartState extends State<MarketDonutChart>
     with SingleTickerProviderStateMixin {
+  final _keyboardFocus = FocusNode(debugLabel: 'Allocation chart');
   late final AnimationController _selectionAnimation = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 280),
@@ -153,6 +155,7 @@ class _MarketDonutChartState extends State<MarketDonutChart>
 
   @override
   void dispose() {
+    _keyboardFocus.dispose();
     _selectionAnimation.dispose();
     super.dispose();
   }
@@ -197,31 +200,47 @@ class _MarketDonutChartState extends State<MarketDonutChart>
         void select(Offset position) =>
             widget.onSelectionChanged(hitTest(position));
 
-        return MouseRegion(
-          onHover: (event) => select(event.localPosition),
-          onExit: (_) => widget.onSelectionChanged(null),
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTapDown: (details) => select(details.localPosition),
-            onPanDown: (details) => select(details.localPosition),
-            onPanUpdate: (details) => select(details.localPosition),
-            onPanEnd: (_) => widget.onSelectionChanged(null),
-            onPanCancel: () => widget.onSelectionChanged(null),
-            child: DrafterTheme.brightness(
-              dark: Theme.of(context).brightness == Brightness.dark,
-              child: AnimatedBuilder(
-                animation: _selectionAnimation,
-                builder: (context, _) => ChartCanvas(
-                  renderer: _MarketDonutRenderer(
-                    slices: widget.slices,
-                    arcs: _animatedArcs(_selectionAnimation.value),
-                    selectedLabel: widget.selectedIndex == null ||
-                            widget.selectedIndex! >= widget.slices.length
-                        ? null
-                        : widget.slices[widget.selectedIndex!].label,
-                    centerSpaceRadius: widget.centerSpaceRadius,
+        return Focus(
+          focusNode: _keyboardFocus,
+          onKeyEvent: (_, event) {
+            if (event is KeyUpEvent || widget.slices.isEmpty)
+              return KeyEventResult.ignored;
+            final key = event.logicalKey;
+            if (key != LogicalKeyboardKey.arrowLeft &&
+                key != LogicalKeyboardKey.arrowRight)
+              return KeyEventResult.ignored;
+            final next = ((widget.selectedIndex ?? -1) +
+                    (key == LogicalKeyboardKey.arrowRight ? 1 : -1)) %
+                widget.slices.length;
+            widget.onSelectionChanged(next);
+            return KeyEventResult.handled;
+          },
+          child: MouseRegion(
+            onHover: (event) => select(event.localPosition),
+            onExit: (_) => widget.onSelectionChanged(null),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (details) => select(details.localPosition),
+              onPanDown: (details) => select(details.localPosition),
+              onPanUpdate: (details) => select(details.localPosition),
+              onPanEnd: (_) => widget.onSelectionChanged(null),
+              onPanCancel: () => widget.onSelectionChanged(null),
+              child: DrafterTheme.brightness(
+                dark: Theme.of(context).brightness == Brightness.dark,
+                child: AnimatedBuilder(
+                  animation: _selectionAnimation,
+                  builder: (context, _) => ChartCanvas(
+                    renderer: _MarketDonutRenderer(
+                      slices: widget.slices,
+                      arcs: _animatedArcs(_selectionAnimation.value),
+                      selectedLabel: widget.selectedIndex == null ||
+                              widget.selectedIndex! >= widget.slices.length
+                          ? null
+                          : widget.slices[widget.selectedIndex!].label,
+                      centerSpaceRadius: widget.centerSpaceRadius,
+                    ),
+                    animate: false,
                   ),
-                  animate: false,
                 ),
               ),
             ),
