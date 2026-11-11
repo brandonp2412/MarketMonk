@@ -372,15 +372,15 @@ class _MyHomePageState extends State<MyHomePage> {
                       : const PageScrollPhysics(),
                   onPageChanged: (index) => _selectedPage.value = index,
                   children: [
-                    ChartsPage(
-                      isActive: !settingsVisible && _currentIndex == 0,
-                    ),
-                    PortfolioPage(
-                      isActive: !settingsVisible && _currentIndex == 1,
-                    ),
-                    HoldingsPage(
-                      isActive: !settingsVisible && _currentIndex == 2,
-                    ),
+                    !settingsVisible && _currentIndex == 0
+                        ? const ChartsPage()
+                        : const ChartsPage(isActive: false),
+                    !settingsVisible && _currentIndex == 1
+                        ? const PortfolioPage()
+                        : const PortfolioPage(isActive: false),
+                    !settingsVisible && _currentIndex == 2
+                        ? const HoldingsPage()
+                        : const HoldingsPage(isActive: false),
                   ],
                 ),
               );

@@ -77,16 +77,38 @@ extension _PortfolioReturnHistory on PortfolioPageState {
     final accounts = context.read<AccountManager>();
     final history = _returnHistory;
     if (period != 0 && history == null) return null;
-    return (history ??
-            const PortfolioHistory(trades: [], candles: {}, rates: {}))
-        .allocationAt(
+    final ibkrEnabled = accounts.ibkrConfigFor().enabled;
+    final performance = ibkrEnabled
+        ? accounts.ibkrPerformanceCacheFor(accounts.activeAccount, '1Y')
+        : null;
+    if (period == 0) {
+      return portfolioAllocationAt(
+        positions: positions,
+        trades: const [],
+        candles: const {},
+        date: null,
+        cashValueUsd: cashValueUsd,
+      );
+    }
+    final source = (positions, history, performance, ibkrEnabled);
+    if (_allocationCacheSource != source) {
+      _allocationCacheSource = source;
+      _allocationCache.clear();
+    }
+    final cutoff = _cutoff(period, DateTime.now());
+    final key = (cutoff, cashValueUsd);
+    if (_allocationCache.containsKey(key)) return _allocationCache[key];
+    if (_allocationCache.length >= 32) _allocationCache.clear();
+    final allocation =
+        (history ?? const PortfolioHistory(trades: [], candles: {}, rates: {}))
+            .allocationAt(
       positions: positions,
-      date: _cutoff(period, DateTime.now()),
-      performance: accounts.ibkrConfigFor().enabled
-          ? accounts.ibkrPerformanceCacheFor(accounts.activeAccount, '1Y')
-          : null,
+      date: cutoff,
+      performance: performance,
       currentCashUsd: cashValueUsd,
     );
+    _allocationCache[key] = allocation;
+    return allocation;
   }
 
   String _returnHistoryKey(AccountManager accounts, List<Position> positions) =>

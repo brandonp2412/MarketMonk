@@ -116,23 +116,28 @@ class PortfolioPage extends StatefulWidget {
 class PortfolioPageState extends State<PortfolioPage>
     with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   final Map<String, int> _holdingColorIndices = {};
-  void _updateState(VoidCallback update) => setState(update);
+  void _updateState(VoidCallback update) {
+    _retainBodyOnDeactivation = false;
+    setState(update);
+  }
 
   @override
   bool get wantKeepAlive => true;
 
   late Stream<_LoadedPortfolio> _stream;
+  Widget? _portfolioBody;
+  bool _retainBodyOnDeactivation = false;
   List<Position> _positions = [];
   IbkrAccountValue? _netLiquidation;
   bool _hasCachedPortfolio = false;
   int _pendingRemoteLoads = 0;
 
   Future<T> _withRemoteLoading<T>(Future<T> Function() load) async {
-    if (mounted) setState(() => _pendingRemoteLoads++);
+    if (mounted) _updateState(() => _pendingRemoteLoads++);
     try {
       return await load();
     } finally {
-      if (mounted) setState(() => _pendingRemoteLoads--);
+      if (mounted) _updateState(() => _pendingRemoteLoads--);
     }
   }
 
@@ -163,6 +168,14 @@ class PortfolioPageState extends State<PortfolioPage>
   Map<String, List<StoredCandle>> _returnCandles = {};
   List<Trade> _returnTrades = [];
   PortfolioHistory? _returnHistory;
+  (
+    List<Position>,
+    PortfolioHistory?,
+    IbkrPerformanceSeries?,
+    bool
+  )? _allocationCacheSource;
+  final Map<(DateTime?, double?), List<PortfolioAllocation>?> _allocationCache =
+      {};
   late final IntradayMarketData _returnIntraday =
       widget._intradayData ?? IntradayMarketData();
   List<IntradayPortfolioValue> _intradayValues = const [];
@@ -201,14 +214,14 @@ class PortfolioPageState extends State<PortfolioPage>
           ],
           dates: [for (final period in ordered) _cutoff(period, now)],
           value: ordered.indexOf(_period),
-          onChanged: (index) => setState(() {
+          onChanged: (index) => _updateState(() {
             _period = ordered[index];
             touchedIndex = null;
           }),
         ),
         if (_historyFailed)
           TextButton.icon(
-            onPressed: () => setState(() => _historyAccount = null),
+            onPressed: () => _updateState(() => _historyAccount = null),
             icon: const Icon(Icons.refresh),
             label: const Text('Retry account history'),
           ),
@@ -244,8 +257,9 @@ class PortfolioPageState extends State<PortfolioPage>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isActive == widget.isActive) return;
 
-    setState(() => _stream = _buildStream());
+    _retainBodyOnDeactivation = !widget.isActive;
     if (widget.isActive) {
+      _stream = _buildStream();
       runDetachedTask(_preload(), 'Failed to preload portfolio');
       runDetachedTask(_loadChartFavorites(), 'Failed to load chart colors');
     }
@@ -256,7 +270,7 @@ class PortfolioPageState extends State<PortfolioPage>
     if (!mounted) return;
     final favorites = prefs.getStringList('favoriteStocks') ?? [];
     if (!listEquals(favorites, _chartFavorites)) {
-      setState(() => _chartFavorites = favorites);
+      _updateState(() => _chartFavorites = favorites);
     }
   }
 
@@ -288,7 +302,7 @@ class PortfolioPageState extends State<PortfolioPage>
     _lastAccount = account;
     _lastIbkrConfig = ibkrConfig;
     _lastIbkrRefreshVersion = refreshVersion;
-    setState(() {
+    _updateState(() {
       _stream = _buildStream(skipInitial: widget.isActive);
       _positions = cached?.positions ?? [];
       _netLiquidation = cached?.netLiquidation;
@@ -325,12 +339,20 @@ class PortfolioPageState extends State<PortfolioPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    if (!_retainBodyOnDeactivation || _portfolioBody == null) {
+      _portfolioBody = StreamBuilder<_LoadedPortfolio>(
+        key: ValueKey(_lastAccount),
+        stream: _stream,
+        builder: _buildBody,
+      );
+    }
+    _retainBodyOnDeactivation = false;
     final summary = _desktopHistorySummary;
     if (isDesktopLayout(context) && summary != null) {
       return TradeHistoryPage(
         key: ValueKey('portfolio-history-$_lastAccount-${summary.symbol}'),
         summary: summary,
-        onClose: () => setState(() => _desktopHistorySummary = null),
+        onClose: () => _updateState(() => _desktopHistorySummary = null),
       );
     }
     return DesktopContextMenu(
@@ -344,18 +366,14 @@ class PortfolioPageState extends State<PortfolioPage>
       ],
       child: Scaffold(
         body: SafeArea(
-          child: StreamBuilder<_LoadedPortfolio>(
-            key: ValueKey(_lastAccount),
-            stream: _stream,
-            builder: (context, snapshot) => _buildBody(context, snapshot),
-          ),
+          child: _portfolioBody!,
         ),
       ),
     );
   }
 
   void _retryPortfolio() {
-    setState(() => _stream = _buildStream(skipInitial: true));
+    _updateState(() => _stream = _buildStream(skipInitial: true));
     runDetachedTask(
       _preload(forceRefresh: true),
       'Failed to retry portfolio preload',
@@ -563,7 +581,7 @@ class PortfolioPageState extends State<PortfolioPage>
             snap.data!.netLiquidation != _netLiquidation)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        setState(() {
+        _updateState(() {
           _positions = snap.data!.positions;
           _netLiquidation = snap.data!.netLiquidation;
           _hasCachedPortfolio = true;
@@ -801,7 +819,7 @@ class PortfolioPageState extends State<PortfolioPage>
                       selectedIndex: selectedIndex,
                       onSelectionChanged: (index) {
                         if (index == touchedIndex) return;
-                        setState(() => touchedIndex = index);
+                        _updateState(() => touchedIndex = index);
                       },
                       centerSpaceRadius: 55,
                       radius: 60,
@@ -857,7 +875,7 @@ class PortfolioPageState extends State<PortfolioPage>
                               ?.percent ??
                           double.nan,
                   isHighlighted: index == selectedIndex,
-                  onTap: () => setState(
+                  onTap: () => _updateState(
                     () => touchedIndex = touchedIndex == index ? null : index,
                   ),
                 );
@@ -883,7 +901,7 @@ class PortfolioPageState extends State<PortfolioPage>
       trades: trades,
     );
     if (isDesktopLayout(context)) {
-      setState(() => _desktopHistorySummary = summary);
+      _updateState(() => _desktopHistorySummary = summary);
       return;
     }
     Navigator.of(context).push(

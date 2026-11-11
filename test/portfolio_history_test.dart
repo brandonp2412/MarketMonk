@@ -154,6 +154,35 @@ void main() {
     }
   });
 
+  test('history reads keep the baseline week and skip older candles', () async {
+    final accounts = await setup();
+    await accounts.cacheIbkrTradeHistory('Default', brokerTrades);
+    final baseline = inception.subtract(const Duration(days: 7));
+    for (final date in [baseline.subtract(const Duration(days: 1)), baseline]) {
+      await testDatabase.into(testDatabase.candles).insert(
+            CandlesCompanion.insert(
+              symbol: 'OPEN',
+              date: date,
+              close: const Value(10),
+              rawCurrency: const Value('USD'),
+            ),
+          );
+    }
+    await seedPrices('OPEN');
+    final history = await loadPortfolioHistory(
+      accounts: accounts,
+      accountName: 'Default',
+      positions: positions,
+      database: testDatabase,
+      now: now,
+      cacheOnly: true,
+    );
+    expect(
+      history.candles['OPEN']!.map((candle) => candle.date),
+      [baseline, september, october, latest],
+    );
+  });
+
   test('cached history renders without network and covered prices are reused',
       () async {
     final accounts = await setup();

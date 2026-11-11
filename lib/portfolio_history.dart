@@ -152,10 +152,13 @@ Future<PortfolioHistory> loadPortfolioHistory({
     ...trades.map((trade) => trade.symbol),
   };
   Future<List<StoredCandle>> readCandles(String symbol) async {
-    final rows = await (database.candles.select()
-          ..where((row) => row.symbol.equals(canonicalMarketSymbol(symbol)))
-          ..orderBy([(row) => OrderingTerm.asc(row.date)]))
-        .get();
+    final query = database.candles.select()
+      ..where((row) => row.symbol.equals(canonicalMarketSymbol(symbol)))
+      ..orderBy([(row) => OrderingTerm.asc(row.date)]);
+    if (starts.isNotEmpty) {
+      query.where((row) => row.date.isBiggerOrEqualValue(from));
+    }
+    final rows = await query.get();
     return [
       for (final row in rows) row.copyWith(date: canonicalMarketDay(row.date)),
     ];
