@@ -139,16 +139,16 @@ class ProfileDataRepository {
         tradeDate: tradeDate,
         realizedPL: realizedPL,
         commission: commission,
-        rawCurrency: resetCurrencyMetadata
-            ? const Value(null)
-            : rawCurrency == null
-                ? const Value.absent()
-                : Value(rawCurrency),
-        usdRateAtTrade: resetCurrencyMetadata
-            ? const Value(null)
-            : usdRateAtTrade == null
-                ? const Value.absent()
-                : Value(usdRateAtTrade),
+        rawCurrency: switch (true) {
+          _ when resetCurrencyMetadata => const Value(null),
+          _ when rawCurrency == null => const Value.absent(),
+          _ => Value(rawCurrency),
+        },
+        usdRateAtTrade: switch (true) {
+          _ when resetCurrencyMetadata => const Value(null),
+          _ when usdRateAtTrade == null => const Value.absent(),
+          _ => Value(usdRateAtTrade),
+        },
       );
 }
 

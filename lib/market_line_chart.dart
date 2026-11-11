@@ -711,17 +711,14 @@ class _MarketLineChartInteractionState
                     key == LogicalKeyboardKey.arrowRight ||
                     key == LogicalKeyboardKey.home ||
                     key == LogicalKeyboardKey.end) {
-                  final next = key == LogicalKeyboardKey.home
-                      ? 0
-                      : key == LogicalKeyboardKey.end
-                          ? indices.length - 1
-                          : current < 0
-                              ? 0
-                              : (current +
-                                      (key == LogicalKeyboardKey.arrowRight
-                                          ? 1
-                                          : -1))
-                                  .clamp(0, indices.length - 1);
+                  final next = switch (true) {
+                    _ when key == LogicalKeyboardKey.home => 0,
+                    _ when key == LogicalKeyboardKey.end => indices.length - 1,
+                    _ when current < 0 => 0,
+                    _ => (current +
+                            (key == LogicalKeyboardKey.arrowRight ? 1 : -1))
+                        .clamp(0, indices.length - 1),
+                  };
                   _activeIndex.value = indices[next];
                 } else if (key == LogicalKeyboardKey.enter &&
                     widget.pickRange &&
@@ -1573,9 +1570,11 @@ class _MarketLineChartRenderer extends ChartRenderer
         final x = (startX + endX) / 2 +
             (seriesIndex - (seriesCount - 1) / 2) * barWidth;
         final positive = last.close >= first.open;
-        final color = seriesCount == 1
-            ? (positive ? const Color(0xFF26A69A) : const Color(0xFFEF5350))
-            : seriesColor;
+        final color = switch (true) {
+          _ when (seriesCount == 1) && (positive) => const Color(0xFF26A69A),
+          _ when (seriesCount == 1) => const Color(0xFFEF5350),
+          _ => seriesColor,
+        };
         final highY = _yForValue(high, bounds);
         final lowY = _yForValue(low, bounds);
         final openY = _yForValue(first.open, bounds);

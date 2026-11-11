@@ -58,11 +58,11 @@ class PortfolioPeriodPicker extends StatelessWidget {
               const SizedBox(width: 4),
             ],
             Text(
-              selectedDate == null
-                  ? 'PRESENT'
-                  : labels[value] == 'Inception'
-                      ? 'INCEPTION'
-                      : '${labels[value]} AGO',
+              switch (true) {
+                _ when selectedDate == null => 'PRESENT',
+                _ when labels[value] == 'Inception' => 'INCEPTION',
+                _ => '${labels[value]} AGO',
+              },
               style: theme.textTheme.labelSmall?.copyWith(
                 color: colors.primary,
                 letterSpacing: 1,

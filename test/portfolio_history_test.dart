@@ -84,7 +84,13 @@ void main() {
             CandlesCompanion.insert(
               symbol: symbol,
               date: date,
-              close: Value(symbol == 'OPEN' ? (date == latest ? 12 : 10) : 20),
+              close: Value(
+                switch (true) {
+                  _ when (symbol == 'OPEN') && (date == latest) => 12,
+                  _ when (symbol == 'OPEN') => 10,
+                  _ => 20,
+                },
+              ),
               rawCurrency: const Value('USD'),
             ),
           );

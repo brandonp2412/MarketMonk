@@ -825,20 +825,20 @@ void main() {
           dates: historyDates,
           nav: [
             for (final date in historyDates)
-              date == historyDates.last
-                  ? 12100
-                  : date.isBefore(week)
-                      ? 10000
-                      : 11000,
+              switch (true) {
+                _ when date == historyDates.last => 12100,
+                _ when date.isBefore(week) => 10000,
+                _ => 11000,
+              },
           ],
           returnDates: historyDates,
           returns: [
             for (final date in historyDates)
-              date == historyDates.last
-                  ? .21
-                  : date.isBefore(week)
-                      ? 0
-                      : .1,
+              switch (true) {
+                _ when date == historyDates.last => .21,
+                _ when date.isBefore(week) => 0,
+                _ => .1,
+              },
           ],
         ),
       );
@@ -863,11 +863,14 @@ void main() {
                   date: date,
                   rawCurrency: const Value('USD'),
                   close: Value(
-                    symbol == 'VOO'
-                        ? (period == 10 ? 200.0 : 100.0)
-                        : symbol == 'MSFT'
-                            ? (period == 10 ? 100.0 : 300.0)
-                            : (period == 10 ? 100.0 : 400.0),
+                    switch (true) {
+                      _ when (symbol == 'VOO') && (period == 10) => 200.0,
+                      _ when (symbol == 'VOO') => 100.0,
+                      _ when (symbol == 'MSFT') && (period == 10) => 100.0,
+                      _ when (symbol == 'MSFT') => 300.0,
+                      _ when period == 10 => 100.0,
+                      _ => 400.0,
+                    },
                   ),
                 ),
               );

@@ -167,11 +167,11 @@ class TickerLine extends StatelessWidget {
             fillChartArea: settings.fillChartArea,
             leftInset: 64,
             accessibilityLabel: 'Price history',
-            accessibilityValue: loading
-                ? 'Loading prices'
-                : spots.isEmpty
-                    ? 'No prices'
-                    : '${spots.length} price points',
+            accessibilityValue: switch (true) {
+              _ when loading => 'Loading prices',
+              _ when spots.isEmpty => 'No prices',
+              _ => '${spots.length} price points',
+            },
           ),
         ),
       ],

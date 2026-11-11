@@ -323,11 +323,11 @@ String fmtChartAxisPercent(double value) {
   final magnitude = absolute >= 1000
       ? NumberFormat.compact().format(absolute)
       : NumberFormat('#,##0.#').format(absolute);
-  final sign = value > 0
-      ? '+'
-      : value < 0
-          ? '-'
-          : '';
+  final sign = switch (true) {
+    _ when value > 0 => '+',
+    _ when value < 0 => '-',
+    _ => '',
+  };
   return '$sign$magnitude%';
 }
 

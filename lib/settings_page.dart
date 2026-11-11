@@ -1122,29 +1122,29 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
             title: Text(context.l10n.text('Sync')),
             subtitle: Text(
-              settings.syncInProgress
-                  ? context.l10n.text(
-                      'Syncing {symbol} ({completed}/{total})',
-                      {
-                        'symbol': settings.syncingSymbol ?? '',
-                        'completed': settings.syncCompleted,
-                        'total': settings.syncTotal,
-                      },
-                    )
-                  : settings.syncTotal == 0
-                      ? context.l10n.text('No sync running')
-                      : settings.syncFailed == 0
-                          ? context.l10n.text(
-                              'Last sync completed {completed}/{total}',
-                              {
-                                'completed': settings.syncCompleted,
-                                'total': settings.syncTotal,
-                              },
-                            )
-                          : context.l10n.text(
-                              'Last sync completed with {failed} failed',
-                              {'failed': settings.syncFailed},
-                            ),
+              switch (true) {
+                _ when settings.syncInProgress => context.l10n.text(
+                    'Syncing {symbol} ({completed}/{total})',
+                    {
+                      'symbol': settings.syncingSymbol ?? '',
+                      'completed': settings.syncCompleted,
+                      'total': settings.syncTotal,
+                    },
+                  ),
+                _ when settings.syncTotal == 0 =>
+                  context.l10n.text('No sync running'),
+                _ when settings.syncFailed == 0 => context.l10n.text(
+                    'Last sync completed {completed}/{total}',
+                    {
+                      'completed': settings.syncCompleted,
+                      'total': settings.syncTotal,
+                    },
+                  ),
+                _ => context.l10n.text(
+                    'Last sync completed with {failed} failed',
+                    {'failed': settings.syncFailed},
+                  ),
+              },
             ),
           ),
       ],
@@ -1677,20 +1677,21 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                     )
                   : Text(
-                      settings.syncTotal == 0
-                          ? context.l10n.text('No sync running')
-                          : settings.syncFailed == 0
-                              ? context.l10n.text(
-                                  'Last sync completed {completed}/{total}',
-                                  {
-                                    'completed': settings.syncCompleted,
-                                    'total': settings.syncTotal,
-                                  },
-                                )
-                              : context.l10n.text(
-                                  'Last sync completed with {failed} failed',
-                                  {'failed': settings.syncFailed},
-                                ),
+                      switch (true) {
+                        _ when settings.syncTotal == 0 =>
+                          context.l10n.text('No sync running'),
+                        _ when settings.syncFailed == 0 => context.l10n.text(
+                            'Last sync completed {completed}/{total}',
+                            {
+                              'completed': settings.syncCompleted,
+                              'total': settings.syncTotal,
+                            },
+                          ),
+                        _ => context.l10n.text(
+                            'Last sync completed with {failed} failed',
+                            {'failed': settings.syncFailed},
+                          ),
+                      },
                     ),
             ),
           if (_hasMatches(
@@ -2183,11 +2184,12 @@ class _ViRebindDialogState extends State<_ViRebindDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              _reservedKey
-                  ? 'That key is reserved for navigation or help'
-                  : _captured == null
-                      ? context.l10n.text('Press a key...')
-                      : viKeyDisplayName(_captured!),
+              switch (true) {
+                _ when _reservedKey =>
+                  'That key is reserved for navigation or help',
+                _ when _captured == null => context.l10n.text('Press a key...'),
+                _ => viKeyDisplayName(_captured!),
+              },
               style: theme.textTheme.titleLarge,
             ),
             const SizedBox(height: 8),

@@ -224,15 +224,19 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                     onPressed: widget.onClose,
                   ),
             title: Text(
-              _selectedTradeIds.isNotEmpty && !isDesktopLayout(context)
-                  ? context.l10n.text('{count} selected', {
-                      'count': _selectedTradeIds.length,
-                    })
-                  : isDesktopLayout(context)
-                      ? context.l10n.text('Trade History')
-                      : context.l10n.text('{symbol} — History', {
-                          'symbol': widget.summary.symbol,
-                        }),
+              switch (true) {
+                _
+                    when _selectedTradeIds.isNotEmpty &&
+                        !isDesktopLayout(context) =>
+                  context.l10n.text('{count} selected', {
+                    'count': _selectedTradeIds.length,
+                  }),
+                _ when isDesktopLayout(context) =>
+                  context.l10n.text('Trade History'),
+                _ => context.l10n.text('{symbol} — History', {
+                    'symbol': widget.summary.symbol,
+                  }),
+              },
             ),
             actions: [
               if (_selectedTradeIds.isNotEmpty &&
@@ -391,11 +395,12 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                                   value: totalRealizedUsd == null
                                       ? 'Historical FX unavailable'
                                       : '${totalRealizedUsd >= 0 ? '+' : ''}${fmtCurrency(totalRealizedUsd)}',
-                                  color: totalRealizedUsd == null
-                                      ? null
-                                      : totalRealizedUsd >= 0
-                                          ? Colors.green
-                                          : Colors.redAccent,
+                                  color: switch (true) {
+                                    _ when totalRealizedUsd == null => null,
+                                    _ when totalRealizedUsd >= 0 =>
+                                      Colors.green,
+                                    _ => Colors.redAccent,
+                                  },
                                 ),
                               ],
                               if (position != null || trades.isNotEmpty)
@@ -405,11 +410,11 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                                   value: totalGain == null
                                       ? 'Historical FX unavailable'
                                       : '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}',
-                                  color: totalGain == null
-                                      ? null
-                                      : totalGain >= 0
-                                          ? Colors.green
-                                          : Colors.redAccent,
+                                  color: switch (true) {
+                                    _ when totalGain == null => null,
+                                    _ when totalGain >= 0 => Colors.green,
+                                    _ => Colors.redAccent,
+                                  },
                                 ),
                             ],
                           ),
@@ -503,19 +508,24 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
       message: snapshot.hasError
           ? context.l10n.text('Could not load IBKR trade history.')
           : null,
-      actionLabel: brokerManaged
-          ? (snapshot.hasError ? context.l10n.text('Retry') : null)
-          : context.l10n.text('Add trade'),
+      actionLabel: switch (true) {
+        _ when (brokerManaged) && (snapshot.hasError) =>
+          context.l10n.text('Retry'),
+        _ when (brokerManaged) => null,
+        _ => context.l10n.text('Add trade'),
+      },
       actionIcon: brokerManaged ? Icons.refresh : Icons.add_rounded,
-      onAction: brokerManaged
-          ? (snapshot.hasError ? _retryBrokerTrades : null)
-          : () => Navigator.push(
+      onAction: switch (true) {
+        _ when (brokerManaged) && (snapshot.hasError) => _retryBrokerTrades,
+        _ when (brokerManaged) => null,
+        _ => () => Navigator.push(
+              context,
+              adaptivePageRoute(
                 context,
-                adaptivePageRoute(
-                  context,
-                  builder: (_) => EditTickerPage(symbol: widget.summary.symbol),
-                ),
+                builder: (_) => EditTickerPage(symbol: widget.summary.symbol),
               ),
+            ),
+      },
     );
   }
 

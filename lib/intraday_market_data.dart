@@ -316,7 +316,11 @@ class IntradayMarketData {
           '/v8/finance/chart/$symbol',
           {
             'range': '${days}d',
-            'interval': daily ? '1d' : (days == 1 ? '1m' : '15m'),
+            'interval': switch (true) {
+              _ when daily => '1d',
+              _ when days == 1 => '1m',
+              _ => '15m',
+            },
             'includePrePost': 'false',
           },
         );

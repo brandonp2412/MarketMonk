@@ -529,11 +529,11 @@ class PortfolioPageState extends State<PortfolioPage>
         PortfolioPeriodPicker(
           labels: [
             for (final period in ordered)
-              period == 0
-                  ? 'Now'
-                  : period == -1
-                      ? 'Inception'
-                      : _periods[period],
+              switch (true) {
+                _ when period == 0 => 'Now',
+                _ when period == -1 => 'Inception',
+                _ => _periods[period],
+              },
           ],
           dates: [for (final period in ordered) _cutoff(period, now)],
           value: ordered.indexOf(_period),
@@ -1350,19 +1350,22 @@ class PortfolioPageState extends State<PortfolioPage>
     final historicalCashOut = cutoff == null || intraday
         ? null
         : _ibkrCashOutSummaryAt(performance, cutoff);
-    final totalGain = cutoff == null
-        ? cashOutSummary?.gainUsd ?? costBasisGain
-        : intradayValueUsd != null && _intradayCurrentValueUsd != null
-            ? _intradayCurrentValueUsd! - intradayValueUsd
-            : historicalCashOut?.gainUsd ?? double.nan;
-    final totalGainPct = cutoff == null
-        ? cashOutSummary?.gainPct ??
-            (totalCost > 0 ? (costBasisGain / totalCost) * 100 : 0.0)
-        : intradayValueUsd != null &&
-                _intradayCurrentValueUsd != null &&
-                intradayValueUsd != 0
-            ? (_intradayCurrentValueUsd! / intradayValueUsd - 1) * 100
-            : historicalCashOut?.gainPct ?? double.nan;
+    final totalGain = switch (true) {
+      _ when cutoff == null => cashOutSummary?.gainUsd ?? costBasisGain,
+      _ when intradayValueUsd != null && _intradayCurrentValueUsd != null =>
+        _intradayCurrentValueUsd! - intradayValueUsd,
+      _ => historicalCashOut?.gainUsd ?? double.nan,
+    };
+    final totalGainPct = switch (true) {
+      _ when cutoff == null => cashOutSummary?.gainPct ??
+          (totalCost > 0 ? (costBasisGain / totalCost) * 100 : 0.0),
+      _
+          when intradayValueUsd != null &&
+              _intradayCurrentValueUsd != null &&
+              intradayValueUsd != 0 =>
+        (_intradayCurrentValueUsd! / intradayValueUsd - 1) * 100,
+      _ => historicalCashOut?.gainPct ?? double.nan,
+    };
 
     final allocation = intraday
         ? _intradayAllocationAt(positions, cutoff)
@@ -1375,11 +1378,12 @@ class PortfolioPageState extends State<PortfolioPage>
       0,
       (sum, holding) => sum + holding.value,
     );
-    final historicalNav = cutoff == null || intraday || performance == null
-        ? null
-        : performance.startNav == 0 && cutoff == performance.startDate
-            ? 0.0
-            : accountNetAssetValueAt(performance, cutoff);
+    final historicalNav = switch (true) {
+      _ when cutoff == null || intraday || performance == null => null,
+      _ when performance.startNav == 0 && cutoff == performance.startDate =>
+        0.0,
+      _ => accountNetAssetValueAt(performance, cutoff),
+    };
     final navIndex = cutoff == null || performance == null
         ? null
         : accountNetAssetValueIndexAt(performance, cutoff);
@@ -1387,30 +1391,35 @@ class PortfolioPageState extends State<PortfolioPage>
         ? null
         : _returnHistory?.rates[performance!.dates[navIndex]]
             ?[performance.currency.toUpperCase()];
-    final displayTotal = intraday && intradayValueUsd != null
-        ? fmtCurrency(intradayValueUsd)
-        : cutoff == null
-            ? netLiquidation == null
-                ? fmtCurrency(totalValue)
-                : allRatesFromUsd.containsKey(netLiquidation.currency)
-                    ? fmtNativeCurrency(
-                        netLiquidation.value,
-                        netLiquidation.currency,
-                      )
-                    : NumberFormat.simpleCurrency(name: netLiquidation.currency)
-                        .format(netLiquidation.value)
-            : historicalNav == null
-                ? fmtCurrency(allocationTotal)
-                : historicalRate == null
-                    ? 'Unavailable'
-                    : fmtCurrency(historicalNav / historicalRate);
-    final totalLabel = intraday
-        ? 'Account value'
-        : cutoff == null && netLiquidation == null
-            ? 'Market value'
-            : cutoff != null && historicalNav == null
-                ? 'Holdings value'
-                : 'Account value';
+    final String displayTotal;
+    if (intraday && intradayValueUsd != null) {
+      displayTotal = fmtCurrency(intradayValueUsd);
+    } else if (cutoff == null) {
+      if (netLiquidation == null) {
+        displayTotal = fmtCurrency(totalValue);
+      } else if (allRatesFromUsd.containsKey(netLiquidation.currency)) {
+        displayTotal = fmtNativeCurrency(
+          netLiquidation.value,
+          netLiquidation.currency,
+        );
+      } else {
+        displayTotal =
+            NumberFormat.simpleCurrency(name: netLiquidation.currency)
+                .format(netLiquidation.value);
+      }
+    } else if (historicalNav == null) {
+      displayTotal = fmtCurrency(allocationTotal);
+    } else if (historicalRate == null) {
+      displayTotal = 'Unavailable';
+    } else {
+      displayTotal = fmtCurrency(historicalNav / historicalRate);
+    }
+    final totalLabel = switch (true) {
+      _ when intraday => 'Account value',
+      _ when cutoff == null && netLiquidation == null => 'Market value',
+      _ when cutoff != null && historicalNav == null => 'Holdings value',
+      _ => 'Account value',
+    };
     final sorted = [...allocation]..sort((a, b) => b.value.compareTo(a.value));
     final currentBySymbol = {
       for (final position in positions) position.symbol: position,
@@ -1852,20 +1861,22 @@ class PortfolioPageState extends State<PortfolioPage>
                               (sum, holding) => sum + holding.value,
                             ),
                       ),
-                      detail: _returnCutoff != null
-                          ? 'Cash · ${fmtCurrency(sorted.where((holding) => holding.isCash).fold<double>(0, (sum, holding) => sum + holding.value))}'
-                          : cashBalance == null
-                              ? context.l10n.text('Open stock positions')
-                              : 'Cash · ${formatIbkrReportedCash(cashBalance)}',
+                      detail: switch (true) {
+                        _ when _returnCutoff != null =>
+                          'Cash · ${fmtCurrency(sorted.where((holding) => holding.isCash).fold<double>(0, (sum, holding) => sum + holding.value))}',
+                        _ when cashBalance == null =>
+                          context.l10n.text('Open stock positions'),
+                        _ => 'Cash · ${formatIbkrReportedCash(cashBalance)}',
+                      },
                       icon: Icons.show_chart_rounded,
                     ),
                     _DesktopPortfolioMetric(
                       label: context.l10n.text(
-                        isCashOut
-                            ? 'Total P/L'
-                            : _period == 0
-                                ? 'Unrealized P/L'
-                                : 'Open holdings P/L',
+                        switch (true) {
+                          _ when isCashOut => 'Total P/L',
+                          _ when _period == 0 => 'Unrealized P/L',
+                          _ => 'Open holdings P/L',
+                        },
                       ),
                       value: totalGain.isFinite
                           ? '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}'
@@ -2535,11 +2546,12 @@ class _LegendTile extends StatelessWidget {
             Text(
               fmtCurrency(value),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: !changePct.isFinite
-                        ? Theme.of(context).colorScheme.onSurfaceVariant
-                        : changePct >= 0
-                            ? Colors.green
-                            : Colors.redAccent,
+                    color: switch (true) {
+                      _ when !changePct.isFinite =>
+                        Theme.of(context).colorScheme.onSurfaceVariant,
+                      _ when changePct >= 0 => Colors.green,
+                      _ => Colors.redAccent,
+                    },
                   ),
             ),
             Text(
@@ -2547,11 +2559,12 @@ class _LegendTile extends StatelessWidget {
                   ? '${changePct >= 0 ? '+' : ''}${changePct.toStringAsFixed(2)}%'
                   : '—',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: !changePct.isFinite
-                        ? Theme.of(context).colorScheme.onSurfaceVariant
-                        : changePct >= 0
-                            ? Colors.green
-                            : Colors.redAccent,
+                    color: switch (true) {
+                      _ when !changePct.isFinite =>
+                        Theme.of(context).colorScheme.onSurfaceVariant,
+                      _ when changePct >= 0 => Colors.green,
+                      _ => Colors.redAccent,
+                    },
                   ),
             ),
           ],

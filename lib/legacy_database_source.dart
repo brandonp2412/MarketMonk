@@ -118,12 +118,14 @@ Future<LegacyDatabaseSnapshot> readLegacyDatabaseSnapshot({
   }
 
   final savedActiveProfile = await readActiveProfile();
-  final activeProfileName =
-      savedActiveProfile != null && profileNames.contains(savedActiveProfile)
-          ? savedActiveProfile
-          : profileNames.contains('Default')
-              ? 'Default'
-              : profileNames.first;
+  final activeProfileName = switch (true) {
+    _
+        when savedActiveProfile != null &&
+            profileNames.contains(savedActiveProfile) =>
+      savedActiveProfile,
+    _ when profileNames.contains('Default') => 'Default',
+    _ => profileNames.first,
+  };
 
   final profiles = <LegacyProfileSnapshot>[];
   for (final profileName in profileNames) {

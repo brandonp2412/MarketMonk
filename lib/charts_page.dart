@@ -2402,28 +2402,28 @@ class ChartsPageState extends State<ChartsPage>
     final inlineCurrencies = desktop &&
         settings.visibleCurrencies.length > 1 &&
         availableWidth >= 750 + settings.visibleCurrencies.length * 65;
-    final leading = _customChartRange != null
-        ? IconButton(
-            key: const Key('chart-clear-filter'),
-            icon: const Icon(Icons.filter_alt_off_rounded),
-            tooltip: 'Clear date filter',
-            padding: const EdgeInsets.only(left: 16, right: 8),
-            onPressed: () {
-              ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
-              _setChartRange(const [], null);
-            },
-          )
-        : canReturnToPortfolio
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                tooltip: context.l10n.text('Back'),
-                padding: const EdgeInsets.only(left: 16, right: 8),
-                onPressed: _clearSearch,
-              )
-            : const Padding(
-                padding: EdgeInsets.only(left: 16, right: 8),
-                child: Icon(Icons.search),
-              );
+    final leading = switch (true) {
+      _ when _customChartRange != null => IconButton(
+          key: const Key('chart-clear-filter'),
+          icon: const Icon(Icons.filter_alt_off_rounded),
+          tooltip: 'Clear date filter',
+          padding: const EdgeInsets.only(left: 16, right: 8),
+          onPressed: () {
+            ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+            _setChartRange(const [], null);
+          },
+        ),
+      _ when canReturnToPortfolio => IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: context.l10n.text('Back'),
+          padding: const EdgeInsets.only(left: 16, right: 8),
+          onPressed: _clearSearch,
+        ),
+      _ => const Padding(
+          padding: EdgeInsets.only(left: 16, right: 8),
+          child: Icon(Icons.search),
+        ),
+    };
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -2761,22 +2761,25 @@ class ChartsPageState extends State<ChartsPage>
   List<Widget> _buildStockContent(SettingsState settings) {
     final intradaySnapshot = AsyncSnapshot.withData(
       ConnectionState.done,
-      _intradaySeries == null
-          ? _networkLoading || _stockError == null
-              ? const <CandleTicker>[]
-              : _stockDailyPreview
-          : [
-              for (final bar in _intradaySeries!.candles)
-                CandleTicker(
-                  candle: CandlesCompanion(
-                    date: Value(bar.date.toLocal()),
-                    open: Value(bar.open),
-                    high: Value(bar.high),
-                    low: Value(bar.low),
-                    close: Value(bar.close),
-                  ),
+      switch (true) {
+        _
+            when (_intradaySeries == null) &&
+                (_networkLoading || _stockError == null) =>
+          const <CandleTicker>[],
+        _ when (_intradaySeries == null) => _stockDailyPreview,
+        _ => [
+            for (final bar in _intradaySeries!.candles)
+              CandleTicker(
+                candle: CandlesCompanion(
+                  date: Value(bar.date.toLocal()),
+                  open: Value(bar.open),
+                  high: Value(bar.high),
+                  low: Value(bar.low),
+                  close: Value(bar.close),
                 ),
-            ],
+              ),
+          ],
+      },
     );
     return [
       if (_usesIntraday)
@@ -2792,7 +2795,15 @@ class ChartsPageState extends State<ChartsPage>
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            '${_intradaySeries!.source} · ${_intradaySeries!.isDaily ? "1 day" : (days == 1 ? (cryptoAssetForSymbol(_selectedSymbol ?? '') != null ? "5 min" : "1 min") : "15 min")} · ${context.l10n.text('Local time')}',
+            '${_intradaySeries!.source} · ${switch (true) {
+              _ when _intradaySeries!.isDaily => "1 day",
+              _
+                  when (days == 1) &&
+                      (cryptoAssetForSymbol(_selectedSymbol ?? '') != null) =>
+                "5 min",
+              _ when (days == 1) => "1 min",
+              _ => "15 min",
+            }} · ${context.l10n.text('Local time')}',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall,
           ),
@@ -3641,30 +3652,32 @@ class ChartsPageState extends State<ChartsPage>
           icon: allEmpty
               ? Icons.candlestick_chart_rounded
               : Icons.visibility_off_rounded,
-          title: pricesUnavailable
-              ? context.l10n.text('Historical prices unavailable')
-              : allEmpty
-                  ? context.l10n.text('No trades yet')
-                  : context.l10n.text('All portfolios are hidden'),
-          message: pricesUnavailable
-              ? context.l10n.text('No market data found')
-              : allEmpty
-                  ? context.l10n.text(
-                      'Search for a stock to start building your portfolio history.',
-                    )
-                  : context.l10n.text(
-                      'Show your portfolios again to restore the chart.',
-                    ),
-          actionLabel: pricesUnavailable
-              ? context.l10n.text('Refresh')
-              : allEmpty
-                  ? context.l10n.text('Search stocks')
-                  : context.l10n.text('Show all'),
-          actionIcon: pricesUnavailable
-              ? Icons.refresh_rounded
-              : allEmpty
-                  ? Icons.search_rounded
-                  : Icons.visibility_rounded,
+          title: switch (true) {
+            _ when pricesUnavailable =>
+              context.l10n.text('Historical prices unavailable'),
+            _ when allEmpty => context.l10n.text('No trades yet'),
+            _ => context.l10n.text('All portfolios are hidden'),
+          },
+          message: switch (true) {
+            _ when pricesUnavailable =>
+              context.l10n.text('No market data found'),
+            _ when allEmpty => context.l10n.text(
+                'Search for a stock to start building your portfolio history.',
+              ),
+            _ => context.l10n.text(
+                'Show your portfolios again to restore the chart.',
+              ),
+          },
+          actionLabel: switch (true) {
+            _ when pricesUnavailable => context.l10n.text('Refresh'),
+            _ when allEmpty => context.l10n.text('Search stocks'),
+            _ => context.l10n.text('Show all'),
+          },
+          actionIcon: switch (true) {
+            _ when pricesUnavailable => Icons.refresh_rounded,
+            _ when allEmpty => Icons.search_rounded,
+            _ => Icons.visibility_rounded,
+          },
           onAction: () {
             if (pricesUnavailable) {
               runDetachedTask(
@@ -3727,11 +3740,12 @@ class ChartsPageState extends State<ChartsPage>
         (value) => value.isFinite && value.abs() > 1e-9,
         orElse: () => 0,
       );
-      double chartValue(double value) => scaleForComparison
-          ? baseline == 0
-              ? 0
-              : (value / baseline - 1) * 100
-          : value;
+      double chartValue(double value) {
+        if (!scaleForComparison) return value;
+        if (baseline == 0) return 0;
+        return (value / baseline - 1) * 100;
+      }
+
       final seriesIndex = chartSeries.length;
       final ohlcByDate = favoriteOhlcBySymbol[entry.key];
       for (var index = 0; index < entry.value.length; index++) {
@@ -3957,9 +3971,11 @@ class ChartsPageState extends State<ChartsPage>
                 : visibleSeries.last.value,
           )
         : 0.0;
-    final returnColor = hasHistory
-        ? (pct >= 0 ? Colors.green : Colors.redAccent)
-        : Theme.of(context).colorScheme.onSurfaceVariant;
+    final returnColor = switch (true) {
+      _ when (hasHistory) && (pct >= 0) => Colors.green,
+      _ when (hasHistory) => Colors.redAccent,
+      _ => Theme.of(context).colorScheme.onSurfaceVariant,
+    };
     final flows = _portfolioCashFlowsByAccount[accountName];
     final externalFlows = flows == null || visibleSeries.length < 2
         ? 0.0
@@ -3992,21 +4008,22 @@ class ChartsPageState extends State<ChartsPage>
     final estimated = series.isNotEmpty &&
         _provisionalStartByAccount[accountName] != null &&
         !series.last.date.isBefore(_provisionalStartByAccount[accountName]!);
-    final summaryValue = estimated
-        ? series.last.value
-        : currentValueUsd != null && currentValueUsd.isFinite
-            ? currentValueUsd
-            : series.isNotEmpty
-                ? series.last.value
-                : null;
+    final summaryValue = switch (true) {
+      _ when estimated => series.last.value,
+      _ when currentValueUsd != null && currentValueUsd.isFinite =>
+        currentValueUsd,
+      _ when series.isNotEmpty => series.last.value,
+      _ => null,
+    };
     final theme = Theme.of(context);
 
     Widget returnLabel() => Text(
-          (hasHistory
-              ? <String>[if (pct >= 0) '+', pct.toStringAsFixed(2), '%'].join()
-              : _portfolioLoading
-                  ? '—'
-                  : '—'),
+          (switch (true) {
+            _ when hasHistory =>
+              <String>[if (pct >= 0) '+', pct.toStringAsFixed(2), '%'].join(),
+            _ when _portfolioLoading => '—',
+            _ => '—',
+          }),
           maxLines: 1,
           style: theme.textTheme.titleMedium!.copyWith(color: returnColor),
         );
@@ -4019,11 +4036,11 @@ class ChartsPageState extends State<ChartsPage>
       style: theme.textTheme.titleMedium!.copyWith(height: 1.1),
     );
     final changeText = Text(
-      hasHistory
-          ? (change >= 0 ? '+' : '') + fmtCurrency(change)
-          : _portfolioLoading
-              ? '—'
-              : '—',
+      switch (true) {
+        _ when hasHistory => (change >= 0 ? '+' : '') + fmtCurrency(change),
+        _ when _portfolioLoading => '—',
+        _ => '—',
+      },
       maxLines: 1,
       style: TextStyle(color: returnColor, fontSize: 13, height: 1.1),
     );

@@ -106,13 +106,14 @@ Future<PortfolioHistory> loadPortfolioHistory({
       talker.handle(error, stack, 'Using cached IBKR portfolio trades');
     }
   }
-  final trades = brokerHistory?.available == true
-      ? cacheOnly
-          ? tradesFromIbkr(brokerHistory!.trades)
-          : await enrichHistoricalTradeRates(
-              tradesFromIbkr(brokerHistory!.trades),
-            )
-      : await ProfileDataRepository(database).readTradesForAccount(accountName);
+  final trades = switch (true) {
+    _ when (brokerHistory?.available == true) && (cacheOnly) =>
+      tradesFromIbkr(brokerHistory!.trades),
+    _ when (brokerHistory?.available == true) =>
+      await enrichHistoricalTradeRates(tradesFromIbkr(brokerHistory!.trades)),
+    _ =>
+      await ProfileDataRepository(database).readTradesForAccount(accountName),
+  };
   final performance = config.enabled
       ? accounts.ibkrPerformanceCacheFor(accountName, '1Y')
       : null;

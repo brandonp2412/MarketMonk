@@ -170,11 +170,11 @@ class SettingsState extends ChangeNotifier {
     }
 
     final savedLanguageCode = prefs.getString('languageCode');
-    final migratedLanguageCode = savedLanguageCode == 'zh'
-        ? 'zh-Hans'
-        : savedLanguageCode == 'pt'
-            ? 'pt-BR'
-            : savedLanguageCode;
+    final migratedLanguageCode = switch (true) {
+      _ when savedLanguageCode == 'zh' => 'zh-Hans',
+      _ when savedLanguageCode == 'pt' => 'pt-BR',
+      _ => savedLanguageCode,
+    };
     final supportedLanguageCodes = AppLocalizations.supportedLocales
         .map(AppLocalizations.localeKey)
         .toSet();

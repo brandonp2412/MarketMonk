@@ -1223,36 +1223,36 @@ class HoldingsPageState extends State<HoldingsPage>
             ],
           ),
         ),
-        floatingActionButton: ibkrManaged
-            ? null
-            : _selecting
-                ? Padding(
-                    padding: const EdgeInsets.only(bottom: bottomNavHeight),
-                    child: FloatingActionButton.extended(
-                      onPressed: () => _deleteSelected(context),
-                      label: Text(
-                        context.l10n.text('Delete ({count})', {
-                          'count': _selectedSymbols.length,
-                        }),
-                      ),
-                      icon: const Icon(Icons.delete),
-                    ),
-                  )
-                : Padding(
-                    padding: const EdgeInsets.only(bottom: bottomNavHeight),
-                    child: FloatingActionButton.extended(
-                      onPressed: () => Navigator.push(
-                        context,
-                        adaptivePageRoute(
-                          context,
-                          builder: (_) => const EditTickerPage(),
-                        ),
-                      ),
-                      label: Text(context.l10n.text('Add')),
-                      icon: const Icon(Icons.add),
-                      tooltip: context.l10n.text('Add trade'),
-                    ),
+        floatingActionButton: switch (true) {
+          _ when ibkrManaged => null,
+          _ when _selecting => Padding(
+              padding: const EdgeInsets.only(bottom: bottomNavHeight),
+              child: FloatingActionButton.extended(
+                onPressed: () => _deleteSelected(context),
+                label: Text(
+                  context.l10n.text('Delete ({count})', {
+                    'count': _selectedSymbols.length,
+                  }),
+                ),
+                icon: const Icon(Icons.delete),
+              ),
+            ),
+          _ => Padding(
+              padding: const EdgeInsets.only(bottom: bottomNavHeight),
+              child: FloatingActionButton.extended(
+                onPressed: () => Navigator.push(
+                  context,
+                  adaptivePageRoute(
+                    context,
+                    builder: (_) => const EditTickerPage(),
                   ),
+                ),
+                label: Text(context.l10n.text('Add')),
+                icon: const Icon(Icons.add),
+                tooltip: context.l10n.text('Add trade'),
+              ),
+            ),
+        },
       ),
     );
   }
@@ -1286,9 +1286,11 @@ class HoldingsPageState extends State<HoldingsPage>
             b.position!.change,
           ),
       };
-      return comparison == 0
-          ? a.symbol.compareTo(b.symbol)
-          : (_desktopSortAscending ? comparison : -comparison);
+      return switch (true) {
+        _ when comparison == 0 => a.symbol.compareTo(b.symbol),
+        _ when _desktopSortAscending => comparison,
+        _ => -comparison,
+      };
     }
 
     sorted.sort(compare);
@@ -1691,16 +1693,17 @@ class HoldingsPageState extends State<HoldingsPage>
                                                   ? 0
                                                   : 3,
                                             );
-                                      final changeColor = isClosed
-                                          ? theme.colorScheme.onSurfaceVariant
-                                          : returnPct >= 0
-                                              ? Colors.green
-                                              : Colors.redAccent;
-                                      final pnlColor = pnl == null
-                                          ? null
-                                          : pnl >= 0
-                                              ? Colors.green
-                                              : Colors.redAccent;
+                                      final changeColor = switch (true) {
+                                        _ when isClosed =>
+                                          theme.colorScheme.onSurfaceVariant,
+                                        _ when returnPct >= 0 => Colors.green,
+                                        _ => Colors.redAccent,
+                                      };
+                                      final pnlColor = switch (true) {
+                                        _ when pnl == null => null,
+                                        _ when pnl >= 0 => Colors.green,
+                                        _ => Colors.redAccent,
+                                      };
 
                                       return DataRow(
                                         color: summary.symbol == focusedSymbol
@@ -1733,13 +1736,15 @@ class HoldingsPageState extends State<HoldingsPage>
                                               child: Row(
                                                 children: [
                                                   Icon(
-                                                    isClosed
-                                                        ? Icons.history_rounded
-                                                        : returnPct >= 0
-                                                            ? Icons
-                                                                .trending_up_rounded
-                                                            : Icons
-                                                                .trending_down_rounded,
+                                                    switch (true) {
+                                                      _ when isClosed =>
+                                                        Icons.history_rounded,
+                                                      _ when returnPct >= 0 =>
+                                                        Icons
+                                                            .trending_up_rounded,
+                                                      _ => Icons
+                                                          .trending_down_rounded,
+                                                    },
                                                     size: 20,
                                                     color: changeColor,
                                                   ),
@@ -1946,40 +1951,40 @@ class HoldingsPageState extends State<HoldingsPage>
       final query = _search.text.trim();
       return _refreshableState(
         AppEmptyState(
-          icon: ibkrManaged
-              ? Icons.account_balance_rounded
-              : query.isEmpty
-                  ? Icons.candlestick_chart_rounded
-                  : Icons.search_off_rounded,
-          title: ibkrManaged
-              ? context.l10n.text('No IBKR stocks found')
-              : query.isEmpty
-                  ? context.l10n.text('No stocks yet')
-                  : context.l10n.text('No matching stocks'),
-          message: ibkrManaged
-              ? context.l10n.text(
-                  'Refresh your portfolio or check your Interactive Brokers connection.',
-                )
-              : query.isEmpty
-                  ? context.l10n.text(
-                      'Import a CSV or add your first trade manually.',
-                    )
-                  : context.l10n.text(
-                      'Nothing matches “{query}”. You can add that ticker now.',
-                      {'query': query},
-                    ),
-          actionLabel: ibkrManaged
-              ? context.l10n.text('IBKR settings')
-              : query.isEmpty
-                  ? context.l10n.text('Import CSV')
-                  : context.l10n.text('Add {symbol}', {
-                      'symbol': query.toUpperCase(),
-                    }),
-          actionIcon: ibkrManaged
-              ? Icons.settings_rounded
-              : query.isEmpty
-                  ? Icons.upload_file_rounded
-                  : Icons.add_rounded,
+          icon: switch (true) {
+            _ when ibkrManaged => Icons.account_balance_rounded,
+            _ when query.isEmpty => Icons.candlestick_chart_rounded,
+            _ => Icons.search_off_rounded,
+          },
+          title: switch (true) {
+            _ when ibkrManaged => context.l10n.text('No IBKR stocks found'),
+            _ when query.isEmpty => context.l10n.text('No stocks yet'),
+            _ => context.l10n.text('No matching stocks'),
+          },
+          message: switch (true) {
+            _ when ibkrManaged => context.l10n.text(
+                'Refresh your portfolio or check your Interactive Brokers connection.',
+              ),
+            _ when query.isEmpty => context.l10n.text(
+                'Import a CSV or add your first trade manually.',
+              ),
+            _ => context.l10n.text(
+                'Nothing matches “{query}”. You can add that ticker now.',
+                {'query': query},
+              ),
+          },
+          actionLabel: switch (true) {
+            _ when ibkrManaged => context.l10n.text('IBKR settings'),
+            _ when query.isEmpty => context.l10n.text('Import CSV'),
+            _ => context.l10n.text('Add {symbol}', {
+                'symbol': query.toUpperCase(),
+              }),
+          },
+          actionIcon: switch (true) {
+            _ when ibkrManaged => Icons.settings_rounded,
+            _ when query.isEmpty => Icons.upload_file_rounded,
+            _ => Icons.add_rounded,
+          },
           onAction: () {
             if (ibkrManaged || query.isEmpty) {
               openAppSettings(context);
