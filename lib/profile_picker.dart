@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:market_monk/accounts/account_manager.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/utils.dart';
-import 'package:market_monk/main.dart';
 import 'package:provider/provider.dart';
 
 class ProfilePicker extends StatelessWidget {

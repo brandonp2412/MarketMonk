@@ -2,16 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:market_monk/accounts/account_manager.dart';
 import 'package:market_monk/adaptive_layout.dart';
+import 'package:market_monk/app.dart';
 import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/edit_ticker_page.dart';
 import 'package:market_monk/google_finance_url.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
-import 'package:market_monk/utils.dart';
-import 'package:market_monk/main.dart';
 import 'package:market_monk/sqlite_settings.dart';
+import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 

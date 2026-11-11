@@ -1,7 +1,7 @@
-import 'package:market_monk/desktop_context_menu.dart';
 import 'package:flutter/material.dart';
+import 'package:market_monk/accounts/account_manager.dart';
+import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
-import 'package:market_monk/main.dart';
 import 'package:provider/provider.dart';
 
 /// Lets the user create, switch between, and delete named portfolio accounts.

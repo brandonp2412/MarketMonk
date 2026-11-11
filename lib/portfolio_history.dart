@@ -1,14 +1,14 @@
 import 'package:drift/drift.dart';
+import 'package:market_monk/accounts/account_manager.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/holdings_page.dart' show tradesFromIbkr;
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/logging.dart';
-import 'package:market_monk/main.dart';
 import 'package:market_monk/portfolio_allocation.dart';
 import 'package:market_monk/portfolio_returns.dart';
 import 'package:market_monk/profile_data_repository.dart';
-import 'package:market_monk/utils.dart';
 import 'package:market_monk/sqlite_settings.dart';
+import 'package:market_monk/utils.dart';
 
 typedef PortfolioCandleSync = Future<void> Function(
   String symbol,
