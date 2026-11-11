@@ -88,6 +88,15 @@ void main() {
     await tester.pump();
   }
 
+  Future<void> resetRange(WidgetTester tester) async {
+    final chartFocus = tester
+        .widgetList<Focus>(find.byType(Focus))
+        .firstWhere((widget) => widget.focusNode?.debugLabel == 'Chart');
+    chartFocus.focusNode!.requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyR);
+  }
+
   testWidgets('keyboard selects points, filters a range and resets zoom',
       (tester) async {
     await tester.pumpWidget(chart(pickRange: true));
@@ -102,11 +111,11 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
-    expect(find.byTooltip('Reset zoom'), findsOneWidget);
+    expect(find.byType(FloatingActionButton), findsNothing);
     expect(scene(tester).marks.map((mark) => mark.index).toSet(), {0, 1, 2});
     await tester.sendKeyEvent(LogicalKeyboardKey.keyR);
     await tester.pump();
-    expect(find.byTooltip('Reset zoom'), findsNothing);
+    expect(find.byTooltip('Remove filter'), findsNothing);
     expect(scene(tester).marks.length, 10);
   });
 
@@ -487,7 +496,7 @@ void main() {
     expect(scene(tester).scale!.maxValue, lessThan(8));
     await drag(tester, 3, 5);
     expect(scene(tester).marks.map((mark) => mark.index), [3, 4, 5]);
-    await tester.tap(find.byTooltip('Reset zoom'));
+    await resetRange(tester);
     await tester.pump();
     expect(scene(tester).marks, hasLength(10));
   });
@@ -576,7 +585,7 @@ void main() {
       [3, 4, 5, 6, 7, 8, 9],
     );
     expect(scene(tester).marks.first.center.dx, 64);
-    await tester.tap(find.byTooltip('Reset zoom'));
+    await resetRange(tester);
     await tester.pump();
     expect(scene(tester).marks, hasLength(10));
   });
@@ -605,7 +614,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Start from this date'), findsNothing);
     expect(scene(tester).marks, hasLength(10));
-    expect(find.byTooltip('Reset zoom'), findsNothing);
+    expect(find.byTooltip('Remove filter'), findsNothing);
   });
 
   testWidgets(
@@ -684,7 +693,7 @@ void main() {
         expect(marks[i].value, closeTo(expected[i], 1e-9));
       }
     }
-    await tester.tap(find.byTooltip('Reset zoom'));
+    await resetRange(tester);
     await tester.pump();
     expect(scene(tester).scale!.maxValue, greaterThan(646.5));
   });
@@ -692,10 +701,10 @@ void main() {
   testWidgets('clicks and touch drags keep the full range', (tester) async {
     await tester.pumpWidget(chart());
     await drag(tester, 3, 3);
-    expect(find.byTooltip('Reset zoom'), findsNothing);
+    expect(find.byTooltip('Remove filter'), findsNothing);
     await drag(tester, 2, 7, kind: PointerDeviceKind.touch);
     expect(scene(tester).marks, hasLength(10));
-    expect(find.byTooltip('Reset zoom'), findsNothing);
+    expect(find.byTooltip('Remove filter'), findsNothing);
   });
 
   testWidgets('mobile range picker requires arming and two released taps',
@@ -713,9 +722,6 @@ void main() {
     await tester.pumpWidget(
       chart(platform: TargetPlatform.android, pickRange: true),
     );
-    await drag(tester, 2, 7, kind: PointerDeviceKind.touch);
-    expect(find.byKey(const Key('chart-range-start-dot')), findsNothing);
-
     await tester.tapAt(first);
     await tester.pump();
     expect(find.byKey(const Key('chart-range-start-dot')), findsOneWidget);
@@ -728,15 +734,71 @@ void main() {
     await tester.tapAt(last);
     await tester.pump();
     expect(scene(tester).marks.map((mark) => mark.index), [2, 3, 4, 5, 6, 7]);
-    expect(find.text('Filtered'), findsOneWidget);
-    expect(find.text('Undo'), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
+    expect(find.byType(FloatingActionButton), findsNothing);
     expect(find.byKey(const Key('chart-range-start-dot')), findsNothing);
 
     await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.text('Undo'));
+    await resetRange(tester);
     await tester.pump();
     expect(scene(tester).marks, hasLength(10));
   });
+
+  testWidgets('mobile picker commits each point only on finger release',
+      (tester) async {
+    await tester.pumpWidget(
+      chart(platform: TargetPlatform.android, pickRange: true),
+    );
+    final marks = scene(tester).marks;
+    final first = await tester.startGesture(marks[0].center);
+    await first.moveTo(marks[2].center);
+    await tester.pump();
+    expect(find.byKey(const Key('chart-range-start-dot')), findsNothing);
+    await first.up();
+    await tester.pump();
+    expect(find.byKey(const Key('chart-range-start-dot')), findsOneWidget);
+    final second = await tester.startGesture(marks[4].center);
+    await second.moveTo(marks[7].center);
+    await tester.pump();
+    expect(scene(tester).marks, hasLength(10));
+    await second.up();
+    await tester.pumpAndSettle();
+    expect(scene(tester).marks.map((mark) => mark.index), [2, 3, 4, 5, 6, 7]);
+    expect(find.byType(SnackBar), findsNothing);
+    expect(find.byType(FloatingActionButton), findsNothing);
+  });
+
+  for (final release in [
+    const Offset(850, 150),
+    const Offset(-50, 150),
+    const Offset(600, -50),
+    const Offset(600, 350),
+  ]) {
+    testWidgets('mobile picker selects end when released outside at $release',
+        (tester) async {
+      await tester.pumpWidget(
+        chart(platform: TargetPlatform.android, pickRange: true),
+      );
+      final initialScene = scene(tester);
+      await tester.tapAt(initialScene.marks[2].center);
+      await tester.pump();
+      final end = await tester.startGesture(initialScene.marks[4].center);
+      await tester.pump(const Duration(milliseconds: 600));
+      await end.moveTo(release);
+      await tester.pump();
+      expect(scene(tester).marks, hasLength(10));
+      await end.up();
+      await tester.pump();
+      final last = ChartHitTest.nearestIndexAtX(initialScene, release.dx)!;
+      final start = last < 2 ? last : 2;
+      final finish = last > 2 ? last : 2;
+      expect(
+        scene(tester).marks.map((mark) => mark.index),
+        [for (var i = start; i <= finish; i++) i],
+      );
+      expect(find.byKey(const Key('chart-range-start-dot')), findsNothing);
+    });
+  }
 
   testWidgets('canceling range mode clears the first selection',
       (tester) async {
@@ -762,7 +824,8 @@ void main() {
     await tester.pumpWidget(chart());
     expect(scene(tester).marks, hasLength(6));
     await tester.pumpWidget(chart(valueOffset: 100));
+    await tester.pumpAndSettle();
     expect(scene(tester).marks, hasLength(10));
-    expect(find.byTooltip('Reset zoom'), findsNothing);
+    expect(find.byTooltip('Remove filter'), findsNothing);
   });
 }

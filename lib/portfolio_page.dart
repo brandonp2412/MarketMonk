@@ -187,7 +187,10 @@ class PortfolioPageState extends State<PortfolioPage>
         (first, second) => first.isBefore(second) ? first : second,
       );
       _inceptionDate = portfolioInception(performance);
-      final covered = <int>[0, -1];
+      final covered = <int>[
+        0,
+        if (_allocationAt(positions, -1) != null) -1,
+      ];
       for (var period = 1; period < _periods.length; period++) {
         final cutoff = _cutoff(period, DateTime.now())!;
         if (cutoff.isBefore(firstKnownDate)) continue;
@@ -197,7 +200,8 @@ class PortfolioPageState extends State<PortfolioPage>
           }
           continue;
         }
-        if (accountNetAssetValueAt(performance, cutoff) != null) {
+        if (accountNetAssetValueAt(performance, cutoff) != null &&
+            _allocationAt(positions, period) != null) {
           covered.add(period);
         }
       }
@@ -261,12 +265,9 @@ class PortfolioPageState extends State<PortfolioPage>
     List<Position> positions,
   ) async {
     _historyAccount = account;
-    _historyLoading = true;
+    _historyLoading = _returnHistory == null;
     _historyRefreshing = true;
     _historyFailed = false;
-    _returnCandles = {};
-    _returnTrades = [];
-    _returnHistory = null;
     final accounts = context.read<AccountManager>();
     final accountName = accounts.activeAccount;
     try {
@@ -280,18 +281,9 @@ class PortfolioPageState extends State<PortfolioPage>
         cacheOnly: true,
       );
       if (!mounted || _historyAccount != account) return;
-      final performance = accounts.ibkrPerformanceCacheFor(accountName, '1Y');
-      final inception = portfolioInception(performance);
       final hasBrokerTrades = !accounts.ibkrConfigFor(accountName).enabled ||
           accounts.ibkrTradeHistoryCacheFor(accountName)?.available == true;
-      if (hasBrokerTrades &&
-          (inception == null ||
-              cachedHistory.allocationAt(
-                    positions: positions,
-                    date: inception,
-                    performance: performance,
-                  ) !=
-                  null)) {
+      if (hasBrokerTrades) {
         setState(() {
           _returnHistory = cachedHistory;
           _returnTrades = cachedHistory.trades;
@@ -550,10 +542,6 @@ class PortfolioPageState extends State<PortfolioPage>
             touchedIndex = null;
           }),
         ),
-        SizedBox(
-          height: 4,
-          child: _historyLoading ? const LinearProgressIndicator() : null,
-        ),
         if (_historyFailed)
           TextButton.icon(
             onPressed: () => setState(() => _historyAccount = null),
@@ -628,6 +616,11 @@ class PortfolioPageState extends State<PortfolioPage>
     }
 
     _historyAccount = null;
+    if (accountChanged || ibkrConfig != _lastIbkrConfig) {
+      _returnCandles = {};
+      _returnTrades = [];
+      _returnHistory = null;
+    }
     _lastAccount = account;
     _lastIbkrConfig = ibkrConfig;
     _lastIbkrRefreshVersion = refreshVersion;
@@ -1333,13 +1326,11 @@ class PortfolioPageState extends State<PortfolioPage>
       unawaited(_ensureReturnHistory(historyKey, positions));
     }
 
-    if (widget.isActive) {
-      _availablePeriods = _coveredPeriods(
-        positions,
-        performance,
-        netLiquidation,
-      );
-    }
+    _availablePeriods = _coveredPeriods(
+      positions,
+      performance,
+      netLiquidation,
+    );
     if (!_availablePeriods.contains(_period)) _period = _availablePeriods.first;
 
     final totalValue = positions.fold(
@@ -1376,11 +1367,10 @@ class PortfolioPageState extends State<PortfolioPage>
     final allocation = intraday
         ? _intradayAllocationAt(positions, cutoff)
         : _allocationAt(
-              positions,
-              _period,
-              cashValueUsd: _returnCutoff == null ? cashUsd : null,
-            ) ??
-            [];
+            positions,
+            _period,
+            cashValueUsd: _returnCutoff == null ? cashUsd : null,
+          )!;
     final allocationTotal = allocation.fold<double>(
       0,
       (sum, holding) => sum + holding.value,
@@ -1511,11 +1501,7 @@ class PortfolioPageState extends State<PortfolioPage>
                 alignment: Alignment.center,
                 children: [
                   if (slices.isEmpty)
-                    Text(
-                      _allocationAt(positions, _period) == null
-                          ? 'Holdings history unavailable for this date'
-                          : 'No holdings on this date',
-                    )
+                    const Text('No holdings on this date')
                   else
                     MarketDonutChart(
                       slices: slices,
@@ -1598,7 +1584,6 @@ class PortfolioPageState extends State<PortfolioPage>
     required List<PortfolioAllocation> sorted,
     required int? selectedIndex,
     required bool compact,
-    required bool historyAvailable,
   }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -1607,11 +1592,7 @@ class PortfolioPageState extends State<PortfolioPage>
       alignment: Alignment.center,
       children: [
         if (slices.isEmpty)
-          Text(
-            historyAvailable
-                ? 'No holdings on this date'
-                : 'Holdings history unavailable for this date',
-          )
+          const Text('No holdings on this date')
         else
           MarketDonutChart(
             slices: slices,
@@ -1992,11 +1973,6 @@ class PortfolioPageState extends State<PortfolioPage>
                                         child: AspectRatio(
                                           aspectRatio: 1,
                                           child: _buildDesktopAllocationChart(
-                                            historyAvailable: _allocationAt(
-                                                  positions,
-                                                  _period,
-                                                ) !=
-                                                null,
                                             slices: slices,
                                             sorted: sorted,
                                             selectedIndex: selectedIndex,

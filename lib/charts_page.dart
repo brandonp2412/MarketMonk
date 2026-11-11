@@ -2197,11 +2197,6 @@ class ChartsPageState extends State<ChartsPage>
       _customChartRange = null;
       _pickingChartRange = true;
     });
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    messenger?.hideCurrentSnackBar();
-    messenger?.showSnackBar(
-      const SnackBar(content: Text('Pick start and end dots')),
-    );
   }
 
   String get _chartPeriodCacheKey {
@@ -3616,7 +3611,8 @@ class ChartsPageState extends State<ChartsPage>
 
     for (final account in accounts) {
       final series = _portfolioSeriesByAccount[account];
-      if (!_hiddenAccounts.contains(account) &&
+      if (!accountManager.isAccountHidden(account) &&
+          !_hiddenAccounts.contains(account) &&
           series != null &&
           series.isNotEmpty) {
         visibleSeries[account] = series;
@@ -3909,13 +3905,14 @@ class ChartsPageState extends State<ChartsPage>
     final rows = Column(
       children: [
         for (final accountName in accounts)
-          _buildAccountSummaryRow(
-            context,
-            accounts,
-            accountName,
-            _portfolioSeriesByAccount[accountName] ?? const [],
-            accountColors,
-          ),
+          if (!context.read<AccountManager>().isAccountHidden(accountName))
+            _buildAccountSummaryRow(
+              context,
+              accounts,
+              accountName,
+              _portfolioSeriesByAccount[accountName] ?? const [],
+              accountColors,
+            ),
       ],
     );
     return Padding(
@@ -4061,6 +4058,22 @@ class ChartsPageState extends State<ChartsPage>
               child: ListTile(
                 dense: true,
                 key: Key('chart-account-selector-$accountName'),
+                onLongPress: () => showModalBottomSheet<void>(
+                  context: context,
+                  showDragHandle: true,
+                  builder: (sheetContext) => SafeArea(
+                    child: ListTile(
+                      leading: const Icon(Icons.visibility_off_outlined),
+                      title: Text(context.l10n.text('Hide this account')),
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        unawaited(
+                          accountManager.setAccountHidden(accountName, true),
+                        );
+                      },
+                    ),
+                  ),
+                ),
                 onTap: () => setState(() {
                   if (isHidden) {
                     _hiddenAccounts.remove(accountName);

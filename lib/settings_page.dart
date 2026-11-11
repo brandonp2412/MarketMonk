@@ -21,8 +21,8 @@ import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';
 import 'package:market_monk/vi_keys.dart';
 import 'package:market_monk/vi_navigation.dart';
-import 'package:market_monk/theme_color_wheel.dart';
 import 'package:market_monk/whats_new.dart';
+import 'package:market_monk/theme_color_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -115,7 +115,6 @@ class _SettingsPageState extends State<SettingsPage> {
       'Chart gridlines',
       'Chart shading',
     ],
-    'Keyboard': ['Vi key bindings', 'Reset to defaults'],
     'Accounts': ['Manage accounts', 'Currencies', 'Interactive Brokers'],
     'Data': ['Export database', 'Import database', 'Import CSV', 'Sync'],
     'Danger zone': ['Delete all data'],
@@ -211,7 +210,7 @@ class _SettingsPageState extends State<SettingsPage> {
           isDesktopLayout(context) ? 24 : 16,
           12,
           isDesktopLayout(context) ? 24 : 16,
-          8,
+          0,
         ),
         child: Center(
           child: ConstrainedBox(
@@ -1572,30 +1571,6 @@ class _SettingsPageState extends State<SettingsPage> {
               settings,
               height: MediaQuery.of(context).size.height * 0.3,
             ),
-          if (_hasMatches('Keyboard', _mobileSearchOptions['Keyboard']!))
-            _sectionHeader(context.l10n.text('Keyboard')),
-          if (_matchesSearch('Keyboard', 'Vi key bindings'))
-            ListTile(
-              key: const Key('settings-vi-mode'),
-              leading: const Icon(Icons.keyboard_tab),
-              title: Text(context.l10n.text('Vi key bindings')),
-              trailing: Switch(
-                value: settings.viModeEnabled,
-                onChanged: settings.setViModeEnabled,
-              ),
-              onTap: () => settings.setViModeEnabled(!settings.viModeEnabled),
-            ),
-          for (final action in ViAction.values)
-            if (_matchesSearch('Keyboard', action.label))
-              _viBindingRow(settings, action),
-          if (_matchesSearch('Keyboard', 'Reset to defaults'))
-            ListTile(
-              key: const Key('settings-vi-reset'),
-              leading: const Icon(Icons.restart_alt),
-              title: Text(context.l10n.text('Reset to defaults')),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => settings.resetViBindings(),
-            ),
           if (_hasMatches('Accounts', _mobileSearchOptions['Accounts']!))
             _sectionHeader(context.l10n.text('Accounts')),
           if (_matchesSearch('Accounts', 'Manage accounts'))
@@ -2022,13 +1997,7 @@ class _IbkrSettingsDialogState extends State<_IbkrSettingsDialog> {
       );
 }
 
-Color? parseHexThemeColor(String input) {
-  final hex = input.trim().replaceFirst(RegExp(r'^#'), '');
-  if (!RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(hex)) return null;
-  return Color(int.parse('FF$hex', radix: 16));
-}
-
-class _ColorPicker extends StatefulWidget {
+class _ColorPicker extends StatelessWidget {
   static const _colors = [
     defaultSeedColor,
     Color(0xFF2B7A78),
@@ -2048,60 +2017,8 @@ class _ColorPicker extends StatefulWidget {
   const _ColorPicker({required this.settings});
 
   @override
-  State<_ColorPicker> createState() => _ColorPickerState();
-}
-
-class _ColorPickerState extends State<_ColorPicker> {
-  late final TextEditingController _hexController;
-  late Color _lastSeedColor;
-  String? _hexError;
-
-  static String _hexFor(Color color) => color
-      .toARGB32()
-      .toRadixString(16)
-      .padLeft(8, '0')
-      .substring(2)
-      .toUpperCase();
-
-  @override
-  void initState() {
-    super.initState();
-    _lastSeedColor = widget.settings.seedColor;
-    _hexController = TextEditingController(text: _hexFor(_lastSeedColor));
-  }
-
-  @override
-  void didUpdateWidget(covariant _ColorPicker oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (_lastSeedColor != widget.settings.seedColor) {
-      _lastSeedColor = widget.settings.seedColor;
-      _hexController.text = _hexFor(_lastSeedColor);
-      _hexError = null;
-    }
-  }
-
-  @override
-  void dispose() {
-    _hexController.dispose();
-    super.dispose();
-  }
-
-  void _applyHex() {
-    final selected = parseHexThemeColor(_hexController.text);
-    if (selected == null) {
-      setState(() => _hexError = 'Enter a 6-digit hex color');
-      return;
-    }
-    setState(() => _hexError = null);
-    runDetachedTask(
-      widget.settings.setSeedColor(selected),
-      'Failed to save custom theme color',
-    );
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final selectedColor = widget.settings.seedColor;
+    final custom = !_colors.contains(settings.seedColor);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       child: Column(
@@ -2109,100 +2026,98 @@ class _ColorPickerState extends State<_ColorPicker> {
         children: [
           Text(
             context.l10n.text('App color'),
-            style: Theme.of(context).textTheme.bodyMedium,
+            style: Theme.of(context).textTheme.bodyLarge,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 10,
+            runSpacing: 10,
             children: [
-              for (final color in _ColorPicker._colors)
-                InkWell(
-                  onTap: () => widget.settings.setSeedColor(color),
-                  customBorder: const CircleBorder(),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: selectedColor == color
-                            ? Theme.of(context).colorScheme.onSurface
-                            : Colors.transparent,
-                        width: 3,
-                      ),
-                    ),
-                    child: selectedColor == color
-                        ? Icon(
-                            Icons.check,
-                            color: color.computeLuminance() > 0.5
-                                ? Colors.black
-                                : Colors.white,
-                            size: 20,
-                          )
-                        : null,
+              for (final color in _colors)
+                _colorSwatch(
+                  context,
+                  color: color,
+                  selected: settings.seedColor == color,
+                  onTap: () => runDetachedTask(
+                    settings.setSeedColor(color),
+                    'Failed to save theme color',
                   ),
                 ),
-              if (!_ColorPicker._colors.contains(selectedColor))
-                Container(
-                  key: const Key('settings-custom-color-preview'),
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: selectedColor,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      width: 3,
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.check,
-                    color: selectedColor.computeLuminance() > 0.5
-                        ? Colors.black
-                        : Colors.white,
-                    size: 20,
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ThemeColorWheel(
-            color: selectedColor,
-            onChanged: (color) => runDetachedTask(
-              widget.settings.setSeedColor(color),
-              'Failed to save theme color',
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: 220,
-            child: TextField(
-              key: const Key('settings-custom-color-hex'),
-              controller: _hexController,
-              textCapitalization: TextCapitalization.characters,
-              maxLength: 7,
-              onSubmitted: (_) => _applyHex(),
-              decoration: InputDecoration(
-                labelText: 'Hex color',
-                hintText: '#RRGGBB',
-                errorText: _hexError,
-                border: const OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  key: const Key('settings-apply-custom-color'),
-                  tooltip: 'Apply color',
-                  onPressed: _applyHex,
-                  icon: const Icon(Icons.check_rounded),
-                ),
+              _colorSwatch(
+                context,
+                color: custom
+                    ? settings.seedColor
+                    : Theme.of(context).colorScheme.surfaceContainerHighest,
+                selected: custom,
+                custom: true,
+                onTap: () async {
+                  final selected =
+                      await showThemeColorPicker(context, settings.seedColor);
+                  if (selected != null) {
+                    runDetachedTask(
+                      settings.setSeedColor(selected),
+                      'Failed to save custom theme color',
+                    );
+                  }
+                },
               ),
-            ),
+            ],
           ),
         ],
       ),
     );
   }
+}
+
+Widget _colorSwatch(
+  BuildContext context, {
+  required Color color,
+  required bool selected,
+  required VoidCallback onTap,
+  bool custom = false,
+}) {
+  final label = custom
+      ? context.l10n.text('Custom color')
+      : '#${(color.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
+  return Tooltip(
+    message: label,
+    child: Semantics(
+      label: label,
+      button: true,
+      selected: selected,
+      child: InkWell(
+        key: Key(
+          custom ? 'theme-color-custom' : 'theme-color-${color.toARGB32()}',
+        ),
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: selected
+                  ? Theme.of(context).colorScheme.onSurface
+                  : Theme.of(context).colorScheme.outlineVariant,
+              width: selected ? 3 : 1,
+            ),
+          ),
+          child: selected || custom
+              ? Icon(
+                  custom ? Icons.colorize_rounded : Icons.check_rounded,
+                  size: 19,
+                  color: color.computeLuminance() > 0.45
+                      ? Colors.black
+                      : Colors.white,
+                )
+              : null,
+        ),
+      ),
+    ),
+  );
 }
 
 class _ViRebindDialog extends StatefulWidget {

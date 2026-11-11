@@ -441,22 +441,45 @@ void main() {
     await settings.setSystemColors(false);
     await tester.pumpAndSettle();
 
-    final hexField = find.byKey(const Key('settings-custom-color-hex'));
-    expect(hexField, findsOneWidget);
+    final originalColor = settings.seedColor;
+    final customButton = find.byKey(const Key('theme-color-custom'));
+    await tester.tap(customButton);
+    await tester.pumpAndSettle();
+    final hexField = find.byKey(const Key('theme-hex-field'));
     await tester.enterText(hexField, '#123ABC');
-    await tester.tap(find.byKey(const Key('settings-apply-custom-color')));
     await tester.pumpAndSettle();
-    expect(settings.seedColor, const Color(0xFF123ABC));
-    expect(
-      find.byKey(const Key('settings-custom-color-preview')),
-      findsOneWidget,
-    );
+    expect(settings.seedColor, originalColor);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(settings.seedColor, originalColor);
 
+    await tester.tap(customButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('theme-saturation-value')));
+    await tester.drag(
+      find.byKey(const Key('theme-hue-slider')),
+      const Offset(30, 0),
+    );
+    await tester.pumpAndSettle();
+    expect(settings.seedColor, originalColor);
     await tester.enterText(hexField, 'invalid');
-    await tester.tap(find.byKey(const Key('settings-apply-custom-color')));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('theme-color-save')))
+          .onPressed,
+      isNull,
+    );
+    await tester.enterText(hexField, '#123ABC');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('theme-color-save')));
     await tester.pumpAndSettle();
     expect(settings.seedColor, const Color(0xFF123ABC));
-    expect(find.text('Enter a 6-digit hex color'), findsOneWidget);
+    await tester.tap(customButton);
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(hexField).controller!.text, '#123ABC');
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
 
     await tester.enterText(
       find.byKey(const Key('settings-search')),

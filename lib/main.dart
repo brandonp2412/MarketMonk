@@ -255,6 +255,28 @@ class AccountManager extends ChangeNotifier {
   List<String> accounts = ['Default'];
   String activeAccount = 'Default';
   int ibkrRefreshVersion = 0;
+  final Set<String> _hiddenProfileIds = {};
+
+  bool isAccountHidden(String name) =>
+      _hiddenProfileIds.contains(_profileIdsByName[name]);
+
+  Future<void> setAccountHidden(String name, bool hidden) =>
+      _serializeStorage(() async {
+        final profileId = _profileIdsByName[name];
+        if (profileId == null) return;
+        final updated = {..._hiddenProfileIds};
+        if (hidden) {
+          updated.add(profileId);
+        } else {
+          updated.remove(profileId);
+        }
+        final prefs = await SqliteSettings.getInstance();
+        await prefs.setStringList('hiddenChartProfileIds', updated.toList());
+        _hiddenProfileIds
+          ..clear()
+          ..addAll(updated);
+        notifyListeners();
+      });
   final Map<String, IbkrAccountConfig> _ibkrConfigs = {};
   static const ibkrPortfolioCacheMaxAge =
       BackgroundNetworkCoordinator.ibkrPortfolioFreshness;
@@ -270,6 +292,9 @@ class AccountManager extends ChangeNotifier {
   /// Loads the profile registry, credentials and caches from SQLite.
   Future<void> init() async {
     final prefs = await SqliteSettings.getInstance();
+    _hiddenProfileIds
+      ..clear()
+      ..addAll(prefs.getStringList('hiddenChartProfileIds') ?? []);
     _ibkrConfigs.clear();
     _portfolioCache.clear();
     _ibkrTradeHistoryCache.clear();

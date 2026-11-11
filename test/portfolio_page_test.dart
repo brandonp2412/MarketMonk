@@ -854,8 +854,8 @@ void main() {
         commission: 0,
         rawCurrency: 'USD',
       );
-      for (final period in [7, 8, 9, 10, 11, 12]) {
-        final date = portfolioReturnCutoff(period, now)!;
+      for (final period in [-1, 7, 8, 9, 10, 11, 12]) {
+        final date = period == -1 ? start : portfolioReturnCutoff(period, now)!;
         for (final symbol in ['VOO', 'MSFT', 'OLD']) {
           await testDatabase.into(testDatabase.candles).insert(
                 CandlesCompanion.insert(
@@ -980,6 +980,19 @@ void main() {
         );
       }
       expect(find.text('63.6%'), findsOneWidget);
+      if (width < 840) {
+        final refresh = tester.widget<RefreshIndicator>(
+          find.byType(RefreshIndicator),
+        );
+        unawaited(refresh.onRefresh());
+        for (var frame = 0; frame < 10; frame++) {
+          await tester.pump();
+          final current = tester.widget<Slider>(finder);
+          expect(current.divisions, slider.divisions);
+          expect(current.value, 1);
+        }
+        await tester.pumpAndSettle();
+      }
       tester.widget<Slider>(finder).onChanged!(0);
       await tester.pump();
       expect(pieValues(), {'VOO': 5500, 'MSFT': 1000});
@@ -1157,6 +1170,14 @@ void main() {
         returns: const [0, .21],
       ),
     );
+    await testDatabase.into(testDatabase.candles).insert(
+          CandlesCompanion.insert(
+            symbol: holding.symbol,
+            date: portfolioReturnCutoff(10, now)!,
+            close: const Value(10),
+            rawCurrency: const Value('USD'),
+          ),
+        );
     final brokerHistory = accounts.ibkrTradeHistoryCacheFor('Default')!;
     final expiredAt = DateTime(2000);
     await testDatabase.writeIbkrCache(
@@ -1223,6 +1244,144 @@ void main() {
     expect(tester.takeException(), null);
   });
 
+  testWidgets('cached IBKR periods survive missing inception prices', (
+    tester,
+  ) async {
+    await seedTestSqlite({});
+    final accounts = await configuredAccounts();
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day - 70);
+    await accounts.cachePortfolio(
+      'Default',
+      [cachedPosition()],
+      const IbkrAccountValue(value: 121, currency: 'USD'),
+    );
+    final holding = cachedPosition();
+    await accounts.cacheIbkrTradeHistory(
+      'Default',
+      IbkrTradeHistory(
+        available: true,
+        trades: [
+          IbkrTrade(
+            symbol: holding.symbol,
+            name: holding.name,
+            currency: 'USD',
+            conid: 1,
+            quantity: holding.netShares,
+            price: holding.avgCost,
+            tradeType: 'open',
+            tradeDate: start.subtract(const Duration(days: 10)),
+            realizedPnl: 0,
+            commission: 0,
+          ),
+        ],
+      ),
+    );
+    await accounts.cacheIbkrPerformance(
+      'Default',
+      IbkrPerformanceSeries(
+        period: '1Y',
+        measure: 'TWR',
+        currency: 'USD',
+        startDate: start.subtract(const Duration(days: 3)),
+        startNav: 0,
+        dates: [start, portfolioReturnCutoff(10, now)!],
+        nav: const [10000, 12100],
+        returnDates: [start, portfolioReturnCutoff(10, now)!],
+        returns: const [0, .21],
+      ),
+    );
+    await testDatabase.into(testDatabase.candles).insert(
+          CandlesCompanion.insert(
+            symbol: holding.symbol,
+            date: portfolioReturnCutoff(10, now)!,
+            close: const Value(550),
+            rawCurrency: const Value('USD'),
+          ),
+        );
+    final brokerHistory = accounts.ibkrTradeHistoryCacheFor('Default')!;
+    final expiredAt = DateTime(2000);
+    await testDatabase.writeIbkrCache(
+      profileId: (await testDatabase.readProfileByName('Default'))!.id,
+      kind: 'trades',
+      cacheKey: 'history',
+      payloadJson: jsonEncode(
+        CachedIbkrTradeHistoryData(
+          history: brokerHistory,
+          cachedAt: expiredAt,
+        ).toJson(),
+      ),
+      cachedAt: expiredAt,
+    );
+    final reloaded = testAccountManager();
+    await reloaded.init();
+    final pending = Completer<IbkrPortfolioSnapshot>();
+    final tradeRefresh = Completer<IbkrTradeHistory>();
+    var tradeLoads = 0;
+    await tester.pumpWidget(
+      app(
+        reloaded,
+        _portfolioPage(
+          ibkrLoader: (_) => pending.future,
+          historyTradeLoader: (_) {
+            tradeLoads++;
+            return tradeRefresh.future;
+          },
+          historyCandleSync: (symbol, from, config) async {
+            await testDatabase.into(testDatabase.candles).insert(
+                  CandlesCompanion.insert(
+                    symbol: symbol,
+                    date: start,
+                    close: const Value(550),
+                    rawCurrency: const Value('USD'),
+                  ),
+                );
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tradeLoads, 1);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    final slider = tester.widget<Slider>(
+      find.byKey(const Key('portfolio-return-period')),
+    );
+    expect(slider.semanticFormatterCallback!(1), contains('1D ago'));
+    expect(
+      slider.semanticFormatterCallback!(slider.max),
+      contains('1D ago'),
+    );
+    expect(slider.onChanged == null, isFalse);
+    expect(tester.takeException(), null);
+    slider.onChanged!(1);
+    await tester.pump();
+    expect(find.text('No holdings on this date'), findsNothing);
+    expect(
+      tester
+          .widget<MarketDonutChart>(find.byType(MarketDonutChart))
+          .slices
+          .map((slice) => slice.label),
+      contains('VOO'),
+    );
+    tradeRefresh.complete(brokerHistory);
+    await tester.pumpAndSettle();
+    final updated = tester.widget<Slider>(
+      find.byKey(const Key('portfolio-return-period')),
+    );
+    expect(
+      updated.semanticFormatterCallback!(updated.max),
+      contains('Inception'),
+    );
+    for (var index = 1; index <= updated.max; index++) {
+      updated.onChanged!(index.toDouble());
+      await tester.pump();
+      expect(find.byType(MarketDonutChart), findsOneWidget);
+      expect(find.text('No holdings on this date'), findsNothing);
+    }
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(tester.takeException(), null);
+  });
+
   testWidgets('short-lived IBKR portfolios get sub-day period dots', (
     tester,
   ) async {
@@ -1283,8 +1442,8 @@ void main() {
         returns: List.filled(historyDates.length, 0),
       ),
     );
-    for (final period in [7, 8, 9, 10, 11, 12]) {
-      final date = portfolioReturnCutoff(period, now)!;
+    for (final period in [-1, 7, 8, 9, 10, 11, 12]) {
+      final date = period == -1 ? start : portfolioReturnCutoff(period, now)!;
       for (final symbol in ['VOO', 'MSFT']) {
         await testDatabase.into(testDatabase.candles).insert(
               CandlesCompanion.insert(

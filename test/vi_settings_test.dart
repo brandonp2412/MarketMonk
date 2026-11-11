@@ -226,38 +226,32 @@ void main() {
     expect(find.text('Keyboard'), findsOneWidget);
   });
 
-  testWidgets('mobile keyboard section lists the vi controls', (tester) async {
-    final settings = await pumpSettings(tester, const Size(430, 940));
+  testWidgets('mobile settings hide keyboard controls and search results',
+      (tester) async {
+    await pumpSettings(tester, const Size(430, 940));
     final list = find.descendant(
       of: find.byType(ListView),
       matching: find.byType(Scrollable),
     );
-    // The mobile list builds children lazily. scrollUntilVisible aligns the
-    // target without pumping, so pump a frame to keep the element tree in
-    // sync with the scroll position before the next lookup.
-    final targets = <Finder>[
-      find.text('Keyboard'),
-      viModeRow(),
-      for (final action in ViAction.values) bindingRow(action),
-      resetRow(),
-    ];
-    for (final target in targets) {
-      await tester.scrollUntilVisible(target, 300, scrollable: list);
-      await tester.pump();
-      expect(target, findsOneWidget);
-    }
-    // Scroll back to the top of the section to read the row label and switch.
-    await tester.scrollUntilVisible(viModeRow(), -300, scrollable: list);
-    await tester.pump();
-    expect(rowKeyLabel(tester, ViAction.search), '/');
-    expect(
-      tester
-          .widget<Switch>(
-            find.descendant(of: viModeRow(), matching: find.byType(Switch)),
-          )
-          .value,
-      isTrue,
+    await tester.scrollUntilVisible(
+      find.text('Accounts'),
+      300,
+      scrollable: list,
     );
-    expect(settings.viModeEnabled, isTrue);
+    await tester.pump();
+    expect(find.text('Keyboard'), findsNothing);
+    expect(viModeRow(), findsNothing);
+    for (final action in ViAction.values) {
+      expect(bindingRow(action), findsNothing);
+    }
+    expect(resetRow(), findsNothing);
+
+    await tester.enterText(
+      find.byKey(const Key('settings-search')),
+      'keyboard',
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Keyboard'), findsNothing);
+    expect(find.text('No matching settings'), findsOneWidget);
   });
 }

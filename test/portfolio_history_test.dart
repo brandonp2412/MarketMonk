@@ -201,6 +201,64 @@ void main() {
     }
   });
 
+  test('10 August allocation uses same-day cached prices with a time',
+      () async {
+    final accounts = await setup();
+    final day = DateTime(2026, 8, 10);
+    final series = IbkrPerformanceSeries(
+      period: '1Y',
+      measure: 'TWR',
+      currency: 'USD',
+      startDate: day,
+      startNav: 1000,
+      dates: [day],
+      nav: const [1000],
+      returnDates: [day],
+      returns: const [0],
+    );
+    await accounts.cacheIbkrPerformance('Default', series);
+    await accounts.cacheIbkrTradeHistory(
+      'Default',
+      const IbkrTradeHistory(available: true, trades: []),
+    );
+    for (final entry in {
+      DateTime(2026, 8, 7): 250.0,
+      DateTime(2026, 8, 10, 12): 100.0,
+    }.entries) {
+      await testDatabase.into(testDatabase.candles).insert(
+            CandlesCompanion.insert(
+              symbol: 'OPEN',
+              date: entry.key,
+              close: Value(entry.value),
+              rawCurrency: const Value('USD'),
+            ),
+          );
+    }
+    for (final cacheOnly in [true, false]) {
+      final history = await loadPortfolioHistory(
+        accounts: accounts,
+        accountName: 'Default',
+        positions: positions,
+        database: testDatabase,
+        now: day.add(const Duration(days: 1)),
+        cacheOnly: cacheOnly,
+        candleSync: (symbol, from, config) async {
+          fail('The same-day price is already cached');
+        },
+      );
+      final allocation = history.allocationAt(
+        positions: positions,
+        date: day,
+        performance: series,
+      );
+      expect(allocation, isNotNull);
+      expect(
+        {for (final holding in allocation!) holding.symbol: holding.value},
+        {'OPEN': 500.0, 'CASH': 500.0},
+      );
+    }
+  });
+
   test('manual refresh updates open holdings without refetching covered sales',
       () async {
     final accounts = await setup();

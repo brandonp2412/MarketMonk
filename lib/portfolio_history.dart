@@ -150,11 +150,16 @@ Future<PortfolioHistory> loadPortfolioHistory({
     ...currentSymbols,
     ...trades.map((trade) => trade.symbol),
   };
-  Future<List<StoredCandle>> readCandles(String symbol) =>
-      (database.candles.select()
-            ..where((row) => row.symbol.equals(canonicalMarketSymbol(symbol)))
-            ..orderBy([(row) => OrderingTerm.asc(row.date)]))
-          .get();
+  Future<List<StoredCandle>> readCandles(String symbol) async {
+    final rows = await (database.candles.select()
+          ..where((row) => row.symbol.equals(canonicalMarketSymbol(symbol)))
+          ..orderBy([(row) => OrderingTerm.asc(row.date)]))
+        .get();
+    return [
+      for (final row in rows) row.copyWith(date: canonicalMarketDay(row.date)),
+    ];
+  }
+
   for (final symbol in symbols) {
     candles[symbol] = await readCandles(symbol);
     final covered = dates.isNotEmpty &&

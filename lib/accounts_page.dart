@@ -40,12 +40,12 @@ class AccountsPage extends StatelessWidget {
                     },
                     icon: Icons.swap_horiz_rounded,
                   ),
+                DesktopMenuAction(
+                  context.l10n.text('Edit account'),
+                  () => _renameAccount(context, accounts, name),
+                  icon: Icons.edit_rounded,
+                ),
                 if (name != 'Default') ...[
-                  DesktopMenuAction(
-                    context.l10n.text('Rename account'),
-                    () => _renameAccount(context, accounts, name),
-                    icon: Icons.edit_rounded,
-                  ),
                   DesktopMenuAction(
                     context.l10n.text('Delete account'),
                     () => _confirmDelete(context, accounts, name),
@@ -74,13 +74,12 @@ class AccountsPage extends StatelessWidget {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined),
+                      tooltip: context.l10n.text('Edit account'),
+                      onPressed: () => _renameAccount(context, accounts, name),
+                    ),
                     if (name != 'Default') ...[
-                      IconButton(
-                        icon: const Icon(Icons.edit_outlined),
-                        tooltip: context.l10n.text('Rename account'),
-                        onPressed: () =>
-                            _renameAccount(context, accounts, name),
-                      ),
                       IconButton(
                         icon: const Icon(Icons.delete_outline),
                         tooltip: context.l10n.text('Delete account'),
@@ -109,15 +108,17 @@ class AccountsPage extends StatelessWidget {
     AccountManager accounts,
     String name,
   ) async {
-    final newName = await showDialog<String>(
+    final result = await showDialog<({String name, bool hidden})>(
       context: context,
-      builder: (_) => _RenameAccountDialog(currentName: name),
+      builder: (_) => _EditAccountDialog(
+        currentName: name,
+        hidden: accounts.isAccountHidden(name),
+      ),
     );
-    if (newName != null &&
-        newName.isNotEmpty &&
-        newName != name &&
-        context.mounted) {
-      await context.read<AccountManager>().renameAccount(name, newName);
+    if (result == null || !context.mounted) return;
+    await accounts.setAccountHidden(name, result.hidden);
+    if (result.name.isNotEmpty && result.name != name) {
+      await accounts.renameAccount(name, result.name);
     }
   }
 
@@ -169,22 +170,25 @@ class AccountsPage extends StatelessWidget {
   }
 }
 
-class _RenameAccountDialog extends StatefulWidget {
-  const _RenameAccountDialog({required this.currentName});
+class _EditAccountDialog extends StatefulWidget {
+  const _EditAccountDialog({required this.currentName, required this.hidden});
 
   final String currentName;
+  final bool hidden;
 
   @override
-  State<_RenameAccountDialog> createState() => _RenameAccountDialogState();
+  State<_EditAccountDialog> createState() => _EditAccountDialogState();
 }
 
-class _RenameAccountDialogState extends State<_RenameAccountDialog> {
+class _EditAccountDialogState extends State<_EditAccountDialog> {
   late final TextEditingController _controller;
+  late bool _hidden;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.currentName);
+    _hidden = widget.hidden;
   }
 
   @override
@@ -196,15 +200,31 @@ class _RenameAccountDialogState extends State<_RenameAccountDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(context.l10n.text('Rename account')),
-      content: TextField(
-        controller: _controller,
-        decoration: InputDecoration(
-          labelText: context.l10n.text('Account name'),
-        ),
-        autofocus: true,
-        textCapitalization: TextCapitalization.words,
-        onSubmitted: (value) => Navigator.pop(context, value.trim()),
+      title: Text(context.l10n.text('Edit account')),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _controller,
+            enabled: widget.currentName != 'Default',
+            decoration: InputDecoration(
+              labelText: context.l10n.text('Account name'),
+            ),
+            autofocus: widget.currentName != 'Default',
+            textCapitalization: TextCapitalization.words,
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(context.l10n.text('Hide')),
+            secondary: Icon(
+              _hidden
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+            ),
+            value: _hidden,
+            onChanged: (value) => setState(() => _hidden = value),
+          ),
+        ],
       ),
       actions: [
         TextButton(
@@ -212,8 +232,11 @@ class _RenameAccountDialogState extends State<_RenameAccountDialog> {
           child: Text(context.l10n.text('Cancel')),
         ),
         FilledButton(
-          onPressed: () => Navigator.pop(context, _controller.text.trim()),
-          child: Text(context.l10n.text('Rename')),
+          onPressed: () => Navigator.pop(
+            context,
+            (name: _controller.text.trim(), hidden: _hidden),
+          ),
+          child: Text(context.l10n.text('Save')),
         ),
       ],
     );

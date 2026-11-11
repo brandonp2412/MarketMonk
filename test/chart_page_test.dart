@@ -98,7 +98,7 @@ void main() {
         expect(find.text('Filter range'), findsOneWidget);
         await tester.tap(find.byKey(const Key('chart-menu-filter-range')));
         await tester.pump();
-        expect(find.text('Pick start and end dots'), findsOneWidget);
+        expect(find.byType(SnackBar), findsNothing);
         await tester.tap(menu);
         await tester.pumpAndSettle();
         expect(find.text('Cancel picking'), findsOneWidget);

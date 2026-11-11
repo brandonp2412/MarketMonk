@@ -18,6 +18,23 @@ void main() {
 
   tearDown(() async {});
 
+  test('chart visibility persists through reload and account rename', () async {
+    await seedTestSqlite({
+      'accounts': ['Default', 'Brokerage'],
+      'activeAccount': 'Default',
+    });
+    final manager = testAccountManager();
+    await manager.init();
+    await manager.setAccountHidden('Brokerage', true);
+    await manager.renameAccount('Brokerage', 'Investments');
+    await manager.init();
+    expect(manager.isAccountHidden('Investments'), isTrue);
+    expect(manager.isAccountHidden('Default'), isFalse);
+    await manager.setAccountHidden('Investments', false);
+    await manager.init();
+    expect(manager.isAccountHidden('Investments'), isFalse);
+  });
+
   test('repairs a persisted active account that no longer exists', () async {
     await seedTestSqlite({
       'accounts': ['Default', 'Brokerage'],

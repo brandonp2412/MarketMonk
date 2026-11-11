@@ -499,6 +499,7 @@ class _MarketLineChartInteractionState
   double? _dragX;
   int? _dragPointer;
   int? _tapRangeStart;
+  int? _rangePointer;
   bool _scrubFrameScheduled = false;
   int? _pendingScrubIndex;
 
@@ -515,8 +516,6 @@ class _MarketLineChartInteractionState
       _clear();
     });
     widget.onRangeChanged?.call(range);
-    if (range == null)
-      ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
   }
 
   bool get _isMobileChart => switch (Theme.of(context).platform) {
@@ -527,9 +526,7 @@ class _MarketLineChartInteractionState
   void _pickRangeDot(ChartScene scene, Offset position) {
     if (!widget.pickRange || !_isMobileChart) return;
     final bounds = scene.bounds;
-    if (bounds == null ||
-        !Rect.fromLTRB(bounds.left, bounds.top, bounds.right, bounds.bottom)
-            .contains(position)) return;
+    if (bounds == null) return;
     final index = ChartHitTest.nearestIndexAtX(scene, position.dx);
     if (index == null) return;
     final start = _tapRangeStart;
@@ -539,19 +536,6 @@ class _MarketLineChartInteractionState
     }
     if (start == index) return;
     _setRange((min(start, index), max(start, index)));
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    messenger?.hideCurrentSnackBar();
-    messenger?.showSnackBar(
-      SnackBar(
-        content: const Text('Filtered'),
-        action: SnackBarAction(
-          label: 'Undo',
-          onPressed: () {
-            if (mounted) _setRange(null);
-          },
-        ),
-      ),
-    );
   }
 
   Future<void> _showStartDateMenu(
@@ -769,6 +753,19 @@ class _MarketLineChartInteractionState
                   behavior: HitTestBehavior.opaque,
                   onPointerDown: (event) {
                     _activate(event.localPosition, scene);
+                    if (widget.pickRange &&
+                        _isMobileChart &&
+                        event.kind == PointerDeviceKind.touch &&
+                        _rangePointer == null &&
+                        bounds != null &&
+                        Rect.fromLTRB(
+                          bounds.left,
+                          bounds.top,
+                          bounds.right,
+                          bounds.bottom,
+                        ).contains(event.localPosition)) {
+                      _rangePointer = event.pointer;
+                    }
                     if (event.kind == PointerDeviceKind.mouse &&
                         event.buttons == kPrimaryMouseButton &&
                         bounds != null &&
@@ -783,6 +780,10 @@ class _MarketLineChartInteractionState
                     }
                   },
                   onPointerMove: (event) {
+                    if (event.pointer == _rangePointer) {
+                      _activateScrub(event.localPosition, scene);
+                      return;
+                    }
                     if (event.pointer != _dragPointer || _dragStart == null)
                       return;
                     setState(() {
@@ -791,6 +792,10 @@ class _MarketLineChartInteractionState
                     _activate(event.localPosition, scene);
                   },
                   onPointerUp: (event) {
+                    if (event.pointer == _rangePointer) {
+                      _rangePointer = null;
+                      _pickRangeDot(scene, event.localPosition);
+                    }
                     if (event.pointer == _dragPointer) {
                       final start = _dragStart;
                       if (start != null &&
@@ -817,6 +822,7 @@ class _MarketLineChartInteractionState
                     if (!_keepTooltipOnTapUp) _clear();
                   },
                   onPointerCancel: (event) => setState(() {
+                    if (event.pointer == _rangePointer) _rangePointer = null;
                     _dragStart = null;
                     _dragX = null;
                     _dragPointer = null;
@@ -824,8 +830,6 @@ class _MarketLineChartInteractionState
                   }),
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTapUp: (details) =>
-                        _pickRangeDot(scene, details.localPosition),
                     onSecondaryTapUp: (details) {
                       final bounds = scene.bounds;
                       if (bounds == null ||
@@ -913,16 +917,6 @@ class _MarketLineChartInteractionState
                             ),
                           ),
                         ],
-                        if (_range != null)
-                          Positioned(
-                            top: 0,
-                            right: 0,
-                            child: IconButton(
-                              tooltip: 'Reset zoom',
-                              icon: const Icon(Icons.zoom_out),
-                              onPressed: () => _setRange(null),
-                            ),
-                          ),
                         Positioned.fill(
                           child: IgnorePointer(
                             child: RepaintBoundary(
