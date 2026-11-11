@@ -670,7 +670,7 @@ class PortfolioPageState extends State<PortfolioPage>
     };
 
     final allocation = intraday
-        ? _intradayAllocationAt(positions, cutoff)
+        ? _intradayAllocationAt(positions, cutoff)!
         : _allocationAt(
             positions,
             _period,

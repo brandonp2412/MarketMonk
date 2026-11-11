@@ -27,6 +27,27 @@ class IntradayPortfolioHolding {
     required this.pricesUsd,
   });
 
+  double quantityAt(DateTime date) =>
+      quantity -
+      trades.where((trade) => trade.date.isAfter(date)).fold<double>(
+            0,
+            (sum, trade) => sum + trade.quantity,
+          );
+
+  double? priceAt(DateTime date) {
+    if (constantPrice && pricesUsd.length == 1) return pricesUsd.values.single;
+    DateTime? latest;
+    double? price;
+    for (final entry in pricesUsd.entries) {
+      if (!entry.key.isAfter(date) &&
+          (latest == null || entry.key.isAfter(latest))) {
+        latest = entry.key;
+        price = entry.value;
+      }
+    }
+    return price;
+  }
+
   /// Converts provider candles using the quote currency's USD exchange rate.
   factory IntradayPortfolioHolding.fromSeries(
     IntradaySeries series, {

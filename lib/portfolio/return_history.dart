@@ -33,7 +33,8 @@ extension _PortfolioReturnHistory on PortfolioPageState {
         final cutoff = _cutoff(period, DateTime.now())!;
         if (cutoff.isBefore(firstKnownDate)) continue;
         if (period >= firstIntradayPeriod) {
-          if (intradayAccountValueAt(_intradayValues, cutoff) != null) {
+          if (intradayAccountValueAt(_intradayValues, cutoff) != null &&
+              _intradayAllocationAt(positions, cutoff) != null) {
             covered.add(period);
           }
           continue;
@@ -335,7 +336,7 @@ extension _PortfolioReturnHistory on PortfolioPageState {
     }
   }
 
-  List<PortfolioAllocation> _intradayAllocationAt(
+  List<PortfolioAllocation>? _intradayAllocationAt(
     List<Position> positions,
     DateTime cutoff,
   ) {
@@ -343,14 +344,12 @@ extension _PortfolioReturnHistory on PortfolioPageState {
     for (final position in positions) {
       if (position.netShares == 0) continue;
       final holding = _intradayHoldings[position.symbol];
-      if (holding == null) continue;
-      double? priceUsd;
-      for (final entry in holding.pricesUsd.entries) {
-        if (entry.key.isAfter(cutoff)) break;
-        priceUsd = entry.value;
-      }
-      if (priceUsd == null || !priceUsd.isFinite) continue;
-      final value = position.netShares * priceUsd;
+      if (holding == null) return null;
+      final priceUsd = holding.priceAt(cutoff);
+      if (priceUsd == null || !priceUsd.isFinite) return null;
+      final quantity = holding.quantityAt(cutoff);
+      if (quantity.abs() <= 1e-6) continue;
+      final value = quantity * priceUsd;
       if (value.isFinite) {
         allocations.add(
           PortfolioAllocation(position.symbol, position.name, value),

@@ -82,6 +82,91 @@ void main() {
     expect(restored.single.quantity, 2);
   });
 
+  testWidgets('mobile selection swaps toolbar actions and confirms deletion',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(400, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({});
+    final accounts = testAccountManager();
+    await accounts.init();
+    await seedTestTrade(
+      symbol: 'AAA',
+      name: 'AAA',
+      quantity: 2,
+      price: 10,
+      tradeType: 'BUY',
+      tradeDate: DateTime(2026, 11, 1),
+    );
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsState()),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: HoldingsPage(
+            positionsLoader: (trades) async => trades.isEmpty
+                ? []
+                : [
+                    Position(
+                      symbol: 'AAA',
+                      name: 'AAA',
+                      nativeCurrency: 'USD',
+                      netShares: 2,
+                      avgCost: 10,
+                      currentPrice: 12,
+                      firstBuyDate: DateTime(2026, 11, 1),
+                      lastBuyDate: DateTime(2026, 11, 1),
+                    ),
+                  ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    Future<void> selectAll() async {
+      await tester.tap(find.byKey(const Key('holdings-menu-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Select all'));
+      await tester.pumpAndSettle();
+    }
+
+    await selectAll();
+    expect(find.byKey(const Key('holdings-settings-button')), findsNothing);
+    expect(find.byKey(const Key('holdings-delete-button')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('holdings-menu-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Copy selected'), findsOneWidget);
+    await tester.tap(find.text('Cancel selection'));
+    await tester.pumpAndSettle();
+    await selectAll();
+    await tester.tap(find.byKey(const Key('holdings-clear-selection-button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('holdings-settings-button')), findsOneWidget);
+    expect(find.byKey(const Key('holdings-delete-button')), findsNothing);
+
+    await selectAll();
+    await tester.tap(find.byKey(const Key('holdings-delete-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete 1 holding?'), findsOneWidget);
+    final profileId = await profileDataRepository.profileIdForName('Default');
+    expect(await profileDataRepository.readTrades(profileId), hasLength(1));
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('holdings-delete-button')), findsOneWidget);
+    expect(await profileDataRepository.readTrades(profileId), hasLength(1));
+    await tester.tap(find.byKey(const Key('holdings-delete-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+    expect(await profileDataRepository.readTrades(profileId), isEmpty);
+    expect(find.byKey(const Key('holdings-settings-button')), findsOneWidget);
+  });
+
   testWidgets('cash-only IBKR account appears in mobile holdings',
       (tester) async {
     tester.view.devicePixelRatio = 1;

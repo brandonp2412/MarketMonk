@@ -508,7 +508,7 @@ class HoldingsPageState extends State<HoldingsPage>
             onTap: _copySelectedSymbols,
             child: ListTile(
               leading: const Icon(Icons.copy),
-              title: Text(context.l10n.text('Copy selected symbols')),
+              title: Text(context.l10n.text('Copy selected')),
             ),
           ),
           if (!ibkrManaged)
@@ -540,19 +540,27 @@ class HoldingsPageState extends State<HoldingsPage>
       ],
     );
 
-    final leading = _search.text.isEmpty
-        ? const Padding(
-            padding: EdgeInsets.only(left: 16, right: 8),
-            child: Icon(Icons.search),
-          )
-        : IconButton(
-            onPressed: () {
-              _search.clear();
-              _onSearchChanged();
-            },
-            icon: const Icon(Icons.arrow_back),
+    final leading = _selecting
+        ? IconButton(
+            key: const Key('holdings-clear-selection-button'),
+            onPressed: _exitSelecting,
+            tooltip: context.l10n.text('Cancel selection'),
+            icon: const Icon(Icons.clear),
             padding: const EdgeInsets.only(left: 16, right: 8),
-          );
+          )
+        : _search.text.isEmpty
+            ? const Padding(
+                padding: EdgeInsets.only(left: 16, right: 8),
+                child: Icon(Icons.search),
+              )
+            : IconButton(
+                onPressed: () {
+                  _search.clear();
+                  _onSearchChanged();
+                },
+                icon: const Icon(Icons.arrow_back),
+                padding: const EdgeInsets.only(left: 16, right: 8),
+              );
 
     if (desktop) {
       final openCount =
@@ -779,11 +787,28 @@ class HoldingsPageState extends State<HoldingsPage>
                   ),
                   onChanged: (_) => _onSearchChanged(),
                   trailing: [
-                    IconButton(
-                      key: const Key('holdings-settings-button'),
-                      icon: const Icon(Icons.settings_outlined),
-                      tooltip: context.l10n.text('Settings'),
-                      onPressed: () => openAppSettings(context),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      transitionBuilder: (child, animation) => ScaleTransition(
+                        scale: animation,
+                        child: FadeTransition(
+                          opacity: animation,
+                          child: child,
+                        ),
+                      ),
+                      child: _selecting && !ibkrManaged
+                          ? IconButton(
+                              key: const Key('holdings-delete-button'),
+                              icon: const Icon(Icons.delete_outline),
+                              tooltip: context.l10n.text('Delete selected'),
+                              onPressed: () => _deleteSelected(context),
+                            )
+                          : IconButton(
+                              key: const Key('holdings-settings-button'),
+                              icon: const Icon(Icons.settings_outlined),
+                              tooltip: context.l10n.text('Settings'),
+                              onPressed: () => openAppSettings(context),
+                            ),
                     ),
                     menuButton,
                   ],

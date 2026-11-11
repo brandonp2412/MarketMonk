@@ -4,6 +4,35 @@ import 'package:market_monk/intraday_market_data.dart';
 import 'package:market_monk/ibkr_api.dart';
 
 void main() {
+  test('allocation uses a single daily valuation before its timestamp', () {
+    final date = DateTime.utc(2026, 11, 11, 20);
+    final holding = IntradayPortfolioHolding(
+      quantity: 3,
+      constantPrice: true,
+      pricesUsd: {date.add(const Duration(hours: 1)): 100},
+    );
+    expect(holding.priceAt(date), 100);
+  });
+
+  test('allocation reverses only trades after the selected timestamp', () {
+    final date = DateTime.utc(2026, 11, 11, 20);
+    final holding = IntradayPortfolioHolding(
+      quantity: 8,
+      trades: [
+        IntradayPortfolioTrade(date, 2, 100),
+        IntradayPortfolioTrade(date.add(const Duration(minutes: 1)), 3, 100),
+      ],
+      pricesUsd: {
+        date.add(const Duration(minutes: 1)): 101,
+        date.subtract(const Duration(minutes: 1)): 99,
+        date: 100,
+      },
+    );
+    expect(holding.quantityAt(date), 5);
+    expect(holding.priceAt(date), 100);
+    expect(holding.priceAt(date.subtract(const Duration(hours: 1))), isNull);
+  });
+
   final start = DateTime.utc(2026, 10, 9, 13, 30);
   final middle = start.add(const Duration(minutes: 15));
   final end = middle.add(const Duration(minutes: 15));
