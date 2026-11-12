@@ -10,6 +10,7 @@ import 'package:market_monk/accounts_page.dart';
 import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/app.dart';
 import 'package:market_monk/backup_archive.dart';
+import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/csv_import.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
@@ -590,6 +591,7 @@ class _SettingsPageState extends State<SettingsPage> {
     return Scaffold(
       appBar: appBar,
       body: ListView(
+        padding: const EdgeInsets.only(bottom: bottomNavScrollClearance),
         children: [
           if (!_hasAnyMatches(_mobileSearchOptions))
             Padding(

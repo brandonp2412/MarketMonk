@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/settings_page.dart';
 import 'package:market_monk/ticker_line.dart';
@@ -122,6 +123,23 @@ void main() {
     final search = tester.getRect(find.byKey(const Key('settings-search')));
     expect(search.left, 16);
     expect(search.right, 414);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('mobile Settings clears the floating bottom navigation dock', (
+    tester,
+  ) async {
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await pumpSettings(tester, const Size(430, 940));
+
+    final settingsList = tester.widget<ListView>(find.byType(ListView).first);
+    expect(
+      settingsList.padding,
+      const EdgeInsets.only(bottom: bottomNavScrollClearance),
+    );
     expect(tester.takeException(), isNull);
   });
 
