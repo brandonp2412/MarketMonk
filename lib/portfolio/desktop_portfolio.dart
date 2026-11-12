@@ -185,7 +185,7 @@ extension _PortfolioDesktopView on PortfolioPageState {
                       icon: Icons.account_balance_wallet_outlined,
                     ),
                     _DesktopPortfolioMetric(
-                      label: context.l10n.text('Market value'),
+                      label: context.l10n.text('Stock value'),
                       value: fmtCurrency(
                         sorted.where((holding) => !holding.isCash).fold<double>(
                               0,

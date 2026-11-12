@@ -718,7 +718,7 @@ class ChartsPageState extends State<ChartsPage>
         ),
     ];
 
-    return SingleChildScrollView(
+    final picker = SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(
@@ -731,6 +731,7 @@ class ChartsPageState extends State<ChartsPage>
         ],
       ),
     );
+    return isDesktopLayout(context) ? Center(child: picker) : picker;
   }
 
   static const double _stockSummaryHeight = 54;

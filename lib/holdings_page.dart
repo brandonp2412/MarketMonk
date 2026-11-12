@@ -690,7 +690,7 @@ class HoldingsPageState extends State<HoldingsPage>
                 Align(
                   alignment: Alignment.centerLeft,
                   child: SizedBox(
-                    width: 460,
+                    width: double.infinity,
                     child: TextField(
                       controller: _search,
                       focusNode: _searchFocusNode,

@@ -713,7 +713,7 @@ class PortfolioPageState extends State<PortfolioPage>
       displayTotal = fmtCurrency(intradayValueUsd);
     } else if (cutoff == null) {
       if (netLiquidation == null) {
-        displayTotal = fmtCurrency(totalValue);
+        displayTotal = fmtCurrency(totalValue + (cashUsd ?? 0));
       } else if (allRatesFromUsd.containsKey(netLiquidation.currency)) {
         displayTotal = fmtNativeCurrency(
           netLiquidation.value,
@@ -733,7 +733,8 @@ class PortfolioPageState extends State<PortfolioPage>
     }
     final totalLabel = switch (true) {
       _ when intraday => 'Account value',
-      _ when cutoff == null && netLiquidation == null => 'Market value',
+      _ when cutoff == null && netLiquidation == null && cashUsd == null =>
+        'Market value',
       _ when cutoff != null && historicalNav == null => 'Holdings value',
       _ => 'Account value',
     };

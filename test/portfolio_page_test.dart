@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
+import 'package:market_monk/ibkr_cash.dart';
 import 'package:market_monk/intraday_market_data.dart';
 import 'package:market_monk/intraday_portfolio.dart';
 import 'package:market_monk/main.dart';
@@ -368,6 +369,49 @@ void main() {
       find.byType(MarketDonutChart),
     );
     expect(chart.slices.map((slice) => slice.value), [5500, 5500]);
+  });
+
+  testWidgets('cash-only desktop portfolio includes cash without broker NAV', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1400, 1000);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({});
+    final accounts = await configuredAccounts();
+    await accounts.cachePortfolio(
+      'Default',
+      [],
+      null,
+      cashBalance: const IbkrAccountValue(value: 3544.36, currency: 'USD'),
+      cashUsd: 3544.36,
+    );
+    final pending = Completer<IbkrPortfolioSnapshot>();
+    await tester.pumpWidget(
+      app(accounts, _portfolioPage(ibkrLoader: (_) => pending.future)),
+    );
+    await tester.pump();
+
+    expect(find.text('Account value'), findsOneWidget);
+    expect(find.text('Stock value'), findsOneWidget);
+    expect(find.text('Market value'), findsNothing);
+    expect(find.text(fmtCurrency(3544.36)), findsWidgets);
+    const cash = IbkrAccountValue(value: 3544.36, currency: 'USD');
+    expect(
+      find.text('Cash · ${formatIbkrReportedCash(cash)}'),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('desktop-portfolio-metrics')),
+        matching: find.text(fmtCurrency(3544.36)),
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), null);
   });
 
   testWidgets('tiny cash balance stays in the allocation legend and donut', (
@@ -1935,7 +1979,7 @@ void main() {
 
     expect(
       (tester.getTopLeft(find.text('Account value')).dy -
-              tester.getTopLeft(find.text('Market value')).dy)
+              tester.getTopLeft(find.text('Stock value')).dy)
           .abs(),
       lessThan(24),
     );

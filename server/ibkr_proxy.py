@@ -249,9 +249,21 @@ class ClientPortalIbkrClient:
             None,
         )
         if position is None:
-            raise IbkrError(
-                "IBKR historical candles are available for current stock positions only"
-            )
+            query = urlencode({"symbols": symbol.upper()})
+            matches = self._get(f"trsrv/stocks?{query}")
+            stocks = matches.get(symbol.upper(), []) if isinstance(matches, dict) else []
+            contracts = {
+                contract["conid"]: contract
+                for stock in stocks
+                if isinstance(stock, dict) and stock.get("symbol") == symbol.upper()
+                for contract in stock.get("contracts", [])
+                if isinstance(contract, dict)
+                and contract.get("isUS") is True
+                and (_number(contract.get("conid")) or 0) > 0
+            }
+            if len(contracts) != 1:
+                raise IbkrError(f"Cannot uniquely resolve IBKR US stock {symbol}")
+            position = {**next(iter(contracts.values())), "currency": "USD"}
         conid = _number(position.get("conid"))
         if conid is None or conid <= 0:
             raise IbkrError(f"IBKR position {symbol} is missing its contract ID")
@@ -802,22 +814,24 @@ class NativeIbkrClient:
                     None,
                 )
                 if item is None:
-                    raise IbkrError(
-                        "IBKR historical candles are available for current stock positions only"
-                    )
+                    from ib_async import Stock
 
-                contract = item.contract
+                    contracts = ib.qualifyContracts(Stock(symbol.upper(), "SMART", "USD"))
+                    if len(contracts) != 1 or not getattr(contracts[0], "conId", 0):
+                        raise IbkrError(f"Cannot uniquely resolve IBKR US stock {symbol}")
+                    contract = contracts[0]
+                else:
+                    contract = item.contract
                 if not str(getattr(contract, "exchange", "")).strip():
                     contract.exchange = "SMART"
 
-                return self._read_historical(ib, item, symbol, years, intraday_days)
+                return self._read_historical(ib, contract, symbol, years, intraday_days)
             except IbkrError:
                 raise
             except Exception as error:
                 raise IbkrError(f"IBKR TWS API historical read failed: {error}") from error
 
-    def _read_historical(self, ib, item, symbol, years, intraday_days):
-        contract = item.contract
+    def _read_historical(self, ib, contract, symbol, years, intraday_days):
         duration, bar_size = self._historical_parameters(years, intraday_days)
         bars = ib.reqHistoricalData(
             contract,

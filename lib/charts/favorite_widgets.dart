@@ -86,72 +86,77 @@ extension _ChartFavoriteWidgets on ChartsPageState {
           if (hasFavorites) ...[
             SizedBox(
               height: 64,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: EdgeInsets.symmetric(horizontal: desktop ? 16 : 0),
-                itemCount: _favoriteStocks.length,
-                itemBuilder: (context, index) {
-                  final symbol = _favoriteStocks[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: DesktopContextMenu(
-                      actions: [
-                        DesktopMenuAction(
-                          context.l10n.text('Rename'),
-                          () => runDetachedTask(
-                            _renameFavorite(symbol),
-                            'Failed to rename favorite',
-                          ),
-                          icon: Icons.edit_rounded,
-                        ),
-                        DesktopMenuAction(
-                          context.l10n.text('Open chart'),
-                          () => _selectSymbol(symbol),
-                          icon: Icons.show_chart_rounded,
-                        ),
-                        DesktopMenuAction(
-                          context.l10n.text('Remove favorite'),
-                          () => _toggleFavorite(symbol),
-                          icon: Icons.star_border_rounded,
-                        ),
-                        if (!context
-                            .read<AccountManager>()
-                            .ibkrConfigFor()
-                            .enabled)
+              child: Align(
+                alignment: desktop ? Alignment.center : Alignment.centerLeft,
+                child: ListView.builder(
+                  shrinkWrap: desktop,
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(horizontal: desktop ? 16 : 0),
+                  itemCount: _favoriteStocks.length,
+                  itemBuilder: (context, index) {
+                    final symbol = _favoriteStocks[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: DesktopContextMenu(
+                        actions: [
                           DesktopMenuAction(
-                            context.l10n.text('Add trade'),
-                            () => Navigator.push(
-                              context,
-                              adaptivePageRoute(
-                                context,
-                                builder: (_) => EditTickerPage(symbol: symbol),
-                              ),
+                            context.l10n.text('Rename'),
+                            () => runDetachedTask(
+                              _renameFavorite(symbol),
+                              'Failed to rename favorite',
                             ),
-                            icon: Icons.add_rounded,
+                            icon: Icons.edit_rounded,
                           ),
-                      ],
-                      copyText: symbol,
-                      copyLabel: context.l10n.text('Copy symbol'),
-                      child: FavoriteChartCard(
-                        symbol: symbol,
-                        displayName: _favoriteNames[symbol] ?? symbol,
-                        periodStart: _requiredCandleStart(),
-                        periodDays: days,
-                        visibleRange: _customChartRange,
-                        intraday: _usesIntraday &&
-                            _selectedFavorites.contains(symbol) &&
-                            (days != 5 ||
-                                _favoriteIntraday.containsKey(symbol)),
-                        intradaySeries: _favoriteIntraday[symbol],
-                        isActive: widget.isActive,
-                        selected: _selectedFavorites.contains(symbol),
-                        selectionColor: _favoriteColor(symbol),
-                        onTap: () => _selectFavorite(symbol),
-                        onLongPress: () => _showFavoriteActions(symbol),
+                          DesktopMenuAction(
+                            context.l10n.text('Open chart'),
+                            () => _selectSymbol(symbol),
+                            icon: Icons.show_chart_rounded,
+                          ),
+                          DesktopMenuAction(
+                            context.l10n.text('Remove favorite'),
+                            () => _toggleFavorite(symbol),
+                            icon: Icons.star_border_rounded,
+                          ),
+                          if (!context
+                              .read<AccountManager>()
+                              .ibkrConfigFor()
+                              .enabled)
+                            DesktopMenuAction(
+                              context.l10n.text('Add trade'),
+                              () => Navigator.push(
+                                context,
+                                adaptivePageRoute(
+                                  context,
+                                  builder: (_) =>
+                                      EditTickerPage(symbol: symbol),
+                                ),
+                              ),
+                              icon: Icons.add_rounded,
+                            ),
+                        ],
+                        copyText: symbol,
+                        copyLabel: context.l10n.text('Copy symbol'),
+                        child: FavoriteChartCard(
+                          symbol: symbol,
+                          displayName: _favoriteNames[symbol] ?? symbol,
+                          periodStart: _requiredCandleStart(),
+                          periodDays: days,
+                          visibleRange: _customChartRange,
+                          intraday: _usesIntraday &&
+                              _selectedFavorites.contains(symbol) &&
+                              (days != 5 ||
+                                  _favoriteIntraday.containsKey(symbol)),
+                          intradaySeries: _favoriteIntraday[symbol],
+                          isActive: widget.isActive,
+                          selected: _selectedFavorites.contains(symbol),
+                          selectionColor: _favoriteColor(symbol),
+                          onTap: () => _selectFavorite(symbol),
+                          onLongPress: () => _showFavoriteActions(symbol),
+                        ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
             const SizedBox(height: 8),

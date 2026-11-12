@@ -269,6 +269,13 @@ class RecordingIbkrClient(ClientPortalIbkrClient):
                 ],
             }
         responses = {
+            "trsrv/stocks?symbols=SPY": {
+                "SPY": [{"symbol": "SPY", "contracts": [
+                    {"conid": 756733, "isUS": True},
+                    {"conid": 999, "isUS": False},
+                ]}]
+            },
+            "trsrv/stocks?symbols=MSFT": {},
             "portfolio/accounts": [{"accountId": "U1234567"}],
             "portfolio2/U1234567/positions": [
                 {
@@ -375,6 +382,13 @@ class FakeNativeIb:
                 realizedPNL=4,
             )
         ]
+
+    def qualifyContracts(self, contract):
+        self.qualified_contract = contract
+        if contract.symbol != "SPY":
+            return []
+        contract.conId = 756733
+        return [contract]
 
     def accountValues(self, account):
         assert account == "U1234567"
@@ -1147,23 +1161,48 @@ class ProxyTests(unittest.TestCase):
                 self.assertTrue(kwargs["useRTH"])
                 self.assertTrue(fake.disconnected)
 
-    def test_intraday_rejects_non_held_stocks_and_unsupported_ranges(self):
+    def test_non_held_stock_history_uses_contract_lookup(self):
+        for intraday_days in (None, 1, 5):
+            with self.subTest(intraday_days=intraday_days):
+                web = RecordingIbkrClient()
+                fake = FakeNativeIb()
+                native = NativeIbkrClient(
+                    config(backend="native"), ib_factory=lambda: fake
+                )
+                for client in (web, native):
+                    history = client.historical("SPY", 1, intraday_days=intraday_days)
+                    self.assertEqual(history["symbol"], "SPY")
+                    self.assertEqual(history["currency"], "USD")
+                    self.assertTrue(history["candles"])
+                self.assertIn("trsrv/stocks?symbols=SPY", web.endpoints)
+                query = parse_qs(urlparse(web.endpoints[-1]).query)
+                self.assertEqual(query["conid"], ["756733"])
+                contract, _ = fake.historical_request
+                self.assertEqual(contract.conId, 756733)
+                self.assertEqual(contract.exchange, "SMART")
+                self.assertEqual(fake.qualified_contract.currency, "USD")
+
+    def test_intraday_rejects_unknown_stocks_and_unsupported_ranges(self):
         for client in [RecordingIbkrClient(), NativeIbkrClient(
             config(backend="native"), ib_factory=FakeNativeIb
         )]:
-            with self.assertRaisesRegex(IbkrError, "current stock positions only"):
+            with self.assertRaisesRegex(IbkrError, "Cannot uniquely resolve"):
                 client.intraday("MSFT", 1)
             with self.assertRaisesRegex(IbkrError, "days must be 1 or 5"):
                 client.intraday("AAPL", 30)
 
-    def test_native_historical_rejects_non_held_symbol(self):
-        fake = FakeNativeIb()
-        client = NativeIbkrClient(
-            config(backend="native", tws_port=4003), ib_factory=lambda: fake
-        )
+    def test_client_portal_rejects_ambiguous_stock_lookup(self):
+        class AmbiguousClient(RecordingIbkrClient):
+            def _get(self, endpoint):
+                if endpoint.startswith("trsrv/stocks?"):
+                    return {"SPY": [{"symbol": "SPY", "contracts": [
+                        {"conid": 1, "isUS": True},
+                        {"conid": 2, "isUS": True},
+                    ]}]}
+                return super()._get(endpoint)
 
-        with self.assertRaisesRegex(IbkrError, "current stock positions only"):
-            client.historical("MSFT", 1)
+        with self.assertRaisesRegex(IbkrError, "Cannot uniquely resolve"):
+            AmbiguousClient().historical("SPY", 1)
 
     def test_intraday_http_validates_parameters_and_requires_authentication(self):
         server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(FakeClient(), "x" * 32))
