@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:market_monk/charts/chart_widgets.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/settings_state.dart';
@@ -21,6 +22,28 @@ Future<void> _pumpApp(WidgetTester tester, AccountManager accounts) async {
 }
 
 void main() {
+  testWidgets('mobile favorites align with the period chips', (tester) async {
+    await seedTestSqlite({
+      'favoriteStocks': ['AAPL', 'MSFT'],
+    });
+    cacheSymbolMeta('AAPL', 'USD');
+    cacheSymbolMeta('MSFT', 'USD');
+
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await _pumpApp(tester, testAccountManager());
+
+    final periodLeft =
+        tester.getTopLeft(find.byKey(const Key('chart-period-1d'))).dx;
+    final favoriteLeft =
+        tester.getTopLeft(find.byType(FavoriteChartCard).first).dx;
+    expect(favoriteLeft, periodLeft);
+  });
   testWidgets('long press confirms favorite removal in a bottom sheet', (
     tester,
   ) async {

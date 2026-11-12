@@ -73,11 +73,12 @@ extension _ChartFavoriteWidgets on ChartsPageState {
   Widget _buildFavoritesRow() {
     final hasFavorites = _favoriteStocks.isNotEmpty;
     if (!hasFavorites) return const SizedBox.shrink();
+    final desktop = isDesktopLayout(context);
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        isDesktopLayout(context) ? 32 : 16,
+        desktop ? 32 : 11,
         12,
-        isDesktopLayout(context) ? 32 : 16,
+        desktop ? 32 : 11,
         8,
       ),
       child: Column(
@@ -87,7 +88,7 @@ extension _ChartFavoriteWidgets on ChartsPageState {
               height: 64,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.symmetric(horizontal: desktop ? 16 : 0),
                 itemCount: _favoriteStocks.length,
                 itemBuilder: (context, index) {
                   final symbol = _favoriteStocks[index];
