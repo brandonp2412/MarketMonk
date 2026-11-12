@@ -120,6 +120,8 @@ extension _PortfolioLoading on PortfolioPageState {
     }
 
     if (!widget.isActive) return;
+    _performanceLoadingAccounts.add(accountName);
+    if (mounted && accounts.activeAccount == accountName) _updateState(() {});
     try {
       final performance = await _fetchIbkrPerformanceOnce(
         accountName,
@@ -133,6 +135,9 @@ extension _PortfolioLoading on PortfolioPageState {
         stackTrace,
         'Failed to load IBKR cash-out performance',
       );
+    } finally {
+      _performanceLoadingAccounts.remove(accountName);
+      if (mounted && accounts.activeAccount == accountName) _updateState(() {});
     }
   }
 
@@ -184,6 +189,18 @@ extension _PortfolioLoading on PortfolioPageState {
     if (_loadError != null && mounted) {
       _updateState(() => _loadError = null);
     }
+    final performanceMissing =
+        accounts.ibkrPerformanceCacheFor(accountName, '1Y') == null;
+    if (performanceMissing) {
+      runDetachedTask(
+        _loadIbkrCashOutPerformance(
+          accountName,
+          config,
+          forceRefresh: forceRefresh,
+        ),
+        'Failed to fetch missing IBKR performance history',
+      );
+    }
     try {
       final trades = await profileDataRepository.readTradesForAccount(
         accountName,
@@ -222,14 +239,16 @@ extension _PortfolioLoading on PortfolioPageState {
         _hasCachedPortfolio = true;
         _loadError = null;
       });
-      runDetachedTask(
-        _loadIbkrCashOutPerformance(
-          accountName,
-          config,
-          forceRefresh: forceRefresh,
-        ),
-        'Failed to refresh IBKR performance history',
-      );
+      if (!performanceMissing) {
+        runDetachedTask(
+          _loadIbkrCashOutPerformance(
+            accountName,
+            config,
+            forceRefresh: forceRefresh,
+          ),
+          'Failed to refresh IBKR performance history',
+        );
+      }
     } catch (error, stackTrace) {
       if (mounted && widget.isActive && accounts.activeAccount == accountName) {
         _updateState(() => _loadError = error);

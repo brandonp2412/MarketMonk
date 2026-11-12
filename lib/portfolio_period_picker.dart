@@ -6,6 +6,7 @@ class PortfolioPeriodPicker extends StatelessWidget {
   final List<DateTime?> dates;
   final int value;
   final ValueChanged<int> onChanged;
+  final bool loading;
 
   const PortfolioPeriodPicker({
     super.key,
@@ -13,6 +14,7 @@ class PortfolioPeriodPicker extends StatelessWidget {
     required this.dates,
     required this.value,
     required this.onChanged,
+    this.loading = false,
   })  : assert(labels.length == dates.length),
         assert(labels.length > 0);
 
@@ -59,6 +61,7 @@ class PortfolioPeriodPicker extends StatelessWidget {
             ],
             Text(
               switch (true) {
+                _ when loading => 'LOADING HISTORY',
                 _ when selectedDate == null => 'PRESENT',
                 _ when labels[value] == 'Inception' => 'INCEPTION',
                 _ => '${labels[value]} AGO',
@@ -88,42 +91,48 @@ class PortfolioPeriodPicker extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            trackHeight: 22,
-            trackShape: _TimeRulerTrack(
-              stops: labels.length,
-              lineColor: colors.outlineVariant,
-              tickColor: colors.onSurfaceVariant,
-              selectedColor: colors.primary,
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: loading ? 1 : 0),
+          duration: Duration(milliseconds: loading ? 1600 : 0),
+          curve: Curves.easeInOut,
+          builder: (context, progress, child) => SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 22,
+              trackShape: _TimeRulerTrack(
+                stops: labels.length,
+                lineColor: colors.outlineVariant,
+                tickColor: colors.onSurfaceVariant,
+                selectedColor: colors.primary,
+                loadingProgress: loading ? progress : null,
+              ),
+              tickMarkShape: SliderTickMarkShape.noTickMark,
+              thumbShape: const RoundSliderThumbShape(
+                enabledThumbRadius: 8,
+                elevation: 0,
+                pressedElevation: 0,
+              ),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),
+              activeTrackColor: colors.outlineVariant,
+              inactiveTrackColor: colors.outlineVariant,
+              thumbColor: colors.primary,
             ),
-            tickMarkShape: SliderTickMarkShape.noTickMark,
-            thumbShape: const RoundSliderThumbShape(
-              enabledThumbRadius: 8,
-              elevation: 0,
-              pressedElevation: 0,
+            child: Slider(
+              key: const Key('portfolio-return-period'),
+              value: value.toDouble(),
+              max: labels.length > 1 ? (labels.length - 1).toDouble() : 1,
+              divisions: labels.length > 1 ? labels.length - 1 : null,
+              label: title,
+              semanticFormatterCallback: (position) {
+                final index = position.round().clamp(0, labels.length - 1);
+                final date = dates[index];
+                return date == null
+                    ? 'Now, current allocation'
+                    : '${DateFormat.yMMMMd().format(date)}, ${labels[index]}${labels[index] == 'Inception' ? '' : ' ago'}';
+              },
+              onChanged: labels.length > 1
+                  ? (position) => onChanged(position.round())
+                  : null,
             ),
-            overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),
-            activeTrackColor: colors.outlineVariant,
-            inactiveTrackColor: colors.outlineVariant,
-            thumbColor: colors.primary,
-          ),
-          child: Slider(
-            key: const Key('portfolio-return-period'),
-            value: value.toDouble(),
-            max: labels.length > 1 ? (labels.length - 1).toDouble() : 1,
-            divisions: labels.length > 1 ? labels.length - 1 : null,
-            label: title,
-            semanticFormatterCallback: (position) {
-              final index = position.round().clamp(0, labels.length - 1);
-              final date = dates[index];
-              return date == null
-                  ? 'Now, current allocation'
-                  : '${DateFormat.yMMMMd().format(date)}, ${labels[index]}${labels[index] == 'Inception' ? '' : ' ago'}';
-            },
-            onChanged: labels.length > 1
-                ? (position) => onChanged(position.round())
-                : null,
           ),
         ),
         Padding(
@@ -139,7 +148,7 @@ class PortfolioPeriodPicker extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                'FURTHEST · $oldestLabel',
+                loading ? 'FETCHING PAST PERIODS' : 'FURTHEST · $oldestLabel',
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: colors.onSurfaceVariant,
                   letterSpacing: 0.9,
@@ -158,12 +167,14 @@ class _TimeRulerTrack extends RoundedRectSliderTrackShape {
   final Color lineColor;
   final Color tickColor;
   final Color selectedColor;
+  final double? loadingProgress;
 
   const _TimeRulerTrack({
     required this.stops,
     required this.lineColor,
     required this.tickColor,
     required this.selectedColor,
+    this.loadingProgress,
   });
 
   // Flutter insets discrete thumbs by half the track height for rounded
@@ -202,6 +213,25 @@ class _TimeRulerTrack extends RoundedRectSliderTrackShape {
         ..color = neutral
         ..strokeWidth = 1,
     );
+    if (loadingProgress != null && track.width > 0) {
+      final edge = track.left + track.width * loadingProgress!;
+      final start = (edge - 72).clamp(track.left, track.right);
+      if (edge > start) {
+        canvas.drawLine(
+          Offset(start, center),
+          Offset(edge, center),
+          Paint()
+            ..shader = LinearGradient(
+              colors: [
+                selectedColor.withValues(alpha: 0.05),
+                selectedColor.withValues(alpha: 0.95),
+              ],
+            ).createShader(Rect.fromLTRB(start, center - 2, edge, center + 2))
+            ..strokeWidth = 3
+            ..strokeCap = StrokeCap.round,
+        );
+      }
+    }
     if (stops > 1) {
       final selectedIndex =
           ((thumbCenter.dx - track.left) / track.width * (stops - 1))

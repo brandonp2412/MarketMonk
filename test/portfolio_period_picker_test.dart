@@ -103,6 +103,47 @@ void main() {
     expect(find.text('1H AGO'), findsOneWidget);
   });
 
+  testWidgets('uncached timeline animates then becomes normal once populated',
+      (tester) async {
+    final now = DateTime(2026, 11, 12);
+    Widget picker({required bool loading}) => MaterialApp(
+          home: Scaffold(
+            body: PortfolioPeriodPicker(
+              loading: loading,
+              labels: loading ? const ['Now'] : const ['Now', '1D'],
+              dates: loading
+                  ? const [null]
+                  : [null, now.subtract(const Duration(days: 1))],
+              value: 0,
+              onChanged: (_) {},
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(picker(loading: true));
+    expect(find.text('LOADING HISTORY'), findsOneWidget);
+    expect(find.text('FETCHING PAST PERIODS'), findsOneWidget);
+    expect(find.text('FURTHEST · NOW'), findsNothing);
+    await tester.pump(const Duration(milliseconds: 450));
+    expect(find.text('LOADING HISTORY'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(picker(loading: false));
+    await tester.pumpAndSettle();
+    expect(find.text('LOADING HISTORY'), findsNothing);
+    expect(find.text('PRESENT'), findsOneWidget);
+    expect(find.text('FURTHEST · NOV 2026'), findsOneWidget);
+    expect(
+      tester
+          .widget<Slider>(
+            find.byKey(const Key('portfolio-return-period')),
+          )
+          .onChanged,
+      isNotNull,
+    );
+  });
+
   testWidgets('one available instant leaves the timeline disabled',
       (tester) async {
     await tester.pumpWidget(

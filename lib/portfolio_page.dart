@@ -205,6 +205,16 @@ class PortfolioPageState extends State<PortfolioPage>
       mainAxisSize: MainAxisSize.min,
       children: [
         PortfolioPeriodPicker(
+          key: ValueKey('portfolio-period-$_lastAccount'),
+          loading: !_historyFailed &&
+              ((_availablePeriods.length == 1 &&
+                      (_historyLoading || _historyRefreshing)) ||
+                  (_performanceLoadingAccounts.contains(_lastAccount) &&
+                      context.read<AccountManager>().ibkrPerformanceCacheFor(
+                                _lastAccount,
+                                '1Y',
+                              ) ==
+                          null)),
           labels: [
             for (final period in ordered)
               switch (true) {
@@ -244,6 +254,7 @@ class PortfolioPageState extends State<PortfolioPage>
   final Map<(String, IbkrAccountConfig), Future<IbkrPerformanceSeries>>
       _ibkrPerformanceLoads = {};
   final Map<(String, bool), Future<void>> _preloadLoads = {};
+  final Set<String> _performanceLoadingAccounts = {};
 
   @override
   void initState() {

@@ -20,6 +20,7 @@ import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/portfolio_returns.dart';
 import 'package:market_monk/portfolio_history.dart';
 import 'package:market_monk/portfolio_intraday_cache.dart';
+import 'package:market_monk/portfolio_period_picker.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
@@ -518,6 +519,168 @@ void main() {
       expect(tester.takeException(), null);
     });
   }
+
+  testWidgets('uncached IBKR Bot periods load before its snapshot finishes', (
+    tester,
+  ) async {
+    await seedTestSqlite({});
+    final accounts = await configuredTwoAccounts();
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day - 70);
+    final dayAgo = portfolioReturnCutoff(10, now)!;
+    for (final profile in accounts.accounts) {
+      await accounts.cachePortfolio(
+        profile,
+        [cachedPosition()],
+        const IbkrAccountValue(value: 5500, currency: 'USD'),
+        netLiquidationUsd: 5500,
+      );
+    }
+    await accounts.cacheIbkrPerformance(
+      'Default',
+      await _performanceLoader(const IbkrAccountConfig(), '1Y'),
+    );
+    await accounts.cacheIbkrTradeHistory(
+      'IBKR Bot',
+      IbkrTradeHistory(
+        available: true,
+        trades: [
+          IbkrTrade(
+            symbol: 'VOO',
+            name: 'VOO',
+            currency: 'USD',
+            conid: 1,
+            quantity: 10,
+            price: 500,
+            tradeType: 'open',
+            tradeDate: start,
+            realizedPnl: 0,
+            commission: 0,
+          ),
+        ],
+      ),
+    );
+    await testDatabase.into(testDatabase.candles).insert(
+          CandlesCompanion.insert(
+            symbol: 'VOO',
+            date: dayAgo,
+            close: const Value(540),
+            rawCurrency: const Value('USD'),
+          ),
+        );
+    final botPerformance = Completer<IbkrPerformanceSeries>();
+    final botSnapshot = Completer<IbkrPortfolioSnapshot>();
+    final cachedBars = [
+      IbkrHistoricalSeries(
+        symbol: 'VOO',
+        currency: 'USD',
+        candles: [
+          for (final offset in [4, 2, 1])
+            IbkrHistoricalCandle(
+              date: now.toUtc().subtract(Duration(hours: offset)),
+              open: 550,
+              high: 550,
+              low: 550,
+              close: 550,
+              volume: 0,
+            ),
+        ],
+      ),
+    ];
+    var performanceRequests = 0;
+    var snapshotRequests = 0;
+
+    await tester.pumpWidget(
+      app(
+        accounts,
+        _portfolioPage(
+          ibkrLoader: (config) {
+            if (config.baseUrl.contains('bot.example.test')) {
+              snapshotRequests++;
+              return botSnapshot.future;
+            }
+            return Future.value(snapshotFor('default', 'VOO'));
+          },
+          ibkrPerformanceLoader: (config, period) {
+            if (config.baseUrl.contains('bot.example.test')) {
+              performanceRequests++;
+              return botPerformance.future;
+            }
+            return _performanceLoader(config, period);
+          },
+          intradayData: IntradayMarketData(
+            ibkrPortfolioFetch: (config, days) async => cachedBars,
+            ibkrFetch: (config, symbol, days) async => cachedBars.single,
+            yahooGet: (_) => throw StateError('Unexpected Yahoo request'),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<PortfolioPeriodPicker>(
+            find.byType(PortfolioPeriodPicker),
+          )
+          .loading,
+      isFalse,
+    );
+    await accounts.switchAccount('IBKR Bot');
+    accounts.requestIbkrRefresh();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(snapshotRequests, 1);
+    expect(performanceRequests, 1);
+    expect(accounts.ibkrPerformanceCacheFor('IBKR Bot', '1Y') == null, isTrue);
+    expect(
+      tester
+          .widget<PortfolioPeriodPicker>(
+            find.byType(PortfolioPeriodPicker),
+          )
+          .loading,
+      isTrue,
+    );
+    expect(find.text('LOADING HISTORY'), findsOneWidget);
+    expect(find.text('FETCHING PAST PERIODS'), findsOneWidget);
+    expect(
+      find.byKey(const Key('portfolio-return-period')),
+      findsOneWidget,
+    );
+
+    botPerformance.complete(
+      IbkrPerformanceSeries(
+        period: '1Y',
+        measure: 'TWR',
+        currency: 'USD',
+        startDate: start,
+        startNav: 5000,
+        dates: [start, dayAgo, now],
+        nav: const [5000, 5400, 5500],
+        returnDates: [start, dayAgo, now],
+        returns: const [0, .08, .1],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(accounts.ibkrPerformanceCacheFor('IBKR Bot', '1Y') == null, isFalse);
+    final picker = tester.widget<PortfolioPeriodPicker>(
+      find.byType(PortfolioPeriodPicker),
+    );
+    expect(picker.loading, isFalse);
+    final slider = tester.widget<Slider>(
+      find.byKey(const Key('portfolio-return-period')),
+    );
+    expect(
+      [
+        for (var i = 0; i <= slider.max; i++)
+          slider.semanticFormatterCallback!(i.toDouble()),
+      ],
+      contains(contains('1D ago')),
+    );
+    expect(find.text('LOADING HISTORY'), findsNothing);
+    expect(tester.takeException(), null);
+    await tester.pumpWidget(const SizedBox.shrink());
+    botSnapshot.complete(snapshotFor('bot', 'VOO'));
+  });
 
   testWidgets('slow IBKR performance refresh does not keep portfolio loading', (
     tester,
