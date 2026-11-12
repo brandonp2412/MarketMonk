@@ -13,11 +13,13 @@ import 'package:intl/intl.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/intraday_market_data.dart';
+import 'package:market_monk/intraday_portfolio.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/market_donut_chart.dart';
 import 'package:market_monk/portfolio_page.dart';
 import 'package:market_monk/portfolio_returns.dart';
 import 'package:market_monk/portfolio_history.dart';
+import 'package:market_monk/portfolio_intraday_cache.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/utils.dart';
@@ -1126,6 +1128,184 @@ void main() {
     expect(tester.takeException(), null);
   });
 
+  testWidgets(
+      'cold start restores intraday dots from SQLite before broker returns',
+      (tester) async {
+    await seedTestSqlite({});
+    final accounts = await configuredAccounts();
+    final now = DateTime.now().toUtc();
+    final start = now.subtract(const Duration(days: 3));
+    final holding = cachedPosition();
+    await accounts.cachePortfolio(
+      'Default',
+      [holding],
+      const IbkrAccountValue(value: 5500, currency: 'USD'),
+      netLiquidationUsd: 5500,
+    );
+    await accounts.cacheIbkrTradeHistory(
+      'Default',
+      IbkrTradeHistory(
+        available: true,
+        trades: [
+          IbkrTrade(
+            symbol: holding.symbol,
+            name: holding.name,
+            currency: 'USD',
+            conid: 1,
+            quantity: holding.netShares,
+            price: 500,
+            tradeType: 'open',
+            tradeDate: start,
+            realizedPnl: 0,
+            commission: 0,
+          ),
+        ],
+      ),
+    );
+    await accounts.cacheIbkrPerformance(
+      'Default',
+      IbkrPerformanceSeries(
+        period: '1Y',
+        measure: 'TWR',
+        currency: 'USD',
+        startDate: start,
+        startNav: 5000,
+        dates: [start, now.subtract(const Duration(days: 1)), now],
+        nav: const [5000, 5400, 5500],
+        returnDates: [start, now.subtract(const Duration(days: 1)), now],
+        returns: const [0, .08, .1],
+      ),
+    );
+    for (final date in [start, now.subtract(const Duration(days: 1))]) {
+      await testDatabase.into(testDatabase.candles).insertOnConflictUpdate(
+            CandlesCompanion.insert(
+              symbol: holding.symbol,
+              date: date,
+              close: const Value(530),
+              rawCurrency: const Value('USD'),
+            ),
+          );
+    }
+    final intraday = CachedPortfolioIntraday(
+      positionsKey: CachedPortfolioIntraday.keyFor([holding]),
+      cachedAt: now.subtract(const Duration(minutes: 10)),
+      holdings: {
+        holding.symbol: IntradayPortfolioHolding(
+          quantity: holding.netShares,
+          pricesUsd: {
+            now.subtract(const Duration(hours: 4)): 520,
+            now.subtract(const Duration(hours: 2)): 535,
+            now.subtract(const Duration(minutes: 1)): 550,
+          },
+        ),
+      },
+    );
+    await testDatabase.writeIbkrCache(
+      profileId: accounts.activeProfileId,
+      kind: 'portfolioIntraday',
+      cacheKey: '1D',
+      payloadJson: jsonEncode(intraday.toJson()),
+      cachedAt: now.subtract(const Duration(minutes: 10)),
+    );
+    final restarted = testAccountManager();
+    await restarted.init();
+    final pendingBars = Completer<List<IbkrHistoricalSeries>>();
+    var brokerRequests = 0;
+    await tester.pumpWidget(
+      app(
+        restarted,
+        _portfolioPage(
+          intradayData: IntradayMarketData(
+            ibkrPortfolioFetch: (config, days) {
+              brokerRequests++;
+              return pendingBars.future;
+            },
+            yahooGet: (uri) => throw StateError('Unexpected Yahoo request'),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final finder = find.byKey(const Key('portfolio-return-period'));
+    final slider = tester.widget<Slider>(finder);
+    final labels = [
+      for (var index = 0; index <= slider.max; index++)
+        slider.semanticFormatterCallback!(index.toDouble()),
+    ];
+    expect(labels, contains(contains('1H ago')));
+    expect(labels, contains(contains('2H ago')));
+    expect(brokerRequests, 1);
+    final index = labels.indexWhere((label) => label.contains('2H ago'));
+    slider.onChanged!(index.toDouble());
+    await tester.pump();
+    expect(find.text('2H AGO'), findsOneWidget);
+    expect(find.byType(MarketDonutChart), findsOneWidget);
+    expect(tester.takeException(), null);
+    pendingBars.complete([
+      IbkrHistoricalSeries(
+        symbol: holding.symbol,
+        currency: 'USD',
+        candles: [
+          for (final date in [
+            now.subtract(const Duration(hours: 4)),
+            now.subtract(const Duration(hours: 2)),
+            now.subtract(const Duration(minutes: 1)),
+          ])
+            IbkrHistoricalCandle(
+              date: date,
+              open: 550,
+              high: 550,
+              low: 550,
+              close: 550,
+              volume: 0,
+            ),
+        ],
+      ),
+    ]);
+    await tester.pumpAndSettle();
+    final stored = await testDatabase.readIbkrCache(
+      accounts.activeProfileId,
+      'portfolioIntraday',
+      '1D',
+    );
+    expect(stored == null, isFalse);
+    expect(
+      stored!.cachedAt.isAfter(now.subtract(const Duration(minutes: 10))),
+      isTrue,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+
+    final freshRestart = testAccountManager();
+    await freshRestart.init();
+    var freshBrokerRequests = 0;
+    await tester.pumpWidget(
+      app(
+        freshRestart,
+        _portfolioPage(
+          intradayData: IntradayMarketData(
+            ibkrPortfolioFetch: (config, days) async {
+              freshBrokerRequests++;
+              return [];
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final restoredSlider = tester.widget<Slider>(
+      find.byKey(const Key('portfolio-return-period')),
+    );
+    expect(
+      [
+        for (var i = 0; i <= restoredSlider.max; i++)
+          restoredSlider.semanticFormatterCallback!(i.toDouble()),
+      ],
+      contains(contains('1H ago')),
+    );
+    expect(freshBrokerRequests, 0);
+    expect(tester.takeException(), null);
+  });
+
   testWidgets('cached IBKR history renders while a trade refresh is stalled', (
     tester,
   ) async {
@@ -1525,6 +1705,34 @@ void main() {
     expect(pieValues(), {'VOO': 6800, 'MSFT': 2800});
     expect(find.text(fmtCurrency(9600)), findsWidgets);
     expect(find.text('Account value'), findsOneWidget);
+    final sqliteCache =
+        (await testDatabase.readIbkrCaches(accounts.activeProfileId))
+            .singleWhere(
+      (entry) => entry.kind == 'portfolioIntraday' && entry.cacheKey == '1D',
+    );
+    final persisted = CachedPortfolioIntraday.fromJson(
+      jsonDecode(sqliteCache.payloadJson) as Map<String, dynamic>,
+    );
+    expect(
+      persisted.isUsableFor(
+        [
+          for (final symbol in ['VOO', 'MSFT'])
+            Position(
+              symbol: symbol,
+              name: symbol,
+              nativeCurrency: 'USD',
+              netShares: 10,
+              avgCost: 100,
+              currentPrice: 100,
+              firstBuyDate: DateTime(2026),
+              lastBuyDate: DateTime(2026),
+            ),
+        ],
+        DateTime.now(),
+      ),
+      isTrue,
+    );
+    expect(persisted.holdings.keys, containsAll(['VOO', 'MSFT']));
     expect(tester.takeException(), null);
   });
 

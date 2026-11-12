@@ -153,6 +153,9 @@ extension _PortfolioReturnHistory on PortfolioPageState {
           _historyLoading = false;
         });
       }
+      final intradayCacheFresh =
+          await _restoreCachedReturnIntraday(account, accountName, positions);
+      if (!mounted || _historyAccount != account) return;
       final history = await loadPortfolioHistory(
         accounts: accounts,
         accountName: accountName,
@@ -174,6 +177,7 @@ extension _PortfolioReturnHistory on PortfolioPageState {
       });
       final config = accounts.ibkrConfigFor(accountName);
       if (config.enabled &&
+          !intradayCacheFresh &&
           positions.any((position) => position.netShares != 0)) {
         await _loadReturnIntraday(
           account,
@@ -265,6 +269,62 @@ extension _PortfolioReturnHistory on PortfolioPageState {
     );
   }
 
+  Future<bool> _restoreCachedReturnIntraday(
+    String historyKey,
+    String accountName,
+    List<Position> positions,
+  ) async {
+    try {
+      final accounts = context.read<AccountManager>();
+      final entry = await marketDataDatabase.readIbkrCache(
+        accounts.activeProfileId,
+        'portfolioIntraday',
+        '1D',
+      );
+      if (entry == null) return false;
+      final cache = CachedPortfolioIntraday.fromJson(
+        jsonDecode(entry.payloadJson) as Map<String, dynamic>,
+      );
+      final now = DateTime.now();
+      if (!cache.isUsableFor(positions, now)) return false;
+      final snapshot = accounts.portfolioCacheFor(accountName);
+      final nav = snapshot?.netLiquidation;
+      final currentValueUsd = snapshot?.netLiquidationUsd ??
+          (nav != null && nav.value.isFinite
+              ? nav.value / requireUsdRate(nav.currency)
+              : null) ??
+          positions.fold<double>(
+            0,
+            (sum, position) => sum + position.currentValue,
+          );
+      final values = buildIntradayPortfolio(
+        holdings: cache.holdings.values.toList(),
+        currentValueUsd: currentValueUsd,
+      );
+      if (values.isEmpty ||
+          !mounted ||
+          _historyAccount != historyKey ||
+          accounts.activeAccount != accountName) {
+        return false;
+      }
+      _updateState(() {
+        _intradayValues = values;
+        _intradayHoldings
+          ..clear()
+          ..addAll(cache.holdings);
+        _intradayCurrentValueUsd = currentValueUsd;
+      });
+      return now.difference(cache.cachedAt) < const Duration(minutes: 5);
+    } catch (error, stack) {
+      talker.handle(
+        error,
+        stack,
+        'Skipped invalid SQLite portfolio intraday cache',
+      );
+      return false;
+    }
+  }
+
   Future<void> _loadReturnIntraday(
     String historyKey,
     String accountName,
@@ -331,6 +391,31 @@ extension _PortfolioReturnHistory on PortfolioPageState {
           });
         _intradayCurrentValueUsd = currentValueUsd;
       });
+      if (_intradayValues.isNotEmpty) {
+        try {
+          final cache = CachedPortfolioIntraday(
+            positionsKey: CachedPortfolioIntraday.keyFor(positions),
+            cachedAt: DateTime.now(),
+            holdings: {
+              for (var i = 0; i < holdings.length; i++)
+                priced[i].symbol: holdings[i],
+            },
+          );
+          await marketDataDatabase.writeIbkrCache(
+            profileId: accounts.activeProfileId,
+            kind: 'portfolioIntraday',
+            cacheKey: '1D',
+            payloadJson: jsonEncode(cache.toJson()),
+            cachedAt: cache.cachedAt,
+          );
+        } catch (error, stack) {
+          talker.handle(
+            error,
+            stack,
+            'Failed to cache intraday portfolio in SQLite',
+          );
+        }
+      }
     } catch (error, stack) {
       talker.handle(error, stack, 'Failed to load intraday portfolio values');
     }

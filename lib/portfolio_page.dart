@@ -28,6 +28,7 @@ import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/market_donut_chart.dart';
 import 'package:market_monk/portfolio_allocation.dart';
 import 'package:market_monk/portfolio_history.dart';
+import 'package:market_monk/portfolio_intraday_cache.dart';
 import 'package:market_monk/portfolio_period_picker.dart';
 import 'package:market_monk/portfolio_returns.dart';
 import 'package:market_monk/profile_data_repository.dart';
@@ -298,6 +299,9 @@ class PortfolioPageState extends State<PortfolioPage>
       _returnCandles = {};
       _returnTrades = [];
       _returnHistory = null;
+      _intradayValues = const [];
+      _intradayHoldings.clear();
+      _intradayCurrentValueUsd = null;
     }
     _lastAccount = account;
     _lastIbkrConfig = ibkrConfig;
