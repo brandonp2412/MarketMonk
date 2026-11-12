@@ -212,6 +212,7 @@ extension _ChartPortfolioView on ChartsPageState {
       return SizedBox(
         height: height,
         child: AppEmptyState(
+          compact: true,
           icon: allEmpty
               ? Icons.candlestick_chart_rounded
               : Icons.visibility_off_rounded,

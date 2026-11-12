@@ -9,6 +9,7 @@ class AppEmptyState extends StatelessWidget {
     this.actionLabel,
     this.actionIcon = Icons.arrow_forward_rounded,
     this.onAction,
+    this.compact = false,
   });
 
   final IconData icon;
@@ -17,25 +18,29 @@ class AppEmptyState extends StatelessWidget {
   final String? actionLabel;
   final IconData actionIcon;
   final VoidCallback? onAction;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final content = Padding(
-      padding: const EdgeInsets.all(28),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 16 : 28,
+        vertical: compact ? 4 : 28,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 64, color: colors.primary),
-          const SizedBox(height: 16),
+          Icon(icon, size: compact ? 32 : 64, color: colors.primary),
+          SizedBox(height: compact ? 6 : 16),
           Text(
             title,
             textAlign: TextAlign.center,
             style: theme.textTheme.titleLarge,
           ),
           if (message != null) ...[
-            const SizedBox(height: 8),
+            SizedBox(height: compact ? 4 : 8),
             Text(
               message!,
               textAlign: TextAlign.center,
@@ -45,7 +50,7 @@ class AppEmptyState extends StatelessWidget {
             ),
           ],
           if (onAction != null && actionLabel != null) ...[
-            const SizedBox(height: 18),
+            SizedBox(height: compact ? 8 : 18),
             FilledButton.icon(
               onPressed: onAction,
               icon: Icon(actionIcon),

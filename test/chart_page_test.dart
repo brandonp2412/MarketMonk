@@ -566,11 +566,23 @@ void main() {
     expect(showAll, findsOneWidget);
     expect(tester.getSize(emptyState).height, closeTo(chartHeight, 0.01));
 
-    await tester.ensureVisible(showAll);
-    await tester.pumpAndSettle();
+    // The restore button must fit without scrolling the chart's empty state.
+    // Scrolling the full page cannot reveal content clipped by the chart.
     expect(
       tester.getRect(showAll).bottom,
       lessThanOrEqualTo(tester.getRect(emptyState).bottom),
+    );
+    expect(
+      tester.getRect(showAll).top,
+      greaterThanOrEqualTo(tester.getRect(emptyState).top),
+    );
+    final emptyStateScroll = find.descendant(
+      of: emptyState,
+      matching: find.byType(Scrollable),
+    );
+    expect(
+      tester.state<ScrollableState>(emptyStateScroll).position.maxScrollExtent,
+      0,
     );
 
     await tester.tap(showAll);
