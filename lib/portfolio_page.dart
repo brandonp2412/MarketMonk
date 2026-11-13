@@ -163,6 +163,15 @@ class PortfolioPageState extends State<PortfolioPage>
   ];
   int _period = 0;
   String? _historyAccount;
+  // Cached candles are provisional until the full history has completed.
+  String? _completedHistoryAccount;
+  bool get _periodHistoryIncomplete =>
+      _historyLoading ||
+      (_historyRefreshing && _completedHistoryAccount != _historyAccount) ||
+      // An existing broker-performance cache can contain only a few dates.
+      // Do not expose those stops while fresher history is being fetched.
+      _performanceLoadingAccounts.contains(_lastAccount) ||
+      _intradayHistoryPending;
   Future<void>? _historyFuture;
   bool _forceHistoryRefresh = false;
   IbkrTradeHistory? _loadedTradeCache;
@@ -184,6 +193,7 @@ class PortfolioPageState extends State<PortfolioPage>
   double? _intradayCurrentValueUsd;
   bool _historyLoading = false;
   bool _historyRefreshing = false;
+  bool _intradayHistoryPending = false;
   bool _historyFailed = false;
 
   List<int> _availablePeriods = const [0];
@@ -206,15 +216,7 @@ class PortfolioPageState extends State<PortfolioPage>
       children: [
         PortfolioPeriodPicker(
           key: ValueKey('portfolio-period-$_lastAccount'),
-          loading: !_historyFailed &&
-              ((_availablePeriods.length == 1 &&
-                      (_historyLoading || _historyRefreshing)) ||
-                  (_performanceLoadingAccounts.contains(_lastAccount) &&
-                      context.read<AccountManager>().ibkrPerformanceCacheFor(
-                                _lastAccount,
-                                '1Y',
-                              ) ==
-                          null)),
+          loading: !_historyFailed && _periodHistoryIncomplete,
           labels: [
             for (final period in ordered)
               switch (true) {
@@ -307,6 +309,8 @@ class PortfolioPageState extends State<PortfolioPage>
 
     _historyAccount = null;
     if (accountChanged || ibkrConfig != _lastIbkrConfig) {
+      _completedHistoryAccount = null;
+      _intradayHistoryPending = false;
       _returnCandles = {};
       _returnTrades = [];
       _returnHistory = null;

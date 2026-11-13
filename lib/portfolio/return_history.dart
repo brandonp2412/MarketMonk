@@ -11,7 +11,7 @@ extension _PortfolioReturnHistory on PortfolioPageState {
     IbkrPerformanceSeries? performance,
     IbkrAccountValue? netLiquidation,
   ) {
-    if (_historyLoading || _historyFailed) return const [0];
+    if (_periodHistoryIncomplete || _historyFailed) return const [0];
     if (performance != null &&
         netLiquidation != null &&
         performance.dates.isNotEmpty) {
@@ -167,25 +167,38 @@ extension _PortfolioReturnHistory on PortfolioPageState {
         rateLoader: widget._historyRateLoader,
       ).timeout(const Duration(seconds: 90));
       if (!mounted || _historyAccount != account) return;
+      final config = accounts.ibkrConfigFor(accountName);
+      final needsIntraday = config.enabled &&
+          !intradayCacheFresh &&
+          positions.any((position) => position.netShares != 0);
+      // A usable older intraday cache already supplies complete period stops.
+      // Otherwise, keep the ruler in its loading state until the daily and
+      // intraday sources have both finished.
+      final waitingForIntraday = needsIntraday && _intradayValues.isEmpty;
       _updateState(() {
         _returnHistory = history;
         _loadedTradeCache = accounts.ibkrTradeHistoryCacheFor(accountName);
         _returnTrades = history.trades;
         _returnCandles = history.candles;
+        _completedHistoryAccount = account;
         _historyLoading = false;
         _historyRefreshing = false;
+        _intradayHistoryPending = waitingForIntraday;
       });
-      final config = accounts.ibkrConfigFor(accountName);
-      if (config.enabled &&
-          !intradayCacheFresh &&
-          positions.any((position) => position.netShares != 0)) {
-        await _loadReturnIntraday(
-          account,
-          accountName,
-          positions,
-          history.trades,
-          config,
-        );
+      if (needsIntraday) {
+        try {
+          await _loadReturnIntraday(
+            account,
+            accountName,
+            positions,
+            history.trades,
+            config,
+          );
+        } finally {
+          if (mounted && _historyAccount == account && waitingForIntraday) {
+            _updateState(() => _intradayHistoryPending = false);
+          }
+        }
       }
     } catch (error, stack) {
       talker.handle(error, stack, 'Failed to load portfolio return history');
@@ -193,7 +206,8 @@ extension _PortfolioReturnHistory on PortfolioPageState {
       _updateState(() {
         _historyLoading = false;
         _historyRefreshing = false;
-        _historyFailed = _returnHistory == null;
+        _intradayHistoryPending = false;
+        _historyFailed = _completedHistoryAccount != account;
       });
     }
   }

@@ -767,11 +767,25 @@ void main() {
     expect(performanceLoads, 1);
     expect(find.bySemanticsLabel('Loading portfolio'), findsNothing);
     expect(find.text('VOO'), findsWidgets);
+    // Cached performance exists, but it may cover only a subset of dates.
+    final pickerDuringRefresh = tester.widget<PortfolioPeriodPicker>(
+      find.byType(PortfolioPeriodPicker),
+    );
+    expect(pickerDuringRefresh.loading, isTrue);
+    expect(pickerDuringRefresh.labels, ['Now']);
+    expect(find.text('LOADING HISTORY'), findsOneWidget);
 
     pendingPerformance.complete(
       await _performanceLoader(const IbkrAccountConfig(), '1Y'),
     );
     await tester.pumpAndSettle();
+    expect(find.text('LOADING HISTORY'), findsNothing);
+    expect(
+      tester
+          .widget<PortfolioPeriodPicker>(find.byType(PortfolioPeriodPicker))
+          .loading,
+      isFalse,
+    );
   });
 
   test('portfolio cache survives AccountManager reinitialization', () async {
@@ -1513,7 +1527,85 @@ void main() {
     expect(tester.takeException(), null);
   });
 
-  testWidgets('cached IBKR history renders while a trade refresh is stalled', (
+  testWidgets('missing intraday history keeps daily period dots hidden',
+      (tester) async {
+    await seedTestSqlite({});
+    final accounts = await configuredAccounts();
+    final now = DateTime.now().toUtc();
+    final holding = cachedPosition();
+    await accounts.cachePortfolio(
+      'Default',
+      [holding],
+      const IbkrAccountValue(value: 5500, currency: 'USD'),
+      netLiquidationUsd: 5500,
+    );
+    await accounts.cacheIbkrPerformance(
+      'Default',
+      IbkrPerformanceSeries(
+        period: '1Y',
+        measure: 'TWR',
+        currency: 'USD',
+        startDate: now.subtract(const Duration(days: 12)),
+        startNav: 5000,
+        dates: [now.subtract(const Duration(days: 12)), now],
+        nav: const [5000, 5500],
+        returnDates: [now.subtract(const Duration(days: 12)), now],
+        returns: const [0, .1],
+      ),
+    );
+    await seedCurrentCandle('VOO');
+    final waiting = Completer<List<IbkrHistoricalSeries>>();
+    var brokerRequests = 0;
+    final bars = IbkrHistoricalSeries(
+      symbol: 'VOO',
+      currency: 'USD',
+      candles: [
+        for (final hoursAgo in [4, 3, 2, 1])
+          IbkrHistoricalCandle(
+            date: now.subtract(Duration(hours: hoursAgo)),
+            open: 550,
+            high: 550,
+            low: 550,
+            close: 550,
+            volume: 0,
+          ),
+      ],
+    );
+    await tester.pumpWidget(
+      app(
+        accounts,
+        _portfolioPage(
+          intradayData: IntradayMarketData(
+            ibkrPortfolioFetch: (_, __) {
+              brokerRequests++;
+              return waiting.future;
+            },
+            ibkrFetch: (_, __, ___) async => bars,
+            yahooGet: (_) => throw StateError('Unexpected Yahoo request'),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(brokerRequests, 1);
+    final during = tester.widget<PortfolioPeriodPicker>(
+      find.byType(PortfolioPeriodPicker),
+    );
+    expect(during.loading, isTrue);
+    expect(during.labels, ['Now']);
+    expect(find.text('LOADING HISTORY'), findsOneWidget);
+    waiting.complete([bars]);
+    await tester.pumpAndSettle();
+    final ready = tester.widget<PortfolioPeriodPicker>(
+      find.byType(PortfolioPeriodPicker),
+    );
+    expect(ready.loading, isFalse);
+    expect(ready.labels.length, greaterThan(1));
+    expect(find.text('LOADING HISTORY'), findsNothing);
+    expect(tester.takeException(), null);
+  });
+
+  testWidgets('partial cached IBKR periods stay loading during trade refresh', (
     tester,
   ) async {
     await seedTestSqlite({});
@@ -1601,7 +1693,24 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(tradeLoads, 1);
-    expect(find.byType(LinearProgressIndicator), findsNothing);
+    final loadingPicker = tester.widget<PortfolioPeriodPicker>(
+      find.byType(PortfolioPeriodPicker),
+    );
+    expect(loadingPicker.loading, isTrue);
+    expect(loadingPicker.labels, ['Now']);
+    expect(find.text('LOADING HISTORY'), findsOneWidget);
+    final waitingSlider = tester.widget<Slider>(
+      find.byKey(const Key('portfolio-return-period')),
+    );
+    expect(waitingSlider.onChanged, null);
+    expect(waitingSlider.divisions, null);
+    tradeRefresh.complete(brokerHistory);
+    await tester.pumpAndSettle();
+    final fullPicker = tester.widget<PortfolioPeriodPicker>(
+      find.byType(PortfolioPeriodPicker),
+    );
+    expect(fullPicker.loading, isFalse);
+    expect(find.text('LOADING HISTORY'), findsNothing);
     final slider = tester.widget<Slider>(
       find.byKey(const Key('portfolio-return-period')),
     );
@@ -1628,8 +1737,6 @@ void main() {
     );
     expect(find.text('INCEPTION'), findsOneWidget);
     expect(tester.takeException(), null);
-    tradeRefresh.complete(brokerHistory);
-    await tester.pumpAndSettle();
     expect(find.byType(LinearProgressIndicator), findsNothing);
     expect(tester.takeException(), null);
   });
@@ -1732,29 +1839,27 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(tradeLoads, 1);
-    expect(find.byType(LinearProgressIndicator), findsNothing);
-    final slider = tester.widget<Slider>(
+    final loadingPicker = tester.widget<PortfolioPeriodPicker>(
+      find.byType(PortfolioPeriodPicker),
+    );
+    expect(loadingPicker.loading, isTrue);
+    expect(loadingPicker.labels, ['Now']);
+    expect(find.text('LOADING HISTORY'), findsOneWidget);
+    final waitingSlider = tester.widget<Slider>(
       find.byKey(const Key('portfolio-return-period')),
     );
-    expect(slider.semanticFormatterCallback!(1), contains('1D ago'));
-    expect(
-      slider.semanticFormatterCallback!(slider.max),
-      contains('1D ago'),
-    );
-    expect(slider.onChanged == null, isFalse);
+    expect(waitingSlider.onChanged, null);
     expect(tester.takeException(), null);
-    slider.onChanged!(1);
-    await tester.pump();
-    expect(find.text('No holdings on this date'), findsNothing);
-    expect(
-      tester
-          .widget<MarketDonutChart>(find.byType(MarketDonutChart))
-          .slices
-          .map((slice) => slice.label),
-      contains('VOO'),
-    );
+
     tradeRefresh.complete(brokerHistory);
     await tester.pumpAndSettle();
+    expect(find.text('LOADING HISTORY'), findsNothing);
+    expect(
+      tester
+          .widget<PortfolioPeriodPicker>(find.byType(PortfolioPeriodPicker))
+          .loading,
+      isFalse,
+    );
     final updated = tester.widget<Slider>(
       find.byKey(const Key('portfolio-return-period')),
     );
