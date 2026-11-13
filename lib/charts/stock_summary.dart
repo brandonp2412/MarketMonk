@@ -5,7 +5,7 @@ extension _ChartStockSummary on ChartsPageState {
     BuildContext context,
     AsyncSnapshot<List<CandleTicker>> snapshot,
   ) {
-    if (_networkLoading || !snapshot.hasData || snapshot.data!.isEmpty) {
+    if (!snapshot.hasData || snapshot.data!.isEmpty) {
       if (_networkLoading && _selectedSymbol != null) {
         return Padding(
           padding: EdgeInsets.symmetric(

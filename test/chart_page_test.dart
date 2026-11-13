@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/market_chart_loading.dart';
+import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
@@ -1304,6 +1305,110 @@ void main() {
     );
     expect(find.byKey(const Key('chart-period-10y')), findsOneWidget);
     expect(tester.takeException(), null);
+  });
+
+  testWidgets('SPY 2m refresh keeps cached chart and avoids portfolio requests',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1400, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({
+      'chartPeriodYears': 0,
+      'chartPeriodMonths': 2,
+      'chartPeriodDays': 0,
+    });
+    await upsertSymbolCurrencyMetadata('SPY', 'USD', source: 'test');
+    cacheSymbolMeta('SPY', 'USD');
+    final today = DateTime.now();
+    await seedTestCandle(
+      'SPY',
+      today.subtract(const Duration(days: 34)),
+      100,
+    );
+    await seedTestCandle(
+      'SPY',
+      today.subtract(const Duration(days: 2)),
+      105,
+    );
+    final accounts = testAccountManager();
+    await accounts.init();
+    final pendingRefresh = Completer<void>();
+    var refreshCount = 0;
+    var nonRefreshCount = 0;
+    var brokerCount = 0;
+    addTearDown(() {
+      if (!pendingRefresh.isCompleted) pendingRefresh.complete();
+    });
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create: (_) =>
+                SettingsState(localCurrencyDetector: () async => 'USD'),
+          ),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: ChartsPage(
+              initialSymbol: 'SPY',
+              stockCandleSyncer: (symbol, requiredFrom, forceRefresh) {
+                expect(symbol, 'SPY');
+                expect(
+                  requiredFrom.isAfter(
+                    today.subtract(const Duration(days: 70)),
+                  ),
+                  isTrue,
+                );
+                if (!forceRefresh) {
+                  nonRefreshCount++;
+                  return Future<void>.value();
+                }
+                refreshCount++;
+                return pendingRefresh.future;
+              },
+              ibkrLoader: (_) async {
+                brokerCount++;
+                throw StateError('Stock refresh fetched portfolio');
+              },
+              ibkrPerformanceLoader: (_, __) async {
+                brokerCount++;
+                throw StateError('Stock refresh fetched performance');
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(nonRefreshCount, 1);
+    expect(find.byType(MarketLineChart), findsOneWidget);
+    final before = tester.widget<MarketLineChart>(find.byType(MarketLineChart));
+    expect(before.series.single.points, hasLength(2));
+
+    await tester.tap(find.byTooltip('Refresh'));
+    await tester.pump();
+    expect(refreshCount, 1);
+    expect(brokerCount, 0);
+    expect(
+      find.byType(MarketLineChart),
+      findsOneWidget,
+      reason: 'Cached SPY chart must remain visible during refresh',
+    );
+    expect(find.byType(MarketChartLoading), findsNothing);
+
+    // Provider never answers: the visual loading state must still end.
+    await tester.pump(const Duration(seconds: 9));
+    await tester.pump();
+    expect(find.byType(MarketLineChart), findsOneWidget);
+    expect(find.byType(MarketChartLoading), findsNothing);
+    expect(refreshCount, 1);
+    expect(brokerCount, 0);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('manual refresh reloads every configured IBKR account',

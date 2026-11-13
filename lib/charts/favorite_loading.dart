@@ -85,6 +85,12 @@ extension _ChartFavoriteLoading on ChartsPageState {
   /// Do not finish the gesture until the caches are actually populated.
   Future<void> _refreshCurrentChart() async {
     if (!mounted || !widget.isActive || _networkLoading) return;
+    // Refresh the currently displayed stock, not every portfolio and the
+    // entire ten-year favourites history. The latter can take minutes.
+    if (_mode == _ChartMode.stock && _selectedSymbol != null) {
+      await _loadSelectedStock(forceRefresh: true);
+      return;
+    }
     _updateState(() {
       _networkLoading = true;
       _stockError = null;

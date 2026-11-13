@@ -97,11 +97,12 @@ extension _ChartStockLoading on ChartsPageState {
     final namespace = accountManager.activeAccount;
     final intraday = _usesIntraday;
     final selectedDays = days;
+    final contentKey = '$namespace|$symbol|$years|$months|$days';
+    final isNewContent = _stockContentKey != contentKey;
     _updateState(() {
       _networkLoading = true;
       _stockError = null;
-      final contentKey = '$namespace|$symbol|$years|$months|$days';
-      if (_stockContentKey != contentKey) {
+      if (isNewContent) {
         _intradaySeries = null;
         _stockDailyPreview = const [];
         _stockContentKey = contentKey;
@@ -109,7 +110,9 @@ extension _ChartStockLoading on ChartsPageState {
       _nativeCurrency = symbolCurrency(symbol);
       _centDivisor = symbolCentDivisor(symbol);
     });
-    _setStockStream(symbol);
+    // Keep the existing database stream alive during refresh, so cached
+    // candles remain on screen while the provider responds.
+    if (isNewContent || _stockStream == null) _setStockStream(symbol);
 
     bool isCurrent() =>
         mounted &&
@@ -139,15 +142,33 @@ extension _ChartStockLoading on ChartsPageState {
         requireUsdRate(symbolCurrency(symbol));
         _updateState(() => _intradaySeries = series);
       } else {
-        await syncCandles(
-          symbol,
-          ibkrConfig: config,
-          syncNamespace: namespace,
-          requiredFrom: _requiredCandleStart(),
-          forceRefresh: forceRefresh,
+        // Even an unresponsive price provider must not leave the chart in a
+        // loading state indefinitely. The underlying sync may still update
+        // Drift's live candle stream after the visible wait ends.
+        await (widget._stockCandleSyncer?.call(
+                  symbol,
+                  _requiredCandleStart(),
+                  forceRefresh,
+                ) ??
+                syncCandles(
+                  symbol,
+                  ibkrConfig: config,
+                  syncNamespace: namespace,
+                  requiredFrom: _requiredCandleStart(),
+                  forceRefresh: forceRefresh,
+                ))
+            .timeout(
+          const Duration(seconds: 8),
+          onTimeout: () {
+            talker.warning('Stock candle refresh still running for $symbol');
+          },
         );
         if (!isCurrent()) return;
-        await fetchSymbolCurrencyAndRate(symbol);
+        await fetchSymbolCurrencyAndRate(symbol).timeout(
+          const Duration(seconds: 3),
+          onTimeout: () =>
+              talker.warning('Stock currency metadata slow for $symbol'),
+        );
         if (!isCurrent()) return;
       }
       _updateState(() {

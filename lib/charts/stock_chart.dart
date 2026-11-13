@@ -29,7 +29,7 @@ extension _ChartStockView on ChartsPageState {
         _buildStockChart(context, intradaySnapshot, settings)
       else
         StreamBuilder(
-          key: ValueKey('stock-chart-$_stockLoadGeneration'),
+          key: ValueKey('stock-chart-$_stockContentKey'),
           stream: _stockStream,
           builder: (context, snapshot) =>
               _buildStockChart(context, snapshot, settings),
@@ -55,7 +55,7 @@ extension _ChartStockView on ChartsPageState {
         _buildStockSummary(context, intradaySnapshot)
       else
         StreamBuilder(
-          key: ValueKey('stock-summary-$_stockLoadGeneration'),
+          key: ValueKey('stock-summary-$_stockContentKey'),
           stream: _stockStream,
           builder: _buildStockSummary,
         ),
@@ -110,7 +110,7 @@ extension _ChartStockView on ChartsPageState {
     if (snapshot.hasError) {
       return _stockUnavailable(context, snapshot.error!, height);
     }
-    if (_networkLoading) {
+    if (_networkLoading && (!snapshot.hasData || snapshot.data!.isEmpty)) {
       if (isDesktopLayout(context)) {
         return SizedBox(
           height: height,
