@@ -109,6 +109,7 @@ class ChartsPage extends StatefulWidget {
   final Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
       _ibkrPerformanceLoader;
   final Future<void> Function(String, DateTime)? _favoriteHistoryPrefetcher;
+  final Future<void> Function(String)? _localCandleSyncer;
 
   const ChartsPage({
     super.key,
@@ -119,10 +120,12 @@ class ChartsPage extends StatefulWidget {
     Future<IbkrPerformanceSeries> Function(IbkrAccountConfig, String)?
         ibkrPerformanceLoader,
     Future<void> Function(String, DateTime)? favoriteHistoryPrefetcher,
+    Future<void> Function(String)? localCandleSyncer,
   })  : _intradayData = intradayData,
         _ibkrLoader = ibkrLoader,
         _ibkrPerformanceLoader = ibkrPerformanceLoader,
-        _favoriteHistoryPrefetcher = favoriteHistoryPrefetcher;
+        _favoriteHistoryPrefetcher = favoriteHistoryPrefetcher,
+        _localCandleSyncer = localCandleSyncer;
 
   @override
   State<ChartsPage> createState() => ChartsPageState();

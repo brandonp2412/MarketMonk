@@ -212,6 +212,72 @@ void main() {
     expect(tester.takeException(), null);
   });
 
+  testWidgets('startup loads broker history before slow local candle sync',
+      (tester) async {
+    await seedTestSqlite({
+      'chartPeriodYears': 1,
+      'chartPeriodMonths': 0,
+      'chartPeriodDays': 0,
+    });
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.addAccount('Local');
+    await accounts.setIbkrConfig(
+      'Default',
+      const IbkrAccountConfig(
+        enabled: true,
+        baseUrl: 'https://ibkr.example.test',
+        token: 'test-token',
+      ),
+    );
+    final localSync = Completer<void>();
+    var brokerLoads = 0;
+    var localSyncs = 0;
+    addTearDown(() {
+      if (!localSync.isCompleted) localSync.complete();
+    });
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create: (_) =>
+                SettingsState(localCurrencyDetector: () async => 'USD'),
+          ),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: ChartsPage(
+              ibkrLoader: (_) async {
+                brokerLoads++;
+                throw StateError('Offline broker');
+              },
+              ibkrPerformanceLoader: (_, __) async =>
+                  throw StateError('Offline broker'),
+              localCandleSyncer: (_) {
+                localSyncs++;
+                return localSync.future;
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    for (var i = 0; i < 30 && (brokerLoads == 0 || localSyncs == 0); i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(
+      brokerLoads,
+      greaterThan(0),
+      reason: 'A slow local sync must not hold broker history hostage',
+    );
+    expect(localSyncs, 1);
+    expect(localSync.isCompleted, isFalse);
+    localSync.complete();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('inactive kept-alive charts do not fetch in background',
       (tester) async {
     await seedTestSqlite({});

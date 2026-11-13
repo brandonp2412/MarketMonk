@@ -291,13 +291,8 @@ extension _ChartPortfolioSeries on ChartsPageState {
       }
     }
 
-    if (_usesIntraday) {
-      await Future.wait(accounts.map(loadAccount));
-    } else {
-      for (final account in accounts) {
-        await loadAccount(account);
-      }
-    }
+    // Independent account loads should not be serialized behind a slow broker.
+    await Future.wait(accounts.map(loadAccount));
 
     if (!mounted ||
         !widget.isActive ||

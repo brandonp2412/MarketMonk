@@ -264,35 +264,50 @@ extension _ChartPortfolioLoading on ChartsPageState {
   }) async {
     if (!mounted || !widget.isActive) return;
 
-    final accountManager = context.read<AccountManager>();
-    for (final accountName in accountManager.accounts) {
-      if (!mounted || !widget.isActive) return;
-      final ibkrConfig = accountManager.ibkrConfigFor(accountName);
-      if (ibkrConfig.enabled) continue;
-      await _syncLocalAccountCandles(accountName, ibkrConfig);
-    }
-
-    if (!mounted || !widget.isActive) return;
-    await _loadAllPortfolios(
+    // Start loading stored portfolio history immediately. Candle refreshes can
+    // take minutes, but must not prevent existing data from being displayed.
+    final initialLoad = _loadAllPortfolios(
       refreshIbkrPerformance: refreshPerformance,
       forceIbkrPerformanceRefresh: forcePerformanceRefresh,
       refreshIbkrPortfolio: refreshPerformance,
       forceIbkrPortfolioRefresh: forcePerformanceRefresh,
     );
+
+    final accountManager = context.read<AccountManager>();
+    var syncedLocalAccount = false;
+    for (final accountName in accountManager.accounts) {
+      if (!mounted || !widget.isActive) return;
+      final ibkrConfig = accountManager.ibkrConfigFor(accountName);
+      if (ibkrConfig.enabled) continue;
+      syncedLocalAccount =
+          await _syncLocalAccountCandles(accountName, ibkrConfig) ||
+              syncedLocalAccount;
+    }
+
+    // Let both passes finish before replaying new candle data. This prevents
+    // an older initial result from overwriting freshly synced history.
+    await initialLoad;
+    if (mounted && widget.isActive && syncedLocalAccount) {
+      await _loadAllPortfolios();
+    }
   }
 
-  Future<void> _syncLocalAccountCandles(
+  Future<bool> _syncLocalAccountCandles(
     String accountName,
     IbkrAccountConfig ibkrConfig,
   ) async {
     try {
+      if (widget._localCandleSyncer case final syncer?) {
+        await syncer(accountName);
+        return true;
+      }
       final trades = await profileDataRepository.readTradesForAccount(
         accountName,
       );
-      if (!mounted || !widget.isActive) return;
+      if (!mounted || !widget.isActive) return false;
       final symbols = trades.map((trade) => trade.symbol).toSet();
       for (final symbol in symbols) {
-        if (!mounted || !widget.isActive) return;
+        if (!mounted || !widget.isActive) return false;
         await syncCandles(
           symbol,
           ibkrConfig: ibkrConfig,
@@ -300,12 +315,14 @@ extension _ChartPortfolioLoading on ChartsPageState {
           requiredFrom: _requiredCandleStart(),
         );
       }
+      return symbols.isNotEmpty;
     } catch (error, stackTrace) {
       talker.handle(
         error,
         stackTrace,
         'Background candle sync failed for $accountName',
       );
+      return false;
     }
   }
 }
