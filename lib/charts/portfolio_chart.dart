@@ -536,11 +536,6 @@ extension _ChartPortfolioView on ChartsPageState {
                 : visibleSeries.last.value,
           )
         : 0.0;
-    final returnColor = switch (true) {
-      _ when (hasHistory) && (pct >= 0) => Colors.green,
-      _ when (hasHistory) => Colors.redAccent,
-      _ => Theme.of(context).colorScheme.onSurfaceVariant,
-    };
     final flows = _portfolioCashFlowsByAccount[accountName];
     final externalFlows = flows == null || visibleSeries.length < 2
         ? 0.0
@@ -554,6 +549,18 @@ extension _ChartPortfolioView on ChartsPageState {
     final change = visibleSeries.length > 1
         ? visibleSeries.last.value - visibleSeries.first.value - externalFlows
         : 0.0;
+    final displayPct = pct.abs() < 0.005 ? 0.0 : pct;
+    final neutralColor = Theme.of(context).colorScheme.onSurfaceVariant;
+    final returnColor = !hasHistory || !pct.isFinite || displayPct == 0
+        ? neutralColor
+        : displayPct > 0
+            ? Colors.green
+            : Colors.redAccent;
+    final changeColor = !hasHistory || !change.isFinite || change.abs() < 0.005
+        ? neutralColor
+        : change > 0
+            ? Colors.green
+            : Colors.redAccent;
     final isHidden = _hiddenAccounts.contains(accountName);
     final accountManager = context.read<AccountManager>();
     final cachedPortfolio = accountManager.portfolioCacheFor(accountName);
@@ -584,8 +591,11 @@ extension _ChartPortfolioView on ChartsPageState {
 
     Widget returnLabel() => Text(
           (switch (true) {
-            _ when hasHistory =>
-              <String>[if (pct >= 0) '+', pct.toStringAsFixed(2), '%'].join(),
+            _ when hasHistory => <String>[
+                if (displayPct > 0) '+',
+                displayPct.toStringAsFixed(2),
+                '%',
+              ].join(),
             _ when _portfolioLoading => '—',
             _ => '—',
           }),
@@ -607,7 +617,7 @@ extension _ChartPortfolioView on ChartsPageState {
         _ => '—',
       },
       maxLines: 1,
-      style: TextStyle(color: returnColor, fontSize: 13, height: 1.1),
+      style: TextStyle(color: changeColor, fontSize: 13, height: 1.1),
     );
     return Column(
       children: [

@@ -1024,6 +1024,92 @@ void main() {
     expect(performanceLoads, successfulPerformanceLoads);
   });
 
+  testWidgets(
+      'flat broker return and negative dollar change use separate colors',
+      (tester) async {
+    await seedTestSqlite({
+      'ibkrAccountConfigs':
+          '{"Default":{"enabled":true,"baseUrl":"https://ibkr.example.test","token":"secret-token"}}',
+      'chartPeriodYears': 0,
+      'chartPeriodMonths': 2,
+      'chartPeriodDays': 0,
+    });
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1056, 1046);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final accounts = testAccountManager();
+    await accounts.init();
+    await accounts.cachePortfolio(
+      'Default',
+      const [],
+      const IbkrAccountValue(value: 300122.20, currency: 'USD'),
+      netLiquidationUsd: 300122.20,
+    );
+    final now = DateTime.now();
+    final start = now.subtract(const Duration(days: 55));
+    final end = now.subtract(const Duration(days: 1));
+    await accounts.cacheIbkrPerformance(
+      'Default',
+      IbkrPerformanceSeries(
+        period: '1Y',
+        measure: 'TWR',
+        currency: 'USD',
+        startDate: start,
+        startNav: 300777.28,
+        dates: [start.add(const Duration(days: 1)), end],
+        nav: const [300777.28, 300122.20],
+        cashFlows: const [0, 0],
+        returnDates: [start, end],
+        returns: const [0, 0],
+      ),
+    );
+    final settings = SettingsState(localCurrencyDetector: () async => 'USD');
+    await settings.initialized;
+    addTearDown(settings.dispose);
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: settings),
+          ChangeNotifierProvider.value(value: accounts),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: ChartsPage(
+              isActive: false,
+              ibkrLoader: (_) async => throw StateError('offline'),
+              ibkrPerformanceLoader: (_, __) async =>
+                  throw StateError('offline'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final pct = tester.widget<Text>(find.text('0.00%'));
+    final dollar = tester.widget<Text>(find.textContaining('655.08'));
+    expect(
+      pct.style?.color,
+      Theme.of(tester.element(find.byType(ChartsPage)))
+          .colorScheme
+          .onSurfaceVariant,
+    );
+    expect(dollar.data, contains('-'));
+    expect(dollar.style?.color, Colors.redAccent);
+    expect(find.text('+0.00%'), findsNothing);
+    await expectLater(
+      find.byKey(const Key('portfolio-summary-content')),
+      matchesGoldenFile(
+        'goldens/chart-summary-zero-return-negative-change.png',
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('IBKR portfolio summary shows concise broker return', (
     WidgetTester tester,
   ) async {
