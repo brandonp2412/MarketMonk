@@ -1307,6 +1307,125 @@ void main() {
     expect(tester.takeException(), null);
   });
 
+  testWidgets('returning to Charts retains selected favorite chart stream',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(440, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({
+      'chartPeriodYears': 0,
+      'chartPeriodMonths': 2,
+      'chartPeriodDays': 0,
+      'favoriteStocks': ['SPY'],
+    });
+    await upsertSymbolCurrencyMetadata('SPY', 'USD', source: 'test');
+    cacheSymbolMeta('SPY', 'USD');
+    final now = DateTime.now();
+    await seedTestCandle('SPY', now.subtract(const Duration(days: 24)), 100);
+    await seedTestCandle('SPY', now.subtract(const Duration(days: 1)), 110);
+    final accounts = testAccountManager();
+    await accounts.init();
+    final settings = SettingsState(localCurrencyDetector: () async => 'USD');
+    addTearDown(settings.dispose);
+
+    Widget page(bool active) => MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: settings),
+            ChangeNotifierProvider.value(value: accounts),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              body: ChartsPage(
+                key: const ValueKey('favorite-charts'),
+                isActive: active,
+                favoriteHistoryPrefetcher: (_, __) async {},
+              ),
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(page(true));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SPY').first);
+    await tester.pumpAndSettle();
+    expect(find.byType(MarketLineChart), findsOneWidget);
+    expect(find.byType(MarketChartLoading), findsNothing);
+
+    await tester.pumpWidget(page(false));
+    await tester.pump();
+    await tester.pumpWidget(page(true));
+    await tester.pump();
+    expect(find.byType(MarketLineChart), findsOneWidget);
+    expect(find.byType(MarketChartLoading), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('returning to Charts preserves loaded SPY without a spinner',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(440, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await seedTestSqlite({
+      'chartPeriodYears': 0,
+      'chartPeriodMonths': 2,
+      'chartPeriodDays': 0,
+    });
+    await upsertSymbolCurrencyMetadata('SPY', 'USD', source: 'test');
+    cacheSymbolMeta('SPY', 'USD');
+    final now = DateTime.now();
+    await seedTestCandle('SPY', now.subtract(const Duration(days: 28)), 100);
+    await seedTestCandle('SPY', now.subtract(const Duration(days: 1)), 110);
+    final accounts = testAccountManager();
+    await accounts.init();
+    final settings = SettingsState(localCurrencyDetector: () async => 'USD');
+    addTearDown(settings.dispose);
+    var stockLoads = 0;
+
+    Widget page(bool active) => MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: settings),
+            ChangeNotifierProvider.value(value: accounts),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              body: ChartsPage(
+                key: const ValueKey('persistent-charts'),
+                initialSymbol: 'SPY',
+                isActive: active,
+                stockCandleSyncer: (_, __, ___) async {
+                  stockLoads++;
+                },
+              ),
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(page(true));
+    await tester.pumpAndSettle();
+    expect(stockLoads, 1);
+    expect(find.byType(MarketLineChart), findsOneWidget);
+    expect(find.byType(MarketChartLoading), findsNothing);
+
+    await tester.pumpWidget(page(false));
+    await tester.pump();
+    await tester.pumpWidget(page(true));
+    await tester.pump();
+    expect(find.byType(MarketLineChart), findsOneWidget);
+    expect(find.byType(MarketChartLoading), findsNothing);
+    expect(
+      stockLoads,
+      1,
+      reason: 'Tab re-entry must not refetch an already loaded stock',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('SPY 2m refresh keeps cached chart and avoids portfolio requests',
       (tester) async {
     tester.view.devicePixelRatio = 1;

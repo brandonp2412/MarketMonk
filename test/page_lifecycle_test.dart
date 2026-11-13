@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/charts_page.dart';
+import 'package:market_monk/market_chart_loading.dart';
+import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/main.dart';
@@ -173,6 +175,50 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(backgroundNetworkCoordinator.resetDiagnostics);
+
+  testWidgets('Charts to Portfolio to Charts reuses loaded portfolio data',
+      (tester) async {
+    await seedTestSqlite({});
+    final accounts = await _configuredAccount();
+    var chartPortfolioLoads = 0;
+    var chartPerformanceLoads = 0;
+    await tester.pumpWidget(
+      _app(
+        accounts,
+        _LifecycleTabs(
+          chartPortfolioLoader: (_) async {
+            chartPortfolioLoads++;
+            return _snapshot('Default');
+          },
+          chartPerformanceLoader: (_, __) async {
+            chartPerformanceLoads++;
+            return _performance();
+          },
+          portfolioLoader: (_) async => _snapshot('Default'),
+          portfolioPerformanceLoader: (_, __) async => _performance(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(chartPortfolioLoads, greaterThan(0));
+    expect(chartPerformanceLoads, greaterThan(0));
+    final initialPortfolioLoads = chartPortfolioLoads;
+    final initialPerformanceLoads = chartPerformanceLoads;
+    expect(find.byType(MarketLineChart), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('portfolio-tab')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.byKey(const Key('charts-tab')));
+    await tester.pump();
+
+    expect(chartPortfolioLoads, initialPortfolioLoads);
+    expect(chartPerformanceLoads, initialPerformanceLoads);
+    expect(find.byType(MarketChartLoading), findsNothing);
+    expect(find.byType(MarketLineChart), findsOneWidget);
+    await _disposeTestApp(tester);
+  });
 
   testWidgets('tab switching does not let the hidden portfolio fetch', (
     tester,
@@ -630,7 +676,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
     expect(defaultLoads, 1);
-    expect(botLoads, 0);
+    expect(botLoads, 1, reason: 'Independent accounts load concurrently');
 
     await tester.pumpWidget(page(false));
     await tester.pump();
@@ -638,7 +684,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(defaultLoads, 1);
-    expect(botLoads, 0);
+    expect(botLoads, 1, reason: 'Deactivation must not start another request');
     await _disposeTestApp(tester);
   });
 

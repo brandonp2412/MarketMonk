@@ -203,6 +203,8 @@ class ChartsPageState extends State<ChartsPage>
   IntradaySeries? _intradaySeries;
   List<CandleTicker> _stockDailyPreview = const [];
   int _stockLoadGeneration = 0;
+  // A tab switch must not invalidate the already rendered stock chart.
+  bool _stockDataLoaded = false;
 
   bool get _usesIntraday =>
       years == 0 && months == 0 && (days == 1 || days == 5);
@@ -275,20 +277,30 @@ class ChartsPageState extends State<ChartsPage>
       _stockLoadGeneration++;
       _favoriteLoadGeneration++;
       _networkLoading = false;
-      _stockStream = null;
+      // Keep both the selected stock stream and cached portfolio series. The
+      // PageView preserves this state while the Portfolio tab is selected.
       return;
     }
     if (!oldWidget.isActive && widget.isActive && _chartPeriodLoaded) {
-      runDetachedTask(_loadFavorites(), 'Failed to reload favorites');
+      // Restoring a previously loaded tab must be synchronous and spinner-free.
+      // Account changes and manual refreshes already invalidate their own data.
       final accountManager = context.read<AccountManager>();
       _hydratePortfolioSeriesFromCache(accountManager);
+      // Changes made while Charts was hidden still need to invalidate data.
+      _handleAccountManagerChanged();
       if (_selectedSymbol != null) {
-        runDetachedTask(_loadSelectedStock(), 'Failed to reload stock chart');
+        if (!_stockDataLoaded) {
+          runDetachedTask(_loadSelectedStock(), 'Failed to reload stock chart');
+        }
+      } else if (_portfolioSeriesByAccount.values
+          .every((series) => series.isEmpty)) {
+        runDetachedTask(
+          _syncCandlesInBackground(),
+          'Failed to initialize chart after activation',
+        );
+      } else {
+        _portfolioLoading = false;
       }
-      runDetachedTask(
-        _syncCandlesInBackground(refreshPerformance: true),
-        'Failed to refresh chart data after activation',
-      );
     }
   }
 

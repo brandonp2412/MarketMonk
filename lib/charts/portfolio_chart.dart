@@ -6,24 +6,25 @@ extension _ChartPortfolioView on ChartsPageState {
     SettingsState settings,
     List<Color> accountColors,
   ) {
-    final streamKey =
-        '${widget.isActive}|$_selectedFavorites|$years|$months|$days';
+    // The database watch is local and cheap. Preserve its subscription while
+    // Charts is hidden so returning from Portfolio never waits for the same
+    // favorite candles again.
+    final streamKey = '$_selectedFavorites|$years|$months|$days';
     if (_favoriteChartStreamKey != streamKey) {
       _favoriteChartStreamKey = streamKey;
-      _favoriteChartStream = widget.isActive &&
-              (!_usesIntraday || days == 5) &&
-              _selectedFavorites.isNotEmpty
-          ? (marketDataDatabase.candles.select()
-                ..where(
-                  (candle) =>
-                      candle.symbol.isIn(
-                        _selectedFavorites.map(canonicalMarketSymbol),
-                      ) &
-                      candle.date.isBiggerThanValue(_requiredCandleStart()),
-                )
-                ..orderBy([(candle) => OrderingTerm.asc(candle.date)]))
-              .watch()
-          : null;
+      _favoriteChartStream =
+          (!_usesIntraday || days == 5) && _selectedFavorites.isNotEmpty
+              ? (marketDataDatabase.candles.select()
+                    ..where(
+                      (candle) =>
+                          candle.symbol.isIn(
+                            _selectedFavorites.map(canonicalMarketSymbol),
+                          ) &
+                          candle.date.isBiggerThanValue(_requiredCandleStart()),
+                    )
+                    ..orderBy([(candle) => OrderingTerm.asc(candle.date)]))
+                  .watch()
+              : null;
     }
     return StreamBuilder<List<StoredCandle>>(
       key: const Key('portfolio-price-stream'),

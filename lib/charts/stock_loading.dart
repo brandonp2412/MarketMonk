@@ -80,6 +80,7 @@ extension _ChartStockLoading on ChartsPageState {
       _pickingChartRange = false;
       _mode = _ChartMode.stock;
       _selectedSymbol = symbol;
+      _stockDataLoaded = false;
       _networkLoading = widget.isActive;
       _stockError = null;
     });
@@ -103,6 +104,7 @@ extension _ChartStockLoading on ChartsPageState {
       _networkLoading = true;
       _stockError = null;
       if (isNewContent) {
+        _stockDataLoaded = false;
         _intradaySeries = null;
         _stockDailyPreview = const [];
         _stockContentKey = contentKey;
@@ -176,6 +178,7 @@ extension _ChartStockLoading on ChartsPageState {
         _centDivisor = symbolCentDivisor(symbol);
       });
       _setStockStream(symbol);
+      if (isCurrent()) _stockDataLoaded = true;
     } catch (error, stackTrace) {
       talker.handle(error, stackTrace, 'Selected ticker sync failed');
       if (isCurrent()) _updateState(() => _stockError = error.toString());
