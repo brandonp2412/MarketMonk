@@ -164,43 +164,57 @@ Future<PortfolioHistory> loadPortfolioHistory({
     ];
   }
 
-  for (final symbol in symbols) {
-    candles[symbol] = await readCandles(symbol);
-    final covered = dates.isNotEmpty &&
-        dates.every((date) {
-          if ((sharesByDate[date]![symbol] ?? 0) <= 1e-6) return true;
-          return candles[symbol]!.any(
-            (candle) =>
-                !candle.date.isAfter(date) &&
-                date.difference(candle.date).inDays <= 7 &&
-                candle.close.isFinite &&
-                candle.close > 0,
-          );
-        });
-    final refreshCurrent = forceRefresh && currentSymbols.contains(symbol);
-    if (cacheOnly || (covered && !refreshCurrent)) continue;
-    final priceConfig =
-        currentSymbols.contains(symbol) ? config : const IbkrAccountConfig();
-    try {
-      if (candleSync != null) {
-        await candleSync(symbol, from, priceConfig);
-      } else {
-        await syncCandles(
-          symbol,
-          database: database,
-          ibkrConfig: priceConfig,
-          requiredFrom: from,
-          forceRefresh: refreshCurrent,
-        );
-      }
-    } catch (error, stack) {
-      talker.handle(
-        error,
-        stack,
-        'Failed to backfill portfolio prices: $symbol',
-      );
-    }
-    candles[symbol] = await readCandles(symbol);
+  // A slow broker/Yahoo request must not block every other holding in turn.
+  // Keep concurrency bounded to avoid overwhelming the broker or SQLite.
+  final symbolList = symbols.toList();
+  const maxConcurrentCandleSyncs = 4;
+  for (var offset = 0;
+      offset < symbolList.length;
+      offset += maxConcurrentCandleSyncs) {
+    final batch = symbolList.skip(offset).take(maxConcurrentCandleSyncs);
+    await Future.wait(
+      batch.map((symbol) async {
+        var stored = await readCandles(symbol);
+        final covered = dates.isNotEmpty &&
+            dates.every((date) {
+              if ((sharesByDate[date]![symbol] ?? 0) <= 1e-6) return true;
+              return stored.any(
+                (candle) =>
+                    !candle.date.isAfter(date) &&
+                    date.difference(candle.date).inDays <= 7 &&
+                    candle.close.isFinite &&
+                    candle.close > 0,
+              );
+            });
+        final refreshCurrent = forceRefresh && currentSymbols.contains(symbol);
+        if (!cacheOnly && (!covered || refreshCurrent)) {
+          final priceConfig = currentSymbols.contains(symbol)
+              ? config
+              : const IbkrAccountConfig();
+          try {
+            if (candleSync != null) {
+              await candleSync(symbol, from, priceConfig);
+            } else {
+              await syncCandles(
+                symbol,
+                database: database,
+                ibkrConfig: priceConfig,
+                requiredFrom: from,
+                forceRefresh: refreshCurrent,
+              );
+            }
+          } catch (error, stack) {
+            talker.handle(
+              error,
+              stack,
+              'Failed to backfill portfolio prices: $symbol',
+            );
+          }
+          stored = await readCandles(symbol);
+        }
+        candles[symbol] = stored;
+      }),
+    );
   }
   final rates = <DateTime, Map<String, double>>{};
   final currencies = {

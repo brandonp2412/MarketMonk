@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/drift.dart' hide isNull, isNotNull;
@@ -151,6 +152,67 @@ void main() {
         allocation.fold<double>(0, (sum, holding) => sum + holding.value),
         performance.nav[index] / 2,
       );
+    }
+  });
+
+  test(
+      'portfolio history backfills different holdings concurrently, capped at four',
+      () async {
+    final accounts = await setup();
+    await accounts.cacheIbkrTradeHistory(
+      'Default',
+      const IbkrTradeHistory(available: true, trades: []),
+    );
+    final symbols = ['AAA', 'BBB', 'CCC', 'DDD', 'EEE', 'FFF', 'GGG', 'HHH'];
+    final holdings = [
+      for (final symbol in symbols)
+        Position(
+          symbol: symbol,
+          name: symbol,
+          nativeCurrency: 'USD',
+          netShares: 1,
+          avgCost: 10,
+          currentPrice: 12,
+          firstBuyDate: september,
+          lastBuyDate: september,
+        ),
+    ];
+    final firstBatchGate = Completer<void>();
+    var active = 0;
+    var maxActive = 0;
+    final started = <String>[];
+    final loading = loadPortfolioHistory(
+      accounts: accounts,
+      accountName: 'Default',
+      positions: holdings,
+      database: testDatabase,
+      now: now,
+      tradeLoader: (_) async => fail('Cached trades should be used'),
+      candleSync: (symbol, from, config) async {
+        started.add(symbol);
+        active++;
+        if (active > maxActive) maxActive = active;
+        try {
+          if (started.length <= 4) await firstBatchGate.future;
+          await seedPrices(symbol);
+        } finally {
+          active--;
+        }
+      },
+      rateLoader: (_, __) async => 2,
+    );
+    // All four requests should start before the first finishes. Serial
+    // backfilling used to make eight holdings wait eight network round trips.
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    expect(started.length, 4);
+    expect(maxActive, 4);
+    firstBatchGate.complete();
+    final history = await loading;
+    expect(started, unorderedEquals(symbols));
+    expect(maxActive, 4);
+    expect(history.candles.keys, containsAll(symbols));
+    for (final symbol in symbols) {
+      expect(history.candles[symbol], isNotEmpty);
     }
   });
 
