@@ -1586,7 +1586,10 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    // Keep pending network calls unresolved; a looping animation cannot settle.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pump();
     expect(brokerRequests, 1);
     final during = tester.widget<PortfolioPeriodPicker>(
       find.byType(PortfolioPeriodPicker),
@@ -1691,7 +1694,10 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    // Keep pending network calls unresolved; a looping animation cannot settle.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pump();
     expect(tradeLoads, 1);
     final loadingPicker = tester.widget<PortfolioPeriodPicker>(
       find.byType(PortfolioPeriodPicker),
@@ -1837,7 +1843,10 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    // Keep pending network calls unresolved; a looping animation cannot settle.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pump();
     expect(tradeLoads, 1);
     final loadingPicker = tester.widget<PortfolioPeriodPicker>(
       find.byType(PortfolioPeriodPicker),

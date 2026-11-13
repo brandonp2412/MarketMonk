@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' show DateFormat;
 
-class PortfolioPeriodPicker extends StatelessWidget {
+class PortfolioPeriodPicker extends StatefulWidget {
   final List<String> labels;
   final List<DateTime?> dates;
   final int value;
@@ -19,7 +19,48 @@ class PortfolioPeriodPicker extends StatelessWidget {
         assert(labels.length > 0);
 
   @override
+  State<PortfolioPeriodPicker> createState() => _PortfolioPeriodPickerState();
+}
+
+class _PortfolioPeriodPickerState extends State<PortfolioPeriodPicker>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _loadingSweep = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.loading) _loadingSweep.repeat();
+  }
+
+  @override
+  void didUpdateWidget(covariant PortfolioPeriodPicker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.loading == oldWidget.loading) return;
+    if (widget.loading) {
+      _loadingSweep
+        ..reset()
+        ..repeat();
+    } else {
+      _loadingSweep.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _loadingSweep.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final labels = widget.labels;
+    final dates = widget.dates;
+    final value = widget.value;
+    final loading = widget.loading;
+    final onChanged = widget.onChanged;
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final selectedDate = dates[value];
@@ -90,11 +131,9 @@ class PortfolioPeriodPicker extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0, end: loading ? 1 : 0),
-          duration: Duration(milliseconds: loading ? 1600 : 0),
-          curve: Curves.easeInOut,
-          builder: (context, progress, child) => SliderTheme(
+        AnimatedBuilder(
+          animation: _loadingSweep,
+          builder: (context, child) => SliderTheme(
             data: SliderTheme.of(context).copyWith(
               trackHeight: 22,
               trackShape: _TimeRulerTrack(
@@ -102,7 +141,9 @@ class PortfolioPeriodPicker extends StatelessWidget {
                 lineColor: colors.outlineVariant,
                 tickColor: colors.onSurfaceVariant,
                 selectedColor: colors.primary,
-                loadingProgress: loading ? progress : null,
+                loadingProgress: loading
+                    ? Curves.easeInOut.transform(_loadingSweep.value)
+                    : null,
               ),
               tickMarkShape: SliderTickMarkShape.noTickMark,
               thumbShape: const RoundSliderThumbShape(

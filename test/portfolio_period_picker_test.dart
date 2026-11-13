@@ -103,7 +103,7 @@ void main() {
     expect(find.text('1H AGO'), findsOneWidget);
   });
 
-  testWidgets('uncached timeline animates then becomes normal once populated',
+  testWidgets('uncached timeline repeats sweep until history is ready',
       (tester) async {
     final now = DateTime(2026, 11, 12);
     Widget picker({required bool loading}) => MaterialApp(
@@ -124,16 +124,37 @@ void main() {
     expect(find.text('PRESENT'), findsOneWidget);
     expect(find.textContaining('FETCHING PAST PERIODS'), findsNothing);
     expect(find.text('FURTHEST · NOW'), findsNothing);
+    double? sweepProgress() {
+      final slider = find.byKey(const Key('portfolio-return-period'));
+      final track = tester
+          .widget<SliderTheme>(
+            find.ancestor(of: slider, matching: find.byType(SliderTheme)).first,
+          )
+          .data
+          .trackShape as dynamic;
+      return track.loadingProgress as double?;
+    }
+
     await tester.pump(const Duration(milliseconds: 450));
+    final firstPass = sweepProgress();
+    expect(firstPass, isNotNull);
+    expect(firstPass!, greaterThan(0));
+    expect(firstPass, lessThan(1));
+    // A second cycle must revisit the same position instead of freezing at 1.
+    await tester.pump(const Duration(milliseconds: 1600));
+    final secondPass = sweepProgress();
+    expect(secondPass, isNotNull);
+    expect(secondPass!, closeTo(firstPass, 0.02));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(sweepProgress(), isNot(closeTo(firstPass, 0.02)));
     expect(find.text('PRESENT'), findsOneWidget);
-    await tester.pumpAndSettle();
-    expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(picker(loading: false));
     await tester.pumpAndSettle();
     expect(find.textContaining('LOADING HISTORY'), findsNothing);
     expect(find.text('PRESENT'), findsOneWidget);
     expect(find.text('FURTHEST · NOV 2026'), findsOneWidget);
+    expect(sweepProgress(), isNull);
     expect(
       tester
           .widget<Slider>(
