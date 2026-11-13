@@ -1,132 +1,63 @@
 part of '../charts_page.dart';
 
 extension _ChartFavoriteLoading on ChartsPageState {
-  /// Syncs candles for all accounts. Caller is responsible for setting
-  /// [_networkLoading].
-  Future<void> _refreshAllPortfolioCandles({DateTime? requiredFrom}) async {
-    if (!mounted || !widget.isActive) return;
-    final accountManager = context.read<AccountManager>();
-
-    for (final accountName in accountManager.accounts) {
-      if (!mounted || !widget.isActive) return;
-      final ibkrConfig = accountManager.ibkrConfigFor(accountName);
-      if (ibkrConfig.enabled) continue;
-
-      try {
-        final trades = await profileDataRepository.readTradesForAccount(
-          accountName,
-        );
-        if (!mounted || !widget.isActive) return;
-        for (final symbol in trades.map((trade) => trade.symbol).toSet()) {
-          if (!mounted || !widget.isActive) return;
-          await syncCandles(
-            symbol,
-            ibkrConfig: ibkrConfig,
-            syncNamespace: accountName,
-            requiredFrom: requiredFrom ?? _requiredCandleStart(),
-            forceRefresh: true,
-          );
-        }
-      } catch (error, stackTrace) {
-        talker.handle(
-          error,
-          stackTrace,
-          'Portfolio candle refresh failed for $accountName',
-        );
-      }
-    }
-  }
-
-  /// A manual refresh warms the largest daily chart range once per favorite.
-  /// The persisted candle store is shared by every smaller period (1m–10y).
-  /// Bound concurrency to avoid flooding Yahoo or the broker with requests.
-  Future<void> _prefetchFavoriteHistory(DateTime from) async {
-    final manager = context.read<AccountManager>();
-    final config = manager.ibkrConfigFor();
-    final namespace = manager.activeAccount;
-    final favorites = _favoriteStocks.toSet().toList(growable: false);
-    final failed = <String>[];
-
-    for (var offset = 0; offset < favorites.length; offset += 2) {
-      final batch = favorites.skip(offset).take(2);
-      await Future.wait(
-        batch.map((symbol) async {
-          try {
-            if (widget._favoriteHistoryPrefetcher case final prefetch?) {
-              await prefetch(symbol, from);
-            } else {
-              await syncCandles(
-                symbol,
-                ibkrConfig: config,
-                syncNamespace: namespace,
-                requiredFrom: from,
-                forceRefresh: true,
-              );
-            }
-          } catch (error, stackTrace) {
-            failed.add(symbol);
-            talker.handle(
-              error,
-              stackTrace,
-              'Failed to prefetch $symbol history',
-            );
-          }
-        }),
-      );
-    }
-    if (failed.isNotEmpty) {
-      talker.warning(
-        'Favorite history prefetch failed for: ${failed.join(', ')}',
-      );
-    }
-  }
-
-  /// Refresh portfolio, broker performance and all favorite daily ranges.
-  /// Do not finish the gesture until the caches are actually populated.
+  /// Refresh only the visible chart. Updating every holding and every
+  /// favorite's ten-year history during a pull can take minutes on mobile.
+  /// The cached chart remains visible while refreshes finish in the background.
   Future<void> _refreshCurrentChart() async {
     if (!mounted || !widget.isActive || _networkLoading) return;
-    // Refresh the currently displayed stock, not every portfolio and the
-    // entire ten-year favourites history. The latter can take minutes.
     if (_mode == _ChartMode.stock && _selectedSymbol != null) {
       await _loadSelectedStock(forceRefresh: true);
       return;
     }
-    _updateState(() {
-      _networkLoading = true;
-      _stockError = null;
-    });
+    if (_mode != _ChartMode.portfolio) return;
 
-    try {
-      clearAllSyncCache();
-      _intradayPortfolioCache.clear();
-      _chartPeriodCache.clear();
-      _restoredFavoriteCandles = null;
-      final now = DateTime.now();
-      final historyStart = DateTime(now.year - 10, now.month, now.day - 1);
-      await Future.wait([
-        _refreshAllPortfolioCandles(requiredFrom: historyStart),
-        _prefetchFavoriteHistory(historyStart),
-      ]);
-      if (!mounted || !widget.isActive) return;
-      await _loadAllPortfolios(
+    if (_portfolioRefreshInFlight != null) {
+      talker.info('Portfolio refresh already in progress; skipping duplicate');
+      return;
+    }
+
+    _updateState(() => _networkLoading = true);
+    final elapsed = Stopwatch()..start();
+    talker.info('Portfolio refresh started for visible chart');
+
+    late final Future<void> refresh;
+    refresh = Future.wait<void>([
+      // Force the two broker snapshots and their performance series, but do
+      // not re-fetch every position's candle history.
+      _loadAllPortfolios(
         refreshIbkrPortfolio: true,
         forceIbkrPortfolioRefresh: true,
         refreshIbkrPerformance: true,
         forceIbkrPerformanceRefresh: true,
+      ),
+      if (_selectedFavorites.isNotEmpty)
+        _syncFavoriteCandles(forceRefresh: true, selectedOnly: true),
+    ]).then<void>((_) {}).catchError((Object error, StackTrace stackTrace) {
+      talker.handle(error, stackTrace, 'Portfolio refresh failed');
+    }).whenComplete(() {
+      if (identical(_portfolioRefreshInFlight, refresh)) {
+        _portfolioRefreshInFlight = null;
+      }
+      talker.info(
+        'Portfolio refresh network finished after '
+        '${elapsed.elapsedMilliseconds}ms',
       );
-      if (!mounted || !widget.isActive) return;
-      if (_usesIntraday && _selectedFavorites.isNotEmpty) {
-        await _syncFavoriteCandles(forceRefresh: true, selectedOnly: true);
-      }
-      if (_mode == _ChartMode.stock && _selectedSymbol != null) {
-        await _loadSelectedStock(forceRefresh: true);
-      }
-    } catch (error, stackTrace) {
-      talker.handle(error, stackTrace, 'Chart refresh failed');
-      if (mounted && _mode == _ChartMode.stock) {
-        _updateState(() => _stockError = error.toString());
-      }
+    });
+    _portfolioRefreshInFlight = refresh;
+
+    try {
+      await refresh.timeout(
+        const Duration(seconds: 6),
+        onTimeout: () => talker.warning(
+          'Portfolio refresh exceeded 6s; continuing in background',
+        ),
+      );
     } finally {
+      talker.info(
+        'Portfolio refresh gesture completed after '
+        '${elapsed.elapsedMilliseconds}ms',
+      );
       if (mounted) _updateState(() => _networkLoading = false);
     }
   }
@@ -211,13 +142,18 @@ extension _ChartFavoriteLoading on ChartsPageState {
             generation != _favoriteLoadGeneration) return;
         try {
           await _withRemoteLoading(
-            () => syncCandles(
-              symbol,
-              ibkrConfig: accountManager.ibkrConfigFor(),
-              syncNamespace: accountManager.activeAccount,
-              requiredFrom: _requiredCandleStart(),
-              forceRefresh: forceRefresh,
-            ),
+            () =>
+                widget._favoriteHistoryPrefetcher?.call(
+                  symbol,
+                  _requiredCandleStart(),
+                ) ??
+                syncCandles(
+                  symbol,
+                  ibkrConfig: accountManager.ibkrConfigFor(),
+                  syncNamespace: accountManager.activeAccount,
+                  requiredFrom: _requiredCandleStart(),
+                  forceRefresh: forceRefresh,
+                ),
           );
         } finally {
           await Future<void>.delayed(const Duration(milliseconds: 250));
@@ -256,6 +192,5 @@ extension _ChartFavoriteLoading on ChartsPageState {
       _syncFavoriteCandle(symbol),
       'Failed to sync favorite ticker candle',
     );
-    toast(ctx, ctx.l10n.text('Set as favorite'));
   }
 }

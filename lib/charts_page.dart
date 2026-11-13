@@ -161,6 +161,7 @@ class ChartsPageState extends State<ChartsPage>
   Future<void> _favoriteDailySync = Future<void>.value();
   int _favoriteLoadGeneration = 0;
   bool _networkLoading = false;
+  Future<void>? _portfolioRefreshInFlight;
   String? _stockContentKey;
   int _pendingRemoteLoads = 0;
 

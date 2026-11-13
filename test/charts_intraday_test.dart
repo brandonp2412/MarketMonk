@@ -111,10 +111,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
   }
 
-  testWidgets('pull refresh awaits 10-year prefetch for every favorite', (
-    tester,
-  ) async {
-    final gate = Completer<void>();
+  testWidgets(
+      'portfolio pull avoids ten-year prefetch for unselected favorites',
+      (tester) async {
     final requested = <String, DateTime>{};
     await mountChart(
       tester,
@@ -123,62 +122,18 @@ void main() {
       ),
       initialSymbol: null,
       favorites: const ['AAPL', 'MSFT'],
-      favoriteHistoryPrefetcher: (symbol, from) {
+      favoriteHistoryPrefetcher: (symbol, from) async {
         requested[symbol] = from;
-        return gate.future;
-      },
-      configureAccounts: (_) async {
-        final now = DateTime.now();
-        for (final symbol in ['AAPL', 'MSFT']) {
-          await testDatabase.upsertSymbolMetadata(
-            symbol: symbol,
-            currency: 'USD',
-            payloadJson: '{"rawCurrency":"USD"}',
-            cachedAt: now,
-          );
-          await seedTestCandle(
-            symbol,
-            now.subtract(const Duration(days: 15)),
-            100,
-          );
-          await seedTestCandle(symbol, now, 101);
-        }
       },
     );
     await tester.pumpAndSettle();
-
-    final refreshFuture = tester
+    await tester
         .widget<RefreshIndicator>(find.byType(RefreshIndicator))
         .onRefresh();
     await tester.pump();
-
-    expect(requested.keys.toSet(), {'AAPL', 'MSFT'});
-    final now = DateTime.now();
-    expect(
-      requested.values,
-      everyElement(DateTime(now.year - 10, now.month, now.day - 1)),
-    );
-    final refresh = find.byTooltip('Refresh');
-    expect(
-      tester
-          .widget<IconButton>(
-            find.ancestor(of: refresh, matching: find.byType(IconButton)),
-          )
-          .onPressed,
-      isNull,
-    );
-
-    gate.complete();
-    await tester.pumpAndSettle();
-    await refreshFuture;
-    expect(
-      tester
-          .widget<IconButton>(
-            find.ancestor(of: refresh, matching: find.byType(IconButton)),
-          )
-          .onPressed,
-      isNotNull,
-    );
+    expect(requested, isEmpty);
+    expect(find.byTooltip('Refresh'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('uncached stock shows the chart loader only until prices arrive',

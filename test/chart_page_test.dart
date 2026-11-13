@@ -1615,6 +1615,22 @@ void main() {
       expect(refreshButton.onPressed, isNull);
       expect(find.byType(MarketLineChart), findsOneWidget);
 
+      // A hung broker must not keep the gesture active indefinitely, and a
+      // second pull must reuse the existing request rather than start another.
+      await tester.pump(const Duration(seconds: 7));
+      await tester.pump();
+      final refreshAfterTimeout = tester.widget<IconButton>(
+        find.ancestor(of: refresh, matching: find.byType(IconButton)),
+      );
+      expect(refreshAfterTimeout.onPressed, isNotNull);
+      expect(find.byType(MarketLineChart), findsOneWidget);
+      await tester
+          .widget<RefreshIndicator>(find.byType(RefreshIndicator))
+          .onRefresh();
+      await tester.pump();
+      expect(performanceLoads, 1);
+      expect(find.byType(MarketLineChart), findsOneWidget);
+
       pendingPerformance.complete(
         IbkrPerformanceSeries(
           period: '1Y',
