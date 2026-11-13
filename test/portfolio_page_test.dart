@@ -684,8 +684,8 @@ void main() {
           .loading,
       isTrue,
     );
-    expect(find.text('LOADING HISTORY'), findsOneWidget);
-    expect(find.text('FETCHING PAST PERIODS'), findsOneWidget);
+    expect(find.text('PRESENT'), findsOneWidget);
+    expect(find.textContaining('FETCHING PAST PERIODS'), findsNothing);
     expect(
       find.byKey(const Key('portfolio-return-period')),
       findsOneWidget,
@@ -720,7 +720,7 @@ void main() {
       ],
       contains(contains('1D ago')),
     );
-    expect(find.text('LOADING HISTORY'), findsNothing);
+    expect(find.textContaining('LOADING HISTORY'), findsNothing);
     expect(tester.takeException(), null);
     await tester.pumpWidget(const SizedBox.shrink());
     botSnapshot.complete(snapshotFor('bot', 'VOO'));
@@ -773,13 +773,13 @@ void main() {
     );
     expect(pickerDuringRefresh.loading, isTrue);
     expect(pickerDuringRefresh.labels, ['Now']);
-    expect(find.text('LOADING HISTORY'), findsOneWidget);
+    expect(find.text('PRESENT'), findsOneWidget);
 
     pendingPerformance.complete(
       await _performanceLoader(const IbkrAccountConfig(), '1Y'),
     );
     await tester.pumpAndSettle();
-    expect(find.text('LOADING HISTORY'), findsNothing);
+    expect(find.textContaining('LOADING HISTORY'), findsNothing);
     expect(
       tester
           .widget<PortfolioPeriodPicker>(find.byType(PortfolioPeriodPicker))
@@ -1593,7 +1593,7 @@ void main() {
     );
     expect(during.loading, isTrue);
     expect(during.labels, ['Now']);
-    expect(find.text('LOADING HISTORY'), findsOneWidget);
+    expect(find.text('PRESENT'), findsOneWidget);
     waiting.complete([bars]);
     await tester.pumpAndSettle();
     final ready = tester.widget<PortfolioPeriodPicker>(
@@ -1601,7 +1601,7 @@ void main() {
     );
     expect(ready.loading, isFalse);
     expect(ready.labels.length, greaterThan(1));
-    expect(find.text('LOADING HISTORY'), findsNothing);
+    expect(find.textContaining('LOADING HISTORY'), findsNothing);
     expect(tester.takeException(), null);
   });
 
@@ -1698,7 +1698,7 @@ void main() {
     );
     expect(loadingPicker.loading, isTrue);
     expect(loadingPicker.labels, ['Now']);
-    expect(find.text('LOADING HISTORY'), findsOneWidget);
+    expect(find.text('PRESENT'), findsOneWidget);
     final waitingSlider = tester.widget<Slider>(
       find.byKey(const Key('portfolio-return-period')),
     );
@@ -1710,7 +1710,7 @@ void main() {
       find.byType(PortfolioPeriodPicker),
     );
     expect(fullPicker.loading, isFalse);
-    expect(find.text('LOADING HISTORY'), findsNothing);
+    expect(find.textContaining('LOADING HISTORY'), findsNothing);
     final slider = tester.widget<Slider>(
       find.byKey(const Key('portfolio-return-period')),
     );
@@ -1844,7 +1844,7 @@ void main() {
     );
     expect(loadingPicker.loading, isTrue);
     expect(loadingPicker.labels, ['Now']);
-    expect(find.text('LOADING HISTORY'), findsOneWidget);
+    expect(find.text('PRESENT'), findsOneWidget);
     final waitingSlider = tester.widget<Slider>(
       find.byKey(const Key('portfolio-return-period')),
     );
@@ -1853,7 +1853,7 @@ void main() {
 
     tradeRefresh.complete(brokerHistory);
     await tester.pumpAndSettle();
-    expect(find.text('LOADING HISTORY'), findsNothing);
+    expect(find.textContaining('LOADING HISTORY'), findsNothing);
     expect(
       tester
           .widget<PortfolioPeriodPicker>(find.byType(PortfolioPeriodPicker))

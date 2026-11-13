@@ -121,17 +121,17 @@ void main() {
         );
 
     await tester.pumpWidget(picker(loading: true));
-    expect(find.text('LOADING HISTORY'), findsOneWidget);
-    expect(find.text('FETCHING PAST PERIODS'), findsOneWidget);
+    expect(find.text('PRESENT'), findsOneWidget);
+    expect(find.textContaining('FETCHING PAST PERIODS'), findsNothing);
     expect(find.text('FURTHEST · NOW'), findsNothing);
     await tester.pump(const Duration(milliseconds: 450));
-    expect(find.text('LOADING HISTORY'), findsOneWidget);
+    expect(find.text('PRESENT'), findsOneWidget);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(picker(loading: false));
     await tester.pumpAndSettle();
-    expect(find.text('LOADING HISTORY'), findsNothing);
+    expect(find.textContaining('LOADING HISTORY'), findsNothing);
     expect(find.text('PRESENT'), findsOneWidget);
     expect(find.text('FURTHEST · NOV 2026'), findsOneWidget);
     expect(

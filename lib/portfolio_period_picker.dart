@@ -61,7 +61,6 @@ class PortfolioPeriodPicker extends StatelessWidget {
             ],
             Text(
               switch (true) {
-                _ when loading => 'LOADING HISTORY',
                 _ when selectedDate == null => 'PRESENT',
                 _ when labels[value] == 'Inception' => 'INCEPTION',
                 _ => '${labels[value]} AGO',
@@ -147,13 +146,14 @@ class PortfolioPeriodPicker extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              Text(
-                loading ? 'FETCHING PAST PERIODS' : 'FURTHEST · $oldestLabel',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: colors.onSurfaceVariant,
-                  letterSpacing: 0.9,
+              if (!loading)
+                Text(
+                  'FURTHEST · $oldestLabel',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                    letterSpacing: 0.9,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
