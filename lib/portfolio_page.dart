@@ -165,14 +165,22 @@ class PortfolioPageState extends State<PortfolioPage>
   String? _historyAccount;
   // Cached candles are provisional until the full history has completed.
   String? _completedHistoryAccount;
-  bool get _periodHistoryIncomplete =>
-      _historyLoading ||
-      (_historyRefreshing && _completedHistoryAccount != _historyAccount) ||
-      // An existing broker-performance cache can contain only a few dates.
-      // Do not expose those stops while fresher history is being fetched.
-      _performanceLoadingAccounts.contains(_lastAccount) ||
-      _intradayHistoryPending;
+  // Only locally verified history skips the network-refresh loading state.
+  String? _verifiedCachedHistoryKey;
+  bool get _periodHistoryIncomplete {
+    if (_returnHistory == null) return true;
+    if (_verifiedCachedHistoryKey == _historyAccount &&
+        !_intradayHistoryPending) {
+      return false;
+    }
+    return _historyLoading ||
+        (_historyRefreshing && _completedHistoryAccount != _historyAccount) ||
+        _performanceLoadingAccounts.contains(_lastAccount) ||
+        _intradayHistoryPending;
+  }
+
   Future<void>? _historyFuture;
+  final Set<String> _refreshingHistoryTrades = {};
   bool _forceHistoryRefresh = false;
   IbkrTradeHistory? _loadedTradeCache;
   Map<String, List<StoredCandle>> _returnCandles = {};
@@ -310,6 +318,7 @@ class PortfolioPageState extends State<PortfolioPage>
     _historyAccount = null;
     if (accountChanged || ibkrConfig != _lastIbkrConfig) {
       _completedHistoryAccount = null;
+      _verifiedCachedHistoryKey = null;
       _intradayHistoryPending = false;
       _returnCandles = {};
       _returnTrades = [];

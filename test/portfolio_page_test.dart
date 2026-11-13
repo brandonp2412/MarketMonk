@@ -997,6 +997,20 @@ void main() {
     await tester.tap(find.byKey(const Key('desktop-return-VOO')));
     await tester.pump();
     expect(find.text('Trade History'), findsWidgets);
+
+    for (var visit = 0; visit < 2; visit++) {
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pump();
+      expect(tester.takeException(), null);
+      expect(find.text('Return by holding'), findsOneWidget);
+      expect(returnScrollbar.controller!.hasClients, isTrue);
+
+      if (visit == 0) {
+        await tester.tap(find.byKey(const Key('desktop-return-VOO')));
+        await tester.pump();
+        expect(find.text('Trade History'), findsWidgets);
+      }
+    }
   });
 
   for (final width in [700.0, 1000.0]) {
@@ -1524,6 +1538,236 @@ void main() {
       contains(contains('1H ago')),
     );
     expect(freshBrokerRequests, 0);
+    expect(tester.takeException(), null);
+  });
+
+  testWidgets('cold start displays fully cached periods while IBKR hangs',
+      (tester) async {
+    await seedTestSqlite({});
+    final initial = await configuredAccounts();
+    final now = DateTime.now();
+    final earliest = DateTime(now.year, now.month - 3, now.day - 10);
+    final dates = <DateTime>{
+      earliest,
+      for (var period = 1; period < firstIntradayPeriod; period++)
+        if (portfolioReturnCutoff(period, now)!.isAfter(earliest))
+          portfolioReturnCutoff(period, now)!,
+      DateTime(now.year, now.month, now.day),
+    }.toList()
+      ..sort();
+    final performance = IbkrPerformanceSeries(
+      period: '1Y',
+      measure: 'TWR',
+      currency: 'USD',
+      startDate: earliest,
+      startNav: 6500,
+      dates: dates,
+      nav: [for (final _ in dates) 6500],
+      returnDates: dates,
+      returns: [for (final _ in dates) 0.0],
+    );
+    await initial.cachePortfolio(
+      'Default',
+      [cachedPosition()],
+      const IbkrAccountValue(value: 6500, currency: 'USD'),
+      netLiquidationUsd: 6500,
+    );
+    await initial.cacheIbkrPerformance('Default', performance);
+    await initial.cacheIbkrTradeHistory(
+      'Default',
+      const IbkrTradeHistory(available: true, trades: []),
+    );
+    for (final date in dates) {
+      await testDatabase.into(testDatabase.candles).insertOnConflictUpdate(
+            CandlesCompanion.insert(
+              symbol: 'VOO',
+              date: date,
+              close: const Value(550),
+              rawCurrency: const Value('USD'),
+            ),
+          );
+    }
+    // Simulate a restart with an old-but-complete local history while its
+    // broker performance and trade history requests never return.
+    final staleAt = DateTime(2000);
+    final profileId = (await testDatabase.readProfileByName('Default'))!.id;
+    await testDatabase.writeIbkrCache(
+      profileId: profileId,
+      kind: 'performance',
+      cacheKey: '1Y',
+      payloadJson: jsonEncode(
+        CachedIbkrPerformanceData(
+          series: performance,
+          cachedAt: staleAt,
+        ).toJson(),
+      ),
+      cachedAt: staleAt,
+    );
+    await testDatabase.writeIbkrCache(
+      profileId: profileId,
+      kind: 'trades',
+      cacheKey: 'history',
+      payloadJson: jsonEncode(
+        CachedIbkrTradeHistoryData(
+          history: const IbkrTradeHistory(available: true, trades: []),
+          cachedAt: staleAt,
+        ).toJson(),
+      ),
+      cachedAt: staleAt,
+    );
+    final reloaded = testAccountManager();
+    await reloaded.init();
+    final stalledPerformance = Completer<IbkrPerformanceSeries>();
+    final stalledTrades = Completer<IbkrTradeHistory>();
+    final stalledSnapshot = Completer<IbkrPortfolioSnapshot>();
+    var performanceLoads = 0;
+    var tradeLoads = 0;
+    addTearDown(() {
+      if (!stalledPerformance.isCompleted)
+        stalledPerformance.complete(performance);
+      if (!stalledTrades.isCompleted) {
+        stalledTrades
+            .complete(const IbkrTradeHistory(available: true, trades: []));
+      }
+      if (!stalledSnapshot.isCompleted) {
+        stalledSnapshot.complete(snapshotFor('test', 'VOO'));
+      }
+    });
+    await tester.pumpWidget(
+      app(
+        reloaded,
+        _portfolioPage(
+          ibkrLoader: (_) => stalledSnapshot.future,
+          ibkrPerformanceLoader: (_, __) {
+            performanceLoads++;
+            return stalledPerformance.future;
+          },
+          historyTradeLoader: (_) {
+            tradeLoads++;
+            return stalledTrades.future;
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pump();
+    final picker = tester.widget<PortfolioPeriodPicker>(
+      find.byType(PortfolioPeriodPicker),
+    );
+    expect(performanceLoads, 1);
+    expect(tradeLoads, 1);
+    expect(picker.loading, isFalse);
+    expect(picker.labels.length, greaterThan(4));
+    expect(find.text('VOO'), findsWidgets);
+    expect(tester.takeException(), null);
+    stalledPerformance.complete(performance);
+    stalledTrades.complete(const IbkrTradeHistory(available: true, trades: []));
+    stalledSnapshot.complete(snapshotFor('test', 'VOO'));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('checkpoint never exposes incomplete cached periods',
+      (tester) async {
+    await seedTestSqlite({});
+    final accounts = await configuredAccounts();
+    final now = DateTime.now();
+    final earliest = DateTime(now.year, now.month - 3, now.day - 10);
+    final missingDate = portfolioReturnCutoff(8, now)!; // 1M
+    final dates = <DateTime>{
+      earliest,
+      for (var period = 1; period < firstIntradayPeriod; period++)
+        if (portfolioReturnCutoff(period, now)!.isAfter(earliest))
+          portfolioReturnCutoff(period, now)!,
+      DateTime(now.year, now.month, now.day),
+    }.toList()
+      ..sort();
+    final performance = IbkrPerformanceSeries(
+      period: '1Y',
+      measure: 'TWR',
+      currency: 'USD',
+      startDate: earliest,
+      startNav: 6500,
+      dates: dates,
+      nav: [for (final _ in dates) 6500],
+      returnDates: dates,
+      returns: [for (final _ in dates) 0.0],
+    );
+    await accounts.cachePortfolio(
+      'Default',
+      [cachedPosition()],
+      const IbkrAccountValue(value: 6500, currency: 'USD'),
+      netLiquidationUsd: 6500,
+    );
+    await accounts.cacheIbkrPerformance('Default', performance);
+    await accounts.cacheIbkrTradeHistory(
+      'Default',
+      const IbkrTradeHistory(available: true, trades: []),
+    );
+    for (final date in dates.where((date) => date != missingDate)) {
+      await testDatabase.into(testDatabase.candles).insertOnConflictUpdate(
+            CandlesCompanion.insert(
+              symbol: 'VOO',
+              date: date,
+              close: const Value(550),
+              rawCurrency: const Value('USD'),
+            ),
+          );
+    }
+    await testDatabase.writeIbkrCache(
+      profileId: accounts.activeProfileId,
+      kind: 'portfolioPeriods',
+      cacheKey: 'complete',
+      payloadJson: jsonEncode({
+        'version': 1,
+        'signature': portfolioHistoryCacheSignature(
+          positions: accounts.portfolioCacheFor('Default')!.positions,
+          trades: accounts.ibkrTradeHistoryCacheFor('Default'),
+          performance: accounts.ibkrPerformanceCacheFor('Default', '1Y'),
+        ),
+        'periods': [0, 7, 9, 10, 11, 12],
+      }),
+      cachedAt: DateTime.now(),
+    );
+    final stalledBackfill = Completer<void>();
+    var backfills = 0;
+    await tester.pumpWidget(
+      app(
+        accounts,
+        _portfolioPage(
+          historyCandleSync: (symbol, from, config) async {
+            backfills++;
+            await stalledBackfill.future;
+            await testDatabase
+                .into(testDatabase.candles)
+                .insertOnConflictUpdate(
+                  CandlesCompanion.insert(
+                    symbol: symbol,
+                    date: missingDate,
+                    close: const Value(550),
+                    rawCurrency: const Value('USD'),
+                  ),
+                );
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pump();
+    expect(backfills, greaterThan(0));
+    final picker = tester.widget<PortfolioPeriodPicker>(
+      find.byType(PortfolioPeriodPicker),
+    );
+    expect(picker.loading, isTrue);
+    expect(picker.labels, ['Now']);
+    stalledBackfill.complete();
+    await tester.pumpAndSettle();
+    final completed = tester.widget<PortfolioPeriodPicker>(
+      find.byType(PortfolioPeriodPicker),
+    );
+    expect(completed.loading, isFalse);
+    expect(completed.labels, contains('1M'));
     expect(tester.takeException(), null);
   });
 

@@ -159,6 +159,99 @@ void main() {
     );
   });
 
+  test('repairs a missing interior portfolio date despite covered endpoints',
+      () async {
+    final database = Database.connect(NativeDatabase.memory());
+    addTearDown(database.close);
+    final expected = _expectedMarketDay();
+    final requiredFrom = _dayOffset(expected, -45);
+    final missingDate = _dayOffset(expected, -15);
+    await insertCandles(
+      [_candle(requiredFrom), _candle(expected)],
+      'AAPL',
+      database: database,
+    );
+    var fetches = 0;
+    DateTime? fetchedFrom;
+    Future<List<YahooFinanceCandleData>> fetch(
+      String symbol,
+      DateTime startDate,
+    ) async {
+      fetches++;
+      fetchedFrom = startDate;
+      return [_candle(missingDate, close: 111), _candle(expected)];
+    }
+
+    await syncCandles(
+      'AAPL',
+      database: database,
+      requiredFrom: requiredFrom,
+      repairGapFrom: missingDate,
+      yahooFetcher: fetch,
+    );
+    expect(fetches, 1);
+    expect(fetchedFrom, canonicalMarketDay(missingDate));
+    expect(
+      (await _rows(database)).any(
+        (row) =>
+            row.date == canonicalMarketDay(missingDate) && row.close == 111,
+      ),
+      isTrue,
+    );
+    await syncCandles(
+      'AAPL',
+      database: database,
+      requiredFrom: requiredFrom,
+      yahooFetcher: fetch,
+    );
+    expect(fetches, 1, reason: 'A warm cache needs no repeat fetch');
+  });
+
+  test('interior repair is independent of an in-flight edge refresh', () async {
+    final database = Database.connect(NativeDatabase.memory());
+    addTearDown(database.close);
+    final expected = _expectedMarketDay();
+    final first = _dayOffset(expected, -40);
+    final missing = _dayOffset(expected, -15);
+    await insertCandles(
+      [_candle(first), _candle(expected)],
+      'AAPL',
+      database: database,
+    );
+    final normalStarted = Completer<void>();
+    final normalGate = Completer<List<YahooFinanceCandleData>>();
+    final normal = syncCandles(
+      'AAPL',
+      database: database,
+      requiredFrom: first,
+      forceRefresh: true,
+      yahooFetcher: (symbol, from) {
+        normalStarted.complete();
+        return normalGate.future;
+      },
+    );
+    await normalStarted.future.timeout(const Duration(seconds: 3));
+    var repairs = 0;
+    await syncCandles(
+      'AAPL',
+      database: database,
+      requiredFrom: first,
+      repairGapFrom: missing,
+      yahooFetcher: (symbol, from) async {
+        repairs++;
+        expect(from, canonicalMarketDay(missing));
+        return [_candle(missing, close: 115)];
+      },
+    ).timeout(const Duration(seconds: 3));
+    expect(repairs, 1);
+    expect(
+      (await _rows(database)).any((candle) => candle.close == 115),
+      isTrue,
+    );
+    normalGate.complete([_candle(expected)]);
+    await normal;
+  });
+
   test('stale DB requests only the incremental overlap', () async {
     final database = Database.connect(NativeDatabase.memory());
     addTearDown(database.close);

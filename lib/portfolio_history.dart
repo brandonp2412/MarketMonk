@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:market_monk/accounts/account_manager.dart';
 import 'package:market_monk/database.dart';
@@ -74,6 +76,66 @@ class PortfolioHistory {
   }
 }
 
+/// Stable identity for a completed on-disk portfolio history snapshot.
+/// Market prices and NAV values may change without invalidating prior-period
+/// coverage; transactions or holdings must invalidate the checkpoint.
+String portfolioHistoryCacheSignature({
+  required List<Position> positions,
+  required IbkrTradeHistory? trades,
+  required IbkrPerformanceSeries? performance,
+}) {
+  final holdings = [
+    for (final position in positions)
+      '${position.symbol}:${position.netShares}',
+  ]..sort();
+  final payload = jsonEncode({
+    'holdings': holdings,
+    'trades': trades?.toJson(),
+    'inception': performance?.startDate?.toUtc().toIso8601String(),
+  });
+  var hash = 0x811c9dc5;
+  for (final codeUnit in payload.codeUnits) {
+    hash = ((hash ^ codeUnit) * 0x01000193) & 0xffffffff;
+  }
+  return 'v1-${hash.toRadixString(16)}';
+}
+
+/// Returns true when the local candle and FX cache can reconstruct every
+/// daily period supported by the saved broker NAV history. A handful of
+/// partially cached dates must not be mistaken for a complete period ruler.
+/// Intraday periods are checked independently against their short-lived cache.
+bool cachedPortfolioDailyPeriodsComplete({
+  required PortfolioHistory history,
+  required List<Position> positions,
+  required IbkrPerformanceSeries? performance,
+  DateTime? now,
+}) {
+  if (performance == null || performance.dates.isEmpty || positions.isEmpty) {
+    return false;
+  }
+  final first = portfolioInception(performance);
+  if (first == null) return false;
+  final today = now ?? DateTime.now();
+  var expected = 0;
+  for (var period = 1; period < firstIntradayPeriod; period++) {
+    final cutoff = portfolioReturnCutoff(period, today);
+    if (cutoff == null || cutoff.isBefore(first)) continue;
+    // A sparse NAV cache can report only "yesterday" even for a portfolio
+    // that has months of missing periods. That is NOT complete history.
+    if (accountNetAssetValueIndexAt(performance, cutoff) == null) return false;
+    expected++;
+    if (history.allocationAt(
+          positions: positions,
+          date: cutoff,
+          performance: performance,
+        ) ==
+        null) {
+      return false;
+    }
+  }
+  return expected > 0;
+}
+
 Future<PortfolioHistory> loadPortfolioHistory({
   required AccountManager accounts,
   required String accountName,
@@ -82,6 +144,7 @@ Future<PortfolioHistory> loadPortfolioHistory({
   DateTime? now,
   bool forceRefresh = false,
   bool cacheOnly = false,
+  bool preferCachedBrokerTrades = false,
   Future<IbkrTradeHistory> Function(IbkrAccountConfig)? tradeLoader,
   PortfolioCandleSync? candleSync,
   PortfolioHistoricalRate? rateLoader,
@@ -90,6 +153,7 @@ Future<PortfolioHistory> loadPortfolioHistory({
   var brokerHistory =
       config.enabled ? accounts.ibkrTradeHistoryCacheFor(accountName) : null;
   if (!cacheOnly &&
+      !(preferCachedBrokerTrades && brokerHistory?.available == true) &&
       config.isConfigured &&
       (forceRefresh || !accounts.isIbkrTradeHistoryCacheFresh(accountName))) {
     try {
@@ -175,17 +239,19 @@ Future<PortfolioHistory> loadPortfolioHistory({
     await Future.wait(
       batch.map((symbol) async {
         var stored = await readCandles(symbol);
-        final covered = dates.isNotEmpty &&
-            dates.every((date) {
-              if ((sharesByDate[date]![symbol] ?? 0) <= 1e-6) return true;
-              return stored.any(
-                (candle) =>
-                    !candle.date.isAfter(date) &&
-                    date.difference(candle.date).inDays <= 7 &&
-                    candle.close.isFinite &&
-                    candle.close > 0,
-              );
-            });
+        final missingDates = [
+          for (final date in dates)
+            if ((sharesByDate[date]![symbol] ?? 0) > 1e-6 &&
+                !stored.any(
+                  (candle) =>
+                      !candle.date.isAfter(date) &&
+                      date.difference(candle.date).inDays <= 7 &&
+                      candle.close.isFinite &&
+                      candle.close > 0,
+                ))
+              date,
+        ]..sort();
+        final covered = missingDates.isEmpty && dates.isNotEmpty;
         final refreshCurrent = forceRefresh && currentSymbols.contains(symbol);
         if (!cacheOnly && (!covered || refreshCurrent)) {
           final priceConfig = currentSymbols.contains(symbol)
@@ -200,6 +266,9 @@ Future<PortfolioHistory> loadPortfolioHistory({
                 database: database,
                 ibkrConfig: priceConfig,
                 requiredFrom: from,
+                repairGapFrom: missingDates.isEmpty
+                    ? null
+                    : missingDates.first.subtract(const Duration(days: 7)),
                 forceRefresh: refreshCurrent,
               );
             }

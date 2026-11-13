@@ -216,6 +216,76 @@ void main() {
     }
   });
 
+  test('full cached periods are usable without refreshing broker history', () {
+    final historicalDates = <DateTime>{
+      september,
+      for (var period = 1; period < firstIntradayPeriod; period++)
+        if (portfolioReturnCutoff(period, now)!.isAfter(september))
+          portfolioReturnCutoff(period, now)!,
+      latest,
+    }.toList()
+      ..sort();
+    final history = PortfolioHistory(
+      trades: const [],
+      candles: {
+        'OPEN': [
+          for (final date in historicalDates)
+            StoredCandle(
+              symbol: 'OPEN',
+              date: date,
+              open: 10,
+              high: 10,
+              low: 10,
+              close: 10,
+              volume: 1,
+              adjClose: 10,
+              rawCurrency: 'USD',
+            ),
+        ],
+      },
+      rates: {
+        for (final date in historicalDates) date: {'USD': 1},
+      },
+    );
+    final usdPerformance = IbkrPerformanceSeries(
+      period: '1Y',
+      measure: 'TWR',
+      currency: 'USD',
+      startDate: september,
+      startNav: 1000,
+      dates: historicalDates,
+      nav: [for (final _ in historicalDates) 1200],
+      returnDates: historicalDates,
+      returns: [for (final _ in historicalDates) 0.0],
+    );
+    expect(
+      cachedPortfolioDailyPeriodsComplete(
+        history: history,
+        positions: positions,
+        performance: usdPerformance,
+        now: now,
+      ),
+      isTrue,
+    );
+    expect(
+      cachedPortfolioDailyPeriodsComplete(
+        history: PortfolioHistory(
+          trades: history.trades,
+          candles: {
+            'OPEN': [history.candles['OPEN']!.first],
+          },
+          rates: history.rates,
+        ),
+        positions: positions,
+        performance: usdPerformance,
+        now: now,
+      ),
+      isFalse,
+      reason:
+          'One cached point must not unlock a partially loaded period ruler',
+    );
+  });
+
   test('history reads keep the baseline week and skip older candles', () async {
     final accounts = await setup();
     await accounts.cacheIbkrTradeHistory('Default', brokerTrades);

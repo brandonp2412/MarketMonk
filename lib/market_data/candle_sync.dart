@@ -245,6 +245,7 @@ Future<void> syncCandles(
   IbkrAccountConfig? ibkrConfig,
   String syncNamespace = 'Default',
   DateTime? requiredFrom,
+  DateTime? repairGapFrom,
   bool forceRefresh = false,
   YahooCandleFetcher? yahooFetcher,
   IbkrCandleFetcher? ibkrFetcher,
@@ -276,6 +277,10 @@ Future<void> syncCandles(
         _offsetMarketDay(today, -defaultMarketCandleLookback.inDays),
     expectedMarketDay,
   );
+  // Explicitly repair missing interior history, not just the edges.
+  final repairStart = repairGapFrom == null
+      ? null
+      : _boundedRequiredCandleStart(repairGapFrom, expectedMarketDay);
 
   Future<
       ({
@@ -341,14 +346,16 @@ Future<void> syncCandles(
   Future<({bool requested, bool progressed, DateTime coverageFrom})>
       performSync() async {
     final coverage = await readCoverage();
-    if (!forceRefresh && coverage.covered) {
+    if (!forceRefresh && coverage.covered && repairStart == null) {
       return (requested: false, progressed: false, coverageFrom: requiredStart);
     }
 
-    var requestFrom = coverage.latestDay == null
-        ? requiredStart
-        : _offsetMarketDay(coverage.latestDay!, -1);
-    if (!coverage.covered &&
+    var requestFrom = repairStart ??
+        (coverage.latestDay == null
+            ? requiredStart
+            : _offsetMarketDay(coverage.latestDay!, -1));
+    if (repairStart == null &&
+        !coverage.covered &&
         (coverage.oldestDay == null ||
             coverage.oldestDay!.isAfter(requiredStart))) {
       requestFrom = requiredStart;
@@ -453,7 +460,8 @@ Future<void> syncCandles(
       final syncResult = await backgroundNetworkCoordinator
           .coalesce<({bool requested, bool progressed, DateTime coverageFrom})>(
         RequestCategory.marketCandles,
-        canonicalSymbol,
+        // A background edge-only refresh cannot satisfy an interior repair.
+        repairStart == null ? canonicalSymbol : (canonicalSymbol, repairStart),
         performSync,
       );
 
