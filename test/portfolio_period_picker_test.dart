@@ -40,7 +40,7 @@ void main() {
     expect(theme.tickMarkShape, SliderTickMarkShape.noTickMark);
     expect(find.text('WHEN'), findsOneWidget);
     expect(find.text('Now'), findsOneWidget);
-    expect(find.text('FURTHEST · SEP 2026'), findsOneWidget);
+    expect(find.text('FURTHEST · 3 SEP 2026'), findsOneWidget);
     expect(slider.semanticFormatterCallback!(0), 'Now, current allocation');
     expect(slider.semanticFormatterCallback!(3), contains('September 3, 2026'));
 
@@ -99,7 +99,7 @@ void main() {
       ),
     );
     expect(find.text('8 Nov 2026, 2:30 PM'), findsOneWidget);
-    expect(find.text('FURTHEST · 8 NOV 2:30 PM'), findsOneWidget);
+    expect(find.text('FURTHEST · 8 NOV 2026'), findsOneWidget);
     expect(find.text('1H AGO'), findsOneWidget);
   });
 
@@ -153,7 +153,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('LOADING HISTORY'), findsNothing);
     expect(find.text('PRESENT'), findsOneWidget);
-    expect(find.text('FURTHEST · NOV 2026'), findsOneWidget);
+    expect(find.text('FURTHEST · 11 NOV 2026'), findsOneWidget);
     expect(sweepProgress(), isNull);
     expect(
       tester

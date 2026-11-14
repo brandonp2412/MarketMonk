@@ -92,14 +92,30 @@ PortfolioReturn? openHoldingPeriodReturn({
   return PortfolioReturn(currentValue - basis, basis);
 }
 
-/// Index of the first intraday return period (12H, 6H, 2H, 1H).
+/// Index of the first legacy intraday return period (unused by the fortnightly picker).
 const int firstIntradayPeriod = 13;
 
-/// The cutoff for a portfolio period, where period is an index into the
-/// portfolio page's period list. Returns null for "All time". Periods from
-/// [firstIntradayPeriod] on are sub-day hours-ago cutoffs.
+/// Stable, consecutive 14-day slider stops (Now, 2W, 4W, ...).
+/// Negative IDs avoid conflicting with historical period IDs in saved data.
+/// The broker performance cache currently covers at most one year.
+List<int> portfolioFortnightlyPeriods(DateTime now, DateTime? firstDate) {
+  if (firstDate == null || !firstDate.isBefore(now)) return const [0];
+  // Compare calendar dates in UTC to avoid losing a day at DST boundaries.
+  final today = DateTime.utc(now.year, now.month, now.day);
+  final oldest = DateTime.utc(firstDate.year, firstDate.month, firstDate.day);
+  final count = (today.difference(oldest).inDays ~/ 14).clamp(0, 26);
+  return [
+    0,
+    for (var fortnight = 1; fortnight <= count; fortnight++) -fortnight - 1,
+  ];
+}
+
+/// Fortnightly stops use IDs -2, -3, ... with consecutive 14-day cutoffs.
+/// Legacy IDs remain supported for migrated caches and existing callers.
+/// Returns null for 'Now' (ID 0).
 DateTime? portfolioReturnCutoff(int period, DateTime now) => switch (period) {
       0 => null,
+      <= -2 => DateTime(now.year, now.month, now.day - (-period - 1) * 14),
       >= 1 && <= 5 => DateTime(now.year - (6 - period), now.month, now.day),
       6 => DateTime(now.year, now.month - 6, now.day),
       7 => DateTime(now.year, now.month - 3, now.day),

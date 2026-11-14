@@ -191,6 +191,55 @@ void main() {
     return accounts;
   }
 
+  Future<void> seedFortnightFixture(
+    AccountManager accounts, {
+    int days = 70,
+  }) async {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day - days);
+    final dates = <DateTime>{
+      start,
+      for (final period in portfolioFortnightlyPeriods(now, start).skip(1))
+        portfolioReturnCutoff(period, now)!,
+      DateTime(now.year, now.month, now.day),
+    }.toList()
+      ..sort();
+    await accounts.cachePortfolio(
+      'Default',
+      [cachedPosition()],
+      const IbkrAccountValue(value: 5500, currency: 'USD'),
+      netLiquidationUsd: 5500,
+    );
+    await accounts.cacheIbkrPerformance(
+      'Default',
+      IbkrPerformanceSeries(
+        period: '1Y',
+        measure: 'TWR',
+        currency: 'USD',
+        startDate: start,
+        startNav: 5500,
+        dates: dates,
+        nav: List.filled(dates.length, 5500),
+        returnDates: dates,
+        returns: List.filled(dates.length, 0.0),
+      ),
+    );
+    await accounts.cacheIbkrTradeHistory(
+      'Default',
+      const IbkrTradeHistory(available: true, trades: []),
+    );
+    for (final date in dates) {
+      await testDatabase.into(testDatabase.candles).insertOnConflictUpdate(
+            CandlesCompanion.insert(
+              symbol: 'VOO',
+              date: date,
+              close: const Value(550),
+              rawCurrency: const Value('USD'),
+            ),
+          );
+    }
+  }
+
   Widget app(AccountManager accounts, Widget page) => MultiProvider(
         providers: [
           ChangeNotifierProvider(create: (_) => SettingsState()),
@@ -718,7 +767,7 @@ void main() {
         for (var i = 0; i <= slider.max; i++)
           slider.semanticFormatterCallback!(i.toDouble()),
       ],
-      contains(contains('1D ago')),
+      contains(contains('2W ago')),
     );
     expect(find.textContaining('LOADING HISTORY'), findsNothing);
     expect(tester.takeException(), null);
@@ -772,7 +821,7 @@ void main() {
       find.byType(PortfolioPeriodPicker),
     );
     expect(pickerDuringRefresh.loading, isTrue);
-    expect(pickerDuringRefresh.labels, ['Now']);
+    expect(pickerDuringRefresh.labels, contains('2W'));
     expect(find.text('PRESENT'), findsOneWidget);
 
     pendingPerformance.complete(
@@ -1027,13 +1076,16 @@ void main() {
       final accounts = await configuredAccounts();
       final now = DateTime.now();
       final start = DateTime(now.year, now.month, now.day - 100);
-      final week = DateTime(now.year, now.month, now.day - 7);
-      final historyDates = [
+      final fortnight = portfolioReturnCutoff(-2, now)!;
+      final historyDates = <DateTime>{
         start,
         for (final period in [7, 11, 8, 12, 9, 10])
           portfolioReturnCutoff(period, now)!,
+        for (final period in portfolioFortnightlyPeriods(now, start).skip(1))
+          portfolioReturnCutoff(period, now)!,
         DateTime(now.year, now.month, now.day),
-      ];
+      }.toList()
+        ..sort();
       await accounts.cachePortfolio(
         'Default',
         [
@@ -1064,7 +1116,7 @@ void main() {
             for (final date in historyDates)
               switch (true) {
                 _ when date == historyDates.last => 12100,
-                _ when date.isBefore(week) => 10000,
+                _ when date.isBefore(fortnight) => 10000,
                 _ => 11000,
               },
           ],
@@ -1073,7 +1125,7 @@ void main() {
             for (final date in historyDates)
               switch (true) {
                 _ when date == historyDates.last => .21,
-                _ when date.isBefore(week) => 0,
+                _ when date.isBefore(fortnight) => 0,
                 _ => .1,
               },
           ],
@@ -1091,21 +1143,30 @@ void main() {
         commission: 0,
         rawCurrency: 'USD',
       );
-      for (final period in [-1, 7, 8, 9, 10, 11, 12]) {
+      for (final period in [
+        -1,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        ...portfolioFortnightlyPeriods(now, start).skip(1),
+      ]) {
         final date = period == -1 ? start : portfolioReturnCutoff(period, now)!;
         for (final symbol in ['VOO', 'MSFT', 'OLD']) {
-          await testDatabase.into(testDatabase.candles).insert(
+          await testDatabase.into(testDatabase.candles).insertOnConflictUpdate(
                 CandlesCompanion.insert(
                   symbol: symbol,
                   date: date,
                   rawCurrency: const Value('USD'),
                   close: Value(
                     switch (true) {
-                      _ when (symbol == 'VOO') && (period == 10) => 200.0,
+                      _ when (symbol == 'VOO') && (period == -2) => 200.0,
                       _ when (symbol == 'VOO') => 100.0,
-                      _ when (symbol == 'MSFT') && (period == 10) => 100.0,
+                      _ when (symbol == 'MSFT') && (period == -2) => 100.0,
                       _ when (symbol == 'MSFT') => 300.0,
-                      _ when period == 10 => 100.0,
+                      _ when period == -2 => 100.0,
                       _ => 400.0,
                     },
                   ),
@@ -1122,12 +1183,12 @@ void main() {
       var slider = tester.widget<Slider>(finder);
       expect(slider.divisions, 7);
       expect(slider.semanticFormatterCallback!(0), 'Now, current allocation');
-      expect(slider.semanticFormatterCallback!(1), contains('1D ago'));
-      expect(slider.semanticFormatterCallback!(2), contains('1W ago'));
-      expect(slider.semanticFormatterCallback!(3), contains('2W ago'));
-      expect(slider.semanticFormatterCallback!(4), contains('1M ago'));
-      expect(slider.semanticFormatterCallback!(5), contains('2M ago'));
-      expect(slider.semanticFormatterCallback!(6), contains('3M ago'));
+      for (var index = 1; index <= slider.max; index++) {
+        expect(
+          slider.semanticFormatterCallback!(index.toDouble()),
+          contains('${index * 2}W ago'),
+        );
+      }
 
       expect(find.textContaining('Open holdings returns'), findsNothing);
       expect(
@@ -1155,7 +1216,7 @@ void main() {
       await tester.pump();
       expect(
         find.text(
-          DateFormat('d MMM yyyy').format(portfolioReturnCutoff(7, now)!),
+          DateFormat('d MMM yyyy').format(portfolioReturnCutoff(-7, now)!),
         ),
         findsOneWidget,
       );
@@ -1195,7 +1256,7 @@ void main() {
       await tester.pump();
       expect(
         find.text(
-          DateFormat('d MMM yyyy').format(portfolioReturnCutoff(10, now)!),
+          DateFormat('d MMM yyyy').format(portfolioReturnCutoff(-2, now)!),
         ),
         findsOneWidget,
       );
@@ -1264,6 +1325,15 @@ void main() {
     final september = portfolioReturnCutoff(11, now)!;
     final october = portfolioReturnCutoff(8, now)!;
     final latest = portfolioReturnCutoff(10, now)!;
+    final historyDates = <DateTime>{
+      start,
+      september,
+      october,
+      latest,
+      for (final period in portfolioFortnightlyPeriods(now, start).skip(1))
+        portfolioReturnCutoff(period, now)!,
+    }.toList()
+      ..sort();
     await accounts.cachePortfolio(
       'Default',
       [cachedPosition()],
@@ -1277,10 +1347,28 @@ void main() {
         currency: 'USD',
         startDate: start.subtract(const Duration(days: 3)),
         startNav: 0,
-        dates: [start, september, october, latest],
-        nav: const [10000, 11000, 12000, 13000],
-        returnDates: [start, september, october, latest],
-        returns: const [0, .1, .2, .3],
+        dates: historyDates,
+        nav: [
+          for (final date in historyDates)
+            date == start
+                ? 10000
+                : date.isBefore(october)
+                    ? 11000
+                    : date.isBefore(latest)
+                        ? 12000
+                        : 13000,
+        ],
+        returnDates: historyDates,
+        returns: [
+          for (final date in historyDates)
+            date == start
+                ? 0.0
+                : date.isBefore(october)
+                    ? .1
+                    : date.isBefore(latest)
+                        ? .2
+                        : .3,
+        ],
       ),
     );
     IbkrTrade trade(String symbol, double quantity, DateTime date) => IbkrTrade(
@@ -1313,7 +1401,7 @@ void main() {
           historyCandleSync: (symbol, from, config) async {
             expect(from.isBefore(start), isTrue);
             synced.add(symbol);
-            for (final date in [september, october, latest]) {
+            for (final date in historyDates.where((date) => date != start)) {
               await testDatabase
                   .into(testDatabase.candles)
                   .insertOnConflictUpdate(
@@ -1340,7 +1428,7 @@ void main() {
     final slider = tester.widget<Slider>(
       find.byKey(const Key('portfolio-return-period')),
     );
-    for (final label in ['1M ago', '2M ago', 'Inception']) {
+    for (final label in ['4W ago', '8W ago', '10W ago']) {
       final index =
           List.generate(slider.max.toInt() + 1, (index) => index).firstWhere(
         (index) =>
@@ -1350,12 +1438,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         pie(),
-        label == 'Inception'
+        label == '10W ago'
             ? {'CASH': 10000.0}
             : {
                 'VOO': 1000.0,
                 'SOLD': 200.0,
-                'CASH': label == '1M ago' ? 10800.0 : 9800.0,
+                'CASH': label == '4W ago' ? 10800.0 : 9800.0,
               },
       );
       expect(find.textContaining('history unavailable'), findsNothing);
@@ -1363,163 +1451,41 @@ void main() {
     expect(tester.takeException(), null);
   });
 
-  testWidgets(
-      'cold start restores intraday dots from SQLite before broker returns',
+  testWidgets('cached intraday quotes never change fortnightly slider ticks',
       (tester) async {
     await seedTestSqlite({});
     final accounts = await configuredAccounts();
-    final now = DateTime.now().toUtc();
-    final start = now.subtract(const Duration(days: 3));
+    await seedFortnightFixture(accounts);
+    final now = DateTime.now();
     final holding = cachedPosition();
-    await accounts.cachePortfolio(
-      'Default',
-      [holding],
-      const IbkrAccountValue(value: 5500, currency: 'USD'),
-      netLiquidationUsd: 5500,
-    );
-    await accounts.cacheIbkrTradeHistory(
-      'Default',
-      IbkrTradeHistory(
-        available: true,
-        trades: [
-          IbkrTrade(
-            symbol: holding.symbol,
-            name: holding.name,
-            currency: 'USD',
-            conid: 1,
-            quantity: holding.netShares,
-            price: 500,
-            tradeType: 'open',
-            tradeDate: start,
-            realizedPnl: 0,
-            commission: 0,
-          ),
-        ],
-      ),
-    );
-    await accounts.cacheIbkrPerformance(
-      'Default',
-      IbkrPerformanceSeries(
-        period: '1Y',
-        measure: 'TWR',
-        currency: 'USD',
-        startDate: start,
-        startNav: 5000,
-        dates: [start, now.subtract(const Duration(days: 1)), now],
-        nav: const [5000, 5400, 5500],
-        returnDates: [start, now.subtract(const Duration(days: 1)), now],
-        returns: const [0, .08, .1],
-      ),
-    );
-    for (final date in [start, now.subtract(const Duration(days: 1))]) {
-      await testDatabase.into(testDatabase.candles).insertOnConflictUpdate(
-            CandlesCompanion.insert(
-              symbol: holding.symbol,
-              date: date,
-              close: const Value(530),
-              rawCurrency: const Value('USD'),
-            ),
-          );
-    }
-    final intraday = CachedPortfolioIntraday(
-      positionsKey: CachedPortfolioIntraday.keyFor([holding]),
-      cachedAt: now.subtract(const Duration(minutes: 10)),
-      holdings: {
-        holding.symbol: IntradayPortfolioHolding(
-          quantity: holding.netShares,
-          pricesUsd: {
-            now.subtract(const Duration(hours: 4)): 520,
-            now.subtract(const Duration(hours: 2)): 535,
-            now.subtract(const Duration(minutes: 1)): 550,
-          },
-        ),
-      },
-    );
     await testDatabase.writeIbkrCache(
       profileId: accounts.activeProfileId,
       kind: 'portfolioIntraday',
       cacheKey: '1D',
-      payloadJson: jsonEncode(intraday.toJson()),
-      cachedAt: now.subtract(const Duration(minutes: 10)),
-    );
-    final restarted = testAccountManager();
-    await restarted.init();
-    final pendingBars = Completer<List<IbkrHistoricalSeries>>();
-    var brokerRequests = 0;
-    await tester.pumpWidget(
-      app(
-        restarted,
-        _portfolioPage(
-          intradayData: IntradayMarketData(
-            ibkrPortfolioFetch: (config, days) {
-              brokerRequests++;
-              return pendingBars.future;
-            },
-            yahooGet: (uri) => throw StateError('Unexpected Yahoo request'),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    final finder = find.byKey(const Key('portfolio-return-period'));
-    final slider = tester.widget<Slider>(finder);
-    final labels = [
-      for (var index = 0; index <= slider.max; index++)
-        slider.semanticFormatterCallback!(index.toDouble()),
-    ];
-    expect(labels, contains(contains('1H ago')));
-    expect(labels, contains(contains('2H ago')));
-    expect(brokerRequests, 1);
-    final index = labels.indexWhere((label) => label.contains('2H ago'));
-    slider.onChanged!(index.toDouble());
-    await tester.pump();
-    expect(find.text('2H AGO'), findsOneWidget);
-    expect(find.byType(MarketDonutChart), findsOneWidget);
-    expect(tester.takeException(), null);
-    pendingBars.complete([
-      IbkrHistoricalSeries(
-        symbol: holding.symbol,
-        currency: 'USD',
-        candles: [
-          for (final date in [
-            now.subtract(const Duration(hours: 4)),
-            now.subtract(const Duration(hours: 2)),
-            now.subtract(const Duration(minutes: 1)),
-          ])
-            IbkrHistoricalCandle(
-              date: date,
-              open: 550,
-              high: 550,
-              low: 550,
-              close: 550,
-              volume: 0,
+      payloadJson: jsonEncode(
+        CachedPortfolioIntraday(
+          positionsKey: CachedPortfolioIntraday.keyFor([holding]),
+          cachedAt: now,
+          holdings: {
+            holding.symbol: IntradayPortfolioHolding(
+              quantity: holding.netShares,
+              pricesUsd: {now.subtract(const Duration(hours: 1)): 550},
             ),
-        ],
+          },
+        ).toJson(),
       ),
-    ]);
-    await tester.pumpAndSettle();
-    final stored = await testDatabase.readIbkrCache(
-      accounts.activeProfileId,
-      'portfolioIntraday',
-      '1D',
+      cachedAt: now,
     );
-    expect(stored == null, isFalse);
-    expect(
-      stored!.cachedAt.isAfter(now.subtract(const Duration(minutes: 10))),
-      isTrue,
-    );
-    await tester.pumpWidget(const SizedBox.shrink());
-
-    final freshRestart = testAccountManager();
-    await freshRestart.init();
-    var freshBrokerRequests = 0;
+    final reloaded = testAccountManager();
+    await reloaded.init();
+    var intradayLoads = 0;
     await tester.pumpWidget(
       app(
-        freshRestart,
+        reloaded,
         _portfolioPage(
           intradayData: IntradayMarketData(
-            ibkrPortfolioFetch: (config, days) async {
-              freshBrokerRequests++;
+            ibkrPortfolioFetch: (_, __) async {
+              intradayLoads++;
               return [];
             },
           ),
@@ -1527,17 +1493,16 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final restoredSlider = tester.widget<Slider>(
+    final picker = tester.widget<PortfolioPeriodPicker>(
+      find.byType(PortfolioPeriodPicker),
+    );
+    expect(picker.labels, ['Now', '2W', '4W', '6W', '8W', '10W']);
+    expect(intradayLoads, 0);
+    final slider = tester.widget<Slider>(
       find.byKey(const Key('portfolio-return-period')),
     );
-    expect(
-      [
-        for (var i = 0; i <= restoredSlider.max; i++)
-          restoredSlider.semanticFormatterCallback!(i.toDouble()),
-      ],
-      contains(contains('1H ago')),
-    );
-    expect(freshBrokerRequests, 0);
+    expect(slider.divisions, 5);
+    expect(slider.semanticFormatterCallback!(1), contains('2W ago'));
     expect(tester.takeException(), null);
   });
 
@@ -1552,6 +1517,8 @@ void main() {
       for (var period = 1; period < firstIntradayPeriod; period++)
         if (portfolioReturnCutoff(period, now)!.isAfter(earliest))
           portfolioReturnCutoff(period, now)!,
+      for (final period in portfolioFortnightlyPeriods(now, earliest).skip(1))
+        portfolioReturnCutoff(period, now)!,
       DateTime(now.year, now.month, now.day),
     }.toList()
       ..sort();
@@ -1667,18 +1634,20 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('checkpoint never exposes incomplete cached periods',
+  testWidgets('missing cached prices retain fortnight stops until repaired',
       (tester) async {
     await seedTestSqlite({});
     final accounts = await configuredAccounts();
     final now = DateTime.now();
     final earliest = DateTime(now.year, now.month - 3, now.day - 10);
-    final missingDate = portfolioReturnCutoff(8, now)!; // 1M
+    final missingDate = portfolioReturnCutoff(-2, now)!; // 2W
     final dates = <DateTime>{
       earliest,
       for (var period = 1; period < firstIntradayPeriod; period++)
         if (portfolioReturnCutoff(period, now)!.isAfter(earliest))
           portfolioReturnCutoff(period, now)!,
+      for (final period in portfolioFortnightlyPeriods(now, earliest).skip(1))
+        portfolioReturnCutoff(period, now)!,
       DateTime(now.year, now.month, now.day),
     }.toList()
       ..sort();
@@ -1760,95 +1729,68 @@ void main() {
       find.byType(PortfolioPeriodPicker),
     );
     expect(picker.loading, isTrue);
-    expect(picker.labels, ['Now']);
+    expect(picker.labels, containsAll(['Now', '2W', '4W']));
+    final waitingSlider = tester.widget<Slider>(
+      find.byKey(const Key('portfolio-return-period')),
+    );
+    waitingSlider.onChanged!(1);
+    await tester.pump();
+    expect(
+      find.textContaining('Historical data could not be reconstructed'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), null);
     stalledBackfill.complete();
     await tester.pumpAndSettle();
     final completed = tester.widget<PortfolioPeriodPicker>(
       find.byType(PortfolioPeriodPicker),
     );
     expect(completed.loading, isFalse);
-    expect(completed.labels, contains('1M'));
+    expect(completed.labels, contains('2W'));
+    expect(find.byType(MarketDonutChart), findsOneWidget);
+    expect(
+      find.textContaining('Historical data could not be reconstructed'),
+      findsNothing,
+    );
     expect(tester.takeException(), null);
   });
 
-  testWidgets('missing intraday history keeps daily period dots hidden',
+  testWidgets('missing intraday quotes cannot hide fortnightly stops',
       (tester) async {
     await seedTestSqlite({});
     final accounts = await configuredAccounts();
-    final now = DateTime.now().toUtc();
-    final holding = cachedPosition();
-    await accounts.cachePortfolio(
-      'Default',
-      [holding],
-      const IbkrAccountValue(value: 5500, currency: 'USD'),
-      netLiquidationUsd: 5500,
-    );
-    await accounts.cacheIbkrPerformance(
-      'Default',
-      IbkrPerformanceSeries(
-        period: '1Y',
-        measure: 'TWR',
-        currency: 'USD',
-        startDate: now.subtract(const Duration(days: 12)),
-        startNav: 5000,
-        dates: [now.subtract(const Duration(days: 12)), now],
-        nav: const [5000, 5500],
-        returnDates: [now.subtract(const Duration(days: 12)), now],
-        returns: const [0, .1],
-      ),
-    );
-    await seedCurrentCandle('VOO');
-    final waiting = Completer<List<IbkrHistoricalSeries>>();
-    var brokerRequests = 0;
-    final bars = IbkrHistoricalSeries(
-      symbol: 'VOO',
-      currency: 'USD',
-      candles: [
-        for (final hoursAgo in [4, 3, 2, 1])
-          IbkrHistoricalCandle(
-            date: now.subtract(Duration(hours: hoursAgo)),
-            open: 550,
-            high: 550,
-            low: 550,
-            close: 550,
-            volume: 0,
-          ),
-      ],
-    );
+    await seedFortnightFixture(accounts, days: 84);
+    var intradayLoads = 0;
     await tester.pumpWidget(
       app(
         accounts,
         _portfolioPage(
           intradayData: IntradayMarketData(
-            ibkrPortfolioFetch: (_, __) {
-              brokerRequests++;
-              return waiting.future;
+            ibkrPortfolioFetch: (_, __) async {
+              intradayLoads++;
+              return [];
             },
-            ibkrFetch: (_, __, ___) async => bars,
-            yahooGet: (_) => throw StateError('Unexpected Yahoo request'),
           ),
         ),
       ),
     );
-    // Keep pending network calls unresolved; a looping animation cannot settle.
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 250));
-    await tester.pump();
-    expect(brokerRequests, 1);
-    final during = tester.widget<PortfolioPeriodPicker>(
-      find.byType(PortfolioPeriodPicker),
-    );
-    expect(during.loading, isTrue);
-    expect(during.labels, ['Now']);
-    expect(find.text('PRESENT'), findsOneWidget);
-    waiting.complete([bars]);
     await tester.pumpAndSettle();
-    final ready = tester.widget<PortfolioPeriodPicker>(
+    final picker = tester.widget<PortfolioPeriodPicker>(
       find.byType(PortfolioPeriodPicker),
     );
-    expect(ready.loading, isFalse);
-    expect(ready.labels.length, greaterThan(1));
-    expect(find.textContaining('LOADING HISTORY'), findsNothing);
+    expect(picker.loading, isFalse);
+    expect(picker.labels, ['Now', '2W', '4W', '6W', '8W', '10W', '12W']);
+    expect(intradayLoads, 0);
+    final slider = tester.widget<Slider>(
+      find.byKey(const Key('portfolio-return-period')),
+    );
+    expect(slider.divisions, 6);
+    for (var index = 1; index <= slider.max; index++) {
+      expect(
+        slider.semanticFormatterCallback!(index.toDouble()),
+        contains('${index * 2}W ago'),
+      );
+    }
     expect(tester.takeException(), null);
   });
 
@@ -1947,13 +1889,13 @@ void main() {
       find.byType(PortfolioPeriodPicker),
     );
     expect(loadingPicker.loading, isTrue);
-    expect(loadingPicker.labels, ['Now']);
+    expect(loadingPicker.labels, contains('2W'));
     expect(find.text('PRESENT'), findsOneWidget);
     final waitingSlider = tester.widget<Slider>(
       find.byKey(const Key('portfolio-return-period')),
     );
-    expect(waitingSlider.onChanged, null);
-    expect(waitingSlider.divisions, null);
+    expect(waitingSlider.onChanged, isNot(null));
+    expect(waitingSlider.divisions, greaterThan(0));
     tradeRefresh.complete(brokerHistory);
     await tester.pumpAndSettle();
     final fullPicker = tester.widget<PortfolioPeriodPicker>(
@@ -1964,10 +1906,10 @@ void main() {
     final slider = tester.widget<Slider>(
       find.byKey(const Key('portfolio-return-period')),
     );
-    expect(slider.semanticFormatterCallback!(1), contains('1D ago'));
+    expect(slider.semanticFormatterCallback!(1), contains('2W ago'));
     expect(
       slider.semanticFormatterCallback!(slider.max),
-      contains('Inception'),
+      contains('${slider.max.toInt() * 2}W ago'),
     );
     slider.onChanged!(slider.max);
     await tester.pump();
@@ -1985,337 +1927,76 @@ void main() {
           .label,
       'CASH',
     );
-    expect(find.text('INCEPTION'), findsOneWidget);
+    expect(find.text('10W AGO'), findsOneWidget);
     expect(tester.takeException(), null);
     expect(find.byType(LinearProgressIndicator), findsNothing);
     expect(tester.takeException(), null);
   });
 
-  testWidgets('cached IBKR periods survive missing inception prices', (
-    tester,
-  ) async {
+  testWidgets('cached IBKR values reconstruct every fortnightly date',
+      (tester) async {
     await seedTestSqlite({});
     final accounts = await configuredAccounts();
-    final now = DateTime.now();
-    final start = DateTime(now.year, now.month, now.day - 70);
-    await accounts.cachePortfolio(
-      'Default',
-      [cachedPosition()],
-      const IbkrAccountValue(value: 121, currency: 'USD'),
-    );
-    final holding = cachedPosition();
-    await accounts.cacheIbkrTradeHistory(
-      'Default',
-      IbkrTradeHistory(
-        available: true,
-        trades: [
-          IbkrTrade(
-            symbol: holding.symbol,
-            name: holding.name,
-            currency: 'USD',
-            conid: 1,
-            quantity: holding.netShares,
-            price: holding.avgCost,
-            tradeType: 'open',
-            tradeDate: start.subtract(const Duration(days: 10)),
-            realizedPnl: 0,
-            commission: 0,
-          ),
-        ],
-      ),
-    );
-    await accounts.cacheIbkrPerformance(
-      'Default',
-      IbkrPerformanceSeries(
-        period: '1Y',
-        measure: 'TWR',
-        currency: 'USD',
-        startDate: start.subtract(const Duration(days: 3)),
-        startNav: 0,
-        dates: [start, portfolioReturnCutoff(10, now)!],
-        nav: const [10000, 12100],
-        returnDates: [start, portfolioReturnCutoff(10, now)!],
-        returns: const [0, .21],
-      ),
-    );
-    await testDatabase.into(testDatabase.candles).insert(
-          CandlesCompanion.insert(
-            symbol: holding.symbol,
-            date: portfolioReturnCutoff(10, now)!,
-            close: const Value(550),
-            rawCurrency: const Value('USD'),
-          ),
-        );
-    final brokerHistory = accounts.ibkrTradeHistoryCacheFor('Default')!;
-    final expiredAt = DateTime(2000);
-    await testDatabase.writeIbkrCache(
-      profileId: (await testDatabase.readProfileByName('Default'))!.id,
-      kind: 'trades',
-      cacheKey: 'history',
-      payloadJson: jsonEncode(
-        CachedIbkrTradeHistoryData(
-          history: brokerHistory,
-          cachedAt: expiredAt,
-        ).toJson(),
-      ),
-      cachedAt: expiredAt,
-    );
+    await seedFortnightFixture(accounts, days: 70);
     final reloaded = testAccountManager();
     await reloaded.init();
     final pending = Completer<IbkrPortfolioSnapshot>();
-    final tradeRefresh = Completer<IbkrTradeHistory>();
-    var tradeLoads = 0;
     await tester.pumpWidget(
       app(
         reloaded,
         _portfolioPage(
           ibkrLoader: (_) => pending.future,
-          historyTradeLoader: (_) {
-            tradeLoads++;
-            return tradeRefresh.future;
-          },
-          historyCandleSync: (symbol, from, config) async {
-            await testDatabase.into(testDatabase.candles).insert(
-                  CandlesCompanion.insert(
-                    symbol: symbol,
-                    date: start,
-                    close: const Value(550),
-                    rawCurrency: const Value('USD'),
-                  ),
-                );
-          },
         ),
       ),
     );
-    // Keep pending network calls unresolved; a looping animation cannot settle.
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 250));
-    await tester.pump();
-    expect(tradeLoads, 1);
-    final loadingPicker = tester.widget<PortfolioPeriodPicker>(
+    await tester.pumpAndSettle();
+    final picker = tester.widget<PortfolioPeriodPicker>(
       find.byType(PortfolioPeriodPicker),
     );
-    expect(loadingPicker.loading, isTrue);
-    expect(loadingPicker.labels, ['Now']);
-    expect(find.text('PRESENT'), findsOneWidget);
-    final waitingSlider = tester.widget<Slider>(
-      find.byKey(const Key('portfolio-return-period')),
-    );
-    expect(waitingSlider.onChanged, null);
-    expect(tester.takeException(), null);
-
-    tradeRefresh.complete(brokerHistory);
-    await tester.pumpAndSettle();
-    expect(find.textContaining('LOADING HISTORY'), findsNothing);
-    expect(
-      tester
-          .widget<PortfolioPeriodPicker>(find.byType(PortfolioPeriodPicker))
-          .loading,
-      isFalse,
-    );
-    final updated = tester.widget<Slider>(
-      find.byKey(const Key('portfolio-return-period')),
-    );
-    expect(
-      updated.semanticFormatterCallback!(updated.max),
-      contains('Inception'),
-    );
-    for (var index = 1; index <= updated.max; index++) {
-      updated.onChanged!(index.toDouble());
-      await tester.pump();
+    expect(picker.labels, ['Now', '2W', '4W', '6W', '8W', '10W']);
+    final finder = find.byKey(const Key('portfolio-return-period'));
+    for (var index = 1; index < picker.labels.length; index++) {
+      tester.widget<Slider>(finder).onChanged!(index.toDouble());
+      await tester.pumpAndSettle();
       expect(find.byType(MarketDonutChart), findsOneWidget);
+      expect(find.textContaining('Historical data could not'), findsNothing);
       expect(find.text('No holdings on this date'), findsNothing);
+      expect(tester.takeException(), null);
     }
-    expect(find.byType(LinearProgressIndicator), findsNothing);
-    expect(tester.takeException(), null);
+    await tester.pumpWidget(const SizedBox.shrink());
+    pending.complete(snapshotFor('test', 'VOO'));
   });
 
-  testWidgets('short-lived IBKR portfolios get sub-day period dots', (
-    tester,
-  ) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(1000, 900);
-    addTearDown(() {
-      tester.view.resetPhysicalSize();
-      tester.view.resetDevicePixelRatio();
-    });
+  testWidgets('longer account histories retain exact fortnightly increments',
+      (tester) async {
     await seedTestSqlite({});
     final accounts = await configuredAccounts();
-    final now = DateTime.now().toUtc();
-    final start = DateTime(now.year, now.month, now.day - 100);
-    final historyDates = [
-      start,
-      for (final period in [7, 11, 8, 12, 9, 10])
-        portfolioReturnCutoff(period, now)!,
-      now,
-    ];
-    await accounts.cachePortfolio(
-      'Default',
-      [
-        Position(
-          symbol: 'VOO',
-          name: 'Vanguard S&P 500 ETF',
-          nativeCurrency: 'USD',
-          netShares: 10,
-          avgCost: 500,
-          currentPrice: 735,
-          firstBuyDate: DateTime(2026),
-          lastBuyDate: DateTime(2026),
-        ),
-        Position(
-          symbol: 'MSFT',
-          name: 'Microsoft',
-          nativeCurrency: 'USD',
-          netShares: 10,
-          avgCost: 100,
-          currentPrice: 335,
-          firstBuyDate: DateTime(2026),
-          lastBuyDate: DateTime(2026),
-        ),
-      ],
-      const IbkrAccountValue(value: 10700, currency: 'USD'),
-      netLiquidationUsd: 10700,
-    );
-    await accounts.cacheIbkrPerformance(
-      'Default',
-      IbkrPerformanceSeries(
-        period: '1Y',
-        measure: 'TWR',
-        currency: 'USD',
-        startDate: start,
-        startNav: 0,
-        dates: historyDates,
-        nav: List.filled(historyDates.length, 10000),
-        returnDates: historyDates,
-        returns: List.filled(historyDates.length, 0),
-      ),
-    );
-    for (final period in [-1, 7, 8, 9, 10, 11, 12]) {
-      final date = period == -1 ? start : portfolioReturnCutoff(period, now)!;
-      for (final symbol in ['VOO', 'MSFT']) {
-        await testDatabase.into(testDatabase.candles).insert(
-              CandlesCompanion.insert(
-                symbol: symbol,
-                date: date,
-                rawCurrency: const Value('USD'),
-                close: const Value(100),
-              ),
-            );
-      }
-    }
-    // A 4-hour 1-minute series ending near now covers 2H and 1H but not 6H.
-    List<IbkrHistoricalCandle> candlesFor(double base) => [
-          for (var m = 5; m <= 240; m += 5)
-            IbkrHistoricalCandle(
-              date: now.subtract(Duration(minutes: m)),
-              open: base + 240 - m,
-              high: base + 240 - m,
-              low: base + 240 - m,
-              close: base + 240 - m,
-              volume: 0,
-            ),
-        ];
-    final pendingIntraday = Completer<List<IbkrHistoricalSeries>>();
-    final intraday = IntradayMarketData(
-      ibkrPortfolioFetch: (config, days) => pendingIntraday.future,
-      now: () => now,
-    );
-    await tester
-        .pumpWidget(app(accounts, _portfolioPage(intradayData: intraday)));
-    // Daily broker NAV and reconstructed allocation must remain selectable
-    // while the independent intraday price backfill is still in flight.
-    for (var attempt = 0; attempt < 30; attempt++) {
-      await tester.pump(const Duration(milliseconds: 50));
-      final picker = tester.widget<PortfolioPeriodPicker>(
-        find.byType(PortfolioPeriodPicker),
-      );
-      if (picker.labels.contains('1D')) break;
-    }
-    final duringIntraday = tester.widget<PortfolioPeriodPicker>(
+    await seedFortnightFixture(accounts, days: 100);
+    await tester.pumpWidget(app(accounts, _portfolioPage()));
+    await tester.pumpAndSettle();
+    final picker = tester.widget<PortfolioPeriodPicker>(
       find.byType(PortfolioPeriodPicker),
     );
-    expect(duringIntraday.loading, isTrue);
-    expect(duringIntraday.labels, contains('1D'));
-    expect(duringIntraday.labels, isNot(contains('1H')));
-    pendingIntraday.complete([
-      IbkrHistoricalSeries(
-        symbol: 'VOO',
-        currency: 'USD',
-        candles: candlesFor(500),
-      ),
-      IbkrHistoricalSeries(
-        symbol: 'MSFT',
-        currency: 'USD',
-        candles: candlesFor(100),
-      ),
+    expect(picker.labels, [
+      'Now',
+      '2W',
+      '4W',
+      '6W',
+      '8W',
+      '10W',
+      '12W',
+      '14W',
     ]);
-    await tester.pumpAndSettle();
     final finder = find.byKey(const Key('portfolio-return-period'));
-    var slider = tester.widget<Slider>(finder);
-    expect(slider.divisions, 9);
-    expect(slider.semanticFormatterCallback!(0), 'Now, current allocation');
-    expect(slider.semanticFormatterCallback!(1), contains('1H ago'));
-    expect(slider.semanticFormatterCallback!(2), contains('2H ago'));
-    expect(slider.semanticFormatterCallback!(3), contains('1D ago'));
-    expect(slider.semanticFormatterCallback!(8), contains('3M ago'));
-    expect(
-      List.generate(
-        (slider.divisions ?? 0) + 1,
-        (i) => slider.semanticFormatterCallback!(i.toDouble()),
-      ).any((label) => label.contains('6H ago') || label.contains('12H ago')),
-      isFalse,
-    );
-
-    Map<String, double> pieValues() => {
-          for (final slice in tester
-              .widget<MarketDonutChart>(find.byType(MarketDonutChart))
-              .slices)
-            slice.label: slice.value,
-        };
-    Map<String, Color> pieColors() => {
-          for (final slice in tester
-              .widget<MarketDonutChart>(find.byType(MarketDonutChart))
-              .slices)
-            slice.label: slice.color,
-        };
-    final originalColors = pieColors();
-    final pickerPosition = tester.getTopLeft(finder);
-    slider.onChanged!(1);
-    await tester.pumpAndSettle();
-    expect(pieColors(), originalColors);
-    expect(tester.getTopLeft(finder), pickerPosition);
-    expect(pieValues(), {'VOO': 6800, 'MSFT': 2800});
-    expect(find.text(fmtCurrency(9600)), findsWidgets);
-    expect(find.text('Account value'), findsOneWidget);
-    final sqliteCache =
-        (await testDatabase.readIbkrCaches(accounts.activeProfileId))
-            .singleWhere(
-      (entry) => entry.kind == 'portfolioIntraday' && entry.cacheKey == '1D',
-    );
-    final persisted = CachedPortfolioIntraday.fromJson(
-      jsonDecode(sqliteCache.payloadJson) as Map<String, dynamic>,
-    );
-    expect(
-      persisted.isUsableFor(
-        [
-          for (final symbol in ['VOO', 'MSFT'])
-            Position(
-              symbol: symbol,
-              name: symbol,
-              nativeCurrency: 'USD',
-              netShares: 10,
-              avgCost: 100,
-              currentPrice: 100,
-              firstBuyDate: DateTime(2026),
-              lastBuyDate: DateTime(2026),
-            ),
-        ],
-        DateTime.now(),
-      ),
-      isTrue,
-    );
-    expect(persisted.holdings.keys, containsAll(['VOO', 'MSFT']));
-    expect(tester.takeException(), null);
+    final slider = tester.widget<Slider>(finder);
+    expect(slider.divisions, 7);
+    for (var index = 0; index <= slider.max; index++) {
+      slider.onChanged!(index.toDouble());
+      await tester.pumpAndSettle();
+      expect(find.byType(MarketDonutChart), findsOneWidget);
+      expect(find.textContaining('Historical data could not'), findsNothing);
+      expect(tester.takeException(), null);
+    }
   });
 
   testWidgets('desktop portfolio summary cards keep readable widths', (

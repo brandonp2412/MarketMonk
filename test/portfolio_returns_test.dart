@@ -66,6 +66,27 @@ void main() {
     expect(result.percent, 20);
   });
 
+  test('fortnightly picker advances by exactly 14 calendar days', () {
+    final now = DateTime(2026, 11, 14, 19);
+    final start = DateTime(2026, 9, 5); // 70 calendar days, across NZ DST.
+    final periods = portfolioFortnightlyPeriods(now, start);
+    expect(periods, [0, -2, -3, -4, -5, -6]);
+    for (var index = 1; index < periods.length; index++) {
+      expect(
+        portfolioReturnCutoff(periods[index], now),
+        DateTime(2026, 11, 14 - index * 14),
+      );
+    }
+  });
+
+  test('fortnightly picker stops at one year of available broker history', () {
+    final now = DateTime(2026, 11, 14);
+    final periods = portfolioFortnightlyPeriods(now, DateTime(2020));
+    expect(periods.length, 27); // Now plus 26 fortnightly stops.
+    expect(portfolioReturnCutoff(periods.last, now), DateTime(2025, 11, 15));
+    expect(portfolioFortnightlyPeriods(now, DateTime(2026, 11, 4)), [0]);
+  });
+
   test('incomplete holding trade history is unavailable', () {
     expect(
       openHoldingPeriodReturn(

@@ -142,25 +142,6 @@ class PortfolioPageState extends State<PortfolioPage>
     }
   }
 
-  static const _periods = [
-    'All time',
-    '5Y',
-    '4Y',
-    '3Y',
-    '2Y',
-    '1Y',
-    '6M',
-    '3M',
-    '1M',
-    '1W',
-    '1D',
-    '2M',
-    '2W',
-    '12H',
-    '6H',
-    '2H',
-    '1H',
-  ];
   int _period = 0;
   String? _historyAccount;
   // Cached candles are provisional until the full history has completed.
@@ -205,6 +186,7 @@ class PortfolioPageState extends State<PortfolioPage>
   bool _historyFailed = false;
 
   List<int> _availablePeriods = const [0];
+  final Set<String> _attemptedPeriodRepairs = {};
 
   DateTime? _inceptionDate;
 
@@ -230,7 +212,7 @@ class PortfolioPageState extends State<PortfolioPage>
               switch (true) {
                 _ when period == 0 => 'Now',
                 _ when period == -1 => 'Inception',
-                _ => _periods[period],
+                _ => '${(-period - 1) * 2}W',
               },
           ],
           dates: [for (final period in ordered) _cutoff(period, now)],
@@ -248,6 +230,13 @@ class PortfolioPageState extends State<PortfolioPage>
           ),
       ],
     );
+  }
+
+  void _retryPeriodHistory() {
+    if (!mounted) return;
+    _forceHistoryRefresh = true;
+    _historyAccount = null;
+    _updateState(() {});
   }
 
   Object? _loadError;
@@ -656,12 +645,17 @@ class PortfolioPageState extends State<PortfolioPage>
       unawaited(_ensureReturnHistory(historyKey, positions));
     }
 
-    _availablePeriods = _coveredPeriods(
-      positions,
-      performance,
-      netLiquidation,
-    );
-    if (!_availablePeriods.contains(_period)) _period = _availablePeriods.first;
+    // The slider is a fixed fortnightly timeline. Do not let partial candle,
+    // FX or allocation coverage silently remove stops and change its scale.
+    final historyStart = portfolioInception(performance) ??
+        (_returnTrades.isEmpty
+            ? null
+            : (_returnTrades.map((trade) => trade.tradeDate).toList()..sort())
+                .first);
+    _availablePeriods = _returnHistory == null || _historyFailed
+        ? const [0]
+        : portfolioFortnightlyPeriods(DateTime.now(), historyStart);
+    if (!_availablePeriods.contains(_period)) _period = 0;
 
     final totalValue = positions.fold(
       0.0,
@@ -698,12 +692,43 @@ class PortfolioPageState extends State<PortfolioPage>
     };
 
     final allocation = intraday
-        ? _intradayAllocationAt(positions, cutoff)!
+        ? _intradayAllocationAt(positions, cutoff)
         : _allocationAt(
             positions,
             _period,
             cashValueUsd: _returnCutoff == null ? cashUsd : null,
-          )!;
+          );
+    if (allocation == null) {
+      // A gap is a failed reconstruction, not permission to erase a date from
+      // the fortnightly ruler. Try repairing it once, then expose an explicit
+      // retry rather than crashing on a null assertion or fabricating values.
+      final missingPeriod = _period;
+      final repairKey = '$_lastAccount:$missingPeriod';
+      if (!_historyLoading &&
+          !_historyRefreshing &&
+          _attemptedPeriodRepairs.add(repairKey)) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _period == missingPeriod) _retryPeriodHistory();
+        });
+      }
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _periodPicker(),
+            const SizedBox(height: 24),
+            const Text(
+              'Historical data could not be reconstructed for this date.',
+            ),
+            TextButton.icon(
+              onPressed: _retryPeriodHistory,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry historical data'),
+            ),
+          ],
+        ),
+      );
+    }
     final allocationTotal = allocation.fold<double>(
       0,
       (sum, holding) => sum + holding.value,

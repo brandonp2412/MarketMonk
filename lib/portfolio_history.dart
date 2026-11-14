@@ -117,9 +117,8 @@ bool cachedPortfolioDailyPeriodsComplete({
   if (first == null) return false;
   final today = now ?? DateTime.now();
   var expected = 0;
-  for (var period = 1; period < firstIntradayPeriod; period++) {
-    final cutoff = portfolioReturnCutoff(period, today);
-    if (cutoff == null || cutoff.isBefore(first)) continue;
+  for (final period in portfolioFortnightlyPeriods(today, first).skip(1)) {
+    final cutoff = portfolioReturnCutoff(period, today)!;
     // A sparse NAV cache can report only "yesterday" even for a portfolio
     // that has months of missing periods. That is NOT complete history.
     if (accountNetAssetValueIndexAt(performance, cutoff) == null) return false;
@@ -193,7 +192,19 @@ Future<PortfolioHistory> loadPortfolioHistory({
           .subtract(const Duration(days: 7));
   final dates = <DateTime>{
     if (portfolioInception(performance) case final inception?) inception,
+    // Preserve legacy valuation dates for other consumers of PortfolioHistory.
     for (var period = 1; period < firstIntradayPeriod; period++)
+      if (performance != null)
+        if (accountNetAssetValueIndexAt(
+          performance,
+          portfolioReturnCutoff(period, today)!,
+        )
+            case final index?)
+          performance.dates[index],
+    for (final period in portfolioFortnightlyPeriods(
+      today,
+      portfolioInception(performance),
+    ).skip(1))
       if (performance != null)
         if (accountNetAssetValueIndexAt(
           performance,

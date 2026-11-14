@@ -72,9 +72,7 @@ class _PortfolioPeriodPickerState extends State<PortfolioPeriodPicker>
     final oldestDate = dates.last;
     final oldestLabel = oldestDate == null
         ? 'NOW'
-        : DateFormat(labels.last.endsWith('H') ? 'd MMM h:mm a' : 'MMM yyyy')
-            .format(oldestDate)
-            .toUpperCase();
+        : DateFormat('d MMM yyyy').format(oldestDate).toUpperCase();
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,

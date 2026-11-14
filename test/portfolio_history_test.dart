@@ -222,6 +222,8 @@ void main() {
       for (var period = 1; period < firstIntradayPeriod; period++)
         if (portfolioReturnCutoff(period, now)!.isAfter(september))
           portfolioReturnCutoff(period, now)!,
+      for (final period in portfolioFortnightlyPeriods(now, september).skip(1))
+        portfolioReturnCutoff(period, now)!,
       latest,
     }.toList()
       ..sort();

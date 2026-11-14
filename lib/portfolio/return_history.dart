@@ -30,19 +30,11 @@ extension _PortfolioReturnHistory on PortfolioPageState {
         0,
         if (_allocationAt(positions, -1) != null) -1,
       ];
-      for (var period = 1;
-          period < PortfolioPageState._periods.length;
-          period++) {
+      for (final period in portfolioFortnightlyPeriods(
+        DateTime.now(),
+        firstKnownDate,
+      ).skip(1)) {
         final cutoff = _cutoff(period, DateTime.now())!;
-        if (cutoff.isBefore(firstKnownDate)) continue;
-        if (period >= firstIntradayPeriod) {
-          if (!ignoreLoading && _intradayHistoryPending) continue;
-          if (intradayAccountValueAt(_intradayValues, cutoff) != null &&
-              _intradayAllocationAt(positions, cutoff) != null) {
-            covered.add(period);
-          }
-          continue;
-        }
         if (accountNetAssetValueAt(performance, cutoff) != null &&
             _allocationAt(positions, period) != null) {
           covered.add(period);
@@ -60,13 +52,11 @@ extension _PortfolioReturnHistory on PortfolioPageState {
     dates.sort();
     return [
       0,
-      for (var period = 1; period < firstIntradayPeriod; period++)
-        if (!_cutoff(
-              period,
-              DateTime.now(),
-            )!
-                .isBefore(dates.first) &&
-            positions.every(
+      for (final period in portfolioFortnightlyPeriods(
+        DateTime.now(),
+        dates.first,
+      ).skip(1))
+        if (positions.every(
               (position) => _holdingReturn(position, period: period) != null,
             ) &&
             _allocationAt(positions, period) != null)
@@ -138,7 +128,7 @@ extension _PortfolioReturnHistory on PortfolioPageState {
       );
       if (entry == null) return false;
       final data = jsonDecode(entry.payloadJson) as Map<String, dynamic>;
-      if (data['version'] != 1) return false;
+      if (data['version'] != 2) return false;
       final signature = portfolioHistoryCacheSignature(
         positions: positions,
         trades: accounts.ibkrTradeHistoryCacheFor(accountName),
@@ -208,7 +198,7 @@ extension _PortfolioReturnHistory on PortfolioPageState {
         kind: 'portfolioPeriods',
         cacheKey: 'complete',
         payloadJson: jsonEncode({
-          'version': 1,
+          'version': 2,
           'signature': portfolioHistoryCacheSignature(
             positions: positions,
             trades: accounts.ibkrTradeHistoryCacheFor(accountName),
@@ -356,7 +346,9 @@ extension _PortfolioReturnHistory on PortfolioPageState {
         rateLoader: widget._historyRateLoader,
       ).timeout(const Duration(seconds: 90));
       if (!mounted || _historyAccount != account) return;
+      // Fortnightly history does not need slow sub-day quote requests.
       final needsIntraday = config.enabled &&
+          _availablePeriods.any((period) => period >= firstIntradayPeriod) &&
           !intradayCacheFresh &&
           positions.any((position) => position.netShares != 0);
       // A usable older intraday cache already supplies complete period stops.
