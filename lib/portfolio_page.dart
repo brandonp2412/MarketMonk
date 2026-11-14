@@ -167,17 +167,17 @@ class PortfolioPageState extends State<PortfolioPage>
   String? _completedHistoryAccount;
   // Only locally verified history skips the network-refresh loading state.
   String? _verifiedCachedHistoryKey;
-  bool get _periodHistoryIncomplete {
+  // A pending intraday backfill must not hide complete daily account history.
+  bool get _dailyPeriodHistoryIncomplete {
     if (_returnHistory == null) return true;
-    if (_verifiedCachedHistoryKey == _historyAccount &&
-        !_intradayHistoryPending) {
-      return false;
-    }
+    if (_verifiedCachedHistoryKey == _historyAccount) return false;
     return _historyLoading ||
         (_historyRefreshing && _completedHistoryAccount != _historyAccount) ||
-        _performanceLoadingAccounts.contains(_lastAccount) ||
-        _intradayHistoryPending;
+        _performanceLoadingAccounts.contains(_lastAccount);
   }
+
+  bool get _periodHistoryIncomplete =>
+      _dailyPeriodHistoryIncomplete || _intradayHistoryPending;
 
   Future<void>? _historyFuture;
   final Set<String> _refreshingHistoryTrades = {};

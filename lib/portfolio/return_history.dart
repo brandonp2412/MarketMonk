@@ -12,7 +12,7 @@ extension _PortfolioReturnHistory on PortfolioPageState {
     IbkrAccountValue? netLiquidation, {
     bool ignoreLoading = false,
   }) {
-    if (!ignoreLoading && (_periodHistoryIncomplete || _historyFailed)) {
+    if (!ignoreLoading && (_dailyPeriodHistoryIncomplete || _historyFailed)) {
       return const [0];
     }
     if (performance != null &&
@@ -36,6 +36,7 @@ extension _PortfolioReturnHistory on PortfolioPageState {
         final cutoff = _cutoff(period, DateTime.now())!;
         if (cutoff.isBefore(firstKnownDate)) continue;
         if (period >= firstIntradayPeriod) {
+          if (!ignoreLoading && _intradayHistoryPending) continue;
           if (intradayAccountValueAt(_intradayValues, cutoff) != null &&
               _intradayAllocationAt(positions, cutoff) != null) {
             covered.add(period);

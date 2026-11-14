@@ -2215,23 +2215,40 @@ void main() {
               volume: 0,
             ),
         ];
+    final pendingIntraday = Completer<List<IbkrHistoricalSeries>>();
     final intraday = IntradayMarketData(
-      ibkrPortfolioFetch: (config, days) async => [
-        IbkrHistoricalSeries(
-          symbol: 'VOO',
-          currency: 'USD',
-          candles: candlesFor(500),
-        ),
-        IbkrHistoricalSeries(
-          symbol: 'MSFT',
-          currency: 'USD',
-          candles: candlesFor(100),
-        ),
-      ],
+      ibkrPortfolioFetch: (config, days) => pendingIntraday.future,
       now: () => now,
     );
     await tester
         .pumpWidget(app(accounts, _portfolioPage(intradayData: intraday)));
+    // Daily broker NAV and reconstructed allocation must remain selectable
+    // while the independent intraday price backfill is still in flight.
+    for (var attempt = 0; attempt < 30; attempt++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      final picker = tester.widget<PortfolioPeriodPicker>(
+        find.byType(PortfolioPeriodPicker),
+      );
+      if (picker.labels.contains('1D')) break;
+    }
+    final duringIntraday = tester.widget<PortfolioPeriodPicker>(
+      find.byType(PortfolioPeriodPicker),
+    );
+    expect(duringIntraday.loading, isTrue);
+    expect(duringIntraday.labels, contains('1D'));
+    expect(duringIntraday.labels, isNot(contains('1H')));
+    pendingIntraday.complete([
+      IbkrHistoricalSeries(
+        symbol: 'VOO',
+        currency: 'USD',
+        candles: candlesFor(500),
+      ),
+      IbkrHistoricalSeries(
+        symbol: 'MSFT',
+        currency: 'USD',
+        candles: candlesFor(100),
+      ),
+    ]);
     await tester.pumpAndSettle();
     final finder = find.byKey(const Key('portfolio-return-period'));
     var slider = tester.widget<Slider>(finder);
