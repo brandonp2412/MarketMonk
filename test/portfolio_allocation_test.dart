@@ -217,6 +217,25 @@ void main() {
     );
   });
 
+  test('historical broker NAV can include negative margin cash', () {
+    final allocation = portfolioAllocationAt(
+      positions: [holding('A', 10, 100)],
+      trades: [],
+      candles: {
+        'A': [candle('A', date, 100)],
+      },
+      date: date,
+      currencyRates: {'USD': 1},
+      historicalAccountValueUsd: 990,
+    )!;
+    expect(allocation, hasLength(2));
+    expect(allocation.first.value, 1000);
+    expect(allocation.last.symbol, 'CASH');
+    expect(allocation.last.isCash, isTrue);
+    expect(allocation.last.value, -10);
+    expect(allocation.fold<double>(0, (sum, item) => sum + item.value), 990);
+  });
+
   test('missing or stale prices cannot produce a partial allocation', () {
     for (final prices in [
       <StoredCandle>[],

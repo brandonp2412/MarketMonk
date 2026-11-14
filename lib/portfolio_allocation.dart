@@ -137,8 +137,10 @@ List<PortfolioAllocation>? portfolioAllocationAt({
       (sum, holding) => sum + holding.value,
     );
     final cash = historicalAccountValueUsd - holdingsValue;
-    if (cash < -0.01) return null;
-    if (cash > 0.01) {
+    // A broker's net liquidation value can be lower than its gross holdings:
+    // a margin debit (or a small quote/NAV mismatch) is valid negative cash.
+    // Preserve that debit instead of hiding the entire historical period.
+    if (cash.abs() > 0.01) {
       allocations.add(PortfolioAllocation('CASH', 'Cash', cash, isCash: true));
     }
   }
