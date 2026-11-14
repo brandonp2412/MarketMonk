@@ -201,34 +201,23 @@ class PortfolioPageState extends State<PortfolioPage>
             .compareTo(_cutoff(a, now)!),
       );
     final ordered = [0, ...past];
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        PortfolioPeriodPicker(
-          key: ValueKey('portfolio-period-$_lastAccount'),
-          loading: !_historyFailed && _periodHistoryIncomplete,
-          labels: [
-            for (final period in ordered)
-              switch (true) {
-                _ when period == 0 => 'Now',
-                _ when period == -1 => 'Inception',
-                _ => '${(-period - 1) * 2}W',
-              },
-          ],
-          dates: [for (final period in ordered) _cutoff(period, now)],
-          value: ordered.indexOf(_period),
-          onChanged: (index) => _updateState(() {
-            _period = ordered[index];
-            touchedIndex = null;
-          }),
-        ),
-        if (_historyFailed)
-          TextButton.icon(
-            onPressed: () => _updateState(() => _historyAccount = null),
-            icon: const Icon(Icons.refresh),
-            label: const Text('Retry account history'),
-          ),
+    return PortfolioPeriodPicker(
+      key: ValueKey('portfolio-period-$_lastAccount'),
+      loading: !_historyFailed && _periodHistoryIncomplete,
+      labels: [
+        for (final period in ordered)
+          switch (true) {
+            _ when period == 0 => 'Now',
+            _ when period == -1 => 'Inception',
+            _ => '${(-period - 1) * 2}W',
+          },
       ],
+      dates: [for (final period in ordered) _cutoff(period, now)],
+      value: ordered.indexOf(_period),
+      onChanged: (index) => _updateState(() {
+        _period = ordered[index];
+        touchedIndex = null;
+      }),
     );
   }
 
@@ -365,14 +354,7 @@ class PortfolioPageState extends State<PortfolioPage>
     }
     _retainBodyOnDeactivation = false;
     final summary = _desktopHistorySummary;
-    if (isDesktopLayout(context) && summary != null) {
-      return TradeHistoryPage(
-        key: ValueKey('portfolio-history-$_lastAccount-${summary.symbol}'),
-        summary: summary,
-        onClose: () => _updateState(() => _desktopHistorySummary = null),
-      );
-    }
-    return DesktopContextMenu(
+    final portfolio = DesktopContextMenu(
       actions: [
         DesktopMenuAction(
           context.l10n.text('Refresh'),
@@ -386,6 +368,19 @@ class PortfolioPageState extends State<PortfolioPage>
           child: _portfolioBody!,
         ),
       ),
+    );
+    final showHistory = isDesktopLayout(context) && summary != null;
+    return IndexedStack(
+      index: showHistory ? 1 : 0,
+      children: [
+        portfolio,
+        if (showHistory)
+          TradeHistoryPage(
+            key: ValueKey('portfolio-history-$_lastAccount-${summary.symbol}'),
+            summary: summary,
+            onClose: () => _updateState(() => _desktopHistorySummary = null),
+          ),
+      ],
     );
   }
 
@@ -652,7 +647,7 @@ class PortfolioPageState extends State<PortfolioPage>
             ? null
             : (_returnTrades.map((trade) => trade.tradeDate).toList()..sort())
                 .first);
-    _availablePeriods = _returnHistory == null || _historyFailed
+    _availablePeriods = historyStart == null
         ? const [0]
         : portfolioFortnightlyPeriods(DateTime.now(), historyStart);
     if (!_availablePeriods.contains(_period)) _period = 0;
@@ -674,34 +669,16 @@ class PortfolioPageState extends State<PortfolioPage>
     final historicalCashOut = cutoff == null || intraday
         ? null
         : _ibkrCashOutSummaryAt(performance, cutoff);
-    final totalGain = switch (true) {
-      _ when cutoff == null => cashOutSummary?.gainUsd ?? costBasisGain,
-      _ when intradayValueUsd != null && _intradayCurrentValueUsd != null =>
-        _intradayCurrentValueUsd! - intradayValueUsd,
-      _ => historicalCashOut?.gainUsd ?? double.nan,
-    };
-    final totalGainPct = switch (true) {
-      _ when cutoff == null => cashOutSummary?.gainPct ??
-          (totalCost > 0 ? (costBasisGain / totalCost) * 100 : 0.0),
-      _
-          when intradayValueUsd != null &&
-              _intradayCurrentValueUsd != null &&
-              intradayValueUsd != 0 =>
-        (_intradayCurrentValueUsd! / intradayValueUsd - 1) * 100,
-      _ => historicalCashOut?.gainPct ?? double.nan,
-    };
 
-    final allocation = intraday
+    final resolvedAllocation = intraday
         ? _intradayAllocationAt(positions, cutoff)
         : _allocationAt(
             positions,
             _period,
             cashValueUsd: _returnCutoff == null ? cashUsd : null,
           );
-    if (allocation == null) {
-      // A gap is a failed reconstruction, not permission to erase a date from
-      // the fortnightly ruler. Try repairing it once, then expose an explicit
-      // retry rather than crashing on a null assertion or fabricating values.
+    final historyPending = resolvedAllocation == null;
+    if (historyPending) {
       final missingPeriod = _period;
       final repairKey = '$_lastAccount:$missingPeriod';
       if (!_historyLoading &&
@@ -711,24 +688,26 @@ class PortfolioPageState extends State<PortfolioPage>
           if (mounted && _period == missingPeriod) _retryPeriodHistory();
         });
       }
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _periodPicker(),
-            const SizedBox(height: 24),
-            const Text(
-              'Historical data could not be reconstructed for this date.',
-            ),
-            TextButton.icon(
-              onPressed: _retryPeriodHistory,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry historical data'),
-            ),
-          ],
-        ),
-      );
     }
+    final allocation = resolvedAllocation ?? const <PortfolioAllocation>[];
+    final totalGain = switch (true) {
+      _ when historyPending => double.nan,
+      _ when cutoff == null => cashOutSummary?.gainUsd ?? costBasisGain,
+      _ when intradayValueUsd != null && _intradayCurrentValueUsd != null =>
+        _intradayCurrentValueUsd! - intradayValueUsd,
+      _ => historicalCashOut?.gainUsd ?? double.nan,
+    };
+    final totalGainPct = switch (true) {
+      _ when historyPending => double.nan,
+      _ when cutoff == null => cashOutSummary?.gainPct ??
+          (totalCost > 0 ? (costBasisGain / totalCost) * 100 : 0.0),
+      _
+          when intradayValueUsd != null &&
+              _intradayCurrentValueUsd != null &&
+              intradayValueUsd != 0 =>
+        (_intradayCurrentValueUsd! / intradayValueUsd - 1) * 100,
+      _ => historicalCashOut?.gainPct ?? double.nan,
+    };
     final allocationTotal = allocation.fold<double>(
       0,
       (sum, holding) => sum + holding.value,
@@ -747,7 +726,9 @@ class PortfolioPageState extends State<PortfolioPage>
         : _returnHistory?.rates[performance!.dates[navIndex]]
             ?[performance.currency.toUpperCase()];
     final String displayTotal;
-    if (intraday && intradayValueUsd != null) {
+    if (historyPending) {
+      displayTotal = '—';
+    } else if (intraday && intradayValueUsd != null) {
       displayTotal = fmtCurrency(intradayValueUsd);
     } else if (cutoff == null) {
       if (netLiquidation == null) {
@@ -815,6 +796,7 @@ class PortfolioPageState extends State<PortfolioPage>
         totalGainPct: totalGainPct,
         isCashOut: cutoff == null ? cashOutSummary != null : !intraday,
         hasRefreshWarning: hasLoadError,
+        historyPending: historyPending,
       );
     }
 
@@ -839,6 +821,7 @@ class PortfolioPageState extends State<PortfolioPage>
                 totalLabel: totalLabel,
                 totalGain: totalGain,
                 totalGainPct: totalGainPct,
+                historyPending: historyPending,
                 onExport: () => runDetachedTask(
                   _exportCsv(context, positions),
                   'Failed to export portfolio CSV',
@@ -865,7 +848,11 @@ class PortfolioPageState extends State<PortfolioPage>
                 fit: StackFit.expand,
                 alignment: Alignment.center,
                 children: [
-                  if (slices.isEmpty)
+                  if (historyPending)
+                    const SizedBox.expand(
+                      key: Key('portfolio-pending-allocation'),
+                    )
+                  else if (slices.isEmpty)
                     const Text('No holdings on this date')
                   else
                     MarketDonutChart(

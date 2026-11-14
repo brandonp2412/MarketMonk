@@ -36,6 +36,7 @@ void main() {
         rawCurrency: 'USD',
       ),
     ];
+    var backCalls = 0;
     var addCalls = 0;
     Set<int>? deletedIds;
 
@@ -43,6 +44,7 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: DesktopTradeHistory(
+            onBack: () => backCalls++,
             symbol: 'VOO',
             name: 'Vanguard S&P 500',
             position: null,
@@ -68,6 +70,10 @@ void main() {
       findsOneWidget,
     );
     expect(find.byType(DataTable), findsOneWidget);
+    expect(find.text('VOO · Trade History'), findsOneWidget);
+    expect(find.byType(AppBar), findsNothing);
+    await tester.tap(find.byKey(const Key('embedded-trade-history-back')));
+    expect(backCalls, 1);
     expect(find.text('BUY'), findsOneWidget);
     expect(find.text('SELL'), findsOneWidget);
 

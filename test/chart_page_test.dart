@@ -1053,7 +1053,10 @@ void main() {
     );
     final now = DateTime.now();
     final start = now.subtract(const Duration(days: 55));
-    final end = now.subtract(const Duration(days: 1));
+    var end = now.subtract(const Duration(days: 1));
+    while (end.weekday == DateTime.saturday || end.weekday == DateTime.sunday) {
+      end = end.subtract(const Duration(days: 1));
+    }
     await accounts.cacheIbkrPerformance(
       'Default',
       IbkrPerformanceSeries(

@@ -9,7 +9,7 @@ extension _ChartStockSummary on ChartsPageState {
       if (_networkLoading && _selectedSymbol != null) {
         return Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: isDesktopLayout(context) ? 32 : 16,
+            horizontal: isDesktopLayout(context) ? desktopPagePadding.left : 16,
             vertical: 8,
           ),
           child: Column(
@@ -48,7 +48,7 @@ extension _ChartStockSummary on ChartsPageState {
 
     return Padding(
       padding: EdgeInsets.symmetric(
-        horizontal: isDesktopLayout(context) ? 32 : 16,
+        horizontal: isDesktopLayout(context) ? desktopPagePadding.left : 16,
         vertical: 8,
       ),
       child: Column(

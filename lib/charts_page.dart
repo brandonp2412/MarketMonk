@@ -764,7 +764,10 @@ class ChartsPageState extends State<ChartsPage>
       for (final symbol in _selectedFavorites)
         if (_usesIntraday && _favoriteIntradayErrors.containsKey(symbol))
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: EdgeInsets.symmetric(
+              horizontal:
+                  isDesktopLayout(context) ? desktopPagePadding.left : 16,
+            ),
             child: Text('$symbol: ${_favoriteIntradayErrors[symbol]}'),
           ),
       _buildPortfolioChart(context, settings, accountColors),
@@ -807,7 +810,12 @@ class ChartsPageState extends State<ChartsPage>
 
   Widget _buildPortfolioChartControls() => Padding(
         key: const Key('desktop-portfolio-chart-controls'),
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        padding: EdgeInsets.fromLTRB(
+          desktopPagePadding.left,
+          12,
+          desktopPagePadding.right,
+          0,
+        ),
         child: Center(
           child: Row(
             mainAxisSize: MainAxisSize.min,

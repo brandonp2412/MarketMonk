@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/accounts/account_manager.dart';
 import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
@@ -23,8 +24,11 @@ class AccountsPage extends StatelessWidget {
         ),
       ],
       child: Scaffold(
-        appBar: AppBar(title: Text(context.l10n.text('Accounts'))),
+        appBar: adaptiveAppBar(context, title: context.l10n.text('Accounts')),
         body: ListView.builder(
+          padding: isDesktopLayout(context)
+              ? desktopPagePadding.copyWith(bottom: 96)
+              : null,
           itemCount: accounts.accounts.length,
           itemBuilder: (context, i) {
             final name = accounts.accounts[i];

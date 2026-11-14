@@ -14,6 +14,7 @@ extension _PortfolioDesktopView on PortfolioPageState {
     required double totalGainPct,
     required bool isCashOut,
     required bool hasRefreshWarning,
+    required bool historyPending,
   }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -23,13 +24,16 @@ extension _PortfolioDesktopView on PortfolioPageState {
       0,
       (sum, holding) => sum + holding.value,
     );
-    final byReturn = [...positions]..sort(
-        (firstPosition, secondPosition) =>
-            (_holdingReturn(secondPosition)?.percent ?? double.negativeInfinity)
-                .compareTo(
-          _holdingReturn(firstPosition)?.percent ?? double.negativeInfinity,
-        ),
-      );
+    final byReturn = historyPending
+        ? <Position>[]
+        : ([...positions]..sort(
+            (firstPosition, secondPosition) =>
+                (_holdingReturn(secondPosition)?.percent ??
+                        double.negativeInfinity)
+                    .compareTo(
+              _holdingReturn(firstPosition)?.percent ?? double.negativeInfinity,
+            ),
+          ));
     final currencyCount =
         positions.map((position) => position.nativeCurrency).toSet().length;
     final positionLabel = positions.length == 1 ? 'position' : 'positions';
@@ -43,49 +47,31 @@ extension _PortfolioDesktopView on PortfolioPageState {
         child: SizedBox(
           height: constraints.maxHeight < 840 ? 840 : constraints.maxHeight,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(32, 28, 32, 24),
+            padding: desktopPagePadding,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    ProfilePicker(
-                      key: const Key('portfolio-profile-picker'),
-                      onExport: expandedActions
-                          ? null
-                          : () => runDetachedTask(
-                                _exportCsv(context, positions),
-                                'Failed to export portfolio CSV',
-                              ),
-                      onShare: !expandedActions && _supportsFileSharing
-                          ? () => runDetachedTask(
-                                _shareCsv(context, positions),
-                                'Failed to share portfolio CSV',
-                              )
-                          : null,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${accounts.activeAccount} · ${context.l10n.text('Portfolio')}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.headlineMedium,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${positions.length} $positionLabel · $currencyCount $currencyLabel',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
+                DesktopPageHeader(
+                  title:
+                      '${accounts.activeAccount} · ${context.l10n.text('Portfolio')}',
+                  subtitle:
+                      '${positions.length} $positionLabel · $currencyCount $currencyLabel',
+                  leading: ProfilePicker(
+                    key: const Key('portfolio-profile-picker'),
+                    onExport: expandedActions
+                        ? null
+                        : () => runDetachedTask(
+                              _exportCsv(context, positions),
+                              'Failed to export portfolio CSV',
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    onShare: !expandedActions && _supportsFileSharing
+                        ? () => runDetachedTask(
+                              _shareCsv(context, positions),
+                              'Failed to share portfolio CSV',
+                            )
+                        : null,
+                  ),
+                  actions: [
                     if (expandedActions) ...[
                       TextButton.icon(
                         key: const Key('desktop-portfolio-export'),
@@ -186,19 +172,26 @@ extension _PortfolioDesktopView on PortfolioPageState {
                     ),
                     _DesktopPortfolioMetric(
                       label: context.l10n.text('Stock value'),
-                      value: fmtCurrency(
-                        sorted.where((holding) => !holding.isCash).fold<double>(
-                              0,
-                              (sum, holding) => sum + holding.value,
+                      value: historyPending
+                          ? '—'
+                          : fmtCurrency(
+                              sorted
+                                  .where((holding) => !holding.isCash)
+                                  .fold<double>(
+                                    0,
+                                    (sum, holding) => sum + holding.value,
+                                  ),
                             ),
-                      ),
-                      detail: switch (true) {
-                        _ when _returnCutoff != null =>
-                          'Cash · ${fmtCurrency(sorted.where((holding) => holding.isCash).fold<double>(0, (sum, holding) => sum + holding.value))}',
-                        _ when cashBalance == null =>
-                          context.l10n.text('Open stock positions'),
-                        _ => 'Cash · ${formatIbkrReportedCash(cashBalance)}',
-                      },
+                      detail: historyPending
+                          ? ' '
+                          : switch (true) {
+                              _ when _returnCutoff != null =>
+                                'Cash · ${fmtCurrency(sorted.where((holding) => holding.isCash).fold<double>(0, (sum, holding) => sum + holding.value))}',
+                              _ when cashBalance == null =>
+                                context.l10n.text('Open stock positions'),
+                              _ =>
+                                'Cash · ${formatIbkrReportedCash(cashBalance)}',
+                            },
                       icon: Icons.show_chart_rounded,
                     ),
                     _DesktopPortfolioMetric(
@@ -209,24 +202,35 @@ extension _PortfolioDesktopView on PortfolioPageState {
                           _ => 'Open holdings P/L',
                         },
                       ),
-                      value: totalGain.isFinite
-                          ? '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}'
-                          : 'Unavailable',
-                      detail: totalGainPct.isFinite
-                          ? '${totalGainPct >= 0 ? '+' : ''}${totalGainPct.toStringAsFixed(2)}%'
-                          : 'History does not cover this period',
-                      valueColor:
-                          totalGain >= 0 ? Colors.green : Colors.redAccent,
-                      icon: totalGain >= 0
-                          ? Icons.trending_up_rounded
-                          : Icons.trending_down_rounded,
+                      value: historyPending
+                          ? '—'
+                          : totalGain.isFinite
+                              ? '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}'
+                              : 'Unavailable',
+                      detail: historyPending
+                          ? ' '
+                          : totalGainPct.isFinite
+                              ? '${totalGainPct >= 0 ? '+' : ''}${totalGainPct.toStringAsFixed(2)}%'
+                              : 'History does not cover this period',
+                      valueColor: historyPending
+                          ? colorScheme.onSurface
+                          : totalGain >= 0
+                              ? Colors.green
+                              : Colors.redAccent,
+                      icon: historyPending
+                          ? Icons.trending_flat_rounded
+                          : totalGain >= 0
+                              ? Icons.trending_up_rounded
+                              : Icons.trending_down_rounded,
                     ),
                     _DesktopPortfolioMetric(
                       label: context.l10n.text('Positions'),
-                      value: sorted
-                          .where((holding) => !holding.isCash)
-                          .length
-                          .toString(),
+                      value: historyPending
+                          ? '—'
+                          : sorted
+                              .where((holding) => !holding.isCash)
+                              .length
+                              .toString(),
                       detail: _returnCutoff == null
                           ? context.l10n.text('Currently open')
                           : 'Held on this date',
@@ -314,12 +318,18 @@ extension _PortfolioDesktopView on PortfolioPageState {
                                       final chart = Center(
                                         child: AspectRatio(
                                           aspectRatio: 1,
-                                          child: _buildDesktopAllocationChart(
-                                            slices: slices,
-                                            sorted: sorted,
-                                            selectedIndex: selectedIndex,
-                                            compact: compact,
-                                          ),
+                                          child: historyPending
+                                              ? const SizedBox(
+                                                  key: Key(
+                                                    'portfolio-pending-allocation',
+                                                  ),
+                                                )
+                                              : _buildDesktopAllocationChart(
+                                                  slices: slices,
+                                                  sorted: sorted,
+                                                  selectedIndex: selectedIndex,
+                                                  compact: compact,
+                                                ),
                                         ),
                                       );
 

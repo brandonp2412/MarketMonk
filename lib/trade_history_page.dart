@@ -214,93 +214,98 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
             totalRealizedUsd == null ? null : totalRealizedUsd + unrealizedPL;
 
         return Scaffold(
-          appBar: AppBar(
-            leading: widget.onClose == null
-                ? null
-                : IconButton(
-                    key: const Key('embedded-trade-history-back'),
-                    tooltip: context.l10n.text('Back'),
-                    icon: const Icon(Icons.arrow_back_rounded),
-                    onPressed: widget.onClose,
+          appBar: isDesktopLayout(context)
+              ? null
+              : AppBar(
+                  leading: widget.onClose == null
+                      ? null
+                      : IconButton(
+                          key: const Key('embedded-trade-history-back'),
+                          tooltip: context.l10n.text('Back'),
+                          icon: const Icon(Icons.arrow_back_rounded),
+                          onPressed: widget.onClose,
+                        ),
+                  title: Text(
+                    switch (true) {
+                      _
+                          when _selectedTradeIds.isNotEmpty &&
+                              !isDesktopLayout(context) =>
+                        context.l10n.text('{count} selected', {
+                          'count': _selectedTradeIds.length,
+                        }),
+                      _ when isDesktopLayout(context) =>
+                        context.l10n.text('Trade History'),
+                      _ => context.l10n.text('{symbol} — History', {
+                          'symbol': widget.summary.symbol,
+                        }),
+                    },
                   ),
-            title: Text(
-              switch (true) {
-                _
-                    when _selectedTradeIds.isNotEmpty &&
-                        !isDesktopLayout(context) =>
-                  context.l10n.text('{count} selected', {
-                    'count': _selectedTradeIds.length,
-                  }),
-                _ when isDesktopLayout(context) =>
-                  context.l10n.text('Trade History'),
-                _ => context.l10n.text('{symbol} — History', {
-                    'symbol': widget.summary.symbol,
-                  }),
-              },
-            ),
-            actions: [
-              if (_selectedTradeIds.isNotEmpty &&
-                  !isDesktopLayout(context)) ...[
-                IconButton(
-                  key: const Key('trade-select-all'),
-                  tooltip: context.l10n.text('Select all'),
-                  icon: const Icon(Icons.done_all_rounded),
-                  onPressed: () => setState(() {
-                    if (trades.isNotEmpty &&
-                        trades.every(
-                          (trade) => _selectedTradeIds.contains(trade.id),
-                        )) {
-                      _selectedTradeIds.clear();
-                    } else {
-                      _selectedTradeIds.addAll(trades.map((trade) => trade.id));
-                    }
-                  }),
+                  actions: [
+                    if (_selectedTradeIds.isNotEmpty &&
+                        !isDesktopLayout(context)) ...[
+                      IconButton(
+                        key: const Key('trade-select-all'),
+                        tooltip: context.l10n.text('Select all'),
+                        icon: const Icon(Icons.done_all_rounded),
+                        onPressed: () => setState(() {
+                          if (trades.isNotEmpty &&
+                              trades.every(
+                                (trade) => _selectedTradeIds.contains(trade.id),
+                              )) {
+                            _selectedTradeIds.clear();
+                          } else {
+                            _selectedTradeIds
+                                .addAll(trades.map((trade) => trade.id));
+                          }
+                        }),
+                      ),
+                      IconButton(
+                        key: const Key('trade-copy-selected'),
+                        tooltip: context.l10n.text('Copy selected trades'),
+                        icon: const Icon(Icons.copy_outlined),
+                        onPressed: () => _copyTrades(
+                          trades.where(
+                            (trade) => _selectedTradeIds.contains(trade.id),
+                          ),
+                        ),
+                      ),
+                      if (!ibkrManaged)
+                        IconButton(
+                          key: const Key('trade-delete-selected'),
+                          tooltip: context.l10n.text('Delete selected trades'),
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () => _confirmDeleteTrades(
+                            Set<int>.of(_selectedTradeIds),
+                          ),
+                        ),
+                      IconButton(
+                        key: const Key('trade-cancel-selection'),
+                        tooltip: context.l10n.text('Cancel selection'),
+                        icon: const Icon(Icons.close),
+                        onPressed: _clearTradeSelection,
+                      ),
+                    ],
+                    if (_selectedTradeIds.isEmpty &&
+                        !ibkrManaged &&
+                        !isDesktopLayout(context))
+                      IconButton(
+                        icon: const Icon(Icons.add),
+                        tooltip: context.l10n.text('Add trade'),
+                        onPressed: () => Navigator.push(
+                          context,
+                          adaptivePageRoute(
+                            context,
+                            builder: (_) =>
+                                EditTickerPage(symbol: widget.summary.symbol),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-                IconButton(
-                  key: const Key('trade-copy-selected'),
-                  tooltip: context.l10n.text('Copy selected trades'),
-                  icon: const Icon(Icons.copy_outlined),
-                  onPressed: () => _copyTrades(
-                    trades.where(
-                      (trade) => _selectedTradeIds.contains(trade.id),
-                    ),
-                  ),
-                ),
-                if (!ibkrManaged)
-                  IconButton(
-                    key: const Key('trade-delete-selected'),
-                    tooltip: context.l10n.text('Delete selected trades'),
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () =>
-                        _confirmDeleteTrades(Set<int>.of(_selectedTradeIds)),
-                  ),
-                IconButton(
-                  key: const Key('trade-cancel-selection'),
-                  tooltip: context.l10n.text('Cancel selection'),
-                  icon: const Icon(Icons.close),
-                  onPressed: _clearTradeSelection,
-                ),
-              ],
-              if (_selectedTradeIds.isEmpty &&
-                  !ibkrManaged &&
-                  !isDesktopLayout(context))
-                IconButton(
-                  icon: const Icon(Icons.add),
-                  tooltip: context.l10n.text('Add trade'),
-                  onPressed: () => Navigator.push(
-                    context,
-                    adaptivePageRoute(
-                      context,
-                      builder: (_) =>
-                          EditTickerPage(symbol: widget.summary.symbol),
-                    ),
-                  ),
-                ),
-            ],
-          ),
           body: SafeArea(
             child: isDesktopLayout(context)
                 ? DesktopTradeHistory(
+                    onBack: widget.onClose,
                     symbol: symbol,
                     name: widget.summary.name,
                     position: position,

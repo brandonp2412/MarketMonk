@@ -21,10 +21,10 @@ class _DesktopPortfolioMetric extends StatelessWidget {
     return Expanded(
       child: Container(
         constraints: const BoxConstraints(minHeight: 104),
-        padding: const EdgeInsets.all(17),
+        padding: desktopMetricPadding,
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(desktopMetricRadius),
           border: Border.all(color: theme.colorScheme.outlineVariant),
         ),
         child: Row(
@@ -288,6 +288,7 @@ class _SummaryCard extends StatelessWidget {
   final String totalLabel;
   final double totalGain;
   final double totalGainPct;
+  final bool historyPending;
   final VoidCallback onExport;
   final VoidCallback onShare;
 
@@ -296,6 +297,7 @@ class _SummaryCard extends StatelessWidget {
     required this.totalLabel,
     required this.totalGain,
     required this.totalGainPct,
+    required this.historyPending,
     required this.onExport,
     required this.onShare,
   });
@@ -325,10 +327,12 @@ class _SummaryCard extends StatelessWidget {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 Text(
-                  totalGain.isFinite
-                      ? '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}'
-                          '  (${totalGainPct.toStringAsFixed(2)}%)'
-                      : 'Return history unavailable',
+                  historyPending
+                      ? ' '
+                      : totalGain.isFinite
+                          ? '${totalGain >= 0 ? '+' : ''}${fmtCurrency(totalGain)}'
+                              '  (${totalGainPct.toStringAsFixed(2)}%)'
+                          : 'Return history unavailable',
                   style: Theme.of(context)
                       .textTheme
                       .bodySmall

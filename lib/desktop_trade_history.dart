@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:market_monk/adaptive_layout.dart';
 import 'package:intl/intl.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/desktop_context_menu.dart';
@@ -10,6 +11,7 @@ import 'package:market_monk/utils.dart';
 /// Dense, desktop-only stock trade history. The compact mobile tiles live in
 /// TradeHistoryPage and remain independent of this layout.
 class DesktopTradeHistory extends StatefulWidget {
+  final VoidCallback? onBack;
   final String symbol;
   final String name;
   final Position? position;
@@ -27,6 +29,7 @@ class DesktopTradeHistory extends StatefulWidget {
 
   const DesktopTradeHistory({
     super.key,
+    this.onBack,
     required this.symbol,
     required this.name,
     required this.position,
@@ -133,11 +136,11 @@ class _DesktopTradeHistoryState extends State<DesktopTradeHistory> {
     final theme = Theme.of(context);
     return Container(
       height: 112,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 17),
+      padding: desktopMetricPadding,
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
         border: Border.all(color: theme.colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(desktopMetricRadius),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -391,230 +394,209 @@ class _DesktopTradeHistoryState extends State<DesktopTradeHistory> {
         .toList()
       ..sort(_compareTrades);
 
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1500),
-        child: ListView(
-          key: const Key('desktop-trade-history-content'),
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.symbol,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      Text(
-                        widget.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (!widget.brokerManaged) ...[
-                  const SizedBox(width: 16),
-                  FilledButton.icon(
-                    onPressed: widget.onAddTrade,
-                    icon: const Icon(Icons.add_rounded),
-                    label: Text(context.l10n.text('Add trade')),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 24),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final columns = constraints.maxWidth >= 940 ? 4 : 2;
-                const gap = 12.0;
-                final width =
-                    (constraints.maxWidth - (columns - 1) * gap) / columns;
-                final metrics = [
-                  _metric(
-                    context,
-                    context.l10n.text('Shares held'),
-                    position?.netShares.toStringAsFixed(4) ?? '—',
-                  ),
-                  _metric(
-                    context,
-                    context.l10n.text('Avg cost'),
-                    position == null
-                        ? '—'
-                        : fmtNativeCurrency(
-                            position.avgCost,
-                            position.nativeCurrency,
-                          ),
-                  ),
-                  _metric(
-                    context,
-                    context.l10n.text('Current value'),
-                    position == null ? '—' : fmtCurrency(position.currentValue),
-                  ),
-                  _metric(
-                    context,
-                    context.l10n.text('Total gain'),
-                    position == null && widget.trades.isEmpty
-                        ? '—'
-                        : _signedUsd(widget.totalGain),
-                    color: position == null && widget.trades.isEmpty
-                        ? null
-                        : _gainColor(widget.totalGain),
-                  ),
-                ];
-                return Wrap(
-                  spacing: gap,
-                  runSpacing: gap,
-                  children: [
-                    for (final metric in metrics)
-                      SizedBox(width: width, child: metric),
-                  ],
-                );
-              },
-            ),
-            if (position != null ||
-                widget.realizedToday != null ||
-                widget.hasImportedRealized) ...[
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  if (position != null)
-                    _performanceChip(
-                      context,
-                      context.l10n.text('Unrealized P/L'),
-                      position.unrealizedPL,
-                    ),
-                  if (widget.realizedToday != null)
-                    _performanceChip(
-                      context,
-                      context.l10n.text('Realized P/L today'),
-                      widget.realizedToday,
-                    ),
-                  if (widget.hasImportedRealized)
-                    _performanceChip(
-                      context,
-                      context.l10n.text('Imported realized P/L'),
-                      widget.totalRealizedUsd,
-                    ),
-                ],
+    return ListView(
+      key: const Key('desktop-trade-history-content'),
+      padding: desktopPagePadding,
+      children: [
+        DesktopPageHeader(
+          title: '${widget.symbol} · ${context.l10n.text('Trade History')}',
+          subtitle: widget.name,
+          leading: IconButton(
+            key: const Key('embedded-trade-history-back'),
+            tooltip: context.l10n.text('Back'),
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: widget.onBack ?? () => Navigator.of(context).maybePop(),
+          ),
+          actions: [
+            if (!widget.brokerManaged) ...[
+              const SizedBox(width: 16),
+              FilledButton.icon(
+                onPressed: widget.onAddTrade,
+                icon: const Icon(Icons.add_rounded),
+                label: Text(context.l10n.text('Add trade')),
               ),
             ],
-            const SizedBox(height: 30),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final title = Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      context.l10n.text('Trade History'),
-                      style: theme.textTheme.titleLarge,
-                    ),
-                    Text(
-                      '${widget.trades.length} ${context.l10n.text('Trades')} · '
-                      '$buys ${context.l10n.text('Buy')} · '
-                      '$sells ${context.l10n.text('Sell')}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                );
-                final filter = SegmentedButton<String>(
-                  key: const Key('desktop-trade-history-filter'),
-                  showSelectedIcon: false,
-                  segments: [
-                    ButtonSegment(
-                      value: 'all',
-                      label: Text(context.l10n.text('All')),
-                    ),
-                    ButtonSegment(
-                      value: 'open',
-                      label: Text(context.l10n.text('Buy')),
-                    ),
-                    ButtonSegment(
-                      value: 'close',
-                      label: Text(context.l10n.text('Sell')),
-                    ),
-                  ],
-                  selected: {_sideFilter},
-                  onSelectionChanged: (selection) =>
-                      setState(() => _sideFilter = selection.first),
-                );
-                if (widget.trades.isEmpty) return title;
-                if (constraints.maxWidth < 650) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      title,
-                      const SizedBox(height: 14),
-                      filter,
-                    ],
-                  );
-                }
-                return Row(
-                  children: [
-                    Expanded(child: title),
-                    filter,
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 14),
-            if (_selectedTradeIds.isNotEmpty && !widget.brokerManaged) ...[
-              Row(
-                children: [
-                  Text(
-                    context.l10n.text(
-                      '{count} selected',
-                      {'count': _selectedTradeIds.length},
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  FilledButton.tonalIcon(
-                    key: const Key('desktop-trade-delete-selected'),
-                    onPressed: () => runDetachedTask(
-                      widget.onDeleteTrades(Set<int>.of(_selectedTradeIds)),
-                      'Failed to delete selected trades',
-                    ),
-                    icon: const Icon(Icons.delete_outline),
-                    label: Text(context.l10n.text('Delete')),
-                  ),
-                  IconButton(
-                    tooltip: context.l10n.text('Cancel selection'),
-                    onPressed: () => setState(_selectedTradeIds.clear),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-            ],
-            if (widget.trades.isEmpty)
-              SizedBox(height: 300, child: widget.emptyState)
-            else if (displayedTrades.isEmpty)
-              SizedBox(
-                height: 180,
-                child: Center(
-                  child: Text(context.l10n.text('No matching trades')),
-                ),
-              )
-            else
-              _tradeTable(context, displayedTrades),
           ],
         ),
-      ),
+        const SizedBox(height: 24),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final columns = constraints.maxWidth >= 940 ? 4 : 2;
+            const gap = 12.0;
+            final width =
+                (constraints.maxWidth - (columns - 1) * gap) / columns;
+            final metrics = [
+              _metric(
+                context,
+                context.l10n.text('Shares held'),
+                position?.netShares.toStringAsFixed(4) ?? '—',
+              ),
+              _metric(
+                context,
+                context.l10n.text('Avg cost'),
+                position == null
+                    ? '—'
+                    : fmtNativeCurrency(
+                        position.avgCost,
+                        position.nativeCurrency,
+                      ),
+              ),
+              _metric(
+                context,
+                context.l10n.text('Current value'),
+                position == null ? '—' : fmtCurrency(position.currentValue),
+              ),
+              _metric(
+                context,
+                context.l10n.text('Total gain'),
+                position == null && widget.trades.isEmpty
+                    ? '—'
+                    : _signedUsd(widget.totalGain),
+                color: position == null && widget.trades.isEmpty
+                    ? null
+                    : _gainColor(widget.totalGain),
+              ),
+            ];
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: [
+                for (final metric in metrics)
+                  SizedBox(width: width, child: metric),
+              ],
+            );
+          },
+        ),
+        if (position != null ||
+            widget.realizedToday != null ||
+            widget.hasImportedRealized) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              if (position != null)
+                _performanceChip(
+                  context,
+                  context.l10n.text('Unrealized P/L'),
+                  position.unrealizedPL,
+                ),
+              if (widget.realizedToday != null)
+                _performanceChip(
+                  context,
+                  context.l10n.text('Realized P/L today'),
+                  widget.realizedToday,
+                ),
+              if (widget.hasImportedRealized)
+                _performanceChip(
+                  context,
+                  context.l10n.text('Imported realized P/L'),
+                  widget.totalRealizedUsd,
+                ),
+            ],
+          ),
+        ],
+        const SizedBox(height: 30),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final title = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  context.l10n.text('Trade History'),
+                  style: theme.textTheme.titleLarge,
+                ),
+                Text(
+                  '${widget.trades.length} ${context.l10n.text('Trades')} · '
+                  '$buys ${context.l10n.text('Buy')} · '
+                  '$sells ${context.l10n.text('Sell')}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            );
+            final filter = SegmentedButton<String>(
+              key: const Key('desktop-trade-history-filter'),
+              showSelectedIcon: false,
+              segments: [
+                ButtonSegment(
+                  value: 'all',
+                  label: Text(context.l10n.text('All')),
+                ),
+                ButtonSegment(
+                  value: 'open',
+                  label: Text(context.l10n.text('Buy')),
+                ),
+                ButtonSegment(
+                  value: 'close',
+                  label: Text(context.l10n.text('Sell')),
+                ),
+              ],
+              selected: {_sideFilter},
+              onSelectionChanged: (selection) =>
+                  setState(() => _sideFilter = selection.first),
+            );
+            if (widget.trades.isEmpty) return title;
+            if (constraints.maxWidth < 650) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  title,
+                  const SizedBox(height: 14),
+                  filter,
+                ],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(child: title),
+                filter,
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 14),
+        if (_selectedTradeIds.isNotEmpty && !widget.brokerManaged) ...[
+          Row(
+            children: [
+              Text(
+                context.l10n.text(
+                  '{count} selected',
+                  {'count': _selectedTradeIds.length},
+                ),
+              ),
+              const SizedBox(width: 12),
+              FilledButton.tonalIcon(
+                key: const Key('desktop-trade-delete-selected'),
+                onPressed: () => runDetachedTask(
+                  widget.onDeleteTrades(Set<int>.of(_selectedTradeIds)),
+                  'Failed to delete selected trades',
+                ),
+                icon: const Icon(Icons.delete_outline),
+                label: Text(context.l10n.text('Delete')),
+              ),
+              IconButton(
+                tooltip: context.l10n.text('Cancel selection'),
+                onPressed: () => setState(_selectedTradeIds.clear),
+                icon: const Icon(Icons.close),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (widget.trades.isEmpty)
+          SizedBox(height: 300, child: widget.emptyState)
+        else if (displayedTrades.isEmpty)
+          SizedBox(
+            height: 180,
+            child: Center(
+              child: Text(context.l10n.text('No matching trades')),
+            ),
+          )
+        else
+          _tradeTable(context, displayedTrades),
+      ],
     );
   }
 }

@@ -94,7 +94,6 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  static const _desktopContentMaxWidth = 1240.0;
   static const _desktopSearchOptions = <String, List<String>>{
     'General': ['Language', 'Start page', 'Date format', 'Hide dollar amounts'],
     'Appearance': ['Theme', 'System color scheme', 'Pure black (AMOLED)'],
@@ -213,37 +212,30 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _searchField() => Padding(
         padding: EdgeInsets.fromLTRB(
-          isDesktopLayout(context) ? 24 : 16,
+          isDesktopLayout(context) ? desktopPagePadding.left : 16,
           12,
-          isDesktopLayout(context) ? 24 : 16,
+          isDesktopLayout(context) ? desktopPagePadding.right : 16,
           0,
         ),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: _desktopContentMaxWidth,
-            ),
-            child: TextField(
-              key: const Key('settings-search'),
-              focusNode: _searchFocus,
-              controller: _searchController,
-              onChanged: (value) => setState(() => _searchQuery = value),
-              decoration: InputDecoration(
-                hintText: context.l10n.text('Search settings'),
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isEmpty
-                    ? null
-                    : IconButton(
-                        tooltip: context.l10n.text('Clear search'),
-                        icon: const Icon(Icons.close),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      ),
-                border: const OutlineInputBorder(),
-              ),
-            ),
+        child: TextField(
+          key: const Key('settings-search'),
+          focusNode: _searchFocus,
+          controller: _searchController,
+          onChanged: (value) => setState(() => _searchQuery = value),
+          decoration: InputDecoration(
+            hintText: context.l10n.text('Search settings'),
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: _searchQuery.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: context.l10n.text('Clear search'),
+                    icon: const Icon(Icons.close),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                  ),
+            border: const OutlineInputBorder(),
           ),
         ),
       );
@@ -564,7 +556,8 @@ class _SettingsPageState extends State<SettingsPage> {
     final packageInfo = PackageInfo.fromPlatform();
     final settings = context.watch<SettingsState>();
 
-    final appBar = AppBar(
+    final appBar = adaptiveAppBar(
+      context,
       leading: widget.onClose == null
           ? null
           : IconButton(
@@ -572,7 +565,7 @@ class _SettingsPageState extends State<SettingsPage> {
               tooltip: 'Back',
               icon: const Icon(Icons.arrow_back),
             ),
-      title: Text(context.l10n.text('Settings')),
+      title: context.l10n.text('Settings'),
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(76),
         child: _searchField(),

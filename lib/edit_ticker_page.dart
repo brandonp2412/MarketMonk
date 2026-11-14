@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/accounts/account_manager.dart';
 import 'package:market_monk/candle_ticker.dart';
 import 'package:market_monk/database.dart';
@@ -280,9 +281,11 @@ class _EditTickerPageState extends State<EditTickerPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(context.l10n.text('Add trade'))),
+      appBar: adaptiveAppBar(context, title: context.l10n.text('Add trade')),
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: isDesktopLayout(context)
+            ? desktopPagePadding
+            : const EdgeInsets.all(16),
         child: material.Column(
           children: [
             Expanded(
@@ -363,6 +366,9 @@ class _EditTickerPageState extends State<EditTickerPage> {
                         );
 
                         return SearchBar(
+                          side: isDesktopLayout(context)
+                              ? const WidgetStatePropertyAll(BorderSide.none)
+                              : null,
                           trailing: getTrailing,
                           controller: fieldTextEditingController,
                           leading: leading,

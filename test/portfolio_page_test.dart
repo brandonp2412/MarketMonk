@@ -1730,16 +1730,42 @@ void main() {
     );
     expect(picker.loading, isTrue);
     expect(picker.labels, containsAll(['Now', '2W', '4W']));
-    final waitingSlider = tester.widget<Slider>(
-      find.byKey(const Key('portfolio-return-period')),
-    );
+    final sliderFinder = find.byKey(const Key('portfolio-return-period'));
+    final summaryFinder = find.byKey(const Key('portfolio-total-value'));
+    final initialSliderTop = tester.getTopLeft(sliderFinder);
+    final initialSummaryTop = tester.getTopLeft(summaryFinder);
+    final waitingSlider = tester.widget<Slider>(sliderFinder);
     waitingSlider.onChanged!(1);
     await tester.pump();
+    expect(tester.getTopLeft(sliderFinder), initialSliderTop);
+    expect(tester.getTopLeft(summaryFinder), initialSummaryTop);
     expect(
-      find.textContaining('Historical data could not be reconstructed'),
+      find.byKey(const Key('portfolio-pending-allocation')),
       findsOneWidget,
     );
+    expect(find.text('Return history unavailable'), findsNothing);
+    expect(find.text('Retry account history'), findsNothing);
+    expect(
+      find.textContaining('Historical data could not be reconstructed'),
+      findsNothing,
+    );
     expect(tester.takeException(), null);
+
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pump();
+    expect(find.byKey(const Key('desktop-portfolio-metrics')), findsOneWidget);
+    expect(
+      find.byKey(const Key('portfolio-pending-allocation')),
+      findsOneWidget,
+    );
+    expect(find.text('Retry account history'), findsNothing);
+    expect(tester.takeException(), null);
+
     stalledBackfill.complete();
     await tester.pumpAndSettle();
     final completed = tester.widget<PortfolioPeriodPicker>(
@@ -1748,10 +1774,7 @@ void main() {
     expect(completed.loading, isFalse);
     expect(completed.labels, contains('2W'));
     expect(find.byType(MarketDonutChart), findsOneWidget);
-    expect(
-      find.textContaining('Historical data could not be reconstructed'),
-      findsNothing,
-    );
+    expect(find.byKey(const Key('portfolio-pending-allocation')), findsNothing);
     expect(tester.takeException(), null);
   });
 

@@ -497,7 +497,7 @@ extension _ChartPortfolioView on ChartsPageState {
     return Padding(
       key: const Key('portfolio-summary-content'),
       padding: EdgeInsets.symmetric(
-        horizontal: isDesktopLayout(context) ? 32 : 16,
+        horizontal: isDesktopLayout(context) ? desktopPagePadding.left : 16,
         vertical: 8,
       ),
       child: isDesktopLayout(context)

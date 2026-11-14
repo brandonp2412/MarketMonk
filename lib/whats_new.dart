@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/empty_state.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/sqlite_settings.dart';
@@ -103,10 +104,15 @@ class _WhatsNewState extends State<WhatsNew> {
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 840),
+        constraints: BoxConstraints(
+          maxWidth: isDesktopLayout(context) ? double.infinity : 840,
+        ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: isDesktopLayout(context)
+              ? const EdgeInsets.only(bottom: 16)
+              : const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Card(
+            margin: isDesktopLayout(context) ? EdgeInsets.zero : null,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -202,7 +208,9 @@ class _WhatsNewState extends State<WhatsNew> {
     final hasMore = visibleCount < _releases.length;
     return ListView.builder(
       key: const PageStorageKey('whats-new-history'),
-      padding: const EdgeInsets.only(top: 8, bottom: 24),
+      padding: isDesktopLayout(context)
+          ? const EdgeInsets.only(top: 16)
+          : const EdgeInsets.only(top: 8, bottom: 24),
       itemCount: visibleCount + (hasMore ? 1 : 0),
       itemBuilder: (context, index) {
         if (index < visibleCount) return _buildRelease(_releases[index]);
@@ -233,15 +241,20 @@ class _WhatsNewState extends State<WhatsNew> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(context.l10n.text("What's New"))),
-      body: Column(
-        children: [
-          SwitchListTile.adaptive(
-            title: Text(context.l10n.text('Show update notices')),
-            value: _showUpdateNotices,
-            onChanged: _setUpdateNotices,
-          ),
-          Expanded(child: _buildBody()),
-        ],
+      body: Padding(
+        padding:
+            isDesktopLayout(context) ? desktopPagePadding : EdgeInsets.zero,
+        child: Column(
+          children: [
+            SwitchListTile.adaptive(
+              contentPadding: isDesktopLayout(context) ? EdgeInsets.zero : null,
+              title: Text(context.l10n.text('Show update notices')),
+              value: _showUpdateNotices,
+              onChanged: _setUpdateNotices,
+            ),
+            Expanded(child: _buildBody()),
+          ],
+        ),
       ),
     );
   }

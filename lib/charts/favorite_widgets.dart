@@ -76,9 +76,9 @@ extension _ChartFavoriteWidgets on ChartsPageState {
     final desktop = isDesktopLayout(context);
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        desktop ? 32 : 11,
+        desktop ? desktopPagePadding.left : 11,
         12,
-        desktop ? 32 : 11,
+        desktop ? desktopPagePadding.left : 11,
         8,
       ),
       child: Column(

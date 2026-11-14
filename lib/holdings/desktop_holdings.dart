@@ -23,10 +23,10 @@ extension _HoldingsDesktopView on HoldingsPageState {
     final theme = Theme.of(context);
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        padding: desktopMetricPadding,
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(desktopMetricRadius),
           border: Border.all(color: theme.colorScheme.outlineVariant),
         ),
         child: Column(

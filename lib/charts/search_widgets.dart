@@ -34,13 +34,14 @@ extension _ChartSearchWidgets on ChartsPageState {
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        desktop ? 32 : 8,
-        desktop ? 28 : 8,
-        desktop ? 32 : 8,
+        desktop ? desktopPagePadding.left : 8,
+        desktop ? desktopPagePadding.top : 8,
+        desktop ? desktopPagePadding.left : 8,
         4,
       ),
       child: SearchBar(
         key: const Key('chart-search-bar'),
+        side: desktop ? const WidgetStatePropertyAll(BorderSide.none) : null,
         constraints: const BoxConstraints(
           minHeight: 56,
           maxWidth: double.infinity,
@@ -201,7 +202,14 @@ extension _ChartSearchWidgets on ChartsPageState {
       onRefresh: () => _runTickerSearch(_searchController.text),
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: bottomNavScrollClearance),
+        padding: isDesktopLayout(context)
+            ? EdgeInsets.fromLTRB(
+                desktopPagePadding.left,
+                0,
+                desktopPagePadding.right,
+                desktopPagePadding.bottom,
+              )
+            : const EdgeInsets.only(bottom: bottomNavScrollClearance),
         itemCount: _searchResults.length + 1 + (_searchLoading ? 1 : 0),
         itemBuilder: (context, index) {
           if (_searchLoading && index == _searchResults.length + 1) {

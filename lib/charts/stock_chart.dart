@@ -36,7 +36,9 @@ extension _ChartStockView on ChartsPageState {
         ),
       if (_usesIntraday && _intradaySeries != null)
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.symmetric(
+            horizontal: isDesktopLayout(context) ? desktopPagePadding.left : 16,
+          ),
           child: Text(
             '${_intradaySeries!.source} · ${switch (true) {
               _ when _intradaySeries!.isDaily => "1 day",

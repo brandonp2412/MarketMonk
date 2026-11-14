@@ -525,15 +525,8 @@ extension _DesktopSettingsView on _SettingsPageState {
               );
 
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: _SettingsPageState._desktopContentMaxWidth,
-              ),
-              child: content,
-            ),
-          ),
+          padding: desktopPagePadding,
+          child: content,
         );
       },
     );

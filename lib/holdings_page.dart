@@ -590,42 +590,21 @@ class HoldingsPageState extends State<HoldingsPage>
         ],
         child: Scaffold(
           body: Padding(
-            padding: const EdgeInsets.fromLTRB(32, 28, 32, 24),
+            padding: desktopPagePadding,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 SizedBox(
                   height: 64,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      const ProfilePicker(key: Key('holdings-profile-picker')),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${accounts.activeAccount} · ${context.l10n.text('Holdings')}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.headlineMedium,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '$openCount open · ${_summaries.length} total symbols',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ),
+                  child: DesktopPageHeader(
+                    title:
+                        '${accounts.activeAccount} · ${context.l10n.text('Holdings')}',
+                    subtitle:
+                        '$openCount open · ${_summaries.length} total symbols',
+                    leading: const ProfilePicker(
+                      key: Key('holdings-profile-picker'),
+                    ),
+                    actions: [
                       if (_selecting) ...[
                         SizedBox(
                           width: 150,
@@ -771,6 +750,7 @@ class HoldingsPageState extends State<HoldingsPage>
               Padding(
                 padding: const EdgeInsets.only(left: 16, right: 16, top: 16),
                 child: SearchBar(
+                  side: const WidgetStatePropertyAll(BorderSide.none),
                   controller: _search,
                   hintText: _selecting
                       ? context.l10n.text('{count} selected', {

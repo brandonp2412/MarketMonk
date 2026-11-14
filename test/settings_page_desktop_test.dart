@@ -107,7 +107,8 @@ void main() {
     final cards = tester.getRect(
       find.byKey(const Key('desktop-settings-two-column')),
     );
-    expect(search.width, 1240);
+    expect(search.left, 32);
+    expect(search.right, 1800 - 32);
     expect(search.left, closeTo(cards.left, 0.1));
     expect(search.right, closeTo(cards.right, 0.1));
     expect(tester.takeException(), isNull);
@@ -442,7 +443,7 @@ void main() {
     await pumpSettings(tester, const Size(1400, 900));
     expect(
       tester.getSize(find.byKey(const Key('settings-search'))).width,
-      lessThanOrEqualTo(1240),
+      1400 - 64,
     );
   });
 
