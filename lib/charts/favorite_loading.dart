@@ -17,14 +17,18 @@ extension _ChartFavoriteLoading on ChartsPageState {
       return;
     }
 
+    // A warm chart is already valid for display. Waiting for fresh snapshots
+    // from IBKR and the selected favorites' price providers makes a pull feel
+    // like a stalled local cache read even though the chart never disappeared.
+    // Keep the refresh asynchronous and publish the refreshed values when
+    // their own network calls finish. Only an empty chart needs to wait.
+    final hasVisibleHistory = !_periodTransition &&
+        _portfolioSeriesByAccount.values.any((series) => series.isNotEmpty);
     _updateState(() => _networkLoading = true);
     final elapsed = Stopwatch()..start();
     talker.info('Portfolio refresh started for visible chart');
-
     late final Future<void> refresh;
     refresh = Future.wait<void>([
-      // Force the two broker snapshots and their performance series, but do
-      // not re-fetch every position's candle history.
       _loadAllPortfolios(
         refreshIbkrPortfolio: true,
         forceIbkrPortfolioRefresh: true,
@@ -43,23 +47,27 @@ extension _ChartFavoriteLoading on ChartsPageState {
         'Portfolio refresh network finished after '
         '${elapsed.elapsedMilliseconds}ms',
       );
+      if (mounted) _updateState(() => _networkLoading = false);
     });
     _portfolioRefreshInFlight = refresh;
 
-    try {
-      await refresh.timeout(
-        const Duration(seconds: 6),
-        onTimeout: () => talker.warning(
-          'Portfolio refresh exceeded 6s; continuing in background',
-        ),
-      );
-    } finally {
+    if (hasVisibleHistory) {
+      // The pull indicator represents a request to refresh, not the duration
+      // of the broker's work. The existing chart remains on screen throughout.
       talker.info(
-        'Portfolio refresh gesture completed after '
+        'Portfolio refresh gesture released using cached chart after '
         '${elapsed.elapsedMilliseconds}ms',
       );
-      if (mounted) _updateState(() => _networkLoading = false);
+      return;
     }
+
+    await refresh.timeout(
+      const Duration(seconds: 6),
+      onTimeout: () {
+        talker.warning('Uncached portfolio refresh exceeded 6s');
+        if (mounted) _updateState(() => _networkLoading = false);
+      },
+    );
   }
 
   Future<void> _loadFavorites() async {

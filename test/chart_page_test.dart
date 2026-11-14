@@ -393,9 +393,11 @@ void main() {
       expect(find.text('Refresh'), findsNothing);
 
       await tester.drag(find.byType(ListView).first, const Offset(0, 240));
-      await tester.pump();
-      expect(find.byType(RefreshProgressIndicator), findsNothing);
+      // A real downward drag can activate RefreshIndicator. Assert its final
+      // settled state rather than incorrectly requiring zero activity during
+      // the gesture itself.
       await tester.pumpAndSettle();
+      expect(find.byType(RefreshProgressIndicator), findsNothing);
     },
   );
 
@@ -1732,7 +1734,7 @@ void main() {
   });
 
   testWidgets(
-    'manual refresh waits for slow IBKR performance prefetch',
+    'cached chart refresh releases gesture while performance is pending',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(1400, 900);
@@ -1820,21 +1822,25 @@ void main() {
       expect(refreshButton.onPressed, isNull);
       expect(find.byType(MarketLineChart), findsOneWidget);
 
-      // A hung broker must not keep the gesture active indefinitely, and a
-      // second pull must reuse the existing request rather than start another.
-      await tester.pump(const Duration(seconds: 7));
-      await tester.pump();
-      final refreshAfterTimeout = tester.widget<IconButton>(
-        find.ancestor(of: refresh, matching: find.byType(IconButton)),
-      );
-      expect(refreshAfterTimeout.onPressed, isNotNull);
-      expect(find.byType(MarketLineChart), findsOneWidget);
+      // A pull returns immediately even while IBKR is unresolved, because a
+      // fully rendered cached chart remains available. Repeated pulls must
+      // not fan out into duplicate broker requests.
       await tester
           .widget<RefreshIndicator>(find.byType(RefreshIndicator))
-          .onRefresh();
+          .onRefresh()
+          .timeout(const Duration(milliseconds: 500));
       await tester.pump();
       expect(performanceLoads, 1);
       expect(find.byType(MarketLineChart), findsOneWidget);
+      expect(find.byType(MarketChartLoading), findsNothing);
+      final stillUpdating = tester.widget<IconButton>(
+        find.ancestor(of: refresh, matching: find.byType(IconButton)),
+      );
+      expect(
+        stillUpdating.onPressed,
+        isNull,
+        reason: 'The broker refresh is still in flight',
+      );
 
       pendingPerformance.complete(
         IbkrPerformanceSeries(
@@ -1850,6 +1856,10 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      final refreshAfterCompletion = tester.widget<IconButton>(
+        find.ancestor(of: refresh, matching: find.byType(IconButton)),
+      );
+      expect(refreshAfterCompletion.onPressed, isNotNull);
     },
   );
 
