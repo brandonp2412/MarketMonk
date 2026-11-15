@@ -149,6 +149,7 @@ extension _ChartFavoriteWidgets on ChartsPageState {
                           intradaySeries: _favoriteIntraday[symbol],
                           isActive: widget.isActive,
                           selected: _selectedFavorites.contains(symbol),
+                          focused: _isViFocusedFavorite(symbol),
                           selectionColor: _favoriteColor(symbol),
                           onTap: () => _selectFavorite(symbol),
                           onLongPress: () => _showFavoriteActions(symbol),

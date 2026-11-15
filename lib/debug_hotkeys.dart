@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 enum DebugHotkeyAction { reload, restart }
 
 final debugHotkeyMessengerKey = GlobalKey<ScaffoldMessengerState>();
+final debugHotkeyError = ValueNotifier<String?>(null);
 
 String debugHotkeyToastLabel(DebugHotkeyAction action) => switch (action) {
       DebugHotkeyAction.reload => 'Hot reloading…',
@@ -88,7 +89,10 @@ void installDesktopDebugHotkeys() {
       metaPressed: keyboard.isMetaPressed,
     );
     if (action == null) return false;
-    if (!_requestPending) unawaited(_requestFlutterTool(action));
+    if (!_requestPending) {
+      _showDebugHotkeyToast(action);
+      unawaited(_requestFlutterTool(action));
+    }
     return true;
   });
 }
@@ -96,6 +100,21 @@ void installDesktopDebugHotkeys() {
 Future<void> _requestFlutterTool(DebugHotkeyAction action) async {
   _requestPending = true;
   try {
+    final cwd = await File('/proc/self/cwd').resolveSymbolicLinks();
+    final analysis = await Process.run(
+      'flutter',
+      ['analyze', '--no-pub'],
+      workingDirectory: cwd,
+    );
+    if (analysis.exitCode != 0) {
+      debugHotkeyError.value = [
+        analysis.stdout.toString().trim(),
+        analysis.stderr.toString().trim(),
+      ].where((output) => output.isNotEmpty).join('\n');
+      return;
+    }
+    debugHotkeyError.value = null;
+
     final parentPid = linuxParentPid(
       await File('/proc/self/stat').readAsString(),
     );
@@ -109,12 +128,12 @@ Future<void> _requestFlutterTool(DebugHotkeyAction action) async {
     final signal = action == DebugHotkeyAction.reload
         ? ProcessSignal.sigusr1
         : ProcessSignal.sigusr2;
-    _showDebugHotkeyToast(action);
     await Future<void>.delayed(const Duration(milliseconds: 250));
     if (!Process.killPid(parentPid, signal)) {
       debugPrint('Flutter ${action.name} signal failed');
     }
   } catch (error) {
+    debugHotkeyError.value = 'Unable to check the code for errors:\n$error';
     debugPrint('Flutter ${action.name} request failed: $error');
   } finally {
     _requestPending = false;

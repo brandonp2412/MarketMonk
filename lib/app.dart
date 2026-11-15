@@ -8,6 +8,7 @@ import 'package:market_monk/adaptive_layout.dart';
 import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/charts_page.dart';
 import 'package:market_monk/debug_hotkeys.dart';
+import 'package:market_monk/debug_error_widget.dart';
 import 'package:market_monk/holdings_page.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
@@ -39,6 +40,20 @@ class MyApp extends StatelessWidget {
         builder: (context, child) => Stack(
           children: [
             if (child != null) ViOverlay(child: child),
+            if (kDebugMode)
+              ValueListenableBuilder<FlutterErrorDetails?>(
+                valueListenable: debugFlutterError,
+                builder: (context, details, _) => details == null
+                    ? const SizedBox.shrink()
+                    : DebugErrorScreen(details: details),
+              ),
+            if (kDebugMode)
+              ValueListenableBuilder<String?>(
+                valueListenable: debugHotkeyError,
+                builder: (context, error, _) => error == null
+                    ? const SizedBox.shrink()
+                    : _DebugHotkeyErrorScreen(error: error),
+              ),
             if (kDebugMode)
               PositionedDirectional(
                 bottom: 0,
@@ -151,6 +166,49 @@ class MyApp extends StatelessWidget {
         supportedLocales: AppLocalizations.supportedLocales,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         home: const MyHomePage(),
+      ),
+    );
+  }
+}
+
+class _DebugHotkeyErrorScreen extends StatelessWidget {
+  const _DebugHotkeyErrorScreen({required this.error});
+
+  final String error;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return ColoredBox(
+      color: colors.surface,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.error_outline, color: colors.error, size: 40),
+              const SizedBox(height: 16),
+              Text(
+                'Code errors',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 12),
+              const Text('Fix these issues, then press r or R to try again.'),
+              const SizedBox(height: 24),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: SelectableText(
+                    error,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontFamily: 'monospace',
+                        ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

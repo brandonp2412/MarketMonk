@@ -75,7 +75,7 @@ extension _ChartPortfolioView on ChartsPageState {
                   _favoriteIntraday.containsKey(symbol) ||
                   _favoriteIntradayErrors.containsKey(symbol),
             ))) {
-      if (_chartPeriodCache.length >= 16 &&
+      if (_chartPeriodCache.length >= 4 &&
           !_chartPeriodCache.containsKey(_chartPeriodCacheKey)) {
         _chartPeriodCache.remove(_chartPeriodCache.keys.first);
       }
@@ -166,6 +166,27 @@ extension _ChartPortfolioView on ChartsPageState {
           .toList();
       if (days > 0 && candles.length > days) {
         candles = candles.sublist(candles.length - days);
+      }
+      if (years > 0 || months > 5) {
+        final weekly = <String, StoredCandle>{};
+        for (final candle in candles) {
+          final day =
+              DateTime(candle.date.year, candle.date.month, candle.date.day);
+          final weekStart = day.subtract(Duration(days: day.weekday - 1));
+          final key = '${weekStart.year}-${weekStart.month}-${weekStart.day}';
+          final first = weekly[key];
+          if (first == null) {
+            weekly[key] = candle;
+          } else {
+            weekly[key] = candle.copyWith(
+              open: first.open,
+              high: max(first.high, candle.high),
+              low: min(first.low, candle.low),
+            );
+          }
+        }
+        candles = weekly.values.toList()
+          ..sort((a, b) => a.date.compareTo(b.date));
       }
       if (candles.isNotEmpty) {
         favoriteOhlcBySymbol[symbol] = {
@@ -650,6 +671,8 @@ extension _ChartPortfolioView on ChartsPageState {
               child: ListTile(
                 dense: true,
                 key: Key('chart-account-selector-$accountName'),
+                selected: _isViFocusedAccount(accountName),
+                selectedColor: theme.colorScheme.primary,
                 onLongPress: () => showModalBottomSheet<void>(
                   context: context,
                   showDragHandle: true,

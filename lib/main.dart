@@ -7,6 +7,7 @@ import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/backup_archive.dart';
 import 'package:market_monk/crash_logger.dart';
 import 'package:market_monk/debug_hotkeys.dart';
+import 'package:market_monk/debug_error_widget.dart';
 import 'package:market_monk/legacy_database_source.dart';
 import 'package:market_monk/legacy_profile_database.dart' as legacy;
 import 'package:market_monk/logging.dart';
@@ -28,6 +29,7 @@ Future<void> main() async {
   await runZonedGuarded<Future<void>>(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+      installDebugErrorWidget();
       installDesktopDebugHotkeys();
       backgroundNetworkCoordinator.observeAppLifecycle();
       await CrashLogger.install(fileName: 'marketmonk-crash.log');

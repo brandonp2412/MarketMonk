@@ -35,14 +35,53 @@ extension _ChartStockLoading on ChartsPageState {
     }
   }
 
-  void _moveViStockFocus(int delta) {
-    if (_favoriteStocks.isEmpty) return;
-    final current = _selectedSymbol == null
-        ? -1
-        : _favoriteStocks.indexOf(_selectedSymbol!);
-    final next = viFocusIndex(current, delta, _favoriteStocks.length);
-    if (_favoriteStocks[next] != _selectedSymbol) {
-      _selectSymbol(_favoriteStocks[next]);
+  List<String> get _viChartItems => [
+        ..._favoriteStocks,
+        ...?_accountManager?.accounts,
+      ];
+
+  bool _isViFocusedFavorite(String symbol) =>
+      _viChartFocusIndex == _favoriteStocks.indexOf(symbol) &&
+      _favoriteStocks.contains(symbol);
+
+  bool _isViFocusedAccount(String account) =>
+      _viChartFocusIndex ==
+      _favoriteStocks.length +
+          (_accountManager?.accounts.indexOf(account) ?? -1);
+
+  void _moveViChartFocus(int delta) {
+    final items = _viChartItems;
+    if (items.isEmpty) return;
+    _updateState(() {
+      _viChartFocusIndex = viFocusIndex(
+        _viChartFocusIndex,
+        delta,
+        items.length,
+      );
+    });
+  }
+
+  void _showOnlyViChartFocus() {
+    final items = _viChartItems;
+    if (_viChartFocusIndex < 0 || _viChartFocusIndex >= items.length) return;
+    final item = items[_viChartFocusIndex];
+    final favoriteIndex = _favoriteStocks.indexOf(item);
+    _updateState(() {
+      _selectedFavorites
+        ..clear()
+        ..addAll(favoriteIndex >= 0 ? [item] : const []);
+      _hiddenAccounts
+        ..clear()
+        ..addAll(
+          (_accountManager?.accounts ?? const <String>[])
+              .where((account) => favoriteIndex >= 0 || account != item),
+        );
+    });
+    if (favoriteIndex >= 0) {
+      runDetachedTask(
+        _syncFavoriteCandle(item),
+        'Failed to sync selected favorite',
+      );
     }
   }
 

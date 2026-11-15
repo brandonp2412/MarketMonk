@@ -146,8 +146,10 @@ class ChartsPageState extends State<ChartsPage>
       _searchController.selection =
           TextSelection.collapsed(offset: _searchController.text.length);
     },
-    moveFocus: _moveViStockFocus,
+    moveFocus: _moveViChartFocus,
+    toggleSelect: _showOnlyViChartFocus,
   );
+  int _viChartFocusIndex = -1;
 
   _ChartMode _mode = _ChartMode.portfolio;
   String? _selectedSymbol;

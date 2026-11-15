@@ -127,6 +127,7 @@ class FavoriteChartCard extends StatelessWidget {
   final IntradaySeries? intradaySeries;
   final bool isActive;
   final bool selected;
+  final bool focused;
   final Color selectionColor;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
@@ -142,6 +143,7 @@ class FavoriteChartCard extends StatelessWidget {
     this.intradaySeries,
     required this.isActive,
     required this.selected,
+    this.focused = false,
     required this.selectionColor,
     required this.onTap,
     required this.onLongPress,
@@ -168,8 +170,10 @@ class FavoriteChartCard extends StatelessWidget {
         : const Stream<List<StoredCandle>>.empty();
 
     return Semantics(
+      key: Key('chart-favorite-$symbol'),
       button: true,
       selected: selected,
+      focused: focused,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOutCubic,
@@ -178,10 +182,12 @@ class FavoriteChartCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           color: selected ? selectionColor.withValues(alpha: 0.10) : null,
           border: Border.all(
-            color: selected
-                ? selectionColor
-                : colorScheme.outline.withValues(alpha: 0.3),
-            width: selected ? 2 : 1,
+            color: focused
+                ? colorScheme.primary
+                : selected
+                    ? selectionColor
+                    : colorScheme.outline.withValues(alpha: 0.3),
+            width: focused || selected ? 2 : 1,
           ),
         ),
         child: Material(

@@ -39,147 +39,189 @@ extension _ChartSearchWidgets on ChartsPageState {
         desktop ? desktopPagePadding.left : 8,
         4,
       ),
-      child: SearchBar(
-        key: const Key('chart-search-bar'),
-        side: desktop ? const WidgetStatePropertyAll(BorderSide.none) : null,
-        constraints: const BoxConstraints(
-          minHeight: 56,
-          maxWidth: double.infinity,
+      child: AnimatedBuilder(
+        animation: _searchFocus,
+        builder: (context, child) => Stack(
+          clipBehavior: Clip.none,
+          children: [
+            child!,
+            if (_searchFocus.hasFocus)
+              Positioned.fill(
+                top: -2,
+                right: -2,
+                bottom: -2,
+                left: -2,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: ShapeDecoration(
+                      shape: StadiumBorder(
+                        side: BorderSide(
+                          color: Theme.of(context).colorScheme.primary,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
-        controller: _searchController,
-        focusNode: _searchFocus,
-        hintText: context.l10n.text('Search stocks...'),
-        leading: leading,
-        onChanged: _onSearchChanged,
-        onTap: () => _searchController.selection = TextSelection(
-          baseOffset: 0,
-          extentOffset: _searchController.text.length,
-        ),
-        onSubmitted: (text) {
-          if (text.isNotEmpty) _onSearchChanged(text);
-        },
-        trailing: [
-          if (desktop && _mode != _ChartMode.searching)
-            IconButton(
-              onPressed: _networkLoading ? null : _refreshCurrentChart,
-              tooltip: context.l10n.text('Refresh'),
-              icon: const Icon(Icons.refresh_rounded),
+        child: Theme(
+          data: Theme.of(context).copyWith(
+            inputDecorationTheme: const InputDecorationTheme(
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
             ),
-          if (inlineCurrencies)
-            const CurrencyButtons(key: Key('chart-currency-buttons')),
-          IconButton(
-            key: const Key('chart-settings-button'),
-            icon: const Icon(Icons.settings_outlined),
-            tooltip: context.l10n.text('Settings'),
-            onPressed: () => openAppSettings(context),
           ),
-          if (!desktop ||
-              (settings.visibleCurrencies.length > 1 && !inlineCurrencies))
-            PopupMenuButton<String>(
-              key: const Key('chart-menu-button'),
-              icon: const Icon(Icons.more_vert),
-              tooltip: context.l10n.text('Show menu'),
-              onSelected: (value) {
-                if (value == '__filter_range__') {
-                  if (_pickingChartRange) {
-                    _updateState(() => _pickingChartRange = false);
-                    ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
-                  } else {
-                    _startChartRangePicker();
-                  }
-                } else if (value == '__rolling_average__') {
-                  runDetachedTask(
-                    settings.setShowRollingAverage(
-                      !settings.showRollingAverage,
-                    ),
-                    'Failed to save rolling average',
-                  );
-                } else if (value == '__candles__') {
-                  _candleSelection.value = null;
-                  runDetachedTask(
-                    settings.setShowCandlesticks(!settings.showCandlesticks),
-                    'Failed to save chart style',
-                  );
-                } else if (value.startsWith('currency:')) {
-                  runDetachedTask(
-                    settings.setDisplayCurrency(value.substring(9)),
-                    'Failed to change display currency',
-                  );
-                }
-              },
-              itemBuilder: (context) => [
-                if (settings.visibleCurrencies.length > 1) ...[
-                  for (final currencyCode in settings.visibleCurrencies)
-                    CheckedPopupMenuItem<String>(
-                      value: 'currency:$currencyCode',
-                      checked: currencyCode == settings.displayCurrency,
-                      child: Text(currencyCode),
-                    ),
-                  if (!desktop) const PopupMenuDivider(),
-                ],
-                if (!desktop) ...[
-                  PopupMenuItem<String>(
-                    key: const Key('chart-menu-filter-range'),
-                    value: '__filter_range__',
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _pickingChartRange
-                              ? Icons.close
-                              : Icons.filter_alt_outlined,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          _pickingChartRange
-                              ? 'Cancel picking'
-                              : 'Filter range',
-                        ),
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem<String>(
-                    key: const Key('chart-menu-rolling-average'),
-                    value: '__rolling_average__',
-                    child: Row(
-                      children: [
-                        Icon(
-                          settings.showRollingAverage
-                              ? Icons.radio_button_checked
-                              : Icons.radio_button_unchecked,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(context.l10n.text('Rolling average')),
-                        if (settings.showRollingAverage) ...[
-                          const SizedBox(width: 8),
-                          const Icon(Icons.check, size: 18),
-                        ],
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem<String>(
-                    key: const Key('chart-menu-candles'),
-                    value: '__candles__',
-                    child: Row(
-                      children: [
-                        Icon(
-                          settings.showCandlesticks
-                              ? Icons.candlestick_chart
-                              : Icons.candlestick_chart_outlined,
-                        ),
-                        const SizedBox(width: 12),
-                        const Text('Candles'),
-                        if (settings.showCandlesticks) ...[
-                          const SizedBox(width: 8),
-                          const Icon(Icons.check, size: 18),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ],
+          child: SearchBar(
+            key: const Key('chart-search-bar'),
+            side: const WidgetStatePropertyAll(BorderSide.none),
+            shape: const WidgetStatePropertyAll(
+              StadiumBorder(side: BorderSide.none),
             ),
-        ],
+            constraints: const BoxConstraints(
+              minHeight: 56,
+              maxWidth: double.infinity,
+            ),
+            controller: _searchController,
+            focusNode: _searchFocus,
+            hintText: context.l10n.text('Search stocks...'),
+            leading: leading,
+            onChanged: _onSearchChanged,
+            onTap: () => _searchController.selection = TextSelection(
+              baseOffset: 0,
+              extentOffset: _searchController.text.length,
+            ),
+            onSubmitted: (text) {
+              if (text.isNotEmpty) _onSearchChanged(text);
+            },
+            trailing: [
+              if (desktop && _mode != _ChartMode.searching)
+                IconButton(
+                  onPressed: _networkLoading ? null : _refreshCurrentChart,
+                  tooltip: context.l10n.text('Refresh'),
+                  icon: const Icon(Icons.refresh_rounded),
+                ),
+              if (inlineCurrencies)
+                const CurrencyButtons(key: Key('chart-currency-buttons')),
+              IconButton(
+                key: const Key('chart-settings-button'),
+                icon: const Icon(Icons.settings_outlined),
+                tooltip: context.l10n.text('Settings'),
+                onPressed: () => openAppSettings(context),
+              ),
+              if (!desktop ||
+                  (settings.visibleCurrencies.length > 1 && !inlineCurrencies))
+                PopupMenuButton<String>(
+                  key: const Key('chart-menu-button'),
+                  icon: const Icon(Icons.more_vert),
+                  tooltip: context.l10n.text('Show menu'),
+                  onSelected: (value) {
+                    if (value == '__filter_range__') {
+                      if (_pickingChartRange) {
+                        _updateState(() => _pickingChartRange = false);
+                        ScaffoldMessenger.maybeOf(context)
+                            ?.hideCurrentSnackBar();
+                      } else {
+                        _startChartRangePicker();
+                      }
+                    } else if (value == '__rolling_average__') {
+                      runDetachedTask(
+                        settings.setShowRollingAverage(
+                          !settings.showRollingAverage,
+                        ),
+                        'Failed to save rolling average',
+                      );
+                    } else if (value == '__candles__') {
+                      _candleSelection.value = null;
+                      runDetachedTask(
+                        settings
+                            .setShowCandlesticks(!settings.showCandlesticks),
+                        'Failed to save chart style',
+                      );
+                    } else if (value.startsWith('currency:')) {
+                      runDetachedTask(
+                        settings.setDisplayCurrency(value.substring(9)),
+                        'Failed to change display currency',
+                      );
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    if (settings.visibleCurrencies.length > 1) ...[
+                      for (final currencyCode in settings.visibleCurrencies)
+                        CheckedPopupMenuItem<String>(
+                          value: 'currency:$currencyCode',
+                          checked: currencyCode == settings.displayCurrency,
+                          child: Text(currencyCode),
+                        ),
+                      if (!desktop) const PopupMenuDivider(),
+                    ],
+                    if (!desktop) ...[
+                      PopupMenuItem<String>(
+                        key: const Key('chart-menu-filter-range'),
+                        value: '__filter_range__',
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _pickingChartRange
+                                  ? Icons.close
+                                  : Icons.filter_alt_outlined,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              _pickingChartRange
+                                  ? 'Cancel picking'
+                                  : 'Filter range',
+                            ),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem<String>(
+                        key: const Key('chart-menu-rolling-average'),
+                        value: '__rolling_average__',
+                        child: Row(
+                          children: [
+                            Icon(
+                              settings.showRollingAverage
+                                  ? Icons.radio_button_checked
+                                  : Icons.radio_button_unchecked,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(context.l10n.text('Rolling average')),
+                            if (settings.showRollingAverage) ...[
+                              const SizedBox(width: 8),
+                              const Icon(Icons.check, size: 18),
+                            ],
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem<String>(
+                        key: const Key('chart-menu-candles'),
+                        value: '__candles__',
+                        child: Row(
+                          children: [
+                            Icon(
+                              settings.showCandlesticks
+                                  ? Icons.candlestick_chart
+                                  : Icons.candlestick_chart_outlined,
+                            ),
+                            const SizedBox(width: 12),
+                            const Text('Candles'),
+                            if (settings.showCandlesticks) ...[
+                              const SizedBox(width: 8),
+                              const Icon(Icons.check, size: 18),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

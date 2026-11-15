@@ -68,12 +68,16 @@ class _ViOverlayState extends State<ViOverlay> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final primary = FocusManager.instance.primaryFocus;
+      final primaryContext = primary?.context;
+      final editing = primaryContext?.widget is EditableText ||
+          primaryContext?.findAncestorWidgetOfExactType<EditableText>() != null;
       final focus = ViNavigation.instance.focusedContext.value ??
           (primary is FocusScopeNode ? null : primary?.context);
       final root = context.findRenderObject();
       final render = focus?.mounted == true ? focus!.findRenderObject() : null;
       Rect? rect;
-      if (root is RenderBox &&
+      if (!editing &&
+          root is RenderBox &&
           render is RenderBox &&
           render.attached &&
           render.hasSize) {

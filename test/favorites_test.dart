@@ -1,18 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/charts/chart_widgets.dart';
 import 'package:market_monk/main.dart';
 import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/settings_state.dart';
+import 'package:market_monk/vi_hotkeys.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 import 'sqlite_test_support.dart';
 
-Future<void> _pumpApp(WidgetTester tester, AccountManager accounts) async {
+Future<void> _pumpApp(
+  WidgetTester tester,
+  AccountManager accounts, {
+  SettingsState? settings,
+}) async {
   await tester.pumpWidget(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => SettingsState()),
+        if (settings == null)
+          ChangeNotifierProvider(create: (_) => SettingsState())
+        else
+          ChangeNotifierProvider.value(value: settings),
         ChangeNotifierProvider.value(value: accounts),
       ],
       child: const MyApp(),
@@ -43,6 +52,98 @@ void main() {
     final favoriteLeft =
         tester.getTopLeft(find.byType(FavoriteChartCard).first).dx;
     expect(favoriteLeft, periodLeft);
+  });
+
+  testWidgets('desktop vi navigation focuses favorites then portfolios', (
+    tester,
+  ) async {
+    await seedTestSqlite({
+      'favoriteStocks': ['AAPL', 'MSFT'],
+    });
+    cacheSymbolMeta('AAPL', 'USD');
+    cacheSymbolMeta('MSFT', 'USD');
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1400, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final settings = SettingsState();
+    await settings.initialized;
+    await settings.setViModeEnabled(true);
+    installDesktopViHotkeys(settings);
+    await _pumpApp(tester, testAccountManager(), settings: settings);
+
+    Future<void> press(LogicalKeyboardKey key) async {
+      await tester.sendKeyDownEvent(key);
+      await tester.sendKeyUpEvent(key);
+      await tester.pump();
+    }
+
+    expect(
+      tester
+          .widget<Semantics>(find.byKey(const Key('chart-favorite-AAPL')))
+          .properties
+          .focused,
+      isFalse,
+    );
+    await press(LogicalKeyboardKey.keyJ);
+    expect(
+      tester
+          .widget<Semantics>(find.byKey(const Key('chart-favorite-AAPL')))
+          .properties
+          .focused,
+      isTrue,
+    );
+    await press(LogicalKeyboardKey.keyJ);
+    expect(
+      tester
+          .widget<Semantics>(find.byKey(const Key('chart-favorite-MSFT')))
+          .properties
+          .focused,
+      isTrue,
+    );
+    await press(LogicalKeyboardKey.keyJ);
+    expect(
+      tester
+          .widget<ListTile>(
+            find.byKey(const Key('chart-account-selector-Default')),
+          )
+          .selected,
+      isTrue,
+    );
+    await press(LogicalKeyboardKey.keyK);
+    expect(
+      tester
+          .widget<Semantics>(find.byKey(const Key('chart-favorite-MSFT')))
+          .properties
+          .focused,
+      isTrue,
+    );
+    await press(LogicalKeyboardKey.keyK);
+    expect(
+      tester
+          .widget<Semantics>(find.byKey(const Key('chart-favorite-AAPL')))
+          .properties
+          .focused,
+      isTrue,
+    );
+    await press(LogicalKeyboardKey.keyJ);
+    await press(LogicalKeyboardKey.keyJ);
+    await press(LogicalKeyboardKey.space);
+    expect(
+      tester
+          .widget<FavoriteChartCard>(find.byType(FavoriteChartCard).first)
+          .selected,
+      isFalse,
+    );
+    expect(
+      tester
+          .widget<FavoriteChartCard>(find.byType(FavoriteChartCard).last)
+          .selected,
+      isFalse,
+    );
   });
   testWidgets('long press confirms favorite removal in a bottom sheet', (
     tester,

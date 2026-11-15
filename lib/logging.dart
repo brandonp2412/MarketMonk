@@ -2,6 +2,7 @@ import 'dart:developer' show log;
 
 import 'package:flutter/foundation.dart';
 import 'package:talker_flutter/talker_flutter.dart';
+import 'package:market_monk/debug_error_widget.dart';
 
 import 'terminal_columns_stub.dart'
     if (dart.library.io) 'terminal_columns_io.dart';
@@ -55,6 +56,7 @@ void _talkerOutput(String message) {
 void installTalkerErrorHandlers() {
   final previousFlutterOnError = FlutterError.onError;
   FlutterError.onError = (details) {
+    reportDebugFlutterError(details);
     previousFlutterOnError?.call(details);
     talker.handle(details.exception, details.stack, 'Flutter framework error');
   };
