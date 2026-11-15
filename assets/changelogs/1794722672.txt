@@ -1,0 +1,10 @@
+• Improve jitter on holdings
+• Remove nested ternaries
+• Split out code into single responsibilities
+• improve account visibility and portfolio controls
+• improve chart navigation and loading feedback
+• improve holdings selection and intraday returns
+• improve portfolio history and keyboard navigation
+• prepare MarketMonk 2.0 with stable portfolio loading
+• fix(charts): align mobile favorites with period chips
+• fix(charts): bound and scope stock pull-to-refresh
