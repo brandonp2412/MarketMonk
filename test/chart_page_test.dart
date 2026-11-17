@@ -992,7 +992,7 @@ void main() {
     expect(ibkrLoads, 1);
     expect(find.textContaining('10,100'), findsWidgets);
     expect(allRatesFromUsd['NZD'], closeTo(10100 / 5800, 1e-9));
-    expect(find.text('+11.69%'), findsOneWidget);
+    expect(find.text('+11.33%'), findsOneWidget);
     expect(find.textContaining('TWR'), findsNothing);
     expect(find.text('History unavailable'), findsNothing);
 
@@ -1007,7 +1007,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('History unavailable'), findsNothing);
     expect(find.textContaining('10,100'), findsWidgets);
-    expect(find.text('+11.69%'), findsOneWidget);
+    expect(find.text('+11.33%'), findsOneWidget);
     expect(find.textContaining('Earlier history unavailable'), findsNothing);
     final longRange =
         tester.widget<MarketLineChart>(find.byType(MarketLineChart));
@@ -1026,8 +1026,7 @@ void main() {
     expect(performanceLoads, successfulPerformanceLoads);
   });
 
-  testWidgets(
-      'flat broker return and negative dollar change use separate colors',
+  testWidgets('negative portfolio profit and percentage use the same color',
       (tester) async {
     await seedTestSqlite({
       'ibkrAccountConfigs':
@@ -1095,27 +1094,22 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final pct = tester.widget<Text>(find.text('0.00%'));
+    final pct = tester.widget<Text>(find.text('-0.22%'));
     final dollar = tester.widget<Text>(find.textContaining('655.08'));
-    expect(
-      pct.style?.color,
-      Theme.of(tester.element(find.byType(ChartsPage)))
-          .colorScheme
-          .onSurfaceVariant,
-    );
+    expect(pct.style?.color, Colors.redAccent);
     expect(dollar.data, contains('-'));
     expect(dollar.style?.color, Colors.redAccent);
-    expect(find.text('+0.00%'), findsNothing);
+    expect(find.text('0.00%'), findsNothing);
     await expectLater(
       find.byKey(const Key('portfolio-summary-content')),
       matchesGoldenFile(
-        'goldens/chart-summary-zero-return-negative-change.png',
+        'goldens/chart-summary-matched-negative-return.png',
       ),
     );
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('IBKR portfolio summary shows concise broker return', (
+  testWidgets('IBKR portfolio summary aligns percent and dollar P/L', (
     WidgetTester tester,
   ) async {
     await seedTestSqlite({
@@ -1214,7 +1208,7 @@ void main() {
     expect(summaryInsets.left, 32);
     expect(summaryInsets.right, 32);
     expect(performanceLoads, greaterThan(0));
-    expect(find.text('+5.49%'), findsOneWidget);
+    expect(find.text('-20.00%'), findsOneWidget);
     expect(find.textContaining('TWR'), findsNothing);
     expect(find.textContaining('return excl. transfers'), findsNothing);
     expect(find.textContaining('holdings change'), findsNothing);
@@ -1225,10 +1219,10 @@ void main() {
 
     await tester.tap(find.text('1y'));
     await tester.pump();
-    expect(find.text('+5.49%'), findsOneWidget);
+    expect(find.text('-20.00%'), findsOneWidget);
     expect(find.text('History unavailable'), findsNothing);
     await tester.pumpAndSettle();
-    expect(find.text('+5.49%'), findsOneWidget);
+    expect(find.text('-20.00%'), findsOneWidget);
   });
 
   testWidgets('exact ticker fallback is available while search is loading', (

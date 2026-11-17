@@ -310,14 +310,28 @@ extension _ChartPortfolioView on ChartsPageState {
       final color = _selectedFavorites.contains(entry.key)
           ? _favoriteColor(entry.key)
           : accountColors[accountIndex.clamp(0, accountColors.length - 1)];
-      final returnByDate = {
-        for (final point
-            in _portfolioReturnSeriesByAccount[entry.key] ?? <_DateValue>[])
-          point.date: point.value,
-      };
+      final cashFlows = _portfolioCashFlowsByAccount[entry.key] ?? const {};
+      final isPortfolio = accounts.contains(entry.key);
+      final visiblePoints = _visibleValues(entry.value);
+      final firstPoint =
+          visiblePoints.isEmpty ? entry.value.first : visiblePoints.first;
       final comparisonValues = [
         for (final point in entry.value)
-          returnByDate[point.date] ?? point.value,
+          if (isPortfolio)
+            !point.date.isAfter(firstPoint.date)
+                ? 1.0
+                : 1 +
+                    (portfolioPeriodPerformance(
+                              startingValue: firstPoint.value,
+                              endingValue: point.value,
+                              startDate: firstPoint.date,
+                              endDate: point.date,
+                              cashFlows: cashFlows,
+                            )?.percent ??
+                            0) /
+                        100
+          else
+            point.value,
       ];
       final displayValues = scaleForComparison
           ? scalePortfolioSeriesForComparison(comparisonValues)
@@ -541,35 +555,19 @@ extension _ChartPortfolioView on ChartsPageState {
   ) {
     final idx = accounts.indexOf(accountName);
     final dotColor = accountColors[idx.clamp(0, accountColors.length - 1)];
-    final accountReturns = _portfolioReturnSeriesByAccount[accountName];
     final visibleSeries = _visibleValues(series);
-    final visibleReturns = _visibleValues(accountReturns ?? <_DateValue>[]);
-    final hasHistory = accountReturns != null
-        ? visibleReturns.length > 1
-        : visibleSeries.length > 1;
-    final pct = hasHistory
-        ? safePercentChange(
-            accountReturns != null
-                ? visibleReturns.first.value
-                : visibleSeries.first.value,
-            accountReturns != null
-                ? visibleReturns.last.value
-                : visibleSeries.last.value,
+    final performance = visibleSeries.length > 1
+        ? portfolioPeriodPerformance(
+            startingValue: visibleSeries.first.value,
+            endingValue: visibleSeries.last.value,
+            startDate: visibleSeries.first.date,
+            endDate: visibleSeries.last.date,
+            cashFlows: _portfolioCashFlowsByAccount[accountName] ?? const {},
           )
-        : 0.0;
-    final flows = _portfolioCashFlowsByAccount[accountName];
-    final externalFlows = flows == null || visibleSeries.length < 2
-        ? 0.0
-        : flows.entries
-            .where(
-              (entry) =>
-                  entry.key.isAfter(visibleSeries.first.date) &&
-                  !entry.key.isAfter(visibleSeries.last.date),
-            )
-            .fold<double>(0.0, (total, entry) => total + entry.value);
-    final change = visibleSeries.length > 1
-        ? visibleSeries.last.value - visibleSeries.first.value - externalFlows
-        : 0.0;
+        : null;
+    final hasHistory = performance != null;
+    final pct = performance?.percent ?? 0.0;
+    final change = performance?.gain ?? 0.0;
     final displayPct = pct.abs() < 0.005 ? 0.0 : pct;
     final neutralColor = Theme.of(context).colorScheme.onSurfaceVariant;
     final returnColor = !hasHistory || !pct.isFinite || displayPct == 0

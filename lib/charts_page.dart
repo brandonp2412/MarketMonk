@@ -31,6 +31,7 @@ import 'package:market_monk/market_chart_loading.dart';
 import 'package:market_monk/market_data_store.dart';
 import 'package:market_monk/market_line_chart.dart';
 import 'package:market_monk/portfolio_chart_scale.dart';
+import 'package:market_monk/portfolio_period_performance.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/provisional_portfolio.dart';
 import 'package:market_monk/settings_state.dart';

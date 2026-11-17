@@ -1,6 +1,6 @@
 name: market_monk
 description: Stock charts and portfolio tracking for Android, Windows, and Linux
-version: 2.0.1+11659
+version: 2.0.1+116594
 environment:
   sdk: ^3.5.4
 dependencies:

@@ -175,7 +175,7 @@ void main() {
     expect(scene().marks.map((mark) => mark.index).toSet(), {0, 1, 2, 3, 4, 5});
   });
 
-  testWidgets('broker returns and favorite returns rebase together after zoom',
+  testWidgets('portfolio P/L and favorite returns rebase together after zoom',
       (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1400, 1100);
@@ -257,7 +257,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('+4.00%'), findsOneWidget);
+    expect(find.text('+4.56%'), findsOneWidget);
     expect(find.text('+20.00%'), findsOneWidget);
     await tester.tap(find.text('SPY'));
     await tester.pumpAndSettle();
@@ -277,7 +277,7 @@ void main() {
 
     final accountBefore =
         scene().marks.where((mark) => mark.seriesIndex == 1).toList();
-    expect(accountBefore.last.value, closeTo(4, 1e-9));
+    expect(accountBefore.last.value, closeTo(4.5581395349, 1e-9));
 
     final origin = tester.getTopLeft(find.byType(ChartCanvas));
     final selectedMark = scene().marks.firstWhere((mark) => mark.index == 3);
@@ -297,7 +297,7 @@ void main() {
 
     expect(find.text('+1.96%'), findsOneWidget);
     expect(find.text('+4.35%'), findsOneWidget);
-    expect(find.text('+4.00%'), findsNothing);
+    expect(find.text('+4.56%'), findsNothing);
     expect(find.text('+20.00%'), findsNothing);
     final account =
         scene().marks.where((mark) => mark.seriesIndex == 1).toList();

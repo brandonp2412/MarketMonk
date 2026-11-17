@@ -74,7 +74,7 @@ void main() {
     );
   });
 
-  testWidgets('chart shows broker returns rather than cash-out P/L',
+  testWidgets('chart percentage follows cash-flow-adjusted dollar P/L',
       (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1200, 900);
@@ -114,7 +114,7 @@ void main() {
         DateTime(2026, 10, 7),
       ],
       nav: const [3355.69, 3355.196063, 23326.951487],
-      cashFlows: const [0, 0, 0],
+      cashFlows: const [0, 0, 20000],
       returnDates: [
         DateTime(2026, 10, 5),
         DateTime(2026, 10, 6),
@@ -140,7 +140,7 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('-0.06%'), findsOneWidget);
+    expect(find.text('-0.86%'), findsOneWidget);
     expect(find.textContaining('TWR'), findsNothing);
     expect(find.textContaining('Total P/L'), findsNothing);
     expect(tester.takeException(), null);
