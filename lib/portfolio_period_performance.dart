@@ -24,19 +24,16 @@ PortfolioPeriodPerformance? portfolioPeriodPerformance({
   }
 
   var externalFlows = 0.0;
-  var weightedFlows = 0.0;
   for (final flow in cashFlows.entries) {
     if (!flow.key.isAfter(startDate) || flow.key.isAfter(endDate)) {
       continue;
     }
     if (!flow.value.isFinite) return null;
     externalFlows += flow.value;
-    weightedFlows +=
-        flow.value * endDate.difference(flow.key).inMilliseconds / periodMillis;
   }
 
   final gain = endingValue - startingValue - externalFlows;
-  final basis = startingValue + weightedFlows;
+  final basis = endingValue - gain;
   if (!gain.isFinite || !basis.isFinite || basis <= 0) return null;
   return PortfolioPeriodPerformance(gain, basis);
 }

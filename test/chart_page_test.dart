@@ -1047,8 +1047,8 @@ void main() {
     await accounts.cachePortfolio(
       'Default',
       const [],
-      const IbkrAccountValue(value: 300122.20, currency: 'USD'),
-      netLiquidationUsd: 300122.20,
+      const IbkrAccountValue(value: 285164.50, currency: 'USD'),
+      netLiquidationUsd: 285164.50,
     );
     final now = DateTime.now();
     final start = now.subtract(const Duration(days: 55));
@@ -1063,9 +1063,9 @@ void main() {
         measure: 'TWR',
         currency: 'USD',
         startDate: start,
-        startNav: 300777.28,
+        startNav: 289772.31,
         dates: [start.add(const Duration(days: 1)), end],
-        nav: const [300777.28, 300122.20],
+        nav: const [289772.31, 285164.50],
         cashFlows: const [0, 0],
         returnDates: [start, end],
         returns: const [0, 0],
@@ -1094,8 +1094,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final pct = tester.widget<Text>(find.text('-0.22%'));
-    final dollar = tester.widget<Text>(find.textContaining('655.08'));
+    final pct = tester.widget<Text>(find.text('-1.59%'));
+    final dollar = tester.widget<Text>(find.textContaining('4,607.81'));
     expect(pct.style?.color, Colors.redAccent);
     expect(dollar.data, contains('-'));
     expect(dollar.style?.color, Colors.redAccent);
@@ -1103,7 +1103,7 @@ void main() {
     await expectLater(
       find.byKey(const Key('portfolio-summary-content')),
       matchesGoldenFile(
-        'goldens/chart-summary-matched-negative-return.png',
+        'goldens/chart-summary-cash-out-return.png',
       ),
     );
     expect(tester.takeException(), isNull);
@@ -1208,7 +1208,7 @@ void main() {
     expect(summaryInsets.left, 32);
     expect(summaryInsets.right, 32);
     expect(performanceLoads, greaterThan(0));
-    expect(find.text('-20.00%'), findsOneWidget);
+    expect(find.text('-15.00%'), findsOneWidget);
     expect(find.textContaining('TWR'), findsNothing);
     expect(find.textContaining('return excl. transfers'), findsNothing);
     expect(find.textContaining('holdings change'), findsNothing);
@@ -1219,10 +1219,10 @@ void main() {
 
     await tester.tap(find.text('1y'));
     await tester.pump();
-    expect(find.text('-20.00%'), findsOneWidget);
+    expect(find.text('-15.00%'), findsOneWidget);
     expect(find.text('History unavailable'), findsNothing);
     await tester.pumpAndSettle();
-    expect(find.text('-20.00%'), findsOneWidget);
+    expect(find.text('-15.00%'), findsOneWidget);
   });
 
   testWidgets('exact ticker fallback is available while search is loading', (

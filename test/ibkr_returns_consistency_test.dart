@@ -140,7 +140,7 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('-0.86%'), findsOneWidget);
+    expect(find.text('-0.12%'), findsOneWidget);
     expect(find.textContaining('TWR'), findsNothing);
     expect(find.textContaining('Total P/L'), findsNothing);
     expect(tester.takeException(), null);
