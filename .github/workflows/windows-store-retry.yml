@@ -48,7 +48,7 @@ jobs:
           if ($pubspec -notmatch $releasePattern) {
             throw "The checked-out tag does not match the requested release version"
           }
-          $msixPattern = '(?m)^  msix_version: [0-9.]+$'
+          $msixPattern = '(?m)^[ \t]*msix_version:[ \t]*[0-9.]+[ \t]*\r?$'
           if ($pubspec -notmatch $msixPattern) {
             throw "pubspec.yaml has no MSIX version"
           }
