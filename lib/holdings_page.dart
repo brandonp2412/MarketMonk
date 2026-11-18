@@ -16,6 +16,8 @@ import 'package:market_monk/ibkr_cash_out_pnl.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/logging.dart';
 import 'package:market_monk/portfolio_allocation.dart';
+import 'package:market_monk/portfolio_returns.dart';
+import 'package:market_monk/temporal_currency_returns.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/profile_picker.dart';
 import 'package:market_monk/settings_state.dart';
@@ -77,6 +79,63 @@ class HoldingsPageState extends State<HoldingsPage>
   List<SymbolSummary> _summaries = [];
   // Keep the last complete view for each profile while its stream refreshes.
   final Map<String, List<SymbolSummary>> _profileSummaries = {};
+  Map<DateTime, double> _temporalRates = {};
+  String? _temporalRatesKey;
+  bool _temporalRatesLoading = false;
+
+  PortfolioReturn? _temporalHolding(SymbolSummary summary) {
+    final position = summary.position;
+    if (position == null) return null;
+    return temporalOpenHoldingReturn(
+      position: position,
+      trades: summary.trades,
+      displayCurrency: currency.currencyName ?? 'USD',
+      ratesByDate: _temporalRates,
+    );
+  }
+
+  void _ensureTemporalRatesForHoldings(List<SymbolSummary> summaries) {
+    final account = context.read<AccountManager>().activeAccount;
+    final display = context.read<SettingsState>().displayCurrency;
+    final trades = [
+      for (final summary in summaries)
+        if (summary.position != null)
+          for (final trade in summary.trades)
+            if (trade.quantity > 0) trade,
+    ];
+    final dates = {
+      for (final trade in trades)
+        if (trade.quantity > 0) temporalFxDay(trade.tradeDate),
+    };
+    final key = '$account:$display:${trades.length}:${dates.length}:'
+        '${trades.fold<int>(0, (hash, t) => hash ^ t.symbol.hashCode ^ t.id ^ t.tradeDate.millisecondsSinceEpoch)}';
+    if (_temporalRatesKey == key) return;
+    _temporalRatesKey = key;
+    _temporalRates = {};
+    _temporalRatesLoading = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _temporalRatesKey != key) return;
+      runDetachedTask(
+        () async {
+          final rates = await loadTemporalTradeRates(
+            trades,
+            display,
+            onBatch: (partial) {
+              if (!mounted || _temporalRatesKey != key) return;
+              setState(() => _temporalRates = partial);
+            },
+          );
+          if (!mounted || _temporalRatesKey != key) return;
+          setState(() {
+            _temporalRates = rates;
+            _temporalRatesLoading = false;
+          });
+        }(),
+        'Failed to retrieve purchase-date exchange rates',
+      );
+    });
+  }
+
   List<Trade> _ibkrTrades = [];
   Future<List<Trade>>? _ibkrTradesLoad;
   String? _ibkrTradesLoadingAccount;
@@ -862,11 +921,13 @@ class HoldingsPageState extends State<HoldingsPage>
         _HoldingsSort.value => a.position!.currentValue.compareTo(
             b.position!.currentValue,
           ),
-        _HoldingsSort.unrealized => a.position!.unrealizedPL.compareTo(
-            b.position!.unrealizedPL,
+        _HoldingsSort.unrealized =>
+          (_temporalHolding(a)?.gain ?? double.negativeInfinity).compareTo(
+            _temporalHolding(b)?.gain ?? double.negativeInfinity,
           ),
-        _HoldingsSort.returnPct => a.position!.change.compareTo(
-            b.position!.change,
+        _HoldingsSort.returnPct =>
+          (_temporalHolding(a)?.percent ?? double.negativeInfinity).compareTo(
+            _temporalHolding(b)?.percent ?? double.negativeInfinity,
           ),
       };
       return switch (true) {
@@ -916,6 +977,8 @@ class HoldingsPageState extends State<HoldingsPage>
 
     final ibkrManaged = context.watch<AccountManager>().ibkrConfigFor().enabled;
     final summaries = ibkrManaged ? _summaries : snap.data ?? _summaries;
+    context.watch<SettingsState>().displayCurrency;
+    _ensureTemporalRatesForHoldings(summaries);
     final cashBalance = ibkrManaged
         ? context.watch<AccountManager>().portfolioCacheFor()?.cashBalance
         : null;
@@ -1041,6 +1104,8 @@ class HoldingsPageState extends State<HoldingsPage>
             actionsBuilder: () => _holdingActions(summary, ibkrManaged),
             child: _SymbolTile(
               summary: summary,
+              temporalReturn: _temporalHolding(summary),
+              temporalRatesLoading: _temporalRatesLoading,
               selecting: _selecting,
               isSelected: _selectedSymbols.contains(summary.symbol),
               onTap: () {

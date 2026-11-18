@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:market_monk/database.dart';
 import 'package:market_monk/desktop_context_menu.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
+import 'package:market_monk/portfolio_returns.dart';
 import 'package:market_monk/utils.dart';
 
 /// Dense, desktop-only stock trade history. The compact mobile tiles live in
@@ -15,6 +16,7 @@ class DesktopTradeHistory extends StatefulWidget {
   final String symbol;
   final String name;
   final Position? position;
+  final PortfolioReturn? temporalReturn;
   final List<Trade> trades;
   final double? totalRealizedUsd;
   final double? realizedToday;
@@ -33,6 +35,7 @@ class DesktopTradeHistory extends StatefulWidget {
     required this.symbol,
     required this.name,
     required this.position,
+    this.temporalReturn,
     required this.trades,
     required this.totalRealizedUsd,
     required this.realizedToday,
@@ -436,10 +439,11 @@ class _DesktopTradeHistoryState extends State<DesktopTradeHistory> {
                 context.l10n.text('Avg cost'),
                 position == null
                     ? '—'
-                    : fmtNativeCurrency(
-                        position.avgCost,
-                        position.nativeCurrency,
-                      ),
+                    : widget.temporalReturn == null
+                        ? '—'
+                        : fmtCurrency(
+                            widget.temporalReturn!.basis / position.netShares,
+                          ),
               ),
               _metric(
                 context,

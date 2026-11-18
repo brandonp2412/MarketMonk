@@ -197,6 +197,34 @@ void main() {
     expect(prefs.getDouble('exchangeRate_NZD'), 1.66);
   });
 
+  test('historical FX falls back to dated currency API after a primary outage',
+      () async {
+    final date = DateTime.utc(2026, 8, 5);
+    final called = <Uri>[];
+    final quote = await fetchHistoricalUsdRate(
+      'NZD',
+      date,
+      fetcher: (uri) async {
+        called.add(uri);
+        return http.Response('unavailable', 503);
+      },
+      fallbackFetcher: (uri) async {
+        called.add(uri);
+        return http.Response(
+          jsonEncode({
+            'date': '2026-08-05',
+            'usd': {'nzd': 1.70174152},
+          }),
+          200,
+        );
+      },
+    );
+    expect(called.first.host, 'api.frankfurter.dev');
+    expect(called.last.host, '2026-08-05.currency-api.pages.dev');
+    expect(quote.rate, 1.70174152);
+    expect(quote.provider, 'currencyApiHistorical');
+  });
+
   test('Frankfurter source supports display and native conversion', () async {
     final settings = SettingsState(
       localCurrencyDetector: () async => 'USD',

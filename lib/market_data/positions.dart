@@ -229,9 +229,21 @@ List<Position> computePositions(
         ? dates.reduce((a, b) => a.isAfter(b) ? a : b)
         : DateTime.now();
 
-    final nativeAvgCost = avgCostUsd == null
-        ? _averageCostForOpenPosition(symbolTrades) / symbolCentDivisor(symbol)
-        : avgCostUsd * requireUsdRate(nativeCurrency);
+    final allTradesInNativeCurrency = symbolTrades.every(
+      (trade) =>
+          trade.rawCurrency != null &&
+          normalizedQuoteCurrency(trade.rawCurrency!) == nativeCurrency,
+    );
+    final nativeAvgCost = allTradesInNativeCurrency
+        ? _averageCostForOpenPosition(
+            symbolTrades,
+            priceForTrade: (trade) =>
+                trade.price / quoteUnitDivisor(trade.rawCurrency!),
+          )
+        : avgCostUsd == null
+            ? _averageCostForOpenPosition(symbolTrades) /
+                symbolCentDivisor(symbol)
+            : avgCostUsd * requireUsdRate(nativeCurrency);
     final currentPrice = latestPrices.containsKey(symbol)
         ? latestPrices[symbol]! / symbolCentDivisor(symbol)
         : nativeAvgCost;

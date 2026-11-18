@@ -234,6 +234,7 @@ Future<FxRateQuote> fetchHistoricalUsdRate(
   String currencyCode,
   DateTime tradeDate, {
   FxRateFetcher? fetcher,
+  FxRateFetcher? fallbackFetcher,
   Duration timeout = fxRequestTimeout,
 }) async {
   final code = currencyCode.toUpperCase();
@@ -244,28 +245,64 @@ Future<FxRateQuote> fetchHistoricalUsdRate(
   final uri = Uri.parse(
     'https://api.frankfurter.dev/v2/rate/USD/$code?date=${_dateString(day)}',
   );
-  final response = await _getWithDeadline(uri, fetcher, timeout);
+  try {
+    final response = await _getWithDeadline(uri, fetcher, timeout);
+    if (response.statusCode != 200) {
+      throw StateError(
+        'Historical FX request failed: HTTP ${response.statusCode}',
+      );
+    }
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    if (json['base'] != 'USD' ||
+        json['quote'] != code ||
+        json['rate'] is! num) {
+      throw const FormatException('Historical FX currency pair mismatch');
+    }
+    final rateDate = _parseDate(json['date']);
+    if (rateDate.isAfter(day) || day.difference(rateDate) > fxMaxRateAge) {
+      throw const FormatException('Historical FX date is outside trade date');
+    }
+    final rate = (json['rate'] as num).toDouble();
+    if (!rate.isFinite || rate <= 0) {
+      throw const FormatException('Invalid historical FX rate');
+    }
+    return FxRateQuote(
+      currencyCode: code,
+      rate: rate,
+      provider: 'frankfurter',
+      rateDate: rateDate,
+      retrievedAt: DateTime.now().toUtc(),
+    );
+  } catch (error) {
+    // Preserve deterministic injected tests unless the caller supplies a
+    // fallback. Production uses a dated independent source for outages.
+    if (fetcher != null && fallbackFetcher == null) rethrow;
+    talker.warning('Historical Frankfurter FX unavailable: $error');
+  }
+  final fallback = Uri.parse(
+    'https://${_dateString(day)}.currency-api.pages.dev/v1/currencies/usd.json',
+  );
+  final response = await _getWithDeadline(fallback, fallbackFetcher, timeout);
   if (response.statusCode != 200) {
     throw StateError(
-      'Historical FX request failed: HTTP ${response.statusCode}',
+      'Historical FX fallback failed: HTTP ${response.statusCode}',
     );
   }
   final json = jsonDecode(response.body) as Map<String, dynamic>;
-  if (json['base'] != 'USD' || json['quote'] != code || json['rate'] is! num) {
-    throw const FormatException('Historical FX currency pair mismatch');
-  }
   final rateDate = _parseDate(json['date']);
   if (rateDate.isAfter(day) || day.difference(rateDate) > fxMaxRateAge) {
-    throw const FormatException('Historical FX date is outside trade date');
+    throw const FormatException('Fallback FX date is outside trade date');
   }
-  final rate = (json['rate'] as num).toDouble();
-  if (!rate.isFinite || rate <= 0) {
-    throw const FormatException('Invalid historical FX rate');
+  final rawRates = json['usd'];
+  final rate =
+      rawRates is Map<String, dynamic> ? rawRates[code.toLowerCase()] : null;
+  if (rate is! num || !rate.toDouble().isFinite || rate <= 0) {
+    throw const FormatException('Invalid fallback historical USD rate');
   }
   return FxRateQuote(
     currencyCode: code,
-    rate: rate,
-    provider: 'frankfurter',
+    rate: rate.toDouble(),
+    provider: 'currencyApiHistorical',
     rateDate: rateDate,
     retrievedAt: DateTime.now().toUtc(),
   );

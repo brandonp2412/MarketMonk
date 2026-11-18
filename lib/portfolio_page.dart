@@ -36,6 +36,7 @@ import 'package:market_monk/profile_picker.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/sqlite_settings.dart';
 import 'package:market_monk/ticker_context_actions.dart';
+import 'package:market_monk/temporal_currency_returns.dart';
 import 'package:market_monk/trade_history_page.dart';
 import 'package:market_monk/utils.dart';
 import 'package:path_provider/path_provider.dart';
@@ -345,6 +346,8 @@ class PortfolioPageState extends State<PortfolioPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    // FX changes must rebuild cached monetary labels immediately.
+    context.select<SettingsState, String>((state) => state.displayCurrency);
     if (!_retainBodyOnDeactivation || _portfolioBody == null) {
       _portfolioBody = StreamBuilder<_LoadedPortfolio>(
         key: ValueKey(_lastAccount),
@@ -656,11 +659,20 @@ class PortfolioPageState extends State<PortfolioPage>
       0.0,
       (sum, position) => sum + position.currentValue,
     );
-    final totalCost = positions.fold(
-      0.0,
-      (sum, position) => sum + position.costBasis,
-    );
-    final costBasisGain = totalValue - totalCost;
+    // Lifetime open-holding performance in the selected display currency.
+    // Only use a complete dated-FX reconstruction: missing history must not
+    // silently turn into a one-shot conversion at today's rate.
+    final openReturns = [
+      for (final position in positions) _holdingReturn(position, period: 0),
+    ];
+    final allOpenReturnsVerified =
+        openReturns.every((result) => result != null);
+    final openGainUsd = allOpenReturnsVerified
+        ? openReturns.fold<double>(0, (sum, result) => sum + result!.gain)
+        : double.nan;
+    final openBasisUsd = allOpenReturnsVerified
+        ? openReturns.fold<double>(0, (sum, result) => sum + result!.basis)
+        : double.nan;
     final cashOutSummary = _ibkrCashOutSummary(performance, netLiquidation);
     final cutoff = _returnCutoff;
     final intraday = cutoff != null && _period >= firstIntradayPeriod;
@@ -692,7 +704,7 @@ class PortfolioPageState extends State<PortfolioPage>
     final allocation = resolvedAllocation ?? const <PortfolioAllocation>[];
     final totalGain = switch (true) {
       _ when historyPending => double.nan,
-      _ when cutoff == null => cashOutSummary?.gainUsd ?? costBasisGain,
+      _ when cutoff == null => cashOutSummary?.gainUsd ?? openGainUsd,
       _ when intradayValueUsd != null && _intradayCurrentValueUsd != null =>
         _intradayCurrentValueUsd! - intradayValueUsd,
       _ => historicalCashOut?.gainUsd ?? double.nan,
@@ -700,7 +712,7 @@ class PortfolioPageState extends State<PortfolioPage>
     final totalGainPct = switch (true) {
       _ when historyPending => double.nan,
       _ when cutoff == null => cashOutSummary?.gainPct ??
-          (totalCost > 0 ? (costBasisGain / totalCost) * 100 : 0.0),
+          (openBasisUsd > 0 ? (openGainUsd / openBasisUsd) * 100 : double.nan),
       _
           when intradayValueUsd != null &&
               _intradayCurrentValueUsd != null &&
@@ -904,17 +916,17 @@ class PortfolioPageState extends State<PortfolioPage>
                 final val = position.value;
                 final pct =
                     allocationTotal > 0 ? val / allocationTotal * 100 : 0.0;
+                final holding = currentBySymbol[position.symbol];
+                final holdingReturn =
+                    holding == null ? null : _holdingReturn(holding);
                 return _LegendTile(
                   color: colors[index],
                   symbol: position.symbol,
                   name: position.name,
                   value: val,
                   allocationPct: pct,
-                  changePct: currentBySymbol[position.symbol] == null
-                      ? double.nan
-                      : _holdingReturn(currentBySymbol[position.symbol]!)
-                              ?.percent ??
-                          double.nan,
+                  changePct: holdingReturn?.percent ?? double.nan,
+                  changeGain: holdingReturn?.gain ?? double.nan,
                   isHighlighted: index == selectedIndex,
                   onTap: () => _updateState(
                     () => touchedIndex = touchedIndex == index ? null : index,

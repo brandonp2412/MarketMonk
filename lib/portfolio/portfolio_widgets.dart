@@ -378,6 +378,7 @@ class _LegendTile extends StatelessWidget {
   final double value;
   final double allocationPct;
   final double changePct;
+  final double changeGain;
   final bool isHighlighted;
   final VoidCallback onTap;
 
@@ -388,6 +389,7 @@ class _LegendTile extends StatelessWidget {
     required this.value,
     required this.allocationPct,
     required this.changePct,
+    required this.changeGain,
     required this.isHighlighted,
     required this.onTap,
   });
@@ -403,6 +405,7 @@ class _LegendTile extends StatelessWidget {
       copyLabel: context.l10n.text('Copy allocation'),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+        minTileHeight: 76,
         onTap: onTap,
         selected: isHighlighted,
         leading: Container(
@@ -411,7 +414,18 @@ class _LegendTile extends StatelessWidget {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         title: Text(symbol),
-        subtitle: Text('${allocationPct.toStringAsFixed(1)}%'),
+        subtitle: Text(
+          changePct.isFinite
+              ? '${changePct >= 0 ? '+' : ''}${changePct.toStringAsFixed(2)}%'
+              : '—',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: !changePct.isFinite
+                    ? Theme.of(context).colorScheme.onSurfaceVariant
+                    : changePct >= 0
+                        ? Colors.green
+                        : Colors.redAccent,
+              ),
+        ),
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -419,23 +433,18 @@ class _LegendTile extends StatelessWidget {
             Text(
               fmtCurrency(value),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: switch (true) {
-                      _ when !changePct.isFinite =>
-                        Theme.of(context).colorScheme.onSurfaceVariant,
-                      _ when changePct >= 0 => Colors.green,
-                      _ => Colors.redAccent,
-                    },
+                    color: Theme.of(context).textTheme.titleMedium?.color,
                   ),
             ),
             Text(
-              changePct.isFinite
-                  ? '${changePct >= 0 ? '+' : ''}${changePct.toStringAsFixed(2)}%'
+              changeGain.isFinite
+                  ? '${changeGain >= 0 ? '+' : ''}${fmtCurrency(changeGain)}'
                   : '—',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: switch (true) {
-                      _ when !changePct.isFinite =>
+                      _ when !changeGain.isFinite =>
                         Theme.of(context).colorScheme.onSurfaceVariant,
-                      _ when changePct >= 0 => Colors.green,
+                      _ when changeGain >= 0 => Colors.green,
                       _ => Colors.redAccent,
                     },
                   ),

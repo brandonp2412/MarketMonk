@@ -107,7 +107,7 @@ extension _PortfolioReturnHistory on PortfolioPageState {
   }
 
   String _returnHistoryKey(AccountManager accounts, List<Position> positions) =>
-      '${accounts.activeAccount}:${accounts.ibkrConfigFor().hashCode}:${accounts.ibkrRefreshVersion}:${identityHashCode(accounts.ibkrPerformanceCacheFor(accounts.activeAccount, '1Y'))}:${positions.map((p) => '${p.symbol}:${p.netShares}:${p.costBasis}').join(',')}';
+      '${accounts.activeAccount}:${accounts.ibkrConfigFor().hashCode}:${accounts.ibkrRefreshVersion}:${identityHashCode(accounts.ibkrPerformanceCacheFor(accounts.activeAccount, '1Y'))}:${currency.currencyName}:${positions.map((p) => '${p.symbol}:${p.netShares}:${p.costBasis}').join(',')}';
 
   Future<void> _ensureReturnHistory(String key, List<Position> positions) {
     if (_historyAccount == key && _historyFuture != null)
@@ -405,9 +405,29 @@ extension _PortfolioReturnHistory on PortfolioPageState {
   }
 
   PortfolioReturn? _holdingReturn(Position position, {int? period}) {
+    final displayCode = currency.currencyName ?? 'USD';
+    final currentRate = allRatesFromUsd[displayCode];
+    if (currentRate == null || !currentRate.isFinite || currentRate <= 0) {
+      return null;
+    }
+    final trades = _returnTrades
+        .where((trade) => trade.symbol == position.symbol)
+        .toList()
+      ..sort((a, b) => a.tradeDate.compareTo(b.tradeDate));
+    final fxByDate = <DateTime, double>{
+      for (final entry in _returnHistory?.rates.entries ??
+          const <MapEntry<DateTime, Map<String, double>>>[])
+        if (entry.value[displayCode] case final double rate)
+          temporalFxDay(entry.key): rate,
+    };
     final cutoff = _cutoff(period ?? _period, DateTime.now());
     if (cutoff == null) {
-      return PortfolioReturn(position.unrealizedPL, position.costBasis);
+      return temporalOpenHoldingReturn(
+        position: position,
+        trades: trades,
+        displayCurrency: displayCode,
+        ratesByDate: fxByDate,
+      );
     }
     if (_historyLoading || _historyFailed) return null;
     if (period != null && period >= firstIntradayPeriod) {
@@ -419,60 +439,88 @@ extension _PortfolioReturnHistory on PortfolioPageState {
         baselineUsd = entry.value;
       }
       if (baselineUsd == null || baselineUsd <= 0) return null;
+      // Intraday FX is not available; use the same-day FX rate for both ends.
       final basis = position.netShares * baselineUsd;
       if (basis <= 0) return null;
       return PortfolioReturn(position.currentValue - basis, basis);
     }
-    final trades = _returnTrades
-        .where((trade) => trade.symbol == position.symbol)
-        .toList()
-      ..sort((a, b) => a.tradeDate.compareTo(b.tradeDate));
     if (trades.isNotEmpty &&
         trades.every(
-          (trade) => DateTime(
-            trade.tradeDate.year,
-            trade.tradeDate.month,
-            trade.tradeDate.day,
-          ).isAfter(cutoff),
+          (trade) =>
+              temporalFxDay(trade.tradeDate).isAfter(temporalFxDay(cutoff)),
         ) &&
         (trades.fold<double>(0, (sum, trade) => sum + trade.quantity) -
                     position.netShares)
                 .abs() <
             1e-6) {
-      return PortfolioReturn(position.unrealizedPL, position.costBasis);
+      return temporalOpenHoldingReturn(
+        position: position,
+        trades: trades,
+        displayCurrency: displayCode,
+        ratesByDate: fxByDate,
+      );
     }
     StoredCandle? baseline;
     for (final candle in _returnCandles[position.symbol] ?? <StoredCandle>[]) {
       if (!candle.date.isAfter(cutoff)) baseline = candle;
     }
-    if (baseline == null || cutoff.difference(baseline.date).inDays > 7)
+    if (baseline == null || cutoff.difference(baseline.date).inDays > 7) {
       return null;
-    final currency = normalizedQuoteCurrency(
+    }
+    final quoteCode = normalizedQuoteCurrency(
       baseline.rawCurrency ?? symbolCurrency(position.symbol),
     );
-    final basis = position.netShares *
-        baseline.close /
-        candleCentDivisor(baseline) /
-        requireUsdRate(currency);
-    if (trades.any(
-      (trade) => verifiedTradeAmountUsd(trade, trade.price) == null,
-    )) return null;
-    if (trades.isEmpty)
-      return PortfolioReturn(position.currentValue - basis, basis);
-    return openHoldingPeriodReturn(
-      currentValue: position.currentValue,
-      currentShares: position.netShares,
-      baselinePrice: basis / position.netShares,
-      cutoff: cutoff,
-      trades: [
-        for (final trade in trades)
-          (
-            date: trade.tradeDate,
-            quantity: trade.quantity,
-            price: tradeAmountUsd(trade, trade.price),
-          ),
-      ],
+    final periodRates = _returnHistory?.rates.entries.where(
+      (entry) => temporalFxDay(entry.key) == temporalFxDay(cutoff),
     );
+    final atCutoff =
+        periodRates?.isNotEmpty == true ? periodRates!.first.value : null;
+    final nativeToUsdAtCutoff = quoteCode == 'USD' ? 1.0 : atCutoff?[quoteCode];
+    final displayAtCutoff = displayCode == 'USD' ? 1.0 : atCutoff?[displayCode];
+    if (nativeToUsdAtCutoff == null ||
+        nativeToUsdAtCutoff <= 0 ||
+        displayAtCutoff == null ||
+        displayAtCutoff <= 0) {
+      return null;
+    }
+    final baselineDisplayPrice = baseline.close /
+        candleCentDivisor(baseline) /
+        nativeToUsdAtCutoff *
+        displayAtCutoff;
+    final futureTrades = <({DateTime date, double quantity, double price})>[];
+    for (final trade in trades) {
+      final after =
+          temporalFxDay(trade.tradeDate).isAfter(temporalFxDay(cutoff));
+      if (!after) {
+        futureTrades
+            .add((date: trade.tradeDate, quantity: trade.quantity, price: 0));
+        continue;
+      }
+      final priceUsd = verifiedTradeAmountUsd(trade, trade.price);
+      final rate =
+          displayCode == 'USD' ? 1.0 : fxByDate[temporalFxDay(trade.tradeDate)];
+      if (priceUsd == null || rate == null) return null;
+      futureTrades.add(
+        (
+          date: trade.tradeDate,
+          quantity: trade.quantity,
+          price: priceUsd * rate,
+        ),
+      );
+    }
+    final calculated = openHoldingPeriodReturn(
+      currentValue: position.currentValue * currentRate,
+      currentShares: position.netShares,
+      baselinePrice: baselineDisplayPrice,
+      cutoff: cutoff,
+      trades: futureTrades,
+    );
+    return calculated == null
+        ? null
+        : PortfolioReturn(
+            calculated.gain / currentRate,
+            calculated.basis / currentRate,
+          );
   }
 
   Future<bool> _restoreCachedReturnIntraday(

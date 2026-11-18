@@ -9,7 +9,7 @@ import 'package:market_monk/logging.dart';
 import 'package:market_monk/portfolio_allocation.dart';
 import 'package:market_monk/portfolio_returns.dart';
 import 'package:market_monk/profile_data_repository.dart';
-import 'package:market_monk/sqlite_settings.dart';
+import 'package:market_monk/temporal_currency_returns.dart';
 import 'package:market_monk/utils.dart';
 
 typedef PortfolioCandleSync = Future<void> Function(
@@ -297,35 +297,39 @@ Future<PortfolioHistory> loadPortfolioHistory({
     );
   }
   final rates = <DateTime, Map<String, double>>{};
+  // A display-currency cost basis must use each purchase day's FX rate,
+  // not the current spot rate applied to old USD purchase costs.
+  final fxDates = {
+    ...dates,
+    for (final trade in trades)
+      if (trade.quantity != 0) temporalFxDay(trade.tradeDate),
+  };
   final currencies = {
     'USD',
+    currency.currencyName ?? 'USD',
     if (performance != null) performance.currency.toUpperCase(),
+    for (final position in positions) position.nativeCurrency.toUpperCase(),
     for (final series in candles.values)
       for (final candle in series)
         if (candle.rawCurrency != null)
           normalizedQuoteCurrency(candle.rawCurrency!),
   };
-  for (final date in dates) {
-    rates[date] = {'USD': 1};
-    for (final currency in currencies.where((currency) => currency != 'USD')) {
-      try {
-        final dateKey = DateTime.utc(date.year, date.month, date.day)
-            .toIso8601String()
-            .substring(0, 10);
-        final rate = cacheOnly
-            ? (await SqliteSettings.getInstance()).getDouble(
-                'historicalUsdRate_${currency}_$dateKey',
-              )
-            : await (rateLoader ?? historicalTradeUsdRate)(currency, date);
-        if (rate == null) continue;
-        if (!rate.isFinite || rate <= 0) {
-          throw StateError('Invalid historical USD/$currency rate');
-        }
-        rates[date]![currency] = rate;
-      } catch (error, stack) {
-        talker.handle(error, stack, 'Failed to load portfolio exchange rate');
-      }
-    }
+  final rateTables = <String, Map<DateTime, double>>{};
+  for (final code in currencies.where((code) => code != 'USD')) {
+    rateTables[code] = await loadTemporalRatesForDates(
+      fxDates,
+      code,
+      cacheOnly: cacheOnly,
+      rateLoader: rateLoader,
+    );
+  }
+  for (final date in fxDates) {
+    final day = temporalFxDay(date);
+    rates[date] = {
+      'USD': 1,
+      for (final entry in rateTables.entries)
+        if (entry.value[day] case final double rate) entry.key: rate,
+    };
   }
   return PortfolioHistory(trades: trades, candles: candles, rates: rates);
 }

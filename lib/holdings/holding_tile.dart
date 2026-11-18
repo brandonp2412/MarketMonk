@@ -2,6 +2,8 @@ part of '../holdings_page.dart';
 
 class _SymbolTile extends StatelessWidget {
   final SymbolSummary summary;
+  final PortfolioReturn? temporalReturn;
+  final bool temporalRatesLoading;
   final bool selecting;
   final bool isSelected;
   final VoidCallback onTap;
@@ -9,6 +11,8 @@ class _SymbolTile extends StatelessWidget {
 
   const _SymbolTile({
     required this.summary,
+    required this.temporalReturn,
+    required this.temporalRatesLoading,
     required this.selecting,
     required this.isSelected,
     required this.onTap,
@@ -18,7 +22,7 @@ class _SymbolTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final position = summary.position;
-    final changePct = position?.change ?? 0.0;
+    final changePct = temporalReturn?.percent;
     Widget leadingWidget;
     if (selecting) {
       leadingWidget = SizedBox(
@@ -42,8 +46,10 @@ class _SymbolTile extends StatelessWidget {
         height: 40,
         child: position != null
             ? Icon(
-                changePct >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
-                color: changePct >= 0 ? Colors.green : Colors.redAccent,
+                (changePct ?? 0) >= 0
+                    ? Icons.arrow_upward
+                    : Icons.arrow_downward,
+                color: (changePct ?? 0) >= 0 ? Colors.green : Colors.redAccent,
               )
             : const Icon(Icons.history, color: Colors.grey),
       );
@@ -59,9 +65,13 @@ class _SymbolTile extends StatelessWidget {
       title: Text(summary.symbol),
       subtitle: position != null
           ? Text(
-              '${changePct >= 0 ? '+' : ''}${changePct.toStringAsFixed(2)}%',
+              changePct == null
+                  ? (temporalRatesLoading
+                      ? 'Loading historical FX…'
+                      : 'Historical FX unavailable')
+                  : '${changePct >= 0 ? '+' : ''}${changePct.toStringAsFixed(2)}%',
               style: TextStyle(
-                color: changePct >= 0 ? Colors.green : Colors.redAccent,
+                color: (changePct ?? 0) >= 0 ? Colors.green : Colors.redAccent,
                 fontSize: 13,
               ),
             )

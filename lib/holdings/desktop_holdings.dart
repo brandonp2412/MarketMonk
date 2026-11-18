@@ -116,14 +116,17 @@ extension _HoldingsDesktopView on HoldingsPageState {
       0.0,
       (sum, position) => sum + position.currentValue,
     );
-    final totalCost = open.fold(
-      0.0,
-      (sum, position) => sum + position.costBasis,
-    );
-    final costBasisGain = open.fold(
-      0.0,
-      (sum, position) => sum + position.unrealizedPL,
-    );
+    final verifiedReturns = [
+      for (final summary in summaries)
+        if (summary.position != null) _temporalHolding(summary),
+    ];
+    final allVerified = verifiedReturns.every((result) => result != null);
+    final totalCost = allVerified
+        ? verifiedReturns.fold<double>(0, (sum, result) => sum + result!.basis)
+        : double.nan;
+    final costBasisGain = allVerified
+        ? verifiedReturns.fold<double>(0, (sum, result) => sum + result!.gain)
+        : double.nan;
     final accounts = context.watch<AccountManager>();
     final cashOutSummary = _ibkrCashOutSummary(accounts);
     final cashBalance =
@@ -135,7 +138,9 @@ extension _HoldingsDesktopView on HoldingsPageState {
     final totalUnrealized = cashOutSummary?.gainUsd ?? costBasisGain;
     final totalUnrealizedPct = cashOutSummary?.gainPct ??
         (totalCost > 0 ? costBasisGain / totalCost * 100 : 0.0);
-    final winners = open.where((position) => position.change >= 0).length;
+    final winners = verifiedReturns
+        .where((result) => result != null && result.gain >= 0)
+        .length;
     final sorted = _sortDesktopSummaries(summaries);
     final focusedSymbol = _viFocusIndex >= 0 && _viFocusIndex < sorted.length
         ? sorted[_viFocusIndex].symbol
@@ -195,7 +200,7 @@ extension _HoldingsDesktopView on HoldingsPageState {
               _desktopMetric(
                 context,
                 label: context.l10n.text('Cost basis'),
-                value: fmtCurrency(totalCost),
+                value: totalCost.isFinite ? fmtCurrency(totalCost) : '—',
               ),
               _desktopMetric(
                 context,
@@ -383,8 +388,10 @@ extension _HoldingsDesktopView on HoldingsPageState {
                                     (() {
                                       final position = summary.position;
                                       final isClosed = position == null;
-                                      final returnPct = position?.change ?? 0;
-                                      final pnl = position?.unrealizedPL;
+                                      final temporal =
+                                          _temporalHolding(summary);
+                                      final returnPct = temporal?.percent;
+                                      final pnl = temporal?.gain;
                                       final pnlText = pnl == null
                                           ? '—'
                                           : '${pnl >= 0 ? '+' : ''}${fmtCurrency(pnl)}';
@@ -400,7 +407,8 @@ extension _HoldingsDesktopView on HoldingsPageState {
                                       final changeColor = switch (true) {
                                         _ when isClosed =>
                                           theme.colorScheme.onSurfaceVariant,
-                                        _ when returnPct >= 0 => Colors.green,
+                                        _ when (returnPct ?? 0) >= 0 =>
+                                          Colors.green,
                                         _ => Colors.redAccent,
                                       };
                                       final pnlColor = switch (true) {
@@ -443,7 +451,10 @@ extension _HoldingsDesktopView on HoldingsPageState {
                                                     switch (true) {
                                                       _ when isClosed =>
                                                         Icons.history_rounded,
-                                                      _ when returnPct >= 0 =>
+                                                      _
+                                                          when (returnPct ??
+                                                                  0) >=
+                                                              0 =>
                                                         Icons
                                                             .trending_up_rounded,
                                                       _ => Icons
@@ -524,10 +535,12 @@ extension _HoldingsDesktopView on HoldingsPageState {
                                           textCell(
                                             position == null
                                                 ? '—'
-                                                : fmtNativeCurrency(
-                                                    position.avgCost,
-                                                    position.nativeCurrency,
-                                                  ),
+                                                : temporal == null
+                                                    ? '—'
+                                                    : fmtCurrency(
+                                                        temporal.basis /
+                                                            position.netShares,
+                                                      ),
                                             summary: summary,
                                           ),
                                           textCell(
@@ -555,7 +568,9 @@ extension _HoldingsDesktopView on HoldingsPageState {
                                           textCell(
                                             position == null
                                                 ? '—'
-                                                : '${returnPct >= 0 ? '+' : ''}${returnPct.toStringAsFixed(2)}%',
+                                                : returnPct == null
+                                                    ? '—'
+                                                    : '${returnPct >= 0 ? '+' : ''}${returnPct.toStringAsFixed(2)}%',
                                             summary: summary,
                                             color: changeColor,
                                           ),

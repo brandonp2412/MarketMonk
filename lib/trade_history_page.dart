@@ -12,6 +12,8 @@ import 'package:market_monk/holdings/symbol_summary.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/l10n/app_localizations.dart';
 import 'package:market_monk/profile_data_repository.dart';
+import 'package:market_monk/settings_state.dart';
+import 'package:market_monk/temporal_currency_returns.dart';
 import 'package:market_monk/utils.dart';
 import 'package:provider/provider.dart';
 
@@ -37,6 +39,28 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
   late Stream<List<Trade>> _tradesStream;
   late Stream<List<Trade>> _ibkrTradesStream;
   final Set<int> _selectedTradeIds = {};
+  Map<DateTime, double> _temporalRates = {};
+  String? _temporalRateKey;
+
+  void _ensureTemporalRates(List<Trade> trades, String code) {
+    final key = '$code:${trades.length}:'
+        '${trades.fold<int>(0, (hash, t) => hash ^ t.id ^ t.tradeDate.millisecondsSinceEpoch ^ t.quantity.hashCode)}';
+    if (_temporalRateKey == key) return;
+    _temporalRateKey = key;
+    _temporalRates = {};
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _temporalRateKey != key) return;
+      runDetachedTask(
+        () async {
+          final rates = await loadTemporalTradeRates(trades, code);
+          if (mounted && _temporalRateKey == key) {
+            setState(() => _temporalRates = rates);
+          }
+        }(),
+        'Failed to load dated trade exchange rates',
+      );
+    });
+  }
 
   @override
   void initState() {
@@ -168,6 +192,8 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
       stream: ibkrManaged ? _ibkrTradesStream : _tradesStream,
       builder: (context, snap) {
         final trades = snap.data ?? cachedTrades;
+        final displayCode = context.watch<SettingsState>().displayCurrency;
+        _ensureTemporalRates(trades, displayCode);
         final symbol = widget.summary.symbol;
         final centDiv = symbolCentDivisor(symbol);
         final cachedPosition = widget.summary.position;
@@ -199,19 +225,38 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
           brokerTradeHistoryAvailable:
               widget.summary.brokerTradeHistoryAvailable,
         );
-        double? totalRealizedUsd = 0;
-        for (final trade in trades) {
-          final amount = verifiedTradeAmountUsd(trade, trade.realizedPL);
-          if (amount == null) {
-            totalRealizedUsd = null;
-            break;
+        double? totalRealizedUsd;
+        if (displayCode == 'USD') {
+          totalRealizedUsd = 0;
+          for (final trade in trades) {
+            final amount = verifiedTradeAmountUsd(trade, trade.realizedPL);
+            if (amount == null) {
+              totalRealizedUsd = null;
+              break;
+            }
+            totalRealizedUsd = totalRealizedUsd! + amount;
           }
-          totalRealizedUsd = totalRealizedUsd! + amount;
+        } else {
+          totalRealizedUsd = temporalRealizedTradeGain(
+            trades: trades,
+            displayCurrency: displayCode,
+            ratesByDate: _temporalRates,
+          );
         }
-        final unrealizedPL = position?.unrealizedPL ?? 0.0;
+        final temporal = position == null
+            ? null
+            : temporalOpenHoldingReturn(
+                position: position,
+                trades: trades,
+                displayCurrency: displayCode,
+                ratesByDate: _temporalRates,
+              );
+        final unrealizedPL = temporal?.gain;
         final realizedToday = liveSummary.realizedTodayUsd();
-        final totalGain =
-            totalRealizedUsd == null ? null : totalRealizedUsd + unrealizedPL;
+        final totalGain = totalRealizedUsd == null ||
+                (position != null && unrealizedPL == null)
+            ? null
+            : totalRealizedUsd + (unrealizedPL ?? 0);
 
         return Scaffold(
           appBar: isDesktopLayout(context)
@@ -309,6 +354,7 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                     symbol: symbol,
                     name: widget.summary.name,
                     position: position,
+                    temporalReturn: temporal,
                     trades: trades,
                     totalRealizedUsd: totalRealizedUsd,
                     realizedToday: realizedToday,
@@ -358,11 +404,11 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                                 ),
                                 _SummaryRow(
                                   label: context.l10n.text('Avg cost'),
-                                  // avgCost is in native currency — show without conversion.
-                                  value: fmtNativeCurrency(
-                                    position.avgCost,
-                                    position.nativeCurrency,
-                                  ),
+                                  value: temporal == null
+                                      ? 'Historical FX unavailable'
+                                      : fmtCurrency(
+                                          temporal.basis / position.netShares,
+                                        ),
                                 ),
                                 _SummaryRow(
                                   label: context.l10n.text('Current value'),
@@ -371,12 +417,15 @@ class _TradeHistoryPageState extends State<TradeHistoryPage> {
                                 ),
                                 _SummaryRow(
                                   label: context.l10n.text('Unrealized P/L'),
-                                  value:
-                                      '${unrealizedPL >= 0 ? '+' : ''}${fmtCurrency(unrealizedPL)}'
-                                      ' (${position.change.toStringAsFixed(2)}%)',
-                                  color: unrealizedPL >= 0
-                                      ? Colors.green
-                                      : Colors.redAccent,
+                                  value: unrealizedPL == null
+                                      ? 'Historical FX unavailable'
+                                      : '${unrealizedPL >= 0 ? '+' : ''}${fmtCurrency(unrealizedPL)}'
+                                          ' (${temporal!.percent.toStringAsFixed(2)}%)',
+                                  color: unrealizedPL == null
+                                      ? null
+                                      : unrealizedPL >= 0
+                                          ? Colors.green
+                                          : Colors.redAccent,
                                 ),
                               ],
                               if (realizedToday != null)
