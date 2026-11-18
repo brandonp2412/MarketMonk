@@ -1,5 +1,64 @@
 [
   {
+    "version": "2.0.2",
+    "date": "2026-11-18",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v2.0.1...v2.0.2",
+    "changes": [
+      "Historical USD-to-NZD exchange rates now determine cost basis and returns at each trade date, rather than converting the entire portfolio at today’s rate.",
+      "Percentage and dollar portfolio returns use the same cash-out calculation.",
+      "Historical charts stay visible while prices refresh; period transitions finish before new quotes arrive."
+    ]
+  },
+  {
+    "version": "2.0.1",
+    "date": "2026-11-15",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.118...v2.0.1",
+    "changes": [
+      "Faster chart navigation and clearer loading states for portfolios and individual stocks.",
+      "Portfolio charts restore cached history immediately, fill missing dates, and refresh in bounded background batches.",
+      "Improved period picker remembers intraday ranges and loads missing periods when switching profiles.",
+      "Holdings selection and intraday returns refined, with cash included in portfolio values.",
+      "Fixed misaligned mobile favorites, hidden portfolio actions, donation visibility, and chart value/return colors."
+    ]
+  },
+  {
+    "version": "1.0.118",
+    "date": "2026-11-08",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.117...v1.0.118",
+    "changes": [
+      "Configurable desktop vi-style keyboard shortcuts, including holdings undo and navigation across tabs.",
+      "More flexible portfolio period selection, including sub-day periods, with charts expanded to the available history.",
+      "Stock charts can open directly in the Charts tab on desktop.",
+      "Improved portfolio and holdings layout, chart loading placeholders, and Linux graphics rendering.",
+      "Reproducible Android builds for F-Droid."
+    ]
+  },
+  {
+    "version": "1.0.117",
+    "date": "2026-11-07",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.116...v1.0.117",
+    "changes": [
+      "Improved IBKR candle request pacing and more informative fallback errors.",
+      "Fixed edge-to-edge display on Android and release-build optimization.",
+      "Removed a duplicate portfolio cash notice."
+    ]
+  },
+  {
+    "version": "1.0.116",
+    "date": "2026-11-07",
+    "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.114...v1.0.116",
+    "changes": [
+      "Added cryptocurrency prices, historical charts, and candlestick views.",
+      "Portfolio and holdings now include IBKR cash balances and cash allocation.",
+      "Historical FX handling preserves original quote currencies and improves rate fallback sources.",
+      "Desktop and mobile settings redesigned with search, live chart previews, and configurable start page.",
+      "New portfolio period ruler and historical allocation changes, plus faster portfolio and favorite chart loading.",
+      "Multi-select holdings, improved desktop trade history, and chart gesture controls.",
+      "Improved portfolio P/L calculations, intraday cash-flow history, and chart loading behavior.",
+      "Android build and JNI fixes, plus layout and responsiveness improvements."
+    ]
+  },
+  {
     "version": "1.0.114",
     "date": "2026-10-30",
     "sourceUrl": "https://github.com/brandonp2412/MarketMonk/compare/v1.0.113...v1.0.114",

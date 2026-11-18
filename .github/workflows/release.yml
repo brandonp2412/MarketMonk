@@ -196,6 +196,11 @@ jobs:
           sed -i "s/msix_version: .*/msix_version: $NEW_MSIX_VERSION/" pubspec.yaml
           echo "Updated pubspec.yaml with new app and MSIX versions"
 
+      - name: Update in-app release history
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: python3 tool/build_release_history.py --version "$RELEASE_VERSION"
+
       - name: Generate changelog
         id: changelog
         run: |
@@ -262,7 +267,7 @@ jobs:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
           RELEASE_BUILD_NUMBER: ${{ steps.version.outputs.build_number }}
         run: |
-          git add pubspec.yaml assets/changelogs/ fastlane/metadata/android/en-US/images/
+          git add pubspec.yaml assets/release_history.json assets/changelogs/ fastlane/metadata/android/en-US/images/
           git commit -m "Bump version to ${RELEASE_VERSION}+${RELEASE_BUILD_NUMBER} [skip ci]"
           gh auth setup-git
           git pull --rebase origin main

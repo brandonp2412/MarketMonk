@@ -47,6 +47,9 @@ jobs:
             flutter/bin/dart format --output=none --set-exit-if-changed "${paths[@]}"
           fi
 
+      - name: Verify in-app release notes
+        run: python3 tool/build_release_history.py --check
+
       - name: Analyze
         run: flutter/bin/flutter analyze --no-fatal-infos
 
