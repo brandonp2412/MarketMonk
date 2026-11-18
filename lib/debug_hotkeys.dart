@@ -73,7 +73,7 @@ bool isFlutterToolRunner(String commandLine) {
 bool _requestPending = false;
 
 void installDesktopDebugHotkeys() {
-  if (!kDebugMode || !Platform.isLinux) return;
+  if (!kDebugMode || kIsWeb || !Platform.isLinux) return;
 
   HardwareKeyboard.instance.addHandler((event) {
     final keyboard = HardwareKeyboard.instance;

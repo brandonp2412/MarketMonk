@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:drift/internal/versioned_schema.dart';
-import 'package:drift_dev/api/migrations_native.dart';
+import 'schema_validation.dart' as schema;
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:market_monk/legacy_profile_database.steps.dart';
@@ -121,7 +121,7 @@ class LegacyProfileDatabase extends _$LegacyProfileDatabase {
           'CREATE INDEX IF NOT EXISTS idx_trades_symbol_trade_date '
           'ON trades (symbol, trade_date)',
         );
-        if (kDebugMode) await validateDatabaseSchema();
+        if (kDebugMode) await schema.validateDatabaseSchema(this);
       },
     );
   }

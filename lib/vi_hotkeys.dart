@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:market_monk/settings_state.dart';
@@ -7,7 +8,8 @@ import 'package:market_monk/vi_keys.dart';
 import 'package:market_monk/vi_navigation.dart';
 
 void installDesktopViHotkeys(SettingsState settings) {
-  if (!(Platform.isWindows || Platform.isMacOS || Platform.isLinux)) return;
+  if (!kIsWeb && !(Platform.isWindows || Platform.isMacOS || Platform.isLinux))
+    return;
   ViKeyState.instance.ensureInstalled();
 
   HardwareKeyboard.instance.addHandler((event) {

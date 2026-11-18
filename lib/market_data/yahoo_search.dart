@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/crypto_market_data.dart';
 import 'package:market_monk/logging.dart';
+import 'package:market_monk/market_data/web_market_uri.dart';
 
 class YahooFinanceApi {
   static const String _baseUrl =
@@ -16,7 +17,8 @@ class YahooFinanceApi {
   String? _pendingQuery;
 
   YahooFinanceApi({Future<http.Response> Function(Uri)? searchFetcher})
-      : _searchFetcher = searchFetcher ?? http.get;
+      : _searchFetcher =
+            searchFetcher ?? ((uri) => http.get(webMarketDataUri(uri)));
 
   Future<List<StockResult>> searchTickers(String query) {
     final trimmedQuery = query.trim();

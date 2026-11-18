@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:market_monk/market_data/web_market_uri.dart';
 import 'package:http/http.dart' as http;
 import 'package:market_monk/ibkr_api.dart';
 
@@ -77,7 +78,10 @@ class CryptoPriceQuote {
 class CryptoMarketData {
   CryptoMarketData({Future<http.Response> Function(Uri)? fetch})
       : _fetch = fetch ??
-            ((uri) => http.get(uri, headers: {'User-Agent': 'Mozilla/5.0'}));
+            ((uri) => http.get(
+                  webMarketDataUri(uri),
+                  headers: {'User-Agent': 'Mozilla/5.0'},
+                ));
 
   final Future<http.Response> Function(Uri) _fetch;
 

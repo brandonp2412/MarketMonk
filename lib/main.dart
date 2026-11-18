@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:drift/native.dart';
+import 'package:flutter/foundation.dart';
+import 'package:market_monk/native_sqlite_file.dart';
 import 'package:flutter/material.dart';
 import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/backup_archive.dart';
@@ -38,26 +39,29 @@ Future<void> main() async {
 
       final sqliteSettings = await SqliteSettings.getInstance();
       final database = profileDataDatabase;
-      await database.migrateLegacyDatabases(
-        snapshotLoader: () => readLegacyDatabaseSnapshot(
-          readSettings: sqliteSettings.database.readSettings,
-          readProfileNames: sqliteSettings.database.readProfileNames,
-          readActiveProfile: sqliteSettings.database.readActiveProfile,
-          openProfileDatabase: (name) async {
-            final directory = await getApplicationSupportDirectory();
-            final file = File(
-              p.join(directory.path, databaseFileNameForAccount(name)),
-            );
-            if (!await file.exists()) return null;
-            return legacy.LegacyProfileDatabase.connect(NativeDatabase(file));
-          },
-        ),
-      );
+      if (!kIsWeb)
+        await database.migrateLegacyDatabases(
+          snapshotLoader: () => readLegacyDatabaseSnapshot(
+            readSettings: sqliteSettings.database.readSettings,
+            readProfileNames: sqliteSettings.database.readProfileNames,
+            readActiveProfile: sqliteSettings.database.readActiveProfile,
+            openProfileDatabase: (name) async {
+              final directory = await getApplicationSupportDirectory();
+              final file = File(
+                p.join(directory.path, databaseFileNameForAccount(name)),
+              );
+              if (!await file.exists()) return null;
+              return legacy.LegacyProfileDatabase.connect(
+                openNativeSqliteFile(file),
+              );
+            },
+          ),
+        );
       final settings = SettingsState();
       installDesktopViHotkeys(settings);
       final accounts = AccountManager(database: database);
       await Future.wait([settings.initialized, accounts.init()]);
-      await sqliteSettings.cleanupLegacyAppStateAfterMigration();
+      if (!kIsWeb) await sqliteSettings.cleanupLegacyAppStateAfterMigration();
       talker.info('Account manager initialized');
 
       runApp(

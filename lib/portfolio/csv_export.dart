@@ -12,7 +12,8 @@ extension _PortfolioCsvExport on PortfolioPageState {
       bytes: csv.bytes,
     );
     if (path == null) return;
-    if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
+    if (!kIsWeb &&
+        (Platform.isLinux || Platform.isWindows || Platform.isMacOS)) {
       await File(path.toFilePath()).writeAsBytes(csv.bytes);
     }
     talker.info('Exported portfolio CSV with ${positions.length} positions');

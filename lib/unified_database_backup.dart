@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:drift/drift.dart' show OrderingTerm;
-import 'package:drift/native.dart';
+import 'package:market_monk/native_sqlite_file.dart';
 import 'package:market_monk/database.dart';
 
 /// Creates a consistent snapshot of the unified database.
@@ -22,7 +22,7 @@ Future<void> restoreUnifiedDatabase(
   required List<String> expectedProfiles,
   required String expectedActiveProfile,
 }) async {
-  final source = Database.connect(NativeDatabase(sourceFile));
+  final source = Database.connect(openNativeSqliteFile(sourceFile));
   try {
     final quickCheck = await source.customSelect('PRAGMA quick_check').get();
     if (quickCheck.length != 1 ||

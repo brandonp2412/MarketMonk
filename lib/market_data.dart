@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
+import 'package:market_monk/market_data/web_market_uri.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:market_monk/background_network_coordinator.dart';

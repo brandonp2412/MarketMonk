@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:drift/native.dart';
+import 'package:market_monk/native_sqlite_file.dart';
 import 'package:flutter/material.dart';
 import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/backup_archive.dart';
@@ -567,7 +567,8 @@ class AccountManager extends ChangeNotifier {
     );
     try {
       final copy = await sourceFile.copy(p.join(temp.path, 'profile.sqlite'));
-      final source = legacy.LegacyProfileDatabase.connect(NativeDatabase(copy));
+      final source =
+          legacy.LegacyProfileDatabase.connect(openNativeSqliteFile(copy));
       try {
         await importLegacyProfile(_database, source, activeProfileId);
       } finally {
@@ -664,7 +665,7 @@ class AccountManager extends ChangeNotifier {
         if (file == null) {
           throw const FormatException('Missing profile database in backup');
         }
-        return legacy.LegacyProfileDatabase.connect(NativeDatabase(file));
+        return legacy.LegacyProfileDatabase.connect(openNativeSqliteFile(file));
       },
     );
     await _database.migrateLegacySnapshot(snapshot, replaceExisting: true);

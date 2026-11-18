@@ -84,11 +84,7 @@ extension _SettingsDataTransfer on _SettingsPageState {
     final contents = <String>[];
     try {
       for (final pickedFile in result) {
-        final path = pickedFile.path;
-        if (path == null) {
-          throw StateError('Could not access ${pickedFile.name}');
-        }
-        contents.add(await File(path).readAsString());
+        contents.add(utf8.decode(await pickedFile.readAsBytes()));
       }
       parsed = parseBrokerCsvBatch(selectedParser!, contents);
     } catch (error) {
@@ -203,6 +199,37 @@ extension _SettingsDataTransfer on _SettingsPageState {
 
   Future<void> _importDatabase(BuildContext context) async {
     final accounts = context.read<AccountManager>();
+    if (kIsWeb) {
+      final picked = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['json'],
+      );
+      if (picked.isEmpty || !context.mounted) return;
+      try {
+        await importWebDatabaseBackup(
+          profileDataDatabase,
+          await picked.single.readAsBytes(),
+        );
+        final prefs = await SqliteSettings.getInstance();
+        await prefs.reload();
+        await accounts.init();
+      } catch (error, stackTrace) {
+        talker.handle(error, stackTrace, 'Browser backup import failed');
+        if (context.mounted) {
+          toast(context, context.l10n.text('Backup import failed'));
+        }
+        return;
+      }
+      if (!context.mounted) return;
+      toast(context, context.l10n.text('Full backup restored'));
+      unawaited(
+        Navigator.of(context).pushAndRemoveUntil(
+          adaptivePageRoute(context, builder: (_) => const MyHomePage()),
+          (_) => false,
+        ),
+      );
+      return;
+    }
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['zip', 'sqlite'],
@@ -251,6 +278,24 @@ extension _SettingsDataTransfer on _SettingsPageState {
   Future<void> _exportBackup(BuildContext context) async {
     final accounts = context.read<AccountManager>();
     if (!isDesktopLayout(context)) Navigator.pop(context);
+    if (kIsWeb) {
+      try {
+        final settings = await SqliteSettings.getInstance();
+        await settings.flush();
+        final bytes = await exportWebDatabaseBackup(profileDataDatabase);
+        await FilePicker.saveFile(
+          fileName: webDatabaseBackupFileName,
+          bytes: bytes,
+          mimeType: 'application/json',
+        );
+      } catch (error, stackTrace) {
+        talker.handle(error, stackTrace, 'Browser backup export failed');
+        if (context.mounted) {
+          toast(context, context.l10n.text('Backup export failed'));
+        }
+      }
+      return;
+    }
     final tempDirectory = await getTemporaryDirectory();
     final workingDirectory = await tempDirectory.createTemp(
       'market-monk-backup-',

@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
-import 'package:drift_dev/api/migrations_native.dart';
+import 'schema_validation.dart' as schema;
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -89,10 +89,22 @@ class Database extends _$Database {
   @override
   int get schemaVersion => 2;
 
-  Future<void> validateSchema() => validateDatabaseSchema();
+  Future<void> validateSchema() => schema.validateDatabaseSchema(this);
 
   static QueryExecutor _openConnection() => driftDatabase(
         name: databaseName,
+        web: DriftWebOptions(
+          sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+          driftWorker: Uri.parse('drift_worker.dart.js'),
+          onResult: (result) {
+            if (result.chosenImplementation ==
+                WasmStorageImplementation.inMemory) {
+              throw StateError(
+                'Browser storage is unavailable; MarketMonk requires persistent storage.',
+              );
+            }
+          },
+        ),
         native: const DriftNativeOptions(
           shareAcrossIsolates: true,
           databaseDirectory: getApplicationSupportDirectory,
@@ -129,7 +141,7 @@ class Database extends _$Database {
           if (loader != null) {
             await migrateLegacyDatabases(snapshotLoader: loader);
           }
-          if (kDebugMode) await validateDatabaseSchema();
+          if (kDebugMode) await schema.validateDatabaseSchema(this);
         },
       );
 

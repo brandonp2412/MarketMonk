@@ -8,6 +8,7 @@ import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/crypto_market_data.dart';
 import 'package:market_monk/ibkr_api.dart';
 import 'package:market_monk/logging.dart';
+import 'package:market_monk/market_data/web_market_uri.dart';
 
 /// Timestamped stock bars kept separate from the daily portfolio cache.
 class IntradaySeries {
@@ -99,7 +100,7 @@ class IntradayMarketData {
         _brokerTimeout = brokerTimeout;
 
   static Future<http.Response> _getYahoo(Uri uri) =>
-      http.get(uri, headers: {'User-Agent': 'Mozilla/5.0'});
+      http.get(webMarketDataUri(uri), headers: {'User-Agent': 'Mozilla/5.0'});
 
   /// Uses minute bars for one session and 15-minute bars for five trading days.
   Future<IntradaySeries> fetch(
@@ -434,7 +435,7 @@ class IntradayMarketData {
         }
         return IntradaySeries(
           currency: meta?['currency'] as String? ?? 'USD',
-          source: 'Yahoo',
+          source: meta?['source'] as String? ?? 'Yahoo',
           isDaily: dailyValuation,
           candles: candles,
         );

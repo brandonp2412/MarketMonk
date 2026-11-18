@@ -391,6 +391,30 @@ Future<void> syncCandles(
 
     final fetch = yahooFetcher ??
         (String ticker, DateTime startDate) async {
+          if (kIsWeb) {
+            final uri = Uri.https(
+              'query2.finance.yahoo.com',
+              '/v8/finance/chart/$ticker',
+              {
+                'period1': '${startDate.millisecondsSinceEpoch ~/ 1000}',
+                'period2': '${DateTime.now().millisecondsSinceEpoch ~/ 1000}',
+                'interval': '1d',
+              },
+            );
+            final response = await http.get(webMarketDataUri(uri));
+            if (response.statusCode != 200) {
+              throw StateError(
+                'Market candle request failed: ${response.statusCode}',
+              );
+            }
+            final data = jsonDecode(response.body) as Map<String, dynamic>;
+            final results =
+                (data['chart'] as Map<String, dynamic>?)?['result'] as List?;
+            if (results == null || results.isEmpty) return [];
+            return YahooFinanceResponse.fromJson(
+              results.first as Map<String, dynamic>,
+            ).candlesData;
+          }
           final response = await const YahooFinanceDailyReader().getDailyDTOs(
             ticker,
             startDate: startDate,
