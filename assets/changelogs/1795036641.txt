@@ -1,0 +1,7 @@
+• chore(release): prepare MarketMonk v2.0.2
+• fix(charts): align percentage and dollar portfolio returns
+• fix(charts): base exit return percent on net invested cash
+• fix(charts): finish period transitions before quote sync
+• fix(charts): keep historical charts visible during quote refresh
+• fix(ci): stabilize chart test and release prepared version
+• fix(fx): calculate NZD returns using historical trade-date rates
