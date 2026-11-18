@@ -649,13 +649,19 @@ void main() {
     pendingPerformance.complete(
       IbkrPerformanceSeries(
         period: '1Y',
-        startDate: today.subtract(const Duration(days: 15)),
+        startDate: today.subtract(const Duration(days: 40)),
         startNav: 900,
         measure: 'TWR',
         currency: 'USD',
-        dates: [today.subtract(const Duration(days: 15)), today],
+        dates: [
+          today.subtract(const Duration(days: 35)),
+          today.subtract(const Duration(days: 20)),
+        ],
         nav: const [900, 1000],
-        returnDates: [today.subtract(const Duration(days: 15)), today],
+        returnDates: [
+          today.subtract(const Duration(days: 35)),
+          today.subtract(const Duration(days: 20)),
+        ],
         returns: const [0, 0.1],
       ),
     );

@@ -178,13 +178,19 @@ jobs:
           MAJOR=${VERSION_PARTS[0]}
           MINOR=${VERSION_PARTS[1]}
           PATCH=${VERSION_PARTS[2]}
-          PATCH=$((PATCH + 1))
-
-          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
-          NEW_BUILD_NUMBER=$((CURRENT_BUILD_NUMBER + 1))
+          NEW_VERSION="$CURRENT_VERSION"
+          NEW_BUILD_NUMBER="$CURRENT_BUILD_NUMBER"
           CURRENT_MSIX_VERSION=$(grep 'msix_version:' pubspec.yaml | sed 's/.*msix_version: *//')
-          IFS='.' read -ra MSIX_VERSION_PARTS <<< "$CURRENT_MSIX_VERSION"
-          NEW_MSIX_VERSION="${MSIX_VERSION_PARTS[0]}.${MSIX_VERSION_PARTS[1]}.$((${MSIX_VERSION_PARTS[2]} + 1)).${MSIX_VERSION_PARTS[3]}"
+          NEW_MSIX_VERSION="$CURRENT_MSIX_VERSION"
+
+          # A prepared version without a release tag should be published as-is.
+          if git show-ref --verify --quiet "refs/tags/v${CURRENT_VERSION}"; then
+            PATCH=$((PATCH + 1))
+            NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+            NEW_BUILD_NUMBER=$((CURRENT_BUILD_NUMBER + 1))
+            IFS='.' read -ra MSIX_VERSION_PARTS <<< "$CURRENT_MSIX_VERSION"
+            NEW_MSIX_VERSION="${MSIX_VERSION_PARTS[0]}.${MSIX_VERSION_PARTS[1]}.$((${MSIX_VERSION_PARTS[2]} + 1)).${MSIX_VERSION_PARTS[3]}"
+          fi
 
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "build_number=$NEW_BUILD_NUMBER" >> "$GITHUB_OUTPUT"
@@ -622,7 +628,7 @@ jobs:
   create-release:
     needs: [version-bump, build-android, build-linux, build-windows, publish-google-play]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: ${{ always() && github.ref == 'refs/heads/main' && needs.version-bump.result == 'success' && needs.build-android.result == 'success' }}
     permissions:
       contents: write
     steps:
