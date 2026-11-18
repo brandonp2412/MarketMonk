@@ -202,17 +202,21 @@ extension _SettingsDataTransfer on _SettingsPageState {
     if (kIsWeb) {
       final picked = await FilePicker.pickFiles(
         type: FileType.custom,
-        allowedExtensions: const ['json'],
+        allowedExtensions: const ['json', 'zip', 'sqlite'],
       );
       if (picked.isEmpty || !context.mounted) return;
       try {
-        await importWebDatabaseBackup(
-          profileDataDatabase,
-          await picked.single.readAsBytes(),
-        );
         final prefs = await SqliteSettings.getInstance();
+        await prefs.flush();
+        final bytes = await picked.single.readAsBytes();
+        if (isNativeBackup(bytes)) {
+          await importNativeBackup(profileDataDatabase, bytes);
+        } else {
+          await importWebDatabaseBackup(profileDataDatabase, bytes);
+        }
         await prefs.reload();
         await accounts.init();
+        clearAllSyncCache();
       } catch (error, stackTrace) {
         talker.handle(error, stackTrace, 'Browser backup import failed');
         if (context.mounted) {

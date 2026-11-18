@@ -10,6 +10,8 @@ dependencies:
     sdk: flutter
   talker_flutter: ^5.2.0
   archive: ^4.0.9
+  typed_data: ^1.4.0
+  sqlite3: ^3.3.4
   csv: ^8.0.0
   yahoo_finance_data_reader: ^1.0.11
   drafter: ^0.3.0
@@ -35,7 +37,6 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-  sqlite3: ^3.3.4
   msix:
     git:
       url: https://github.com/insertjokehere/msix.git
