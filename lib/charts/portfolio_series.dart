@@ -315,6 +315,9 @@ extension _ChartPortfolioSeries on ChartsPageState {
       _portfolioCashFlowsByAccount = newFlows;
       _portfolioError = firstError;
       _portfolioLoading = false;
+      // Rendering official history must not wait for provisional quote sync.
+      // Keep the asynchronous operation tracked to avoid leaked test timers.
+      if (!_usesIntraday) _periodTransition = false;
       _provisionalStartByAccount.clear();
       if (_usesIntraday &&
           _portfolioDailyPreviewAccounts.isEmpty &&
@@ -328,33 +331,28 @@ extension _ChartPortfolioSeries on ChartsPageState {
       }
     });
     if (!_usesIntraday) {
-      // Provisional quotes are a follow-up to the official history, not a
-      // prerequisite for displaying that history or ending period loading.
-      runDetachedTask(
-        Future.wait(
-          loadedAccounts.entries.map((entry) async {
-            final config = accountManager.ibkrConfigFor(entry.key);
-            if (!config.enabled || newReturns[entry.key]?.isEmpty != false) {
-              return;
-            }
-            try {
-              await _loadProvisionalAccount(
-                entry.key,
-                entry.value,
-                config,
-                generation,
-                forceRefresh: forceIbkrPortfolioRefresh,
-              );
-            } catch (error, stackTrace) {
-              talker.handle(
-                error,
-                stackTrace,
-                'Failed to update provisional portfolio prices',
-              );
-            }
-          }),
-        ).then<void>((_) {}),
-        'Failed to load provisional portfolio prices',
+      await Future.wait(
+        loadedAccounts.entries.map((entry) async {
+          final config = accountManager.ibkrConfigFor(entry.key);
+          if (!config.enabled || newReturns[entry.key]?.isEmpty != false) {
+            return;
+          }
+          try {
+            await _loadProvisionalAccount(
+              entry.key,
+              entry.value,
+              config,
+              generation,
+              forceRefresh: forceIbkrPortfolioRefresh,
+            );
+          } catch (error, stackTrace) {
+            talker.handle(
+              error,
+              stackTrace,
+              'Failed to update provisional portfolio prices',
+            );
+          }
+        }),
       );
     }
   }
