@@ -328,15 +328,34 @@ extension _ChartPortfolioSeries on ChartsPageState {
       }
     });
     if (!_usesIntraday) {
-      for (final entry in loadedAccounts.entries) {
-        final config = accountManager.ibkrConfigFor(entry.key);
-        if (!config.enabled || newReturns[entry.key]?.isEmpty != false)
-          continue;
-        runDetachedTask(
-          _loadProvisionalAccount(entry.key, entry.value, config, generation),
-          'Failed to update provisional portfolio prices',
-        );
-      }
+      // Provisional quotes are a follow-up to the official history, not a
+      // prerequisite for displaying that history or ending period loading.
+      runDetachedTask(
+        Future.wait(
+          loadedAccounts.entries.map((entry) async {
+            final config = accountManager.ibkrConfigFor(entry.key);
+            if (!config.enabled || newReturns[entry.key]?.isEmpty != false) {
+              return;
+            }
+            try {
+              await _loadProvisionalAccount(
+                entry.key,
+                entry.value,
+                config,
+                generation,
+                forceRefresh: forceIbkrPortfolioRefresh,
+              );
+            } catch (error, stackTrace) {
+              talker.handle(
+                error,
+                stackTrace,
+                'Failed to update provisional portfolio prices',
+              );
+            }
+          }),
+        ).then<void>((_) {}),
+        'Failed to load provisional portfolio prices',
+      );
     }
   }
 
@@ -345,6 +364,7 @@ extension _ChartPortfolioSeries on ChartsPageState {
         !widget.isActive ||
         _usesIntraday ||
         _mode != _ChartMode.portfolio ||
+        _portfolioRefreshInFlight != null ||
         _provisionalRefreshInFlight) return;
     _provisionalRefreshInFlight = true;
     try {
@@ -380,8 +400,9 @@ extension _ChartPortfolioSeries on ChartsPageState {
     String name,
     _LoadedChartPortfolio loaded,
     IbkrAccountConfig config,
-    int generation,
-  ) async {
+    int generation, {
+    bool forceRefresh = false,
+  }) async {
     bool isCurrent() =>
         mounted &&
         widget.isActive &&
@@ -463,7 +484,11 @@ extension _ChartPortfolioSeries on ChartsPageState {
         if (point.date.isAfter(anchor.date)) point,
     ];
     final quotes = <ProvisionalQuote>[];
-    await _intradayData.prefetchPortfolio(config, days: 1);
+    final prefetched = await _intradayData.prefetchPortfolio(
+      config,
+      days: 1,
+      forceRefresh: forceRefresh,
+    );
     for (var start = 0; start < positions.length; start += 4) {
       if (!isCurrent()) return;
       final batch = await Future.wait(
@@ -473,6 +498,7 @@ extension _ChartPortfolioSeries on ChartsPageState {
               position.symbol,
               days: 1,
               config: config,
+              forceRefresh: forceRefresh && !prefetched,
             );
             await fetchSymbolCurrencyAndRate(
               position.symbol,

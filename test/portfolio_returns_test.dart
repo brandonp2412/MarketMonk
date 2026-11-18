@@ -82,9 +82,22 @@ void main() {
   test('fortnightly picker stops at one year of available broker history', () {
     final now = DateTime(2026, 11, 14);
     final periods = portfolioFortnightlyPeriods(now, DateTime(2020));
-    expect(periods.length, 27); // Now plus 26 fortnightly stops.
+    expect(periods, [0, -4, -7, -10, -13, -16, -19, -22, -25, -27]);
     expect(portfolioReturnCutoff(periods.last, now), DateTime(2025, 11, 15));
     expect(portfolioFortnightlyPeriods(now, DateTime(2026, 11, 4)), [0]);
+  });
+
+  test('picker caps stops and preserves its range at every account age', () {
+    final now = DateTime(2026, 11, 14);
+    for (var fortnights = 1; fortnights <= 26; fortnights++) {
+      final start = DateTime(now.year, now.month, now.day - fortnights * 14);
+      final periods = portfolioFortnightlyPeriods(now, start);
+      expect(periods.length, lessThanOrEqualTo(10));
+      expect(periods.first, 0);
+      expect(portfolioReturnCutoff(periods.last, now), start);
+      expect(periods.toSet().length, periods.length);
+      if (fortnights <= 9) expect(periods.length, fortnights + 1);
+    }
   });
 
   test('incomplete holding trade history is unavailable', () {

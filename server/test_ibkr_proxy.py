@@ -697,7 +697,7 @@ class ProxyTests(unittest.TestCase):
                 query = parse_qs(urlparse(endpoint).query)
                 self.assertEqual(query["period"], [period])
                 self.assertEqual(query["bar"], [bar])
-                self.assertEqual(query["outsideRth"], ["false"])
+                self.assertEqual(query["outsideRth"], ["true"])
 
     def test_client_portal_returns_current_position_trade_history(self):
         client = RecordingIbkrClient()
@@ -1158,7 +1158,7 @@ class ProxyTests(unittest.TestCase):
                 self.assertEqual(kwargs["durationStr"], duration)
                 self.assertEqual(kwargs["barSizeSetting"], bar)
                 self.assertEqual(kwargs["formatDate"], 2)
-                self.assertTrue(kwargs["useRTH"])
+                self.assertFalse(kwargs["useRTH"])
                 self.assertTrue(fake.disconnected)
 
     def test_non_held_stock_history_uses_contract_lookup(self):

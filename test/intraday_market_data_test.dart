@@ -80,7 +80,7 @@ void main() {
       expect(request.queryParameters, {
         'range': '1d',
         'interval': '1m',
-        'includePrePost': 'false',
+        'includePrePost': 'true',
       });
       expect(series.currency, 'GBp');
       expect(series.source, 'Yahoo');
@@ -279,6 +279,28 @@ void main() {
     },
   );
 
+  test('concurrent forced refreshes share an unchanged quote request',
+      () async {
+    var calls = 0;
+    final pending = Completer<http.Response>();
+    final loader = IntradayMarketData(
+      yahooGet: (_) {
+        calls++;
+        return calls == 1 ? Future.value(_yahooResponse()) : pending.future;
+      },
+    );
+    final cached = await loader.fetch('AAPL');
+    final first = loader.fetch('AAPL', forceRefresh: true);
+    final second = loader.fetch('AAPL', forceRefresh: true);
+    pending.complete(_yahooResponse());
+    final results = await Future.wait([first, second]);
+    expect(calls, 2);
+    expect(results.first, same(results.last));
+    expect(results.first.candles.last.date, cached.candles.last.date);
+    expect(await loader.fetch('AAPL'), same(results.first));
+    expect(calls, 2);
+  });
+
   test(
     'portfolio batch seeds held prices and fetches missing favorite symbols',
     () async {
@@ -309,6 +331,12 @@ void main() {
       expect(individual, 1);
       await loader.prefetchPortfolio(_config, days: 5, forceRefresh: true);
       expect(batches, 2);
+      await loader.fetch(
+        'AAPL',
+        config: _config,
+        days: 5,
+      );
+      expect(individual, 1);
       await loader.prefetchPortfolio(_config, days: 1);
       expect(batches, 3);
     },

@@ -321,7 +321,7 @@ class IntradayMarketData {
               _ when days == 1 => '1m',
               _ => '15m',
             },
-            'includePrePost': 'false',
+            'includePrePost': daily ? 'false' : 'true',
           },
         );
         final response = await _requestYahooWithRetry(uri);

@@ -11,7 +11,7 @@ class _MarketChartLoadingState extends State<MarketChartLoading>
     with SingleTickerProviderStateMixin {
   late final _animation = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1800),
+    duration: const Duration(milliseconds: 2600),
   );
 
   @override
@@ -19,7 +19,7 @@ class _MarketChartLoadingState extends State<MarketChartLoading>
     super.didChangeDependencies();
     if (MediaQuery.disableAnimationsOf(context)) {
       _animation.stop();
-      _animation.value = 1;
+      _animation.value = 1800 / 2600;
     } else {
       _animation.repeat();
     }
@@ -81,15 +81,19 @@ class _ChartLoadingPainter extends CustomPainter {
       ..color = colors.primary.withValues(alpha: 0.12);
     canvas.drawPath(path, paint);
     final metric = path.computeMetrics().first;
-    final distance = metric.length * animation.value;
+    final elapsed = animation.value * 2600;
+    final progress = (elapsed / 1800).clamp(0.0, 1.0);
+    final opacity = 1 -
+        Curves.easeInOut.transform(((elapsed - 2100) / 500).clamp(0.0, 1.0));
+    final distance = metric.length * progress;
     paint.color = colors.primary;
     canvas.drawPath(metric.extractPath(0, distance), paint);
     final head = metric.getTangentForOffset(distance)?.position ?? trend.first;
     paint
       ..style = PaintingStyle.fill
-      ..color = colors.primary.withValues(alpha: 0.12);
+      ..color = colors.primary.withValues(alpha: 0.12 * opacity);
     canvas.drawCircle(head, 7, paint);
-    paint.color = colors.primary;
+    paint.color = colors.primary.withValues(alpha: opacity);
     canvas.drawCircle(head, 3, paint);
   }
 

@@ -280,7 +280,7 @@ class ClientPortalIbkrClient:
                 "conid": int(conid),
                 "period": period,
                 "bar": bar_size,
-                "outsideRth": "false",
+                "outsideRth": "true" if intraday_days is not None else "false",
             }
         )
         raw = self._get(f"iserver/marketdata/history?{query}")
@@ -839,7 +839,7 @@ class NativeIbkrClient:
             durationStr=duration,
             barSizeSetting=bar_size,
             whatToShow="TRADES",
-            useRTH=True,
+            useRTH=intraday_days is None,
             formatDate=2 if intraday_days else 1,
             timeout=30,
         )
@@ -900,7 +900,7 @@ class NativeIbkrClient:
                                 durationStr=duration,
                                 barSizeSetting=bar_size,
                                 whatToShow="TRADES",
-                                useRTH=True,
+                                useRTH=False,
                                 formatDate=2,
                                 timeout=12,
                             )

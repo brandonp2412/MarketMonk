@@ -95,18 +95,19 @@ PortfolioReturn? openHoldingPeriodReturn({
 /// Index of the first legacy intraday return period (unused by the fortnightly picker).
 const int firstIntradayPeriod = 13;
 
-/// Stable, consecutive 14-day slider stops (Now, 2W, 4W, ...).
-/// Negative IDs avoid conflicting with historical period IDs in saved data.
-/// The broker performance cache currently covers at most one year.
 List<int> portfolioFortnightlyPeriods(DateTime now, DateTime? firstDate) {
   if (firstDate == null || !firstDate.isBefore(now)) return const [0];
   // Compare calendar dates in UTC to avoid losing a day at DST boundaries.
   final today = DateTime.utc(now.year, now.month, now.day);
   final oldest = DateTime.utc(firstDate.year, firstDate.month, firstDate.day);
   final count = (today.difference(oldest).inDays ~/ 14).clamp(0, 26);
+  const maxStops = 10;
+  final step = (count / (maxStops - 1)).ceil().clamp(1, 26);
   return [
     0,
-    for (var fortnight = 1; fortnight <= count; fortnight++) -fortnight - 1,
+    for (var fortnight = step; fortnight < count; fortnight += step)
+      -fortnight - 1,
+    if (count > 0) -count - 1,
   ];
 }
 
