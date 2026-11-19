@@ -199,6 +199,7 @@ extension _SettingsDataTransfer on _SettingsPageState {
 
   Future<void> _importDatabase(BuildContext context) async {
     final accounts = context.read<AccountManager>();
+    final settingsState = context.read<SettingsState>();
     if (kIsWeb) {
       final picked = await FilePicker.pickFiles(
         type: FileType.custom,
@@ -216,6 +217,7 @@ extension _SettingsDataTransfer on _SettingsPageState {
         }
         await prefs.reload();
         await accounts.init();
+        await settingsState.reloadAfterBackupImport();
         clearAllSyncCache();
       } catch (error, stackTrace) {
         talker.handle(error, stackTrace, 'Browser backup import failed');
@@ -263,6 +265,8 @@ extension _SettingsDataTransfer on _SettingsPageState {
       return;
     }
 
+    if (!context.mounted) return;
+    await settingsState.reloadAfterBackupImport();
     if (!context.mounted) return;
     toast(
       context,

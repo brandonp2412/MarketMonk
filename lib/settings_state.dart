@@ -150,6 +150,13 @@ class SettingsState extends ChangeNotifier {
   static List<String> _defaultVisibleCurrencies(String homeCurrency) =>
       _normalizeCurrencies([homeCurrency, 'USD']);
 
+  Future<void> reloadAfterBackupImport() async {
+    final prefs = await SqliteSettings.getInstance();
+    await prefs.flush();
+    await prefs.reload();
+    await init();
+  }
+
   Future<void> init() async {
     final prefs = await SqliteSettings.getInstance();
     final themeStr = prefs.getString('theme');

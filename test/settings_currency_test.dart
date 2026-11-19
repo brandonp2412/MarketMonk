@@ -90,6 +90,35 @@ void main() {
     expect(currency.currencyName, 'NZD');
   });
 
+  test('restoring a Linux backup updates the active web currency', () async {
+    final settings = SettingsState(
+      localCurrencyDetector: () async => 'USD',
+      rateFetcher: (_) async => frankfurterResponse('NZD', 1.7),
+    );
+    await settings.initialized;
+    expect(settings.displayCurrency, 'GBP');
+    expect(currency.currencyName, 'GBP');
+
+    await testDatabase.writeSetting('displayCurrency', 'NZD');
+    await testDatabase.writeSetting('visibleCurrencies', [
+      'EUR',
+      'NZD',
+      'USD',
+    ]);
+    await testDatabase.writeSetting('exchangeRate_NZD', 1.7);
+    expect(settings.displayCurrency, 'GBP');
+
+    await settings.reloadAfterBackupImport();
+
+    final prefs = await SqliteSettings.getInstance();
+    expect(prefs.getString('displayCurrency'), 'NZD');
+    expect(settings.displayCurrency, 'NZD');
+    expect(settings.visibleCurrencies, ['EUR', 'NZD', 'USD']);
+    expect(currency.currencyName, 'NZD');
+    expect(exchangeRate, 1.7);
+    expect(fmtCurrency(100), currency.format(170));
+  });
+
   test('removing the active currency immediately activates the fallback',
       () async {
     final settings = SettingsState();
