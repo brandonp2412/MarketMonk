@@ -26,6 +26,7 @@ import 'package:market_monk/settings/vi_rebind_dialog.dart';
 import 'package:market_monk/settings_state.dart';
 import 'package:market_monk/sqlite_settings.dart';
 import 'package:market_monk/web_database_backup.dart';
+import 'package:market_monk/sqlite_backup_export.dart';
 import 'package:market_monk/native_web_backup.dart';
 import 'package:market_monk/ticker_line.dart';
 import 'package:market_monk/utils.dart';

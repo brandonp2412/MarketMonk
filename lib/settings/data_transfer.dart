@@ -248,12 +248,13 @@ extension _SettingsDataTransfer on _SettingsPageState {
 
     final sourceFile = File(selectedPath);
     final isArchive = p.extension(selectedPath).toLowerCase() == '.zip';
+    var isFullBackup = isArchive;
     try {
       if (isArchive) {
         await accounts.importBackup(sourceFile);
       } else {
         await validateMarketMonkSqliteFile(sourceFile);
-        await accounts.importDatabase(sourceFile);
+        isFullBackup = await accounts.importSqliteDatabase(sourceFile);
       }
     } catch (_) {
       if (context.mounted) {
@@ -266,7 +267,7 @@ extension _SettingsDataTransfer on _SettingsPageState {
     toast(
       context,
       context.l10n.text(
-        isArchive
+        isFullBackup
             ? 'Full backup restored'
             : 'Database imported into the active profile',
       ),
@@ -286,11 +287,11 @@ extension _SettingsDataTransfer on _SettingsPageState {
       try {
         final settings = await SqliteSettings.getInstance();
         await settings.flush();
-        final bytes = await exportWebDatabaseBackup(profileDataDatabase);
+        final bytes = await exportSqliteBackup(profileDataDatabase);
         await FilePicker.saveFile(
-          fileName: webDatabaseBackupFileName,
+          fileName: sqliteBackupFileName,
           bytes: bytes,
-          mimeType: 'application/json',
+          mimeType: 'application/x-sqlite3',
         );
       } catch (error, stackTrace) {
         talker.handle(error, stackTrace, 'Browser backup export failed');
@@ -305,14 +306,15 @@ extension _SettingsDataTransfer on _SettingsPageState {
       'market-monk-backup-',
     );
     try {
-      final archive = await accounts.exportBackup(workingDirectory);
+      final snapshot = await accounts.exportSqliteDatabase(workingDirectory);
       final result = await FilePicker.saveFile(
-        fileName: marketMonkBackupFileName,
-        bytes: await archive.readAsBytes(),
+        fileName: sqliteBackupFileName,
+        bytes: await snapshot.readAsBytes(),
+        mimeType: 'application/x-sqlite3',
       );
       if (result == null) return;
       if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
-        await archive.copy(result.toFilePath());
+        await snapshot.copy(result.toFilePath());
       }
     } catch (_) {
       if (context.mounted) {

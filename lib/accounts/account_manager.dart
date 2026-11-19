@@ -15,6 +15,8 @@ import 'package:market_monk/logging.dart';
 import 'package:market_monk/profile_data_repository.dart';
 import 'package:market_monk/sqlite_settings.dart';
 import 'package:market_monk/unified_database_backup.dart';
+import 'package:market_monk/native_backup_layout.dart';
+import 'package:market_monk/sqlite_backup_export.dart';
 import 'package:market_monk/utils.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -583,32 +585,38 @@ class AccountManager extends ChangeNotifier {
     }
   }
 
-  /// Snapshots every profile and exports the SQLite application settings.
-  Future<File> exportBackup(Directory workingDirectory) =>
-      _serializeStorage(() => _exportBackup(workingDirectory));
+  Future<File> exportSqliteDatabase(Directory directory) =>
+      _serializeStorage(() async {
+        final prefs = await SqliteSettings.getInstance();
+        await prefs.flush();
+        return snapshotUnifiedDatabase(
+          _database,
+          File(p.join(directory.path, sqliteBackupFileName)),
+        );
+      });
 
-  Future<File> _exportBackup(Directory workingDirectory) async {
-    final prefs = await SqliteSettings.getInstance();
-    await prefs.flush();
-    final temp = await workingDirectory.createTemp('unified-snapshot-');
-    try {
-      final snapshot = await snapshotUnifiedDatabase(
-        _database,
-        File(p.join(temp.path, 'market-monk.unified.sqlite')),
-      );
-      return await buildMarketMonkBackupArchive(
-        workingDirectory: workingDirectory,
-        logical: MarketMonkLogicalBackup(
-          profiles: List<String>.of(accounts),
-          activeProfile: activeAccount,
-          settings: prefs.snapshot(),
-        ),
-        storage: MarketMonkBackupStorage.unifiedDatabase(snapshot),
-      );
-    } finally {
-      await temp.delete(recursive: true);
-    }
-  }
+  Future<bool> importSqliteDatabase(File sourceFile) =>
+      _serializeStorage(() async {
+        if (!await isUnifiedBackupSqlite(sourceFile)) {
+          await _importDatabase(sourceFile);
+          return false;
+        }
+        final prefs = await SqliteSettings.getInstance();
+        await prefs.flush();
+        final directory = await (await getTemporaryDirectory()).createTemp(
+          'market-monk-sqlite-restore-',
+        );
+        try {
+          final snapshot = await sourceFile.copy(
+            p.join(directory.path, 'restore.sqlite'),
+          );
+          await restoreUnifiedDatabase(_database, snapshot);
+          await _refreshRestoredState();
+          return true;
+        } finally {
+          await directory.delete(recursive: true);
+        }
+      });
 
   /// Restores current or legacy backups, rolling back on restore errors.
   Future<void> importBackup(File sourceFile) =>
@@ -645,6 +653,10 @@ class AccountManager extends ChangeNotifier {
     } else {
       await _restoreLegacyArchive(restored);
     }
+    await _refreshRestoredState();
+  }
+
+  Future<void> _refreshRestoredState() async {
     final prefs = await SqliteSettings.getInstance();
     await prefs.reload();
     await init();

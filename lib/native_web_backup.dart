@@ -96,12 +96,18 @@ Uint8List _entryBytes(Archive archive, String path) {
   return Uint8List.fromList(entry.content as List<int>);
 }
 
-void _validateSource(CommonDatabase source, {required bool unified}) {
+void _validateSource(
+  CommonDatabase source, {
+  required bool unified,
+  int? expectedSchemaVersion,
+}) {
   if (source.select('PRAGMA quick_check').single.values.single != 'ok') {
     throw const FormatException('Backup SQLite integrity check failed');
   }
   final version = source.userVersion;
-  if (unified ? version != 2 : version < 8 || version > 12) {
+  if (unified
+      ? version != expectedSchemaVersion
+      : version < 8 || version > 12) {
     throw FormatException(
       'Unsupported SQLite backup version $version',
     );
@@ -124,7 +130,11 @@ Future<void> _validateUnifiedSource(
   Database destination,
   _LogicalBackup? logical,
 ) async {
-  _validateSource(source, unified: true);
+  _validateSource(
+    source,
+    unified: true,
+    expectedSchemaVersion: destination.schemaVersion,
+  );
   final expected = destination.allTables.map((t) => t.actualTableName).toList();
   final names = _tableNames(source);
   if (!names.containsAll(expected)) {

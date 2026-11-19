@@ -336,8 +336,19 @@ void main() {
       token: 'backup-token',
     );
     final exportDirectory = await tempDir.createTemp('export-');
-    final backup = await manager.exportBackup(exportDirectory);
+    final sqliteBackup = await manager.exportSqliteDatabase(exportDirectory);
+    final backup = await buildMarketMonkBackupArchive(
+      workingDirectory: exportDirectory,
+      logical: MarketMonkLogicalBackup(
+        profiles: manager.accounts,
+        activeProfile: manager.activeAccount,
+        settings: (await SqliteSettings.getInstance()).snapshot(),
+      ),
+      storage: MarketMonkBackupStorage.unifiedDatabase(sqliteBackup),
+    );
 
+    expect(sqliteBackup.path, endsWith('.sqlite'));
+    expect(await sqliteBackup.exists(), isTrue);
     expect(backup.path, endsWith('.zip'));
     expect(await backup.exists(), isTrue);
 
@@ -370,7 +381,7 @@ void main() {
     final prefs = await SqliteSettings.getInstance();
     await prefs.setString('displayCurrency', 'USD');
 
-    await manager.importBackup(backup);
+    expect(await manager.importSqliteDatabase(sqliteBackup), isTrue);
 
     expect(manager.accounts, ['Default', 'Brokerage']);
     expect(manager.activeAccount, 'Brokerage');
@@ -398,6 +409,7 @@ void main() {
       File('${tempDir.path}/market-monk-Brokerage.sqlite').existsSync(),
       isFalse,
     );
+    await manager.importBackup(backup);
     await manager.importBackup(legacyArchive);
     final oldDefault = await unifiedDatabase.readProfileByName('Default');
     final oldBrokerage = await unifiedDatabase.readProfileByName('Brokerage');

@@ -19,8 +19,8 @@ Future<File> snapshotUnifiedDatabase(
 Future<void> restoreUnifiedDatabase(
   Database destination,
   File sourceFile, {
-  required List<String> expectedProfiles,
-  required String expectedActiveProfile,
+  List<String>? expectedProfiles,
+  String? expectedActiveProfile,
 }) async {
   final source = Database.connect(openNativeSqliteFile(sourceFile));
   try {
@@ -31,9 +31,14 @@ Future<void> restoreUnifiedDatabase(
     }
     await source.validateSchema();
     final profiles = await source.readProfiles();
-    if (profiles.map((profile) => profile.name).join('\u0000') !=
-            expectedProfiles.join('\u0000') ||
-        await source.readActiveProfile() != expectedActiveProfile) {
+    if ((expectedProfiles != null &&
+            (profiles.length != expectedProfiles.length ||
+                profiles.asMap().entries.any(
+                      (entry) =>
+                          entry.value.name != expectedProfiles[entry.key],
+                    ))) ||
+        (expectedActiveProfile != null &&
+            await source.readActiveProfile() != expectedActiveProfile)) {
       throw const FormatException(
         'Backup manifest does not match SQLite profiles',
       );
