@@ -71,7 +71,7 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('load-more-releases')));
     await tester.pumpAndSettle();
     final count = (jsonDecode(
-      await rootBundle.loadString('assets/release_history.json'),
+      File('assets/release_history.json').readAsStringSync(),
     ) as List<dynamic>)
         .length;
     expect(find.text('Showing 10 of $count releases'), findsOneWidget);
