@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 import 'package:market_monk/background_network_coordinator.dart';
 
 /// Per-MarketMonk-account connection details for a self-hosted IBKR service.
@@ -19,11 +20,7 @@ class IbkrAccountConfig {
   bool get isConfigured =>
       enabled && baseUrl.trim().isNotEmpty && token.trim().isNotEmpty;
 
-  IbkrAccountConfig copyWith({
-    bool? enabled,
-    String? baseUrl,
-    String? token,
-  }) =>
+  IbkrAccountConfig copyWith({bool? enabled, String? baseUrl, String? token}) =>
       IbkrAccountConfig(
         enabled: enabled ?? this.enabled,
         baseUrl: baseUrl ?? this.baseUrl,
@@ -534,9 +531,8 @@ class IbkrApiClient {
         RequestCategory.ibkrPortfolio,
         config,
         () async {
-          final response = await _request('/v1/portfolio').timeout(
-            const Duration(seconds: 30),
-          );
+          final response = await _request('/v1/portfolio')
+              .timeout(const Duration(seconds: 30));
           return IbkrPortfolioSnapshot.fromJson(
             _decodeJsonObject(response, '/v1/portfolio'),
           );
@@ -644,21 +640,24 @@ class IbkrApiClient {
   /// Loads all held stocks' intraday bars in one broker session.
   Future<List<IbkrHistoricalSeries>> fetchIntradayPortfolio({int days = 1}) {
     if (days != 1 && days != 5) throw ArgumentError.value(days, 'days');
-    return backgroundNetworkCoordinator
-        .coalesce('ibkr.intradayPortfolio', (config, days), () async {
-      final response = await _request(
-        '/v1/intraday/portfolio',
-        queryParameters: {'days': '$days'},
-      );
-      final body = _decodeJsonObject(response, '/v1/intraday/portfolio');
-      if (body['interval'] != (days == 1 ? '1m' : '15m')) {
-        throw StateError('IBKR returned an unexpected intraday interval');
-      }
-      return [
-        for (final raw in body['series'] as List<dynamic>)
-          IbkrHistoricalSeries.fromJson(raw as Map<String, dynamic>),
-      ];
-    });
+    return backgroundNetworkCoordinator.coalesce(
+      'ibkr.intradayPortfolio',
+      (config, days),
+      () async {
+        final response = await _request(
+          '/v1/intraday/portfolio',
+          queryParameters: {'days': '$days'},
+        );
+        final body = _decodeJsonObject(response, '/v1/intraday/portfolio');
+        if (body['interval'] != (days == 1 ? '1m' : '15m')) {
+          throw StateError('IBKR returned an unexpected intraday interval');
+        }
+        return [
+          for (final raw in body['series'] as List<dynamic>)
+            IbkrHistoricalSeries.fromJson(raw as Map<String, dynamic>),
+        ];
+      },
+    );
   }
 
   Map<String, dynamic> _decodeJsonObject(http.Response response, String path) {
@@ -674,6 +673,16 @@ class IbkrApiClient {
     }
     throw StateError('IBKR API returned an invalid response for $path');
   }
+
+  @visibleForTesting
+  static Uri webProxyUri(
+    Uri pageUrl,
+    String path,
+    Map<String, String>? queryParameters,
+  ) =>
+      pageUrl
+          .resolve('/api/ibkr$path')
+          .replace(queryParameters: queryParameters);
 
   Future<http.Response> _request(
     String path, {
@@ -698,8 +707,11 @@ class IbkrApiClient {
       fragment: null,
     );
     final response = await _get(
-      uri,
-      headers: {'Authorization': 'Bearer ${config.token.trim()}'},
+      kIsWeb ? webProxyUri(Uri.base, path, queryParameters) : uri,
+      headers: {
+        'Authorization': 'Bearer ${config.token.trim()}',
+        if (kIsWeb) 'X-MarketMonk-Ibkr-Upstream': config.baseUrl.trim(),
+      },
     ).timeout(timeout);
     if (response.statusCode != 200) {
       String detail = 'HTTP ${response.statusCode}';

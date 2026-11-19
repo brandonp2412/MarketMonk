@@ -18,6 +18,99 @@ cache = {}
 cache_lock = threading.Lock()
 yahoo_blocked_until = 0.0
 
+IBKR_ENDPOINTS = {
+    "/v1/health": frozenset(),
+    "/v1/portfolio": frozenset(),
+    "/v1/historical": frozenset({"symbol", "years"}),
+    "/v1/intraday": frozenset({"symbol", "days"}),
+    "/v1/intraday/portfolio": frozenset({"days"}),
+    "/v1/performance": frozenset({"period"}),
+    "/v1/trades": frozenset({"days"}),
+}
+MAX_IBKR_RESPONSE = 16 * 1024 * 1024
+
+
+def normalized_ibkr_upstream(value):
+    value = value.strip()
+    try:
+        uri = urllib.parse.urlsplit(value)
+        port = uri.port
+    except ValueError as error:
+        raise ValueError("Invalid IBKR upstream URL") from error
+    if (
+        not uri.hostname or uri.username or uri.password or uri.query or uri.fragment
+        or uri.scheme not in ("https", "http")
+        or (uri.scheme == "http" and uri.hostname not in
+            ("localhost", "127.0.0.1", "::1"))
+        or any(segment in (".", "..") for segment in uri.path.split("/"))
+        or uri.path.startswith("//")
+        or (port is not None and port < 1)
+    ):
+        raise ValueError("IBKR upstream must be HTTPS or explicitly allowlisted loopback HTTP")
+    return urllib.parse.urlunsplit((
+        uri.scheme, uri.netloc.lower(), uri.path.rstrip("/"), "", ""
+    ))
+
+
+def ibkr_request_url(upstream, path, query):
+    allowed_params = IBKR_ENDPOINTS.get(path)
+    if allowed_params is None:
+        raise ValueError("Unsupported read-only IBKR endpoint")
+    try:
+        parameters = urllib.parse.parse_qs(query, strict_parsing=True)
+    except ValueError as error:
+        raise ValueError("Invalid IBKR query") from error
+    if set(parameters) - allowed_params or any(
+        len(values) != 1 or len(values[0]) > 80 for values in parameters.values()
+    ):
+        raise ValueError("Unsupported IBKR query")
+    if "symbol" in parameters and not re.fullmatch(
+        r"[A-Za-z0-9._^-]{1,48}", parameters["symbol"][0]
+    ):
+        raise ValueError("Invalid IBKR symbol")
+    for name, limit in (("years", 10), ("days", 3650)):
+        if name in parameters:
+            raw = parameters[name][0]
+            if not raw.isdigit() or not 1 <= int(raw) <= limit:
+                raise ValueError("Invalid IBKR " + name)
+    if "period" in parameters and parameters["period"][0] not in (
+        "1D", "7D", "MTD", "1M", "YTD", "1Y"
+    ):
+        raise ValueError("Invalid IBKR performance period")
+    return upstream + path + ("?" + urllib.parse.urlencode(parameters, doseq=True)
+                              if parameters else "")
+
+
+class _NoIbkrRedirects(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        return None
+
+
+_ibkr_opener = urllib.request.build_opener(_NoIbkrRedirects)
+
+
+def fetch_ibkr(upstream, path, query, bearer):
+    url = ibkr_request_url(upstream, path, query)
+    request = urllib.request.Request(url, headers={
+        "Authorization": bearer,
+        "Accept": "application/json",
+        "User-Agent": USER_AGENT,
+    })
+    try:
+        with _ibkr_opener.open(request, timeout=75) as response:
+            payload = response.read(MAX_IBKR_RESPONSE + 1)
+            status = response.status
+    except urllib.error.HTTPError as error:
+        status = error.code
+        payload = error.read(MAX_IBKR_RESPONSE + 1)
+        try:
+            json.loads(payload)
+        except (ValueError, UnicodeDecodeError):
+            payload = json.dumps({"detail": "IBKR returned HTTP " + str(status)}).encode()
+    if len(payload) > MAX_IBKR_RESPONSE:
+        raise ValueError("IBKR response exceeded size limit")
+    return status, payload
+
 
 def fetch_json(url):
     request = urllib.request.Request(url, headers={
@@ -176,8 +269,14 @@ def get_market_data(path, query):
 
 
 class WebHandler(SimpleHTTPRequestHandler):
+    def __init__(self, *args, ibkr_upstreams=frozenset(), **kwargs):
+        self.ibkr_upstreams = ibkr_upstreams
+        super().__init__(*args, **kwargs)
+
     def do_GET(self):
         parsed = urllib.parse.urlsplit(self.path)
+        if parsed.path.startswith("/api/ibkr/"):
+            return self.serve_ibkr(parsed)
         if not parsed.path.startswith("/api/finance"):
             return super().do_GET()
         path = parsed.path.removeprefix("/api/finance")
@@ -204,14 +303,42 @@ class WebHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
-    def api_error(self, status, message):
-        data = json.dumps({"error": message}).encode()
+    def serve_ibkr(self, parsed):
+        if not self.ibkr_upstreams:
+            return self.api_error(503, "IBKR web gateway is not configured")
+        upstream = self.headers.get("X-MarketMonk-Ibkr-Upstream", "")
+        try:
+            upstream = normalized_ibkr_upstream(upstream)
+        except ValueError:
+            return self.api_error(403, "Invalid IBKR upstream")
+        if upstream not in self.ibkr_upstreams:
+            return self.api_error(403, "IBKR upstream is not allowlisted")
+        bearer = self.headers.get("Authorization", "")
+        if not bearer.startswith("Bearer ") or not 8 < len(bearer) < 8192:
+            return self.api_error(401, "IBKR bearer token is required")
+        try:
+            path = parsed.path.removeprefix("/api/ibkr")
+            ibkr_request_url(upstream, path, parsed.query)
+            status, payload = fetch_ibkr(
+                upstream, path, parsed.query, bearer,
+            )
+        except ValueError as error:
+            return self.api_error(422, str(error))
+        except (urllib.error.URLError, OSError):
+            return self.api_error(502, "IBKR upstream unavailable")
+        self.respond_json(status, payload)
+
+    def respond_json(self, status, data):
         self.send_response(status)
-        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(data)
+
+    def api_error(self, status, message):
+        self.respond_json(status, json.dumps({"error": message}).encode())
 
 
 def main():
@@ -219,10 +346,23 @@ def main():
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--directory", type=Path, default=Path(__file__).resolve().parent.parent / "build/web")
+    parser.add_argument(
+        "--ibkr-upstream", action="append", default=[],
+        help="Explicitly permitted self-hosted IBKR read-only API base URL",
+    )
     args = parser.parse_args()
+    try:
+        ibkr_upstreams = frozenset(
+            normalized_ibkr_upstream(value) for value in args.ibkr_upstream
+        )
+    except ValueError as error:
+        parser.error(str(error))
     if not args.directory.joinpath("index.html").is_file():
         parser.error("Build web first using: flutter build web")
-    with ThreadingHTTPServer((args.host, args.port), partial(WebHandler, directory=str(args.directory))) as server:
+    with ThreadingHTTPServer(
+        (args.host, args.port),
+        partial(WebHandler, directory=str(args.directory), ibkr_upstreams=ibkr_upstreams),
+    ) as server:
         print(f"MarketMonk web: http://{args.host}:{args.port}", flush=True)
         server.serve_forever()
 

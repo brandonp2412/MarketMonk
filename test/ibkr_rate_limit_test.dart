@@ -13,6 +13,19 @@ void main() {
     token: 'test-token',
   );
 
+  test('browser IBKR requests use a same-origin route without token query', () {
+    final page = Uri.parse('http://glass.local:8765/portfolio#holdings');
+    final uri = IbkrApiClient.webProxyUri(
+      page,
+      '/v1/historical',
+      {'symbol': 'QQQ', 'years': '2'},
+    );
+    expect(uri.origin, page.origin);
+    expect(uri.path, '/api/ibkr/v1/historical');
+    expect(uri.queryParameters, {'symbol': 'QQQ', 'years': '2'});
+    expect(uri.toString(), isNot(contains('Bearer')));
+  });
+
   test(
     'broker HTTP 429 pauses queued historical requests across symbols',
     () async {
