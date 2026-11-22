@@ -192,7 +192,6 @@ class ChartsPageState extends State<ChartsPage>
   // laid out at a degenerate size, e.g. before the Linux window is realized).
   final _overlayKey = GlobalKey();
   double _overlayHeight = 80.0;
-  double _chartBottomPadding = 0;
 
   int years = 1;
   int months = 0;
@@ -644,47 +643,31 @@ class ChartsPageState extends State<ChartsPage>
 
   Widget _buildChartContent(SettingsState settings, List<Color> accountColors) {
     final desktop = isDesktopLayout(context);
-    return NotificationListener<ScrollMetricsNotification>(
-      onNotification: (notification) {
-        if (desktop ||
-            notification.depth != 0 ||
-            notification.metrics.axis != Axis.vertical) {
-          return false;
-        }
-        final desiredPadding =
-            notification.metrics.maxScrollExtent > _chartBottomPadding + 0.5
-                ? bottomNavScrollClearance
-                : 0.0;
-        if (desiredPadding != _chartBottomPadding) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && _chartBottomPadding != desiredPadding) {
-              setState(() => _chartBottomPadding = desiredPadding);
-            }
-          });
-        }
-        return false;
-      },
-      child: RefreshIndicator(
-        triggerMode: RefreshIndicatorTriggerMode.anywhere,
-        edgeOffset: _overlayHeight + 8,
-        onRefresh: _refreshCurrentChart,
-        child: ListView(
-          key: const Key('charts-main-scroll'),
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: ClampingScrollPhysics(),
-          ),
-          padding: EdgeInsets.only(
-            top: _overlayHeight + 8,
-            bottom: desktop ? 24 : _chartBottomPadding,
-          ),
-          children: [
-            _buildTimeChips(),
-            if (_mode == _ChartMode.stock)
-              ..._buildStockContent(settings)
-            else
-              ..._buildPortfolioContent(settings, accountColors),
-          ],
+    return RefreshIndicator(
+      triggerMode: RefreshIndicatorTriggerMode.anywhere,
+      edgeOffset: _overlayHeight + 8,
+      onRefresh: _refreshCurrentChart,
+      child: ListView(
+        key: const Key('charts-main-scroll'),
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: ClampingScrollPhysics(),
         ),
+        padding: EdgeInsets.only(
+          top: _overlayHeight + 8,
+          bottom: desktop ? 24 : 0,
+        ),
+        children: [
+          _buildTimeChips(),
+          if (_mode == _ChartMode.stock)
+            ..._buildStockContent(settings)
+          else
+            ..._buildPortfolioContent(settings, accountColors),
+          if (!desktop)
+            const SizedBox(
+              key: Key('charts-bottom-nav-spacer'),
+              height: bottomNavScrollClearance,
+            ),
+        ],
       ),
     );
   }

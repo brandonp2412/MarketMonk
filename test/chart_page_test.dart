@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/charts_page.dart';
+import 'package:market_monk/bottom_nav.dart';
 import 'package:market_monk/background_network_coordinator.dart';
 import 'package:market_monk/market_chart_loading.dart';
 import 'package:market_monk/market_data_store.dart';
@@ -174,10 +175,10 @@ void main() {
     });
   }
 
-  testWidgets('short charts do not scroll just to clear the floating dock',
+  testWidgets('mobile portfolio rows scroll clear of the floating dock',
       (tester) async {
     tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(360, 900);
+    tester.view.physicalSize = const Size(360, 720);
     addTearDown(() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
@@ -185,6 +186,9 @@ void main() {
     await seedTestSqlite({});
     final accounts = testAccountManager();
     await accounts.init();
+    await accounts.addAccount('IBKR Bot');
+    await accounts.addAccount('Crypto');
+    await accounts.addAccount('Retirement');
     await tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -202,14 +206,23 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     final scroll = find.byKey(const Key('charts-main-scroll'));
+    final spacer = find.byKey(const Key('charts-bottom-nav-spacer'));
+    final lastRow = find.byKey(const Key('chart-account-selector-Retirement'));
+    final dock = find.byType(BottomNav);
     expect(scroll, findsOneWidget);
+    expect(spacer, findsOneWidget);
+    expect(tester.getSize(spacer).height, bottomNavScrollClearance);
     final scrollable = tester.state<ScrollableState>(
       find.descendant(of: scroll, matching: find.byType(Scrollable)).first,
     );
-    expect(scrollable.position.maxScrollExtent, 0);
-    await tester.drag(scroll, const Offset(0, -120));
-    await tester.pump();
-    expect(scrollable.position.pixels, 0);
+    expect(scrollable.position.maxScrollExtent, greaterThan(0));
+    await tester.drag(scroll, const Offset(0, -700));
+    await tester.pumpAndSettle();
+    expect(scrollable.position.pixels, greaterThan(0));
+    expect(
+      tester.getBottomLeft(lastRow).dy,
+      lessThan(tester.getTopLeft(dock).dy),
+    );
     expect(tester.takeException(), null);
   });
 
@@ -374,11 +387,10 @@ void main() {
       final chipTop = tester.getTopLeft(find.text('5d')).dy;
       expect(chipTop, greaterThanOrEqualTo(searchBottom));
 
-      // The scrollable leaves room for the floating navigation dock rather
-      // than hiding its final rows.
-      final listView = tester.widget<ListView>(find.byType(ListView).first);
-      final padding = listView.padding! as EdgeInsets;
-      expect(padding.bottom, greaterThan(92));
+      // The final scrollable child clears the floating navigation dock.
+      final spacer = find.byKey(const Key('charts-bottom-nav-spacer'));
+      expect(spacer, findsOneWidget);
+      expect(tester.getSize(spacer).height, bottomNavScrollClearance);
 
       // Pull-to-refresh belongs to the full-height scroll view behind the
       // floating search bar, so its indicator must start below the overlay.
