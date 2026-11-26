@@ -648,6 +648,17 @@ jobs:
             --skip_upload_screenshots true \
             --skip_upload_changelogs false
 
+  deploy-web:
+    needs: [version-bump, create-release]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && needs.version-bump.result == 'success' && needs.create-release.result == 'success' }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/privacy-pages.yml
+    with:
+      release_commit: ${{ needs.version-bump.outputs.commit_sha }}
+
   virustotal:
     needs: [create-release, version-bump]
     runs-on: ubuntu-latest
