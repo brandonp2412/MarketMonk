@@ -15,6 +15,7 @@ on:
         type: string
 
 permissions:
+  actions: read
   contents: read
   pages: write
   id-token: write
@@ -59,6 +60,19 @@ jobs:
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: ./build/web
+
+      - name: Wait for Pages artifact metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in {1..15}; do
+            if gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" --jq '.artifacts[] | select(.name == "github-pages" and .expired == false) | .id' | grep -q '[0-9]'; then
+              exit 0
+            fi
+            sleep 4
+          done
+          echo "::error::Pages artifact did not become visible"
+          exit 1
 
       - name: Deploy to GitHub Pages
         id: deployment

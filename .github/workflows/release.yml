@@ -652,6 +652,7 @@ jobs:
     needs: [version-bump, create-release]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && needs.version-bump.result == 'success' && needs.create-release.result == 'success' }}
     permissions:
+      actions: read
       contents: read
       pages: write
       id-token: write
