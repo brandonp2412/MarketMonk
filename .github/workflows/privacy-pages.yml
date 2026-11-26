@@ -1,7 +1,9 @@
-name: Privacy policy Pages
+name: MarketMonk Pages
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 permissions:
   contents: read
@@ -21,15 +23,31 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
+          submodules: recursive
           persist-credentials: false
 
       - name: Setup Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
-      - name: Upload privacy policy
+      - name: Build Flutter web
+        run: |
+          flutter/bin/flutter --version
+          flutter/bin/flutter config --no-analytics
+          flutter/bin/flutter pub get --enforce-lockfile
+          flutter/bin/flutter build web --release --base-href /MarketMonk/
+
+      - name: Preserve published documentation
+        run: |
+          cp -r docs/. build/web/
+          test -s build/web/index.html
+          test -s build/web/privacy-policy.html
+          test -s build/web/sqlite3.wasm
+          test -s build/web/drift_worker.dart.js
+
+      - name: Upload web app and documentation
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          path: ./docs
+          path: ./build/web
 
       - name: Deploy to GitHub Pages
         id: deployment
