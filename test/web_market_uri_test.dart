@@ -36,9 +36,13 @@ void main() {
   test('unrelated providers are not rewritten', () {
     final other = Uri.parse('https://example.com/data');
     expect(
-        resolveWebMarketDataUri(other, page,
-            'https://marketmonk-finance.brandonp2412.workers.dev/'),
-        other);
+      resolveWebMarketDataUri(
+        other,
+        page,
+        'https://marketmonk-finance.brandonp2412.workers.dev/',
+      ),
+      other,
+    );
   });
 
   test('insecure configured gateway is rejected', () {
