@@ -78,8 +78,8 @@ class CryptoPriceQuote {
 class CryptoMarketData {
   CryptoMarketData({Future<http.Response> Function(Uri)? fetch})
       : _fetch = fetch ??
-            ((uri) => http.get(
-                  webMarketDataUri(uri),
+            ((uri) => marketDataGet(
+                  uri,
                   headers: {'User-Agent': 'Mozilla/5.0'},
                 ));
 

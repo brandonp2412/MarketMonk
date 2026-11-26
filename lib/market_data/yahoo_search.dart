@@ -17,8 +17,7 @@ class YahooFinanceApi {
   String? _pendingQuery;
 
   YahooFinanceApi({Future<http.Response> Function(Uri)? searchFetcher})
-      : _searchFetcher =
-            searchFetcher ?? ((uri) => http.get(webMarketDataUri(uri)));
+      : _searchFetcher = searchFetcher ?? ((uri) => marketDataGet(uri));
 
   Future<List<StockResult>> searchTickers(String query) {
     final trimmedQuery = query.trim();

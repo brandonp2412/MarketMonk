@@ -52,3 +52,14 @@ test("fetches real upstream JSON and does not forward credentials", async () => 
     }
   } finally {globalThis.fetch = fetch;}
 });
+
+test("preserves a rate limit when the second upstream is unavailable", async () => {
+  const original = globalThis.fetch;
+  let n = 0;
+  globalThis.fetch = async () => new Response("", {status: ++n === 1 ? 429 : 503});
+  try {
+    const result = await worker.fetch(new Request(base + "/v1/finance/search?q=ant", {headers:{Origin:origin}}));
+    assert.equal(result.status,429);
+    assert.equal(result.headers.get("Access-Control-Allow-Origin"),origin);
+  } finally { globalThis.fetch = original; }
+});

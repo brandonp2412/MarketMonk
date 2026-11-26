@@ -32,7 +32,7 @@ Future<void> _fetchSymbolCurrencyAndRate(String symbol) async {
       'https://query1.finance.yahoo.com/v8/finance/chart/$canonicalSymbol'
       '?interval=1d&range=1d',
     );
-    final response = await http.get(webMarketDataUri(uri));
+    final response = await marketDataGet(uri);
     if (response.statusCode != 200) return;
     final data = json.decode(response.body) as Map<String, dynamic>;
     final result =

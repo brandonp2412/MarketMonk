@@ -100,7 +100,7 @@ class IntradayMarketData {
         _brokerTimeout = brokerTimeout;
 
   static Future<http.Response> _getYahoo(Uri uri) =>
-      http.get(webMarketDataUri(uri), headers: {'User-Agent': 'Mozilla/5.0'});
+      marketDataGet(uri, headers: {'User-Agent': 'Mozilla/5.0'});
 
   /// Uses minute bars for one session and 15-minute bars for five trading days.
   Future<IntradaySeries> fetch(

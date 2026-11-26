@@ -50,7 +50,9 @@ export default {async fetch(request, env, ctx) {
       try {
         const yahoo = await upstream("https://" + host + spec.path + "?" + spec.query);
         if (!yahoo.ok) {
-          lastStatus = [404, 429].includes(yahoo.status) ? yahoo.status : 503;
+          if (yahoo.status === 429 || lastStatus !== 429) {
+            lastStatus = [404, 429].includes(yahoo.status) ? yahoo.status : 503;
+          }
           continue;
         }
         if (!yahoo.headers.get("content-type")?.includes("application/json")) continue;

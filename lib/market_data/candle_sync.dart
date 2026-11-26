@@ -401,7 +401,7 @@ Future<void> syncCandles(
                 'interval': '1d',
               },
             );
-            final response = await http.get(webMarketDataUri(uri));
+            final response = await marketDataGet(uri);
             if (response.statusCode != 200) {
               throw StateError(
                 'Market candle request failed: ${response.statusCode}',
