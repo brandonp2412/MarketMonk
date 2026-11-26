@@ -50,6 +50,9 @@ jobs:
       - name: Verify in-app release notes
         run: python3 tool/build_release_history.py --check
 
+      - name: Test finance Worker
+        run: node --test tool/test_finance_worker.mjs
+
       - name: Analyze
         run: flutter/bin/flutter analyze --no-fatal-infos
 
