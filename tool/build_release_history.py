@@ -51,7 +51,7 @@ def notes_between(start, end):
     return notes[:12] or ["Bug fixes and improvements"]
 
 
-def build_history(candidate=None):
+def build_history(candidate=None, release_notes=None):
     current = json.loads(OUTPUT.read_text()) if OUTPUT.exists() else []
     entries = {item["version"]: item for item in current}
     tags = {}
@@ -77,7 +77,9 @@ def build_history(candidate=None):
             }
         previous = ref
 
-    if candidate is not None and candidate not in entries:
+    if candidate is not None:
+        if release_notes is None:
+            raise ValueError("Handwritten release notes are required for a new release")
         version_key(candidate)
         if ordered and version_key(candidate) <= version_key(ordered[-1]):
             raise ValueError("Candidate must be newer than the latest tagged release")
@@ -89,7 +91,7 @@ def build_history(candidate=None):
                 f"{REPOSITORY_URL}/compare/{previous}...{ref}"
                 if previous else f"{REPOSITORY_URL}/tree/{ref}"
             ),
-            "changes": notes_between(previous, "HEAD"),
+            "changes": [release_notes.strip()],
         }
     return sorted(entries.values(), key=lambda item: version_key(item["version"]), reverse=True)
 
@@ -98,8 +100,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--version", help="Prepare history for a version about to be tagged")
+    parser.add_argument("--notes", type=Path, help="Handwritten release notes for the candidate version")
     args = parser.parse_args()
-    content = json.dumps(build_history(candidate=args.version), indent=2, ensure_ascii=False) + "\n"
+    content = json.dumps(build_history(candidate=args.version, release_notes=args.notes.read_text(encoding="utf-8") if args.notes else None), indent=2, ensure_ascii=False) + "\n"
     if args.check:
         if not OUTPUT.exists() or OUTPUT.read_text() != content:
             print("Release history is out of date; run python3 tool/build_release_history.py", file=sys.stderr)
