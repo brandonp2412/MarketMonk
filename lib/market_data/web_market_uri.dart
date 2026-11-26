@@ -1,28 +1,11 @@
 import 'package:flutter/foundation.dart';
 
-const _financeBaseUrl = String.fromEnvironment('MARKET_MONK_FINANCE_BASE_URL');
-
-Uri resolveWebMarketDataUri(Uri uri, Uri pageUri, String financeBaseUrl) {
-  if (!{
-    'query1.finance.yahoo.com',
-    'query2.finance.yahoo.com',
-  }.contains(uri.host)) {
+Uri webMarketDataUri(Uri uri) {
+  if (!kIsWeb ||
+      !{'query1.finance.yahoo.com', 'query2.finance.yahoo.com'}
+          .contains(uri.host)) {
     return uri;
   }
-  final path = 'api/finance${uri.path}${uri.hasQuery ? '?${uri.query}' : ''}';
-  if (financeBaseUrl.isEmpty) return pageUri.resolve(path);
-  final base = Uri.parse(financeBaseUrl);
-  if (base.scheme != 'https' ||
-      !base.hasAuthority ||
-      base.userInfo.isNotEmpty ||
-      base.hasQuery ||
-      base.hasFragment) {
-    throw StateError('Market data gateway must be an HTTPS base URL');
-  }
-  return base
-      .replace(path: '${base.path.replaceFirst(RegExp(r'/+$'), '')}/')
-      .resolve(path);
+  return Uri.base
+      .resolve('api/finance${uri.path}${uri.hasQuery ? '?${uri.query}' : ''}');
 }
-
-Uri webMarketDataUri(Uri uri) =>
-    kIsWeb ? resolveWebMarketDataUri(uri, Uri.base, _financeBaseUrl) : uri;

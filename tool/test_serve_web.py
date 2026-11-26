@@ -18,38 +18,6 @@ spec.loader.exec_module(gateway)
 
 
 class WebGatewayTests(unittest.TestCase):
-    def test_public_finance_gateway_is_origin_and_path_restricted(self):
-        origin = "https://brandonp2412.github.io"
-        server = ThreadingHTTPServer(
-            ("127.0.0.1", 0),
-            partial(gateway.WebHandler, directory=str(Path(__file__).parent),
-                    finance_origin=origin),
-        )
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
-        thread.start()
-        try:
-            def call(path, request_origin):
-                connection = http.client.HTTPConnection(
-                    "127.0.0.1", server.server_address[1], timeout=3,
-                )
-                connection.request("GET", path, headers={"Origin": request_origin})
-                response = connection.getresponse()
-                result = response.status, response.getheader("Access-Control-Allow-Origin")
-                response.read()
-                connection.close()
-                return result
-
-            path = "/api/finance/v1/finance/search?q=ant"
-            with patch.object(gateway, "get_market_data", return_value={"quotes": []}):
-                self.assertEqual(call(path, origin), (200, origin))
-                self.assertEqual(call(path, "https://evil.example"), (403, None))
-                self.assertEqual(call("/api/ibkr/v1/portfolio", origin), (404, None))
-                self.assertEqual(call("/serve_web.py", origin), (404, None))
-        finally:
-            server.shutdown()
-            server.server_close()
-            thread.join()
-
     def test_search_fallback_returns_yahoo_compatible_results(self):
         with patch.object(gateway, "nasdaq_data", return_value=[
             {"symbol": "AAPL", "name": "Apple Inc.", "asset": "STOCKS"},

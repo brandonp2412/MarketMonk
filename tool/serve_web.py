@@ -16,7 +16,6 @@ NASDAQ = "https://api.nasdaq.com"
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/125 Safari/537.36"
 cache = {}
 cache_lock = threading.Lock()
-finance_fetch_slots = threading.BoundedSemaphore(8)
 yahoo_blocked_until = 0.0
 
 IBKR_ENDPOINTS = {
@@ -244,27 +243,12 @@ def chart_fallback(symbol, parameters):
 def get_market_data(path, query):
     global yahoo_blocked_until
     parameters = urllib.parse.parse_qs(query)
-    if any(len(values) != 1 for values in parameters.values()):
-        raise ValueError("Repeated finance query parameter")
     if path == "/v1/finance/search":
-        if set(parameters) != {"q"}:
-            raise ValueError("Unsupported search query")
         q = parameters.get("q", [""])[0].strip()
         if not 0 < len(q) <= 50:
             raise ValueError("Invalid search term")
         fallback = lambda: search_fallback(q)
     elif path.startswith("/v8/finance/chart/"):
-        if set(parameters) - {"range", "interval", "period1", "period2", "includePrePost"}:
-            raise ValueError("Unsupported chart query")
-        for key in ("period1", "period2"):
-            if key in parameters and not re.fullmatch(r"[0-9]{1,11}", parameters[key][0]):
-                raise ValueError("Invalid chart timestamp")
-        if "range" in parameters and not re.fullmatch(r"[0-9]{1,3}(d|mo|y)", parameters["range"][0]):
-            raise ValueError("Invalid chart range")
-        if "interval" in parameters and parameters["interval"][0] not in {"1m", "2m", "5m", "15m", "30m", "1d", "1wk", "1mo"}:
-            raise ValueError("Invalid chart interval")
-        if "includePrePost" in parameters and parameters["includePrePost"][0] not in {"true", "false"}:
-            raise ValueError("Invalid pre/post setting")
         symbol = urllib.parse.unquote(path.removeprefix("/v8/finance/chart/"))
         if not re.fullmatch(r"[A-Za-z0-9._^=-]{1,48}", symbol):
             raise ValueError("Invalid ticker symbol")
@@ -285,33 +269,12 @@ def get_market_data(path, query):
 
 
 class WebHandler(SimpleHTTPRequestHandler):
-    def __init__(self, *args, ibkr_upstreams=frozenset(), finance_origin=None, **kwargs):
+    def __init__(self, *args, ibkr_upstreams=frozenset(), **kwargs):
         self.ibkr_upstreams = ibkr_upstreams
-        self.finance_origin = finance_origin
         super().__init__(*args, **kwargs)
-
-    def end_headers(self):
-        if (self.finance_origin and
-                self.headers.get("Origin") == self.finance_origin and
-                urllib.parse.urlsplit(self.path).path.startswith("/api/finance/")):
-            self.send_header("Access-Control-Allow-Origin", self.finance_origin)
-            self.send_header("Vary", "Origin")
-        super().end_headers()
-
-    def do_HEAD(self):
-        if self.finance_origin:
-            return self.api_error(405, "GET required")
-        return super().do_HEAD()
 
     def do_GET(self):
         parsed = urllib.parse.urlsplit(self.path)
-        if self.finance_origin:
-            if not parsed.path.startswith("/api/finance/"):
-                return self.api_error(404, "Not found")
-            if self.headers.get("Origin") != self.finance_origin:
-                return self.api_error(403, "Origin not permitted")
-            if len(parsed.query) > 512:
-                return self.api_error(422, "Invalid market data query")
         if parsed.path.startswith("/api/ibkr/"):
             return self.serve_ibkr(parsed)
         if not parsed.path.startswith("/api/finance"):
@@ -323,16 +286,12 @@ class WebHandler(SimpleHTTPRequestHandler):
         if entry and entry[0] > time.monotonic():
             data = entry[1]
         else:
-            if not finance_fetch_slots.acquire(blocking=False):
-                return self.api_error(429, "Market data busy; retry shortly")
             try:
                 data = json.dumps(get_market_data(path, parsed.query), separators=(",", ":")).encode()
             except ValueError as error:
                 return self.api_error(422, str(error))
             except (urllib.error.URLError, OSError, KeyError, TypeError) as error:
                 return self.api_error(503, "Market data unavailable")
-            finally:
-                finance_fetch_slots.release()
             with cache_lock:
                 if len(cache) > 256:
                     cache.clear()
@@ -391,21 +350,18 @@ def main():
         "--ibkr-upstream", action="append", default=[],
         help="Explicitly permitted self-hosted IBKR read-only API base URL",
     )
-    parser.add_argument("--finance-origin", help="Serve only public finance GETs for this browser origin")
     args = parser.parse_args()
-    if args.finance_origin and args.ibkr_upstream:
-        parser.error("Public finance-only mode cannot serve IBKR")
     try:
         ibkr_upstreams = frozenset(
             normalized_ibkr_upstream(value) for value in args.ibkr_upstream
         )
     except ValueError as error:
         parser.error(str(error))
-    if not args.finance_origin and not args.directory.joinpath("index.html").is_file():
+    if not args.directory.joinpath("index.html").is_file():
         parser.error("Build web first using: flutter build web")
     with ThreadingHTTPServer(
         (args.host, args.port),
-        partial(WebHandler, directory=str(args.directory), ibkr_upstreams=ibkr_upstreams, finance_origin=args.finance_origin),
+        partial(WebHandler, directory=str(args.directory), ibkr_upstreams=ibkr_upstreams),
     ) as server:
         print(f"MarketMonk web: http://{args.host}:{args.port}", flush=True)
         server.serve_forever()
