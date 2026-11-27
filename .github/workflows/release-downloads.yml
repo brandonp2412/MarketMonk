@@ -1,4 +1,4 @@
-name: Update release downloads badge
+name: Update release badges
 
 on:
   schedule:
@@ -22,16 +22,18 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: main
-      - name: Update badge
+      - name: Install locked badge renderer
+        run: npm ci --prefix scripts/badges --ignore-scripts
+      - name: Update badges
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python3 scripts/update_release_downloads.py
-          if git diff --quiet -- docs/release-downloads.svg; then
+          node scripts/badges/update.mjs
+          if git diff --quiet -- docs/release-downloads.svg docs/release.svg; then
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/release-downloads.svg
-          git commit -m "docs: refresh release downloads badge"
+          git add docs/release-downloads.svg docs/release.svg
+          git commit -m "docs: refresh release badges"
           git push origin HEAD:main
