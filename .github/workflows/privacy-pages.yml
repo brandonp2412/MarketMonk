@@ -40,7 +40,7 @@ jobs:
           flutter/bin/flutter --version
           flutter/bin/flutter config --no-analytics
           flutter/bin/flutter pub get --enforce-lockfile
-          flutter/bin/flutter build web --release --base-href /MarketMonk/ --dart-define=MARKET_MONK_FINANCE_BASE_URL=https://marketmonk-finance.brandonp2412.workers.dev
+          flutter/bin/flutter build web --release --base-href /MarketMonk/ --dart-define=MARKET_MONK_FINANCE_BASE_URL=https://marketmonk-finance.marketmonk.workers.dev
 
       - name: Preserve published documentation
         run: |

@@ -11,7 +11,7 @@ void main() {
   );
 
   test('Pages uses configured finance gateway for search and charts', () {
-    const base = 'https://marketmonk-finance.brandonp2412.workers.dev/';
+    const base = 'https://marketmonk-finance.marketmonk.workers.dev/';
     expect(
       resolveWebMarketDataUri(search, page, base).toString(),
       '${base}api/finance/v1/finance/search?q=ant',
@@ -39,7 +39,7 @@ void main() {
       resolveWebMarketDataUri(
         other,
         page,
-        'https://marketmonk-finance.brandonp2412.workers.dev/',
+        'https://marketmonk-finance.marketmonk.workers.dev/',
       ),
       other,
     );

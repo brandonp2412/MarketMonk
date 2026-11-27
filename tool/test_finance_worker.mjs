@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import worker, {parseRequest} from "./finance_worker.mjs";
 
-const base = "https://marketmonk-finance.brandonp2412.workers.dev/api/finance";
+const base = "https://marketmonk-finance.marketmonk.workers.dev/api/finance";
 const origin = "https://brandonp2412.github.io";
 
 test("only finance search and chart routes are accepted", () => {

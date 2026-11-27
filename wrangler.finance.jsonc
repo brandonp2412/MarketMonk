@@ -1,1 +1,1 @@
-{"name":"marketmonk-finance","main":"tool/finance_worker.mjs","compatibility_date":"2026-11-01","workers_dev":true,"preview_urls":false,"observability":{"enabled":false}}
+{"name":"marketmonk-finance","main":"tool/finance_worker.mjs","compatibility_date":"2026-11-01","workers_dev":true,"preview_urls":false,"observability":{"enabled":false},"account_id":"15ad21504cea660a90ea66b35873d739"}
