@@ -974,7 +974,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 },
               ),
             ),
-          if ((Platform.isAndroid || Platform.isWindows) &&
+          if (!kIsWeb &&
+              (Platform.isAndroid || Platform.isWindows) &&
               _hasMatches('About', _mobileSearchOptions['About']!)) ...[
             _sectionHeader(context.l10n.text('About')),
             if (_matchesSearch('About', 'What\'s New'))
@@ -997,7 +998,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       Text(snapshot.data?.version ?? "1.0.0"),
                 ),
                 onTap: () async {
-                  if (Platform.isIOS || Platform.isMacOS) return;
+                  if (!kIsWeb && (Platform.isIOS || Platform.isMacOS)) return;
                   const url =
                       'https://github.com/brandonp2412/MarketMonk/releases';
                   await launchUrlString(url);
@@ -1012,7 +1013,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   builder: (context, snapshot) => const Text("Brandon Dick"),
                 ),
                 onTap: () async {
-                  if (Platform.isIOS || Platform.isMacOS) return;
+                  if (!kIsWeb && (Platform.isIOS || Platform.isMacOS)) return;
                   const url = 'https://github.com/brandonp2412';
                   await launchUrlString(url);
                 },
@@ -1026,7 +1027,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   builder: (context, snapshot) => const Text("MIT"),
                 ),
                 onTap: () async {
-                  if (Platform.isIOS || Platform.isMacOS) return;
+                  if (!kIsWeb && (Platform.isIOS || Platform.isMacOS)) return;
                   const url =
                       'https://github.com/brandonp2412/MarketMonk?tab=MIT-1-ov-file#readme';
                   await launchUrlString(url);
@@ -1042,7 +1043,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       Text(context.l10n.text('Check it out on GitHub')),
                 ),
                 onTap: () async {
-                  if (Platform.isIOS || Platform.isMacOS) return;
+                  if (!kIsWeb && (Platform.isIOS || Platform.isMacOS)) return;
                   const url = 'https://github.com/brandonp2412/MarketMonk';
                   await launchUrlString(url);
                 },
@@ -1057,7 +1058,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       Text(context.l10n.text('Help support this project')),
                 ),
                 onTap: () async {
-                  if (Platform.isIOS || Platform.isMacOS) return;
+                  if (!kIsWeb && (Platform.isIOS || Platform.isMacOS)) return;
                   const url = 'https://github.com/sponsors/brandonp2412';
                   await launchUrlString(url);
                 },

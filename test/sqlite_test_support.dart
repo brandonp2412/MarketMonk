@@ -1,4 +1,5 @@
-import 'package:drift/native.dart';
+import 'sqlite_test_executor_native.dart'
+    if (dart.library.js_interop) 'sqlite_test_executor_web.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:market_monk/database.dart';
@@ -17,7 +18,7 @@ Future<void> seedTestSqlite(Map<String, Object?> values) async {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
   final profileData = Database.connect(
     DatabaseConnection(
-      NativeDatabase.memory(),
+      createTestExecutor(),
       closeStreamsSynchronously: true,
     ),
   );
