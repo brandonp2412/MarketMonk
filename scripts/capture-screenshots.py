@@ -2,6 +2,7 @@
 import argparse, asyncio, functools, http.server, json, threading, shutil, struct, tempfile
 from pathlib import Path
 from patchright.async_api import async_playwright
+from screenshot_status_bar import STATUS_BAR_HEIGHT, capture_with_status_bar
 
 EXPECTED_NAMES = {f"{n}_en-US.png" for n in range(1, 7)}
 MAX_BYTES = 8 * 1024 * 1024
@@ -37,13 +38,16 @@ async def request(page, message=None):
 
 async def capture(browser, url, out, name, debug_dir):
     w,h,scale = PROFILES[name]
-    options = dict(viewport={"width":w,"height":h}, device_scale_factor=scale, reduced_motion="reduce", locale="en-US", timezone_id="UTC")
+    status_bar = name != "desktop"
+    options = dict(viewport={"width":w,"height":h - STATUS_BAR_HEIGHT if status_bar else h}, device_scale_factor=scale, reduced_motion="reduce", locale="en-US", timezone_id="UTC")
     if name == "phoneScreenshots":
         options.update(is_mobile=True, has_touch=True, user_agent="Mozilla/5.0 (Linux; Android 15; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36")
     context=await browser.new_context(**options)
     dest=out/name
     dest.mkdir(parents=True,exist_ok=True)
     page=await context.new_page()
+    compositor_context = await browser.new_context(viewport={"width": round(w * scale), "height": round(h * scale)}, device_scale_factor=1) if status_bar else None
+    compositor = await compositor_context.new_page() if compositor_context else None
     page.on("console", lambda msg: print(name, msg.type, msg.text[:500], flush=True) )
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
@@ -61,7 +65,10 @@ async def capture(browser, url, out, name, debug_dir):
                 if filename not in EXPECTED_NAMES or filename in captured:
                     raise RuntimeError(f"Unexpected screenshot: {filename}")
                 await page.wait_for_timeout(500)
-                await page.screenshot(path=str(dest/filename), animations="disabled", scale="device")
+                if compositor:
+                    await capture_with_status_bar(page, compositor, dest/filename, w, h, scale)
+                else:
+                    await page.screenshot(path=str(dest/filename), animations="disabled", scale="device")
                 validate_screenshot(dest/filename, (round(w*scale), round(h*scale)))
                 captured.add(filename)
                 print(name,filename,flush=True)
@@ -81,6 +88,8 @@ async def capture(browser, url, out, name, debug_dir):
         raise
     finally:
         await context.close()
+        if compositor_context:
+            await compositor_context.close()
 
 async def main(args):
     args.output.mkdir(parents=True, exist_ok=True)
