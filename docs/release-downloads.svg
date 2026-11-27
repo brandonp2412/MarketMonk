@@ -1,9 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="207" height="28" role="img" aria-label="Release downloads: 6,762">
-  <title>Release downloads: 6,762</title>
-  <rect width="142" height="28" fill="#FFB52E"/>
-  <rect x="142" width="65" height="28" fill="#151218"/>
-  <g font-family="Verdana,DejaVu Sans,sans-serif" font-size="10" font-weight="bold" letter-spacing="1" text-anchor="middle">
-    <text x="71.0" y="18" fill="#151218">RELEASE DOWNLOADS</text>
-    <text x="174.5" y="18" fill="#fff">6,762</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="150.6" height="28" role="img" aria-label="DOWNLOADS: 6,762">
+  <title>DOWNLOADS: 6,762</title>
+  <g shape-rendering="crispEdges">
+    <rect width="93.5" height="28" fill="#ffb52e"/>
+    <rect x="93.5" width="57.1" height="28" fill="#151218"/>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="100">
+    <text transform="scale(.1)" x="467.5" y="175" textLength="695" fill="#333">DOWNLOADS</text>
+    <text transform="scale(.1)" x="1220.5" y="175" textLength="331" font-weight="bold">6,762</text>
   </g>
 </svg>
