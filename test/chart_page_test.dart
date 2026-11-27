@@ -1063,7 +1063,8 @@ void main() {
       netLiquidationUsd: 285164.50,
     );
     final now = DateTime.now();
-    final start = now.subtract(const Duration(days: 55));
+    final base = now.subtract(const Duration(days: 55));
+    final start = base.subtract(Duration(days: base.weekday - DateTime.monday));
     var end = now.subtract(const Duration(days: 1));
     while (end.weekday == DateTime.saturday || end.weekday == DateTime.sunday) {
       end = end.subtract(const Duration(days: 1));
@@ -1095,7 +1096,7 @@ void main() {
         child: MaterialApp(
           home: Scaffold(
             body: ChartsPage(
-              isActive: false,
+              isActive: true,
               ibkrLoader: (_) async => throw StateError('offline'),
               ibkrPerformanceLoader: (_, __) async =>
                   throw StateError('offline'),
