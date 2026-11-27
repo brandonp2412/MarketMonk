@@ -8,7 +8,7 @@ Stock charts and portfolio tracking for Android, Windows, and Linux 📈
 
 <p>
   <a href="https://github.com/brandonp2412/MarketMonk/releases/latest"><img alt="GitHub Release" src="docs/release.svg"></a>
-  <a href="https://github.com/brandonp2412/MarketMonk/releases"><img alt="Release downloads" src="docs/release-downloads.svg"></a>
+  <a href="https://github.com/brandonp2412/MarketMonk/releases"><img alt="Release downloads" src="docs/downloads.svg"></a>
 </p>
 
 <p>

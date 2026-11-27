@@ -31,5 +31,5 @@ function writeBadge(file, label, message) {
   writeFileSync(new URL('../../docs/' + file, import.meta.url), svg + '\n');
 }
 writeBadge('release.svg', 'release', latest);
-writeBadge('release-downloads.svg', 'downloads', metric(count));
+writeBadge('downloads.svg', 'downloads', metric(count));
 console.log(`Release: ${latest}; downloads: ${count}`);
